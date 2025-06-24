@@ -9,7 +9,7 @@ export default {
       title: 'Badge Name',
       type: 'string',
       description: 'The display name of the badge (e.g., "First Course Completed", "Community Contributor").',
-      validation: Rule => Rule.required().min(3).max(80)
+      // validation: Rule => Rule.required().min(3).max(80)
     },
     {
       name: 'slug',
@@ -27,7 +27,7 @@ export default {
       title: 'Short Description',
       type: 'text',
       description: 'A brief explanation of what the badge signifies and how it can be earned.',
-      validation: Rule => Rule.max(300)
+      // validation: Rule => Rule.max(300)
     },
     {
       name: 'icon', // Pode ser uma imagem ou SVG do ícone
@@ -36,7 +36,7 @@ export default {
       options: {
         hotspot: true,
       },
-      validation: Rule => Rule.required(), // Um badge geralmente precisa de um visual
+      // validation: Rule => Rule.required(), // Um badge geralmente precisa de um visual
       description: 'The visual representation of the badge.'
     },
     {
@@ -69,7 +69,7 @@ export default {
           type: 'number',
           description: 'The total value required to earn the badge (e.g., 5 courses, 10 posts).',
           hidden: ({ parent }) => !parent?.isEnabled, // Esconde se o rastreamento não estiver habilitado
-          validation: Rule => Rule.min(1).required().precision(0).error('Target value must be a positive whole number if tracking is enabled.'),
+          // validation: Rule => Rule.min(1).required().precision(0).error('Target value must be a positive whole number if tracking is enabled.'),
         },
         {
           name: 'unit',
@@ -88,7 +88,7 @@ export default {
           },
           description: 'The unit of measurement for tracking progress (e.g., courses, posts).',
           hidden: ({ parent }) => !parent?.isEnabled,
-          validation: Rule => Rule.required().error('A unit is required if progress tracking is enabled.'),
+          // validation: Rule => Rule.required().error('A unit is required if progress tracking is enabled.'),
         },
         {
           name: 'additionalNotes',
@@ -121,7 +121,7 @@ export default {
         layout: 'radio',
       },
       initialValue: 'courseCompletion',
-      validation: Rule => Rule.required(),
+      // validation: Rule => Rule.required(),
       description: 'The category or type of achievement this badge represents.'
     },
     {
