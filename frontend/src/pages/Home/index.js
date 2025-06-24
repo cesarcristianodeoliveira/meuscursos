@@ -7,7 +7,7 @@ function Home() {
     <Container maxWidth="md" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
       <Box sx={{ textAlign: 'center' }}>
         <SchoolIcon sx={{ fontSize: 64 }} />
-        <Typography variant="h3" component="h1" sx={{ mb: 1 }}>
+        <Typography variant="h3" component="h1" sx={{ mb: .25 }}>
           Meus Cursos
         </Typography>
         <Typography variant="h6" component="p" color="text.secondary" sx={{ mb: 2 }}>

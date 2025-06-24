@@ -71,7 +71,7 @@ function CourseCreatePage() {
     setSuccessMessage(null);
 
     try {
-      const response = await fetch('http://localhost:3001/api/courses/generate', {
+      const response = await fetch('https://meuscursos.onrender.com/api/courses/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
