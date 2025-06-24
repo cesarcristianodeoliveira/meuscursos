@@ -17,4 +17,12 @@ export default defineConfig({
   schema: {
     types: schemaTypes,
   },
+
+  vite: {
+    build: {
+      rollupOptions: {
+        external: ['react-is'],
+      },
+    },
+  },
 })
