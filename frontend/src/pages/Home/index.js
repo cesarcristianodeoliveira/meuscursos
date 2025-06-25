@@ -21,9 +21,9 @@ function Home() {
             color="primary" 
             size="large" 
             component={Link} 
-            to="/cursos"
+            to="/cadastrar"
           >
-            Explorar
+            Cadastrar
           </Button>
           <Button 
             disableElevation
@@ -31,9 +31,9 @@ function Home() {
             color="primary" 
             size="large" 
             component={Link} 
-            to="/cadastrar"
+            to="/entrar"
           >
-            Cadastrar
+            Entrar
           </Button>
         </Box>
       </Box>
