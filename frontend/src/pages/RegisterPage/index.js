@@ -76,20 +76,20 @@ const RegisterPage = () => {
   };
 
   return (
-    <Container component="main" maxWidth="xs" sx={{ mt: 8, mb: 4 }}>
+    <Container component="main" maxWidth="xs" sx={{ my: 4 }}>
       <Box
         sx={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           backgroundColor: 'background.paper',
-          p: 4,
+          p: 2,
           borderRadius: 2,
           boxShadow: 3,
         }}
       >
         <Typography component="h1" variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>
-          Criar Nova Conta
+          Cadastrar
         </Typography>
         <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, width: '100%' }}>
           <TextField
@@ -97,7 +97,7 @@ const RegisterPage = () => {
             required
             fullWidth
             id="name"
-            label="Nome Completo"
+            placeholder="Nome Completo"
             name="name"
             autoComplete="name"
             autoFocus
@@ -109,7 +109,7 @@ const RegisterPage = () => {
             required
             fullWidth
             id="email"
-            label="Email"
+            placeholder="Email"
             name="email"
             autoComplete="email"
             value={email}
@@ -120,7 +120,7 @@ const RegisterPage = () => {
             required
             fullWidth
             name="password"
-            label="Senha"
+            placeholder="Senha"
             type="password"
             id="password"
             autoComplete="new-password"
@@ -132,7 +132,7 @@ const RegisterPage = () => {
             required
             fullWidth
             name="confirmPassword"
-            label="Confirmar Senha"
+            placeholder="Confirmar Senha"
             type="password"
             id="confirmPassword"
             autoComplete="new-password"
