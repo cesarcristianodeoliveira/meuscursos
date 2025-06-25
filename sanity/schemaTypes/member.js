@@ -8,7 +8,7 @@ export default {
       name: 'name',
       title: 'Full Name',
       type: 'string',
-      // validation: Rule => Rule.required().min(3).max(80),
+      validation: Rule => Rule.required().min(3).max(80),
       description: 'The full name of the member, used for profile display and slug generation.'
     },
     {
@@ -19,14 +19,14 @@ export default {
         source: 'name',
         // maxLength: 96,
       },
-      // validation: Rule => Rule.required(),
+      validation: Rule => Rule.required(),
       description: 'A unique, human-readable identifier for the member\'s profile URL (e.g., /member/john-doe).'
     },
     {
       name: 'email',
       title: 'Email Address',
       type: 'string',
-      // validation: Rule => Rule.required().email().lowercase(),
+      validation: Rule => Rule.required().email().lowercase(),
       description: 'The member\'s unique email address, used for login and notifications.',
       options: {
         isUnique: true
@@ -166,14 +166,12 @@ export default {
               title: 'Course',
               type: 'reference',
               to: [{ type: 'course' }],
-              weak: true,
             },
             {
               name: 'currentLesson',
               title: 'Current Lesson',
               type: 'reference',
               to: [{ type: 'lesson' }],
-              weak: true,
               description: 'The last lesson the member was studying in this course.'
             },
             {
@@ -181,7 +179,6 @@ export default {
               title: 'Completed Lessons',
               type: 'array',
               of: [{ type: 'reference', to: [{ type: 'lesson' }] }],
-              weak: true,
               description: 'List of lessons completed by the member in this specific course.'
             },
             {

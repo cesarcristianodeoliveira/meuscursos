@@ -23,11 +23,16 @@ if (!JWT_SECRET) {
 
 // --- Função auxiliar para gerar slug ---
 const generateSlug = (text) => {
-  const baseSlug = text
+  const normalizedText = text
+    .normalize("NFD") // Normaliza para decompor caracteres acentuados em base + diacrítico
+    .replace(/[\u0300-\u036f]/g, ""); // Remove os diacríticos (acentos, til, etc.)
+
+  const baseSlug = normalizedText
     .toLowerCase()
     .replace(/[^a-z0-9 -]/g, '') // Remove caracteres inválidos (mantém letras, números, espaço, hífen)
     .replace(/\s+/g, '-')        // Substitui espaços por hífens
     .replace(/-+/g, '-');        // Remove hífens duplicados
+  
   return `${baseSlug}-${uuidv4().substring(0, 8)}`; // Adiciona um sufixo único para evitar colisões
 };
 
