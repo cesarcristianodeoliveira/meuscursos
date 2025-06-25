@@ -163,7 +163,7 @@ const RegisterPage = () => {
           <Box sx={{ textAlign: 'center', mt: 2 }}>
             <Typography variant="body2" color="text.secondary">
               Já tem uma conta?{' '}
-              <MuiLink component="button" variant="body2" onClick={() => navigate('/login')} sx={{ cursor: 'pointer' }}>
+              <MuiLink component="button" variant="body2" onClick={() => navigate('/entrar')} sx={{ cursor: 'pointer' }}>
                 Faça Login aqui.
               </MuiLink>
             </Typography>
