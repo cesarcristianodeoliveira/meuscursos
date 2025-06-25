@@ -89,9 +89,9 @@ function CoursesPage() {
       {courses.length === 0 ? (
         <Alert severity="info">Nenhum curso encontrado.</Alert>
       ) : (
-        <Grid container spacing={4}>
+        <Grid container spacing={2}>
           {courses.map((course) => (
-            <Grid item key={course._id} xs={12} sm={6} md={4}>
+            <Grid key={course._id} size={{ xs: 12, sm: 6, md: 4 }}>
               <CourseCard course={course} />
             </Grid>
           ))}

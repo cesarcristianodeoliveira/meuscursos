@@ -4,17 +4,17 @@ import SchoolIcon from '@mui/icons-material/School';
 
 function Home() {
   return (
-    <Container maxWidth="md" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+    <Container maxWidth="md" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2 }}>
       <Box sx={{ textAlign: 'center' }}>
         <SchoolIcon sx={{ fontSize: 64 }} />
         <Typography variant="h3" component="h1" sx={{ mb: .25 }}>
           Meus Cursos
         </Typography>
         <Typography variant="h6" component="p" color="text.secondary" sx={{ mb: 2 }}>
-          Comunidade de Cursos por Inteligência Artificial
+          Cursos por Inteligência Artificial
         </Typography>
         
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           <Button 
             variant="contained" 
             color="primary" 
