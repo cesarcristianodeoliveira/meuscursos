@@ -4,7 +4,7 @@ import SchoolIcon from '@mui/icons-material/School';
 
 function Home() {
   return (
-    <Container maxWidth="md" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2 }}>
+    <Container maxWidth="md" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 4 }}>
       <Box sx={{ textAlign: 'center' }}>
         <SchoolIcon sx={{ fontSize: 64 }} />
         <Typography variant="h3" component="h1" sx={{ mb: .25 }}>

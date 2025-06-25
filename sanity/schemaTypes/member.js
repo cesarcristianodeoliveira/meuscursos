@@ -1,4 +1,3 @@
-// schemas/member.js
 export default {
   name: 'member',
   title: 'Member',
