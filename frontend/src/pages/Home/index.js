@@ -14,15 +14,26 @@ function Home() {
           Cursos por Inteligência Artificial
         </Typography>
         
-        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
           <Button 
-            variant="contained" 
+            disableElevation
+            variant="outlined" 
             color="primary" 
             size="large" 
             component={Link} 
             to="/cursos"
           >
             Explorar
+          </Button>
+          <Button 
+            disableElevation
+            variant="contained" 
+            color="primary" 
+            size="large" 
+            component={Link} 
+            to="/cadastrar"
+          >
+            Cadastrar
           </Button>
         </Box>
       </Box>
