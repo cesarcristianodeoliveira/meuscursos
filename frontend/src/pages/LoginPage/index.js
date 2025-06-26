@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// D:\meuscursos\frontend\src\pages\LoginPage\index.js
+
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Importa componentes do Material-UI
 import {
@@ -10,56 +12,63 @@ import {
   Button,
   Alert,
   CircularProgress,
-  Link as MuiLink // Renomeado para evitar conflito com o Link do react-router-dom
+  Link as MuiLink 
 } from '@mui/material';
+
+// Importa o hook useAuth do seu AuthContext
+import { useAuth } from '../../contexts/AuthContext'; 
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null); // Para mensagens de sucesso
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation(); // Hook para acessar o estado da navegação
+  const { login, isAuthenticated } = useAuth(); // Pega a função 'login' e o estado 'isAuthenticated' do seu AuthContext
 
-  // A mesma variável de ambiente usada no RegisterPage
-  const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
+  // Efeito para exibir mensagens de sucesso que vêm de outras páginas (ex: após registro)
+  useEffect(() => {
+    if (location.state && location.state.message) {
+      setSuccessMessage(location.state.message);
+      // Limpa o estado da localização para que a mensagem não reapareça em recargas de página
+      navigate(location.pathname, { replace: true, state: {} }); 
+    }
+  }, [location, navigate]); // Dependências: location e navigate para evitar warnings
+
+  // Efeito para redirecionar se o usuário já estiver autenticado
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/painel'); // Redireciona para o painel se já estiver logado
+    }
+  }, [isAuthenticated, navigate]); // Dependências: isAuthenticated e navigate
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); // Previne o recarregamento da página
+    e.preventDefault(); 
 
-    setError(null);    // Limpa erros anteriores
-    setLoading(true);  // Ativa o estado de carregamento
+    setError(null);         // Limpa erros anteriores
+    setSuccessMessage(null); // Limpa mensagens de sucesso anteriores
+    setLoading(true);       // Ativa o estado de carregamento
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      // Chama a função 'login' do AuthContext em vez de fazer o fetch diretamente
+      const result = await login(email, password); 
 
-      const data = await response.json();
-
-      if (response.ok) {
-        // Sucesso no login: Armazenar o token JWT e dados do usuário no localStorage
-        localStorage.setItem('userToken', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Exemplo: Mostrar uma mensagem de sucesso antes de redirecionar (opcional)
-        // Você pode ter um estado para mensagem de sucesso aqui se quiser mostrar.
-        // setSuccess('Login realizado com sucesso! Redirecionando...');
-
-        // Redireciona para a página inicial ou dashboard após um pequeno atraso
-        setTimeout(() => {
-          navigate('/'); // Redireciona para a home
-        }, 1000); // 1 segundo de atraso
+      if (result.success) {
+        setSuccessMessage(result.message || 'Login realizado com sucesso!');
+        // O redirecionamento para /painel já será tratado pelo useEffect acima
+        // que observa isAuthenticated, que é atualizado pelo AuthContext.
+        // Não precisamos de setTimeout aqui, o useEffect faz o trabalho.
       } else {
-        setError(data.message || 'Erro ao fazer login. Credenciais inválidas.');
+        // Exibe a mensagem de erro vinda do AuthContext/backend
+        setError(result.message);
       }
     } catch (err) {
-      console.error('Erro na requisição de login:', err);
-      setError('Não foi possível conectar ao servidor. Verifique sua conexão.');
+      console.error('Erro ao processar login:', err);
+      // Erro inesperado, talvez problema de rede
+      setError('Ocorreu um erro inesperado. Tente novamente.');
     } finally {
       setLoading(false); // Desativa o estado de carregamento
     }
@@ -81,6 +90,20 @@ const LoginPage = () => {
         <Typography component="h1" variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>
           Entrar na Sua Conta
         </Typography>
+
+        {/* Exibe mensagem de sucesso se houver */}
+        {successMessage && (
+          <Alert severity="success" sx={{ mt: 2, mb: 1 }}>
+            {successMessage}
+          </Alert>
+        )}
+        {/* Exibe mensagem de erro se houver */}
+        {error && (
+          <Alert severity="error" sx={{ mt: 2, mb: 1 }}>
+            {error}
+          </Alert>
+        )}
+
         <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, width: '100%' }}>
           <TextField
             margin="normal"
@@ -106,13 +129,7 @@ const LoginPage = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-
-          {error && (
-            <Alert severity="error" sx={{ mt: 2, mb: 1 }}>
-              {error}
-            </Alert>
-          )}
-
+          
           <Button
             type="submit"
             fullWidth
@@ -125,7 +142,12 @@ const LoginPage = () => {
           <Box sx={{ textAlign: 'center', mt: 2 }}>
             <Typography variant="body2" color="text.secondary">
               Não tem uma conta?{' '}
-              <MuiLink component="button" variant="body2" onClick={() => navigate('/cadastrar')} sx={{ cursor: 'pointer' }}>
+              <MuiLink 
+                component="button" 
+                variant="body2" 
+                onClick={() => navigate('/cadastrar')} // Corrigido para /cadastrar
+                sx={{ cursor: 'pointer' }}
+              >
                 Crie uma aqui.
               </MuiLink>
             </Typography>

@@ -17,7 +17,6 @@ export default {
       type: 'slug',
       options: {
         source: 'name',
-        // maxLength: 96,
       },
       validation: Rule => Rule.required(),
       description: 'A unique, human-readable identifier for the member\'s profile URL (e.g., /member/john-doe).'
@@ -37,7 +36,10 @@ export default {
       title: 'Password Hash',
       type: 'string',
       readOnly: true,
-      description: 'The hashed and salted password of the member. Should NOT be edited manually.',
+      // Adicionado: Validação para o tamanho mínimo da senha (6 dígitos)
+      // A validação de 'apenas números' é feita no backend e frontend antes de salvar.
+      validation: Rule => Rule.required().min(6), 
+      description: 'The hashed and salted password of the member. Should NOT be edited manually. Expected to be 6 numeric digits.'
     },
     {
       name: 'profileImage',
@@ -142,7 +144,8 @@ export default {
       name: 'geminiCredits',
       title: 'Gemini Credits',
       type: 'number',
-      initialValue: 0,
+      // Ajustado: Alinhado com o valor inicial definido no backend para novos registros
+      initialValue: 1, 
       description: 'Available credits for generating content via Gemini API. Can be manually adjusted by Admin or consumed by AI generation features.'
     },
     {
@@ -288,12 +291,8 @@ export default {
           initialValue: 'system',
           description: 'Preferred visual theme (light, dark, or system default).'
         },
-        {
-          name: 'primaryColor',
-          title: 'Primary Color',
-          type: 'string',
-          description: 'Preferred primary color for the UI (e.g., a HEX code or a predefined name).'
-        },
+        // REMOVIDO: Campo 'primaryColor' foi removido para manter a sincronia com o backend e simplificar.
+        // Se precisar dele, me avise para adicionarmos novamente.
       ],
       description: 'Customizable user interface preferences.'
     },

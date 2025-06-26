@@ -1,3 +1,5 @@
+// D:\meuscursos\frontend\src\pages\RegisterPage\index.js
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,83 +15,77 @@ import {
   Link as MuiLink // Renomeado para evitar conflito com o Link do react-router-dom
 } from '@mui/material';
 
+// Importa o hook useAuth do seu AuthContext
+import { useAuth } from '../../contexts/AuthContext'; 
+
 const RegisterPage = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Removido 'success' pois vamos redirecionar com mensagem
 
   const navigate = useNavigate();
-
-  // Garante que a URL do backend está configurada
-  // No ambiente de produção da Netlify, `REACT_APP_BACKEND_URL` deve ser a URL do seu Render.com
-  // No ambiente de desenvolvimento local, será 'http://localhost:3001'
-  const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
+  const { register } = useAuth(); // Pega a função 'register' do seu AuthContext
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    setError(null);
-    setSuccess(null);
+    setError(null); // Limpa qualquer erro anterior
     setLoading(true);
 
+    // Validação frontend: senhas não coincidem
     if (password !== confirmPassword) {
       setError('As senhas não coincidem!');
       setLoading(false);
       return;
     }
 
+    // Validação frontend: exatamente 6 dígitos numéricos
+    const passwordRegex = /^\d{6}$/; 
+    if (!passwordRegex.test(password)) {
+        setError('A senha deve conter exatamente 6 dígitos numéricos.');
+        setLoading(false);
+        return; 
+    }
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, email, password }),
-      });
+      // Chama a função 'register' do AuthContext
+      const result = await register(name, email, password); 
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess(data.message);
-        // Armazenar o token JWT e dados do usuário no localStorage
-        localStorage.setItem('userToken', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Redireciona para a página inicial ou dashboard após um pequeno atraso
-        setTimeout(() => {
-          navigate('/'); 
-        }, 2000);
-
+      if (result.success) {
+        // Se o registro for bem-sucedido, redireciona para a página de login
+        // e passa uma mensagem de sucesso via state para ser exibida lá.
+        navigate('/entrar', { state: { message: result.message } });
       } else {
-        setError(data.message || 'Erro ao registrar. Tente novamente.');
+        // Se houver erro (do backend via AuthContext), exibe a mensagem
+        setError(result.message);
       }
     } catch (err) {
-      console.error('Erro na requisição de registro:', err);
-      setError('Não foi possível conectar ao servidor. Verifique sua conexão.');
+      console.error('Erro ao processar registro:', err);
+      // Erro inesperado, talvez problema de rede
+      setError('Ocorreu um erro inesperado. Tente novamente.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container component="main" maxWidth="xs" sx={{ my: 4 }}>
+    <Container component="main" maxWidth="xs" sx={{ mt: 8, mb: 4 }}> {/* Ajustado my para mt e mb */}
       <Box
         sx={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           backgroundColor: 'background.paper',
-          p: 2,
+          p: 4, // Ajustado p de 2 para 4 para mais padding
           borderRadius: 2,
           boxShadow: 3,
         }}
       >
         <Typography component="h1" variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>
-          Cadastrar
+          Criar Nova Conta
         </Typography>
         <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, width: '100%' }}>
           <TextField
@@ -97,7 +93,7 @@ const RegisterPage = () => {
             required
             fullWidth
             id="name"
-            placeholder="Nome Completo"
+            label="Nome Completo" // Usando label ao invés de placeholder
             name="name"
             autoComplete="name"
             autoFocus
@@ -109,7 +105,7 @@ const RegisterPage = () => {
             required
             fullWidth
             id="email"
-            placeholder="Email"
+            label="Email" // Usando label ao invés de placeholder
             name="email"
             autoComplete="email"
             value={email}
@@ -120,34 +116,42 @@ const RegisterPage = () => {
             required
             fullWidth
             name="password"
-            placeholder="Senha"
+            label="Senha (6 dígitos numéricos)" // Label mais descritivo
             type="password"
             id="password"
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            // Adicionado inputProps para o teclado numérico e limite de caracteres
+            inputProps={{
+              inputMode: 'numeric',
+              pattern: '[0-9]*',
+              maxLength: 6,
+            }}
           />
           <TextField
             margin="normal"
             required
             fullWidth
             name="confirmPassword"
-            placeholder="Confirmar Senha"
+            label="Confirmar Senha" // Usando label ao invés de placeholder
             type="password"
             id="confirmPassword"
             autoComplete="new-password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
+            // Adicionado inputProps para o teclado numérico e limite de caracteres
+            inputProps={{
+              inputMode: 'numeric',
+              pattern: '[0-9]*',
+              maxLength: 6,
+            }}
           />
 
+          {/* Removido o Alert de sucesso, pois agora redirecionamos para a página de login com a mensagem */}
           {error && (
             <Alert severity="error" sx={{ mt: 2, mb: 1 }}>
               {error}
-            </Alert>
-          )}
-          {success && (
-            <Alert severity="success" sx={{ mt: 2, mb: 1 }}>
-              {success}
             </Alert>
           )}
 
@@ -163,8 +167,13 @@ const RegisterPage = () => {
           <Box sx={{ textAlign: 'center', mt: 2 }}>
             <Typography variant="body2" color="text.secondary">
               Já tem uma conta?{' '}
-              <MuiLink component="button" variant="body2" onClick={() => navigate('/entrar')} sx={{ cursor: 'pointer' }}>
-                Faça Login aqui.
+              <MuiLink 
+                component="button" 
+                variant="body2" 
+                onClick={() => navigate('/entrar')} // Corrigido para /entrar
+                sx={{ cursor: 'pointer' }}
+              >
+                Faça login aqui.
               </MuiLink>
             </Typography>
           </Box>
