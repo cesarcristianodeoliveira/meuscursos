@@ -1,54 +1,82 @@
 // D:\meuscursos\frontend\src\App.js
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { ThemeProvider, CssBaseline, useMediaQuery } from '@mui/material';
 
-// Importa seu tema personalizado
-import theme from './theme'; 
+// Importa seu tema personalizado (agora é uma função)
+import getAppTheme from './theme'; 
 
-// Importa o AuthProvider do diretório 'contexts'
-import { AuthProvider } from './contexts/AuthContext'; 
+// Importa o AuthProvider e useAuth do diretório 'contexts'
+import { AuthProvider, useAuth } from './contexts/AuthContext'; 
 
-// Importa suas páginas
-import HomePage from './pages/HomePage'; // Mantendo como HomePage para clareza
+// Importa suas páginas e o componente de redirecionamento
 import CoursesPage from './pages/CoursesPage';
-import CourseCreatePage from './pages/CoursesPage/CourseCreatePage'; // Rota para criar curso
+import CourseCreatePage from './pages/CourseCreatePage'; 
 import CoursePage from './pages/CoursePage'; 
 import LessonPage from './pages/CoursePage/LessonPage'; 
-import MemberProfilePage from './pages/Member/Profile'; // Renomeado para evitar conflito com 'Member' do Sanity
+import MemberProfilePage from './pages/Member/Profile'; 
 import RegisterPage from './pages/RegisterPage'; 
 import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage'; // Adicionando o DashboardPage
+import HomeOrDashboardRedirect from './components/HomeOrDashboardRedirect'; 
+
+// --- NOVO: Importa o ProtectedRoute ---
+import ProtectedRoute from './components/ProtectedRoute'; 
+
+// Componente interno para lidar com o tema dinâmico
+const ThemeWrapper = ({ children }) => {
+  const { user } = useAuth(); 
+  const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
+
+  const themeMode = useMemo(() => {
+    if (user && user.uiSettings && user.uiSettings.themeMode) {
+      if (user.uiSettings.themeMode === 'system') {
+        return prefersDarkMode ? 'dark' : 'light';
+      }
+      return user.uiSettings.themeMode;
+    }
+    return prefersDarkMode ? 'dark' : 'light';
+  }, [user, prefersDarkMode]);
+
+  const theme = useMemo(() => getAppTheme(themeMode), [themeMode]);
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline /> 
+      {children}
+    </ThemeProvider>
+  );
+};
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline /> {/* Reseta o CSS para um padrão consistente */}
-      {/* Envolve o BrowserRouter com o AuthProvider
-        para que o contexto de autenticação esteja disponível
-        em toda a sua aplicação.
-      */}
-      <AuthProvider> 
+    <AuthProvider> 
+      <ThemeWrapper>
         <Router>
           <Routes>
-            <Route path="/" element={<HomePage />} /> {/* Rota para a página inicial */}
-            <Route path="/cursos" element={<CoursesPage />} /> {/* Página de listagem de cursos */}
-            <Route path="/cursos/criar" element={<CourseCreatePage />} /> {/* Página para criar um novo curso */}
-            <Route path="/cursos/:courseSlug" element={<CoursePage />} /> {/* Página de detalhes de um curso */}
-            <Route path="/cursos/:courseSlug/aula/:lessonSlug" element={<LessonPage />} /> {/* Página de uma aula específica */}
+            <Route path="/" element={<HomeOrDashboardRedirect />} /> 
+            <Route path="/cursos" element={<CoursesPage />} />
             
-            <Route path="/membro/perfil" element={<MemberProfilePage />} /> {/* Rota para o perfil do membro */}
+            {/* --- ATUALIZADO: Rota para criar curso protegida --- */}
+            <Route 
+              path="/cursos/criar" 
+              element={
+                <ProtectedRoute>
+                  <CourseCreatePage />
+                </ProtectedRoute>
+              } 
+            /> 
+            {/* -------------------------------------------------- */}
             
-            <Route path="/cadastrar" element={<RegisterPage />} /> {/* Rota de registro */}
-            <Route path="/entrar" element={<LoginPage />} /> {/* Rota de login */}
-            <Route path="/painel" element={<DashboardPage />} /> {/* Rota do Dashboard (página pós-login) */}
-
-            {/* Adicione outras rotas conforme necessário */}
+            <Route path="/cursos/:courseSlug" element={<CoursePage />} />
+            <Route path="/cursos/:courseSlug/aula/:lessonSlug" element={<LessonPage />} />
+            <Route path="/membro/perfil" element={<MemberProfilePage />} />
+            <Route path="/cadastrar" element={<RegisterPage />} />
+            <Route path="/entrar" element={<LoginPage />} />
           </Routes>
         </Router>
-      </AuthProvider>
-    </ThemeProvider>
+      </ThemeWrapper>
+    </AuthProvider>
   );
 }
 

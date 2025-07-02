@@ -41,7 +41,7 @@ const LoginPage = () => {
   // Efeito para redirecionar se o usuário já estiver autenticado
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/painel'); // Redireciona para o painel se já estiver logado
+      navigate('/'); // Redireciona se já estiver logado
     }
   }, [isAuthenticated, navigate]); // Dependências: isAuthenticated e navigate
 
@@ -58,7 +58,7 @@ const LoginPage = () => {
 
       if (result.success) {
         setSuccessMessage(result.message || 'Login realizado com sucesso!');
-        // O redirecionamento para /painel já será tratado pelo useEffect acima
+        // O redirecionamento já será tratado pelo useEffect acima
         // que observa isAuthenticated, que é atualizado pelo AuthContext.
         // Não precisamos de setTimeout aqui, o useEffect faz o trabalho.
       } else {
