@@ -88,9 +88,11 @@ export const register = async (req, res) => {
             memberLevel: 1,   // Ajustado: Nível inicial do membro
             experiencePoints: 0, // Ajustado: Pontos de experiência iniciais
             
-            // Adicionado: Inicializa campos de objetos aninhados para garantir que o Sanity os crie
-            uiSettings: {}, 
-            notificationSettings: {},
+            // CORREÇÃO AQUI: Inicializa uiSettings com themeMode: 'system'
+            uiSettings: { 
+                themeMode: 'system' 
+            }, 
+            notificationSettings: {}, // Inicializa o objeto de configurações de notificação
 
             // Sanity gera _createdAt e _updatedAt automaticamente. Não os defina manualmente aqui.
             // createdAt: new Date().toISOString(), // REMOVIDO: Sanity gerencia _createdAt
@@ -104,22 +106,29 @@ export const register = async (req, res) => {
             { 
                 id: createdMember._id, 
                 isAdmin: createdMember.isAdmin, 
-                plan: createdMember.plan // Inclui informações essenciais no token
+                plan: createdMember.plan 
             },
             JWT_SECRET, // Usa a chave secreta do ambiente
             { expiresIn: '1h' } // Token expira em 1 hora para segurança
         );
 
         // 6. Enviar resposta de sucesso para o frontend
+        // Inclui os dados do usuário para que o frontend possa armazená-los no contexto/localStorage
         res.status(201).json({
             message: 'Usuário registrado com sucesso!',
             token, // Token JWT para futuras requisições autenticadas
-            user: { // Dados do usuário para o frontend
+            user: { // Dados do usuário para o frontend (sem a senha)
                 id: createdMember._id,
                 name: createdMember.name,
                 email: createdMember.email,
                 isAdmin: createdMember.isAdmin,
                 plan: createdMember.plan,
+                // Inclui uiSettings e notificationSettings para que o frontend tenha acesso
+                uiSettings: createdMember.uiSettings,
+                notificationSettings: createdMember.notificationSettings,
+                memberLevel: createdMember.memberLevel,
+                experiencePoints: createdMember.experiencePoints,
+                geminiCredits: createdMember.geminiCredits,
             },
         });
 
