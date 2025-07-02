@@ -1,6 +1,6 @@
 // D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\index.js
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'; // <-- Adicionado useMemo
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Typography,
     Container,
@@ -35,12 +35,11 @@ function CourseCreatePage() {
     const [fetchedCategories, setFetchedCategories] = useState([]);
     const [fetchedSubCategories, setFetchedSubCategories] = useState([]);
     
-    // --- CORREÇÃO AQUI: levels agora usando useMemo ---
     const levels = useMemo(() => [
         { value: 'beginner', label: 'Iniciante' },
         { value: 'intermediate', label: 'Intermediário' },
         { value: 'advanced', label: 'Avançado' },
-    ], []); // Array de dependências vazio para garantir que só seja criado uma vez
+    ], []);
 
     const [generatedTopic, setGeneratedTopic] = useState('');
 
@@ -88,7 +87,6 @@ function CourseCreatePage() {
         fetchSanityData();
     }, [fetchSanityData]);
 
-    // Efeito para gerar o tópico com base nas seleções (levels agora é estável)
     useEffect(() => {
         const categoryTitle = fetchedCategories.find(cat => cat._id === selectedCategory)?.title;
         const subCategoryTitle = fetchedSubCategories.find(sub => sub._id === selectedSubCategory)?.title;
@@ -99,7 +97,7 @@ function CourseCreatePage() {
         } else {
             setGeneratedTopic('');
         }
-    }, [selectedCategory, selectedSubCategory, selectedLevel, fetchedCategories, fetchedSubCategories, levels]); // 'levels' ainda precisa estar aqui como dependência, mas agora é estável
+    }, [selectedCategory, selectedSubCategory, selectedLevel, fetchedCategories, fetchedSubCategories, levels]);
 
     const handleNext = () => {
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
@@ -173,6 +171,7 @@ function CourseCreatePage() {
         }
     };
 
+    // Filtra as subcategorias com base na categoria selecionada
     const filteredSubCategories = fetchedSubCategories.filter(
         (subCat) => subCat.categoryRef === selectedCategory
     );
@@ -214,7 +213,7 @@ function CourseCreatePage() {
                                                 label="Categoria"
                                                 onChange={(e) => {
                                                     setSelectedCategory(e.target.value);
-                                                    setSelectedSubCategory('');
+                                                    setSelectedSubCategory(''); // Limpa a subcategoria ao mudar a categoria
                                                 }}
                                                 disabled={loading || fetchedCategories.length === 0}
                                             >
@@ -229,7 +228,12 @@ function CourseCreatePage() {
                                             </Select>
                                         </FormControl>
 
-                                        <FormControl fullWidth margin="normal" disabled={!selectedCategory || loading || filteredSubCategories.length === 0}>
+                                        <FormControl 
+                                            fullWidth 
+                                            margin="normal" 
+                                            // Desabilita se nenhuma categoria for selecionada, estiver carregando, ou não houver subcategorias para a categoria selecionada
+                                            disabled={!selectedCategory || loading || filteredSubCategories.length === 0}
+                                        >
                                             <InputLabel id="sub-category-select-label">Subcategoria</InputLabel>
                                             <Select
                                                 labelId="sub-category-select-label"
@@ -241,12 +245,19 @@ function CourseCreatePage() {
                                                 <MenuItem value="">
                                                     <em>Nenhum</em>
                                                 </MenuItem>
+                                                {/* Renderiza apenas as subcategorias filtradas */}
                                                 {filteredSubCategories.map((subCat) => (
                                                     <MenuItem key={subCat._id} value={subCat._id}>
                                                         {subCat.title}
                                                     </MenuItem>
                                                 ))}
                                             </Select>
+                                            {/* Mensagem para o usuário se não houver subcategorias */}
+                                            {!loading && selectedCategory && filteredSubCategories.length === 0 && (
+                                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, ml: 1 }}>
+                                                    Não há subcategorias disponíveis para esta categoria.
+                                                </Typography>
+                                            )}
                                         </FormControl>
 
                                         <FormControl fullWidth margin="normal">
