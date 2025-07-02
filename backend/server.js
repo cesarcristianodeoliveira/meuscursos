@@ -107,7 +107,7 @@ app.get('/', (req, res) => {
 
 // Rotas de Autenticação (NÃO protegidas, pois são para login/registro)
 app.post('/api/auth/register', register); // Rota para criar um novo usuário
-app.post('/api/auth/login', login);       // Rota para logar um usuário existente
+app.post('/api/auth/login', login);      // Rota para logar um usuário existente
 
 // Rota de Geração de Cursos (AGORA PROTEGIDA)
 // O middleware 'protect' é executado antes da lógica da rota.
@@ -231,12 +231,14 @@ app.post('/api/courses/generate', protect, async (req, res) => {
         console.log(`Curso "${newCourse.title}" adicionado à transação.`);
 
         const sanityResult = await transaction.commit(); // Executa a transação no Sanity
-        console.log(`Transação concluída. Documentos criados: ${sanityResult.map(doc => doc._id).join(', ')}`);
+        // --- LINHA AJUSTADA ---
+        console.log(`Transação concluída. Documentos criados: ${sanityResult.results.map(doc => doc._id).join(', ')}`);
 
         // Resposta de sucesso para o frontend
         res.status(201).json({
             message: 'Curso e lições gerados e salvos com sucesso!',
-            course: sanityResult[0], // Retorna o primeiro documento criado (geralmente o curso)
+            // --- LINHA AJUSTADA ---
+            course: sanityResult.results[0], // Retorna o primeiro documento criado (geralmente o curso)
             lessons: generatedCourseData.lessons // Retorna os dados das lições (não os docs do Sanity)
         });
 
@@ -263,6 +265,6 @@ app.listen(PORT, () => {
     console.log('Endpoints disponíveis:');
     console.log(`GET /`);
     console.log(`POST /api/auth/register`); // Para registro de novos usuários
-    console.log(`POST /api/auth/login`);    // Para login de usuários existentes
+    console.log(`POST /api/auth/login`);      // Para login de usuários existentes
     console.log(`POST /api/courses/generate (protegida)`); // Requer autenticação JWT
 });
