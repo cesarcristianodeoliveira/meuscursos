@@ -173,7 +173,7 @@ function CourseCreatePage() {
 
     // Filtra as subcategorias com base na categoria selecionada
     const filteredSubCategories = fetchedSubCategories.filter(
-        (subCat) => subCat.categoryRef === selectedCategory
+        (subCat) => subCat.parentCategory && subCat.parentCategory._ref === selectedCategory
     );
 
     return (
