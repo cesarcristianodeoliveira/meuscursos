@@ -13,7 +13,7 @@ import { AuthProvider } from './contexts/AuthContext';
 // Importa suas páginas
 import HomePage from './pages/HomePage'; // Mantendo como HomePage para clareza
 import CoursesPage from './pages/CoursesPage';
-import CourseCreatePage from './pages/CourseCreatePage'; // Rota para criar curso
+import CourseCreatePage from './pages/CoursesPage/CourseCreatePage'; // Rota para criar curso
 import CoursePage from './pages/CoursePage'; 
 import LessonPage from './pages/CoursePage/LessonPage'; 
 import MemberProfilePage from './pages/Member/Profile'; // Renomeado para evitar conflito com 'Member' do Sanity
