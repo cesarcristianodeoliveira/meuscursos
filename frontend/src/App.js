@@ -12,7 +12,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Importa suas páginas e o componente de redirecionamento
 import CoursesPage from './pages/CoursesPage';
-import CourseCreatePage from './pages/CourseCreatePage'; 
+import CourseCreatePage from './pages/CoursesPage/CourseCreatePage'; 
 import CoursePage from './pages/CoursePage'; 
 import LessonPage from './pages/CoursePage/LessonPage'; 
 import MemberProfilePage from './pages/Member/Profile'; 

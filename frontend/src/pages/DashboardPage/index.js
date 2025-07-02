@@ -2,7 +2,7 @@
 import React from 'react';
 import { Container, Typography, Box, Button } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext'; // Importe o useAuth
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const DashboardPage = () => {
   const { user, logout } = useAuth(); // Pega o usuário e a função de logout do contexto
@@ -37,14 +37,25 @@ const DashboardPage = () => {
         <Typography variant="body1" sx={{ mb: 4, textAlign: 'center' }}>
           Aqui é onde você verá seu progresso, cursos e outras informações importantes.
         </Typography>
-        <Button 
-          variant="contained" 
-          color="primary" 
-          onClick={handleLogout}
-          sx={{ py: 1.5 }}
-        >
-          Sair (Logout)
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button 
+            color="primary" 
+            component={Link} 
+            variant="contained" 
+            to="/cursos/criar"
+            sx={{ py: 1.5 }}
+          >
+            Criar Curso
+          </Button>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={handleLogout}
+            sx={{ py: 1.5 }}
+          >
+            Sair (Logout)
+          </Button>
+        </Box>
       </Box>
     </Container>
   );

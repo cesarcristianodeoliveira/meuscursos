@@ -1,3 +1,4 @@
+// D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\index.js
 import React, { useState } from 'react';
 import {
   Typography,
@@ -13,8 +14,9 @@ import {
   CircularProgress,
   Alert
 } from '@mui/material';
-import { Link /* Removido useNavigate aqui, se não for usar 'navigate' */ } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import { useAuth } from '../../../contexts/AuthContext'; 
 
 function CourseCreatePage() {
   const [activeStep, setActiveStep] = useState(0);
@@ -22,7 +24,8 @@ function CourseCreatePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
-  // const navigate = useNavigate(); // <-- Linha comentada/removida para resolver o warning
+
+  const { userToken } = useAuth(); // OBTEM O TOKEN DO USUÁRIO AQUI
 
   const steps = [
     {
@@ -43,11 +46,6 @@ function CourseCreatePage() {
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
   };
 
-  // const handleBack = () => { // <-- Função removida para resolver o warning
-  //   setActiveStep((prevActiveStep) => prevActiveStep + 1); // Bug fix: should be prevActiveStep - 1
-  // };
-
-  // Correção da função handleBack para realmente voltar ao passo anterior
   const handleBackCorrected = () => {
     setActiveStep((prevActiveStep) => prevActiveStep - 1);
   };
@@ -70,18 +68,27 @@ function CourseCreatePage() {
     setError(null);
     setSuccessMessage(null);
 
+    // VERIFICAÇÃO SE HÁ TOKEN ANTES DE ENVIAR
+    if (!userToken) {
+      setError('Você não está autenticado. Por favor, faça login novamente.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('https://meuscursos.onrender.com/api/courses/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`, // AQUI: ADICIONA O CABEÇALHO DE AUTORIZAÇÃO
         },
         body: JSON.stringify({ topic: courseTopic }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Falha ao gerar o curso no backend.');
+        // Erros do backend agora podem ser mais específicos
+        throw new Error(errorData.message || errorData.error || 'Falha ao gerar o curso no backend.');
       }
 
       const result = await response.json();
@@ -91,10 +98,15 @@ function CourseCreatePage() {
 
     } catch (err) {
       console.error("Erro ao gerar curso:", err);
-      setError(`Erro ao gerar curso: ${err.message}. Verifique o console do backend.`);
-      setLoading(false); // Permite tentar novamente no mesmo passo
+      // Se for um erro 401 (não autorizado), podemos dar uma mensagem mais específica
+      if (err.message && err.message.includes('401')) { // Pode ser necessário um tratamento mais robusto de status codes se o erro.message não for suficiente
+        setError('Não autorizado. Sua sessão pode ter expirado. Por favor, faça login novamente.');
+      } else {
+        setError(`Erro ao gerar curso: ${err.message}. Verifique o console do backend.`);
+      }
+      setLoading(false);
     } finally {
-      // setLoading(false); // Já é feito acima se for erro
+      // setLoading(false); // Já é feito se for erro, não precisa aqui
     }
   };
 
@@ -167,7 +179,7 @@ function CourseCreatePage() {
                   </Button>
                   <Button
                     disabled={index === 0 || loading}
-                    onClick={handleBackCorrected} // Usando a função corrigida
+                    onClick={handleBackCorrected}
                     sx={{ mt: 1, mr: 1 }}
                   >
                     Voltar
