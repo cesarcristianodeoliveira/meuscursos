@@ -18,7 +18,6 @@ export default {
       options: {
         source: 'name',
         // maxLength: 96,
-        isUnique: true,
       },
       description: 'A unique, URL-friendly identifier for the certificate.'
     },

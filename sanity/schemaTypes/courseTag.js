@@ -18,7 +18,6 @@ export default {
       options: {
         source: 'name', // Gerar slug a partir do 'name' da tag
         // maxLength: 96,
-        isUnique: true,
       },
       description: 'A unique, URL-friendly identifier for the course tag.'
     },

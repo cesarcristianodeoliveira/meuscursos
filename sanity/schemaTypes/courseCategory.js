@@ -18,7 +18,6 @@ export default {
       options: {
         source: 'title',
         // maxLength: 96,
-        isUnique: true,
       },
       description: 'A unique, URL-friendly identifier for the course category.'
     },
