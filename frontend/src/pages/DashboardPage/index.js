@@ -31,7 +31,7 @@ const DashboardPage = () => {
         </Typography>
         {user && (
           <Typography variant="h6" sx={{ mb: 2 }}>
-            Olá, {user.name}! (ID: {user._id})
+            Olá, {user.name}! (ID: {user.id || ''}) 
           </Typography>
         )}
         <Typography variant="body1" sx={{ mb: 4, textAlign: 'center' }}>
