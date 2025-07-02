@@ -9,7 +9,8 @@ import jwt from 'jsonwebtoken'; // Importar jsonwebtoken para o middleware de pr
 // Importa as funções de registro e login do controlador de autenticação
 import { register, login } from './controllers/authController.js'; 
 // Importa a nova função de geração de cursos
-import { generateCourse } from './controllers/courseController.js'; // <--- NOVA IMPORTAÇÃO
+import { generateCourse } from './controllers/courseController.js';
+import { getCourseCategories, getCourseSubCategories } from './controllers/dataController.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,7 +24,6 @@ app.use(express.json());
 // já inicializados, e importá-los tanto no authController quanto no courseController.
 // Por enquanto, para que o exemplo seja autônomo, eles estão duplicados no courseController.js.
 // Em um cenário real, você não iria duplicar essas configurações.
-
 
 // --- Middleware de Autenticação (JWT Protection) ---
 const protect = (req, res, next) => {
@@ -59,7 +59,11 @@ app.post('/api/auth/register', register);
 app.post('/api/auth/login', login);      
 
 // Rota de Geração de Cursos (protegida e modularizada)
-app.post('/api/courses/generate', protect, generateCourse); // <--- ALTERAÇÃO PRINCIPAL AQUI
+app.post('/api/courses/generate', protect, generateCourse); 
+
+// --- NOVAS ROTAS PARA BUSCA DE DADOS ---
+app.get('/api/data/categories', getCourseCategories);
+app.get('/api/data/subcategories', getCourseSubCategories);
 
 // --- Inicia o Servidor ---
 app.listen(PORT, () => {
@@ -70,4 +74,6 @@ app.listen(PORT, () => {
     console.log(`POST /api/auth/register`); 
     console.log(`POST /api/auth/login`);      
     console.log(`POST /api/courses/generate (protegida)`); 
+    console.log(`GET /api/data/categories`); 
+    console.log(`GET /api/data/subcategories`);
 });

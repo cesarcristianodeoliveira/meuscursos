@@ -1,226 +1,345 @@
 // D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\index.js
-import React, { useState } from 'react';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react'; // <-- Adicionado useMemo
 import {
-  Typography,
-  Container,
-  Box,
-  Stepper,
-  Step,
-  StepLabel,
-  StepContent,
-  Button,
-  Paper,
-  TextField,
-  CircularProgress,
-  Alert
+    Typography,
+    Container,
+    Box,
+    Stepper,
+    Step,
+    StepLabel,
+    StepContent,
+    Button,
+    Paper,
+    CircularProgress,
+    Alert,
+    MenuItem,
+    Select,
+    FormControl,
+    InputLabel,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import { useAuth } from '../../../contexts/AuthContext'; 
 
+// Adiciona a variável de ambiente para a URL base da API
+const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
+
 function CourseCreatePage() {
-  const [activeStep, setActiveStep] = useState(0);
-  const [courseTopic, setCourseTopic] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState(null);
+    const [activeStep, setActiveStep] = useState(0);
+    
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [selectedSubCategory, setSelectedSubCategory] = useState('');
+    const [selectedLevel, setSelectedLevel] = useState('beginner');
 
-  const { userToken } = useAuth(); // OBTEM O TOKEN DO USUÁRIO AQUI
+    const [fetchedCategories, setFetchedCategories] = useState([]);
+    const [fetchedSubCategories, setFetchedSubCategories] = useState([]);
+    
+    // --- CORREÇÃO AQUI: levels agora usando useMemo ---
+    const levels = useMemo(() => [
+        { value: 'beginner', label: 'Iniciante' },
+        { value: 'intermediate', label: 'Intermediário' },
+        { value: 'advanced', label: 'Avançado' },
+    ], []); // Array de dependências vazio para garantir que só seja criado uma vez
 
-  const steps = [
-    {
-      label: 'Detalhes do Curso',
-      description: 'Informe o tópico principal para o novo curso. A IA usará isso para gerar o conteúdo.'
-    },
-    {
-      label: 'Gerar Conteúdo',
-      description: 'Revise o tópico e inicie a geração do curso pela IA. Isso pode levar alguns segundos.'
-    },
-    {
-      label: 'Concluído',
-      description: 'O curso foi gerado e salvo no Sanity CMS!'
-    },
-  ];
+    const [generatedTopic, setGeneratedTopic] = useState('');
 
-  const handleNext = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep + 1);
-  };
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [successMessage, setSuccessMessage] = useState(null);
 
-  const handleBackCorrected = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep - 1);
-  };
+    const { userToken } = useAuth();
 
-  const handleReset = () => {
-    setActiveStep(0);
-    setCourseTopic('');
-    setLoading(false);
-    setError(null);
-    setSuccessMessage(null);
-  };
-
-  const handleGenerateCourse = async () => {
-    if (!courseTopic.trim()) {
-      setError('Por favor, insira um tópico para o curso.');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-
-    // VERIFICAÇÃO SE HÁ TOKEN ANTES DE ENVIAR
-    if (!userToken) {
-      setError('Você não está autenticado. Por favor, faça login novamente.');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch('https://meuscursos.onrender.com/api/courses/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userToken}`, // AQUI: ADICIONA O CABEÇALHO DE AUTORIZAÇÃO
+    const steps = [
+        {
+            label: 'Escolha os Detalhes do Curso',
+            description: 'Selecione a categoria, subcategoria e nível do curso desejado.'
         },
-        body: JSON.stringify({ topic: courseTopic }),
-      });
+        {
+            label: 'Gerar Conteúdo',
+            description: 'Confirme os detalhes e inicie a geração do curso pela IA. Isso pode levar alguns segundos.'
+        },
+        {
+            label: 'Concluído',
+            description: 'O curso foi gerado e salvo no Sanity CMS!'
+        },
+    ];
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        // Erros do backend agora podem ser mais específicos
-        throw new Error(errorData.message || errorData.error || 'Falha ao gerar o curso no backend.');
-      }
+    const fetchSanityData = useCallback(async () => {
+        setError(null);
+        try {
+            const categoriesResponse = await fetch(`${API_BASE_URL}/api/data/categories`);
+            if (!categoriesResponse.ok) throw new Error('Falha ao buscar categorias.');
+            const categoriesData = await categoriesResponse.json();
+            setFetchedCategories(categoriesData);
 
-      const result = await response.json();
-      console.log('Curso gerado com sucesso:', result);
-      setSuccessMessage('Curso e lições gerados e salvos com sucesso no Sanity CMS! 🎉');
-      handleNext(); // Avança para o passo 'Concluído'
+            const subCategoriesResponse = await fetch(`${API_BASE_URL}/api/data/subcategories`);
+            if (!subCategoriesResponse.ok) throw new Error('Falha ao buscar subcategorias.');
+            const subCategoriesData = await subCategoriesResponse.json();
+            setFetchedSubCategories(subCategoriesData);
 
-    } catch (err) {
-      console.error("Erro ao gerar curso:", err);
-      // Se for um erro 401 (não autorizado), podemos dar uma mensagem mais específica
-      if (err.message && err.message.includes('401')) { // Pode ser necessário um tratamento mais robusto de status codes se o erro.message não for suficiente
-        setError('Não autorizado. Sua sessão pode ter expirado. Por favor, faça login novamente.');
-      } else {
-        setError(`Erro ao gerar curso: ${err.message}. Verifique o console do backend.`);
-      }
-      setLoading(false);
-    } finally {
-      // setLoading(false); // Já é feito se for erro, não precisa aqui
-    }
-  };
+        } catch (err) {
+            console.error("Erro ao carregar dados do Sanity:", err);
+            setError(`Erro ao carregar opções: ${err.message}. Tente recarregar a página.`);
+        }
+    }, [setError, setFetchedCategories, setFetchedSubCategories]);
 
-  return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Button
-          component={Link}
-          to="/cursos" // Link para a página de listagem de cursos
-          startIcon={<ChevronLeftIcon />}
-          variant="outlined"
-        >
-          Voltar para a Lista de Cursos
-        </Button>
-      </Box>
+    useEffect(() => {
+        fetchSanityData();
+    }, [fetchSanityData]);
 
-      <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ mb: 4 }}>
-        Crie um Novo Curso com IA
-      </Typography>
+    // Efeito para gerar o tópico com base nas seleções (levels agora é estável)
+    useEffect(() => {
+        const categoryTitle = fetchedCategories.find(cat => cat._id === selectedCategory)?.title;
+        const subCategoryTitle = fetchedSubCategories.find(sub => sub._id === selectedSubCategory)?.title;
+        const levelLabel = levels.find(lvl => lvl.value === selectedLevel)?.label;
 
-      <Stepper activeStep={activeStep} orientation="vertical">
-        {steps.map((step, index) => (
-          <Step key={step.label}>
-            <StepLabel optional={index === 2 ? <Typography variant="caption">Conclusão</Typography> : null}>
-              {step.label}
-            </StepLabel>
-            <StepContent>
-              <Typography>{step.description}</Typography>
-              <Box sx={{ mb: 2 }}>
-                {/* Conteúdo de cada passo */}
-                {index === 0 && (
-                  <TextField
-                    label="Tópico do Curso (ex: 'Introdução à Programação com Python')"
+        if (categoryTitle && subCategoryTitle && levelLabel) {
+            setGeneratedTopic(`${categoryTitle} - ${subCategoryTitle} (${levelLabel})`);
+        } else {
+            setGeneratedTopic('');
+        }
+    }, [selectedCategory, selectedSubCategory, selectedLevel, fetchedCategories, fetchedSubCategories, levels]); // 'levels' ainda precisa estar aqui como dependência, mas agora é estável
+
+    const handleNext = () => {
+        setActiveStep((prevActiveStep) => prevActiveStep + 1);
+    };
+
+    const handleBackCorrected = () => {
+        setActiveStep((prevActiveStep) => prevActiveStep - 1);
+    };
+
+    const handleReset = () => {
+        setActiveStep(0);
+        setSelectedCategory('');
+        setSelectedSubCategory('');
+        setSelectedLevel('beginner');
+        setGeneratedTopic('');
+        setLoading(false);
+        setError(null);
+        setSuccessMessage(null);
+    };
+
+    const handleGenerateCourse = async () => {
+        if (!selectedCategory || !selectedSubCategory || !selectedLevel || !generatedTopic.trim()) {
+            setError('Por favor, preencha todos os campos obrigatórios (Categoria, Subcategoria e Nível).');
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+        setSuccessMessage(null);
+
+        if (!userToken) {
+            setError('Você não está autenticado. Por favor, faça login novamente.');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/courses/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userToken}`,
+                },
+                body: JSON.stringify({ 
+                    topic: generatedTopic, 
+                    category: selectedCategory, 
+                    subCategory: selectedSubCategory, 
+                    level: selectedLevel, 
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || errorData.error || 'Falha ao gerar o curso no backend.');
+            }
+
+            const result = await response.json();
+            console.log('Curso gerado com sucesso:', result);
+            setSuccessMessage('Curso e lições gerados e salvos com sucesso no Sanity CMS! 🎉');
+            setLoading(false);
+            handleNext();
+
+        } catch (err) {
+            console.error("Erro ao gerar curso:", err);
+            if (err.message && err.message.includes('401')) {
+                setError('Não autorizado. Sua sessão pode ter expirado. Por favor, faça login novamente.');
+            } else {
+                setError(`Erro ao gerar curso: ${err.message}. Verifique o console do backend.`);
+            }
+            setLoading(false);
+        }
+    };
+
+    const filteredSubCategories = fetchedSubCategories.filter(
+        (subCat) => subCat.categoryRef === selectedCategory
+    );
+
+    return (
+        <Container maxWidth="md" sx={{ py: 4 }}>
+            <Box sx={{ mb: 4 }}>
+                <Button
+                    component={Link}
+                    to="/cursos"
+                    startIcon={<ChevronLeftIcon />}
                     variant="outlined"
-                    fullWidth
-                    margin="normal"
-                    value={courseTopic}
-                    onChange={(e) => setCourseTopic(e.target.value)}
-                    disabled={loading}
-                  />
-                )}
-                {index === 1 && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="h6" gutterBottom>
-                      Tópico Escolhido: <br/>
-                      <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                        "{courseTopic || 'Nenhum tópico inserido'}"
-                      </Box>
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        Ao clicar em "Gerar Curso Agora", a inteligência artificial irá criar o curso e suas lições. Este processo pode levar alguns segundos.
-                    </Typography>
-                  </Box>
-                )}
+                >
+                    Voltar para a Lista de Cursos
+                </Button>
+            </Box>
 
-                {/* Botões de navegação */}
-                <div>
-                  <Button
-                    variant="contained"
-                    onClick={index === 1 ? handleGenerateCourse : handleNext}
-                    sx={{ mt: 1, mr: 1 }}
-                    disabled={
-                      loading ||
-                      (index === 0 && !courseTopic.trim()) ||
-                      (index === 1 && loading)
-                    }
-                    startIcon={index === 1 && loading ? <CircularProgress size={20} color="inherit" /> : null}
-                  >
-                    {index === 1 ? (loading ? 'Gerando...' : 'Gerar Curso Agora') : 'Próximo'}
-                  </Button>
-                  <Button
-                    disabled={index === 0 || loading}
-                    onClick={handleBackCorrected}
-                    sx={{ mt: 1, mr: 1 }}
-                  >
-                    Voltar
-                  </Button>
-                </div>
-                {loading && index === 1 && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Aguarde, a IA está trabalhando...
-                  </Typography>
-                )}
-                {error && (
-                  <Alert severity="error" sx={{ mt: 2 }}>
-                    {error}
-                  </Alert>
-                )}
-              </Box>
-            </StepContent>
-          </Step>
-        ))}
-      </Stepper>
+            <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ mb: 4 }}>
+                Crie um Novo Curso com IA
+            </Typography>
 
-      {activeStep === steps.length && (
-        <Paper square elevation={0} sx={{ p: 3, mt: 3 }}>
-          <Typography variant="h6" color="success.main" sx={{ mb: 2 }}>
-            {successMessage || 'Processo de criação concluído!'}
-          </Typography>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          <Button onClick={handleReset} sx={{ mt: 1, mr: 1 }}>
-            Criar Outro Curso
-          </Button>
-          <Button component={Link} to="/cursos" variant="contained" sx={{ mt: 1 }}>
-            Ver Todos os Cursos
-          </Button>
-        </Paper>
-      )}
-    </Container>
-  );
+            <Stepper activeStep={activeStep} orientation="vertical">
+                {steps.map((step, index) => (
+                    <Step key={step.label}>
+                        <StepLabel optional={index === 2 ? <Typography variant="caption">Conclusão</Typography> : null}>
+                            {step.label}
+                        </StepLabel>
+                        <StepContent>
+                            <Typography>{step.description}</Typography>
+                            <Box sx={{ mb: 2 }}>
+                                {index === 0 && (
+                                    <>
+                                        <FormControl fullWidth margin="normal">
+                                            <InputLabel id="category-select-label">Categoria</InputLabel>
+                                            <Select
+                                                labelId="category-select-label"
+                                                id="category-select"
+                                                value={selectedCategory}
+                                                label="Categoria"
+                                                onChange={(e) => {
+                                                    setSelectedCategory(e.target.value);
+                                                    setSelectedSubCategory('');
+                                                }}
+                                                disabled={loading || fetchedCategories.length === 0}
+                                            >
+                                                <MenuItem value="">
+                                                    <em>Nenhum</em>
+                                                </MenuItem>
+                                                {fetchedCategories.map((cat) => (
+                                                    <MenuItem key={cat._id} value={cat._id}>
+                                                        {cat.title}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+
+                                        <FormControl fullWidth margin="normal" disabled={!selectedCategory || loading || filteredSubCategories.length === 0}>
+                                            <InputLabel id="sub-category-select-label">Subcategoria</InputLabel>
+                                            <Select
+                                                labelId="sub-category-select-label"
+                                                id="sub-category-select"
+                                                value={selectedSubCategory}
+                                                label="Subcategoria"
+                                                onChange={(e) => setSelectedSubCategory(e.target.value)}
+                                            >
+                                                <MenuItem value="">
+                                                    <em>Nenhum</em>
+                                                </MenuItem>
+                                                {filteredSubCategories.map((subCat) => (
+                                                    <MenuItem key={subCat._id} value={subCat._id}>
+                                                        {subCat.title}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+
+                                        <FormControl fullWidth margin="normal">
+                                            <InputLabel id="level-select-label">Nível</InputLabel>
+                                            <Select
+                                                labelId="level-select-label"
+                                                id="level-select"
+                                                value={selectedLevel}
+                                                label="Nível"
+                                                onChange={(e) => setSelectedLevel(e.target.value)}
+                                                disabled={loading}
+                                            >
+                                                {levels.map((lvl) => (
+                                                    <MenuItem key={lvl.value} value={lvl.value}>
+                                                        {lvl.label}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </>
+                                )}
+                                {index === 1 && (
+                                    <Box sx={{ mt: 2 }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Tópico Gerado: <br/>
+                                            <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                                "{generatedTopic || 'Selecione a categoria, subcategoria e nível.'}"
+                                            </Box>
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                            Ao clicar em "Gerar Curso Agora", a inteligência artificial irá criar o curso e suas lições. Este processo pode levar alguns segundos.
+                                        </Typography>
+                                    </Box>
+                                )}
+
+                                <div>
+                                    <Button
+                                        variant="contained"
+                                        onClick={index === 1 ? handleGenerateCourse : handleNext}
+                                        sx={{ mt: 1, mr: 1 }}
+                                        disabled={
+                                            loading ||
+                                            (index === 0 && (!selectedCategory || !selectedSubCategory || !selectedLevel)) ||
+                                            (index === 1 && loading)
+                                        }
+                                        startIcon={index === 1 && loading ? <CircularProgress size={20} color="inherit" /> : null}
+                                    >
+                                        {index === 1 ? (loading ? 'Gerando...' : 'Gerar Curso Agora') : 'Próximo'}
+                                    </Button>
+                                    <Button
+                                        disabled={index === 0 || loading}
+                                        onClick={handleBackCorrected}
+                                        sx={{ mt: 1, mr: 1 }}
+                                    >
+                                        Voltar
+                                    </Button>
+                                </div>
+                                {loading && index === 1 && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        Aguarde, a IA está trabalhando...
+                                    </Typography>
+                                )}
+                                {error && (
+                                    <Alert severity="error" sx={{ mt: 2 }}>
+                                        {error}
+                                    </Alert>
+                                )}
+                            </Box>
+                        </StepContent>
+                    </Step>
+                ))}
+            </Stepper>
+
+            {activeStep === steps.length && (
+                <Paper square elevation={0} sx={{ p: 3, mt: 3 }}>
+                    <Typography variant="h6" color="success.main" sx={{ mb: 2 }}>
+                        {successMessage || 'Processo de criação concluído!'}
+                    </Typography>
+                    {error && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {error}
+                        </Alert>
+                    )}
+                    <Button onClick={handleReset} sx={{ mt: 1, mr: 1 }}>
+                        Criar Outro Curso
+                    </Button>
+                    <Button component={Link} to="/cursos" variant="contained" sx={{ mt: 1 }}>
+                        Ver Todos os Cursos
+                    </Button>
+                </Paper>
+            )}
+        </Container>
+    );
 }
 
 export default CourseCreatePage;
