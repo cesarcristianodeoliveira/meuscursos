@@ -27,7 +27,7 @@ export default {
       title: 'Parent Course',
       type: 'reference',
       to: [{ type: 'course' }],
-      weak: true, // Lições podem existir independentemente do curso, mas são linkadas aqui
+      weak: false, // *** CORRETO: REFERÊNCIA FORTE PARA GARANTIR INTEGRIDADE ***
       // validation: Rule => Rule.required(),
       description: 'The course this lesson belongs to.'
     },
