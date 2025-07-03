@@ -10,7 +10,7 @@ if (!process.env.SANITY_PROJECT_ID || !process.env.SANITY_TOKEN) {
 const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN) ? createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET || 'production',
-    apiVersion: '2024-06-25',
+    apiVersion: '2024-06-25', // Certifique-se de que esta API version está atualizada ou corresponde à que você está usando
     useCdn: false,
     token: process.env.SANITY_TOKEN,
 }) : null;
@@ -38,8 +38,8 @@ export const getCourseSubCategories = async (req, res) => {
     }
     try {
         // Query Sanity para buscar todos os documentos do tipo 'courseSubCategory'
-        // E também busca a referência da categoria pai para mapeamento
-        const query = `*[_type == "courseSubCategory"]{_id, title, description, "categoryRef": category._ref}`;
+        // CORREÇÃO: Usando 'parentCategory._ref' para acessar a referência da categoria pai
+        const query = `*[_type == "courseSubCategory"]{_id, title, description, "categoryRef": parentCategory._ref}`;
         const subCategories = await sanityClient.fetch(query);
         res.status(200).json(subCategories);
     } catch (error) {
