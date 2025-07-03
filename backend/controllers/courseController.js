@@ -5,24 +5,27 @@ import { createClient } from '@sanity/client';
 import { v4 as uuidv4 } from 'uuid';
 
 // --- Configuração da Gemini API ---
+// É uma boa prática centralizar as configurações em um arquivo separado e importá-las.
+// Por enquanto, mantemos aqui, mas considere refatorar em projetos maiores.
 if (!process.env.GEMINI_API_KEY) {
     console.error("Erro: Variável de ambiente GEMINI_API_KEY não definida em courseController.");
-    // Em produção, você pode querer lançar um erro ou parar a execução
+    // Em um ambiente de produção, você pode querer lançar um erro fatal ou parar o processo aqui.
 }
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 
 // --- Configuração do Sanity Client ---
+// Assim como a Gemini API, idealmente centralizado.
 if (!process.env.SANITY_PROJECT_ID || !process.env.SANITY_TOKEN) {
     console.error("Erro: Variáveis de ambiente SANITY_PROJECT_ID ou SANITY_TOKEN não definidas em courseController.");
-    // Em produção, você pode querer lançar um erro ou parar a execução
+    // Em um ambiente de produção, você pode querer lançar um erro fatal ou parar o processo aqui.
 }
 const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN) ? createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET || 'production',
-    apiVersion: '2025-06-12', // RECOMENDADO: Use a data atual para garantir compatibilidade com patches.
-    useCdn: false,
-    token: process.env.SANITY_TOKEN,
+    apiVersion: '2024-07-03', // RECOMENDADO: Mantenha a API version atualizada.
+    useCdn: false, // Define para false para garantir que você está interagindo com a API de escrita
+    token: process.env.SANITY_TOKEN, // Token com permissões de escrita
 }) : null;
 
 
@@ -32,11 +35,11 @@ const convertToPortableText = (text) => {
     const paragraphs = text.split('\n\n').filter(p => p.trim() !== '');
 
     return paragraphs.map(p => ({
-        _key: uuidv4(),
+        _key: uuidv4(), // Garante uma chave única para cada bloco
         _type: 'block',
         children: [
             {
-                _key: uuidv4(),
+                _key: uuidv4(), // Garante uma chave única para cada span
                 _type: 'span',
                 marks: [],
                 text: p.trim(),
@@ -48,22 +51,21 @@ const convertToPortableText = (text) => {
 };
 
 export const generateCourse = async (req, res) => {
-    // Verificar se as configurações estão OK antes de prosseguir
+    // Verificar se as configurações estão OK antes de prosseguir com qualquer lógica.
     if (!genAI || !sanityClient) {
-        return res.status(500).json({ error: 'Erro de configuração do servidor para geração de cursos.' });
+        return res.status(500).json({ error: 'Erro de configuração do servidor: Chaves de API ou Cliente Sanity não inicializados.' });
     }
 
-    // NOVO: req.user.id deve vir do seu middleware de autenticação
-    const { topic, category, subCategory, level, userId } = req.body; // Supondo que userId também possa vir do corpo da requisição ou req.user.id
-
-    // MODIFICADO: Use userId do corpo da requisição ou do objeto req.user (se for injetado por um middleware de auth)
-    const creatorId = userId || req.user?.id; // Usar 'req.user?.id' com optional chaining é mais seguro
+    // `userId` deve vir do seu middleware de autenticação (ex: `req.user.id`).
+    // Opcionalmente, pode ser enviado no corpo da requisição para testes, mas `req.user.id` é o padrão seguro.
+    const { topic, category, subCategory, level, userId } = req.body; 
+    const creatorId = userId || req.user?.id; // Preferir `req.user.id` injetado pelo middleware de autenticação
 
     if (!topic || !category || !subCategory || !level || !creatorId) {
-        return res.status(400).json({ error: 'Todos os campos (tópico, categoria, subcategoria, nível, userId) são necessários para gerar o curso.' });
+        return res.status(400).json({ error: 'Dados incompletos: Tópico, Categoria, Subcategoria, Nível e ID do criador são necessários.' });
     }
 
-    let transaction; // Declare transaction fora do try para que possa ser acessado no catch
+    let transaction; // Declarada fora do `try` para acessibilidade no `catch`.
 
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); 
@@ -93,31 +95,29 @@ export const generateCourse = async (req, res) => {
             }
         ]`;
 
-        console.log(`Gerando curso para o tópico: "${topic}", categoria: "${category}", subcategoria: "${subCategory}", nível: "${level}" para o usuário ${creatorId}...`);
+        console.log(`[BACKEND] Gerando curso para o tópico: "${topic}", categoria: "${category}", subcategoria: "${subCategory}", nível: "${level}" para o usuário ${creatorId}...`);
         const geminiResponse = await model.generateContent(prompt);
         const text = geminiResponse.response.candidates[0].content.parts[0].text;
 
         let generatedCourseData;
         try {
+            // Remove marcadores de código JSON e espaços em branco extras
             let cleanText = text.replace(/```json\n|```json|```/g, '').trim();
-            // Esta linha abaixo pode ser problemática se a IA inserir caracteres especiais que não são UTF-8 válidos
-            // ou se estiver removendo coisas que não deveria.
-            // Para JSON, '\\n' é a representação correta de quebra de linha.
-            // Se a IA não estiver gerando \\n, você pode precisar ajustar o prompt ou a sanitização.
-            // Por enquanto, vamos manter, mas fique atento.
+            // Substitui quebras de linha por '\n' para garantir JSON válido.
+            // Cuidado com a remoção de caracteres de controle, pode ser excessivo dependendo da resposta da IA.
             cleanText = cleanText.replace(/[\u0000-\u001F\u007F-\u009F\u00A0]/g, '').replace(/(\r\n|\n|\r)/gm, '\\n');
             
             generatedCourseData = JSON.parse(cleanText);
         } catch (parseError) {
-            console.error("Erro ao parsear JSON da Gemini API:", parseError);
-            console.error("Texto bruto recebido da Gemini:", text);
+            console.error("[BACKEND] Erro ao parsear JSON da Gemini API:", parseError);
+            console.error("[BACKEND] Texto bruto recebido da Gemini:", text);
             return res.status(500).json({ error: 'Erro ao processar a resposta da IA. Formato JSON inválido.', rawText: text });
         }
 
         const courseId = `course-${uuidv4()}`; 
-        transaction = sanityClient.transaction(); // Inicia a transação aqui
+        transaction = sanityClient.transaction(); // Inicia a transação Sanity.
 
-        // NOVO: 1. Obter informações do membro antes de criar o curso
+        // 1. Obter informações do membro criador para verificar créditos e admin status.
         const member = await sanityClient.fetch(
             `*[_id == $creatorId][0]{isAdmin, credits}`,
             { creatorId }
@@ -128,33 +128,35 @@ export const generateCourse = async (req, res) => {
         }
 
         let updatedCredits = member.credits;
-        const isMemberAdmin = member.isAdmin === true; // Garante que é booleano
+        const isMemberAdmin = member.isAdmin === true; // Garante que seja booleano.
 
-        // NOVO: 2. Lógica de Consumo de Créditos
+        // 2. Lógica de Consumo de Créditos.
         if (!isMemberAdmin) {
             if (member.credits <= 0) {
                 throw new Error('Insufficient credits to create a course.');
             }
-            updatedCredits = member.credits - 1; // Decrementa 1 crédito
-            console.log(`Credits before: ${member.credits}, Credits after: ${updatedCredits} for member ${creatorId}`);
+            updatedCredits = member.credits - 1; // Decrementa 1 crédito.
+            console.log(`[BACKEND] Credits before: ${member.credits}, Credits after: ${updatedCredits} for member ${creatorId}`);
         } else {
-            console.log(`Admin user ${creatorId} is creating a course. No credits consumed.`);
+            console.log(`[BACKEND] Admin user ${creatorId} is creating a course. No credits consumed.`);
         }
 
-        // NOVO: 3. Adicionar operação de atualização de créditos do membro na transação
-        // E também adicionar a referência do curso ao array createdCourses do membro.
+        // 3. Adicionar operação de atualização de créditos do membro e adicionar o novo curso à lista `createdCourses`.
         transaction.patch(creatorId, (patch) =>
             patch
-                .set({ credits: updatedCredits }) // Atualiza o valor do campo 'credits'
-                .insert('after', 'createdCourses[-1]', [{ // Adiciona a nova referência ao final do array
-                    _ref: courseId, // Usa o ID do curso que será criado
+                .set({ credits: updatedCredits }) // Atualiza o valor do campo 'credits'.
+                .insert('after', 'createdCourses[-1]', [{ // Adiciona a nova referência ao final do array.
+                    _ref: courseId, // Referência ao curso que será criado nesta mesma transação.
                     _type: 'reference',
-                    _key: uuidv4(), // Usa um novo uuid para a _key do item no array
+                    _key: uuidv4(), // Chave única para o item do array.
                 }])
         );
 
         const lessonRefs = [];
         const createdLessonIds = []; 
+        let totalEstimatedDuration = 0; // Para calcular a duração total do curso.
+
+        // 4. Criar os documentos das lições e adicionar à transação.
         for (const lesson of generatedCourseData.lessons) {
             const lessonSlug = { current: lesson.slug || `${generatedCourseData.slug}-${lesson.order}` };
             const lessonId = `lesson-${uuidv4()}`; 
@@ -167,23 +169,25 @@ export const generateCourse = async (req, res) => {
                 content: convertToPortableText(lesson.content),
                 order: lesson.order,
                 estimatedReadingTime: lesson.estimatedReadingTime || 5,
-                status: 'published',
+                status: 'published', // Status inicial das lições.
                 course: {
-                    _ref: courseId, // Referencia o curso pai
+                    _ref: courseId, // Referencia o curso pai que está sendo criado.
                     _type: 'reference',
                 },
             };
 
             transaction.create(newLesson);
             lessonRefs.push({
-                _key: uuidv4(), // Use uuidv4 para o _key da referência no array do curso
+                _key: uuidv4(), // Chave única para a referência no array `lessons` do curso.
                 _ref: lessonId,
                 _type: 'reference',
             });
             createdLessonIds.push(lessonId);
-            console.log(`Lição "${lesson.title}" adicionada à transação (ID: ${lessonId}).`);
+            totalEstimatedDuration += (lesson.estimatedReadingTime || 0); // Soma a duração das lições.
+            console.log(`[BACKEND] Lição "${lesson.title}" adicionada à transação (ID: ${lessonId}).`);
         }
 
+        // 5. Criar o documento do curso e adicionar à transação.
         const newCourse = {
             _id: courseId,
             _type: 'course',
@@ -191,59 +195,67 @@ export const generateCourse = async (req, res) => {
             description: generatedCourseData.description,
             slug: { current: generatedCourseData.slug },
             lessons: lessonRefs,
-            status: 'published',
-            price: 0,
-            isProContent: false,
+            status: 'published', // Status inicial do curso.
+            price: 0, // Preço padrão para cursos gerados por IA.
+            isProContent: false, // Define se é conteúdo Pro.
             level: level,
-            // MODIFICADO: Mantenha estimatedDuration como um número (total de minutos) para facilitar cálculos
-            // É melhor calcular a soma total das estimatedReadingTime das lições
-            estimatedDuration: generatedCourseData.lessons.reduce((sum, l) => sum + (l.estimatedReadingTime || 0), 0), 
+            estimatedDuration: totalEstimatedDuration, // Duração total calculada.
             creator: {
                 _ref: creatorId, 
                 _type: 'reference',
             },
             category: { _ref: category, _type: 'reference' }, 
             subCategory: { _ref: subCategory, _type: 'reference' }, 
-            aiGenerationPrompt: prompt, 
-            aiModelUsed: model.model,   
+            aiGenerationPrompt: prompt, // Salva o prompt usado para gerar o curso.
+            aiModelUsed: model.model,   // Salva o modelo de IA usado.
             generatedAt: new Date().toISOString(),
             lastGenerationRevision: new Date().toISOString(),
         };
 
         transaction.create(newCourse);
-        console.log(`Curso "${newCourse.title}" adicionado à transação (ID: ${courseId}).`);
+        console.log(`[BACKEND] Curso "${newCourse.title}" adicionado à transação (ID: ${courseId}).`);
 
-        // NOVO: Executa todas as operações em uma única transação atômica
+        // 6. Comitar a transação: todas as operações são executadas atomicamente.
         const transactionResult = await transaction.commit(); 
         
-        console.log(`Transação concluída. Documentos criados e atualizados:`, transactionResult);
+        console.log(`[BACKEND] Transação concluída. Documentos criados e atualizados:`, transactionResult);
+
+        // 7. Preparar a resposta para o frontend.
+        // Encontra o resultado da atualização do membro para incluir na resposta (opcional).
+        const memberUpdateInfo = transactionResult.results.find(
+            r => r.id === creatorId && r.operation === 'update'
+        );
 
         res.status(201).json({
             message: 'Curso, lições geradas e salvos com sucesso! Créditos e cursos do membro atualizados.',
             course: newCourse, 
             lessons: generatedCourseData.lessons,
-            memberUpdate: transactionResult.results.find(r => r.document._id === creatorId), // Opcional: retornar o membro atualizado
+            memberUpdateId: memberUpdateInfo ? memberUpdateInfo.id : null, // ID do membro atualizado
+            // Se precisar dos *dados completos* do membro atualizado, faria um `sanityClient.getDocument(creatorId)` aqui.
         });
 
     } catch (error) {
-        console.error("Erro no processo de geração/salvamento do curso:", error);
-        // NOVO: Se a transação foi iniciada e falhou, Sanity tentará um rollback automático.
-        // Não é necessário chamar transaction.abort() explicitamente a menos que haja um cenário muito específico.
-
+        console.error("[BACKEND] Erro no processo de geração/salvamento do curso:", error);
+        // O Sanity Transaction automaticamente fará o rollback em caso de falha.
+        
+        // Tratamento de erros específicos para o frontend.
         if (error.message === 'Insufficient credits to create a course.') {
-            return res.status(403).json({ error: error.message }); // 403 Forbidden para falta de créditos
+            return res.status(403).json({ error: error.message }); // 403 Forbidden: Usuário não tem permissão/créditos.
         }
-        if (error.message.includes('Member not found')) {
-            return res.status(404).json({ error: error.message }); // 404 Not Found para membro
+        if (error.message.includes('Member with ID') && error.message.includes('not found')) {
+            return res.status(404).json({ error: error.message }); // 404 Not Found: Membro inválido.
         }
+        // Erros da Gemini API.
         if (error.response && error.response.data && error.response.data.error) {
-            console.error("Erro da Gemini API:", error.response.data.error);
+            console.error("[BACKEND] Erro da Gemini API:", error.response.data.error);
             return res.status(500).json({ error: `Erro da Gemini API: ${error.response.data.error.message}`, details: error.response.data });
         }
+        // Erros do Sanity CMS.
         if (error.statusCode) { 
-            console.error("Erro do Sanity:", error.message);
+            console.error("[BACKEND] Erro do Sanity:", error.message);
             return res.status(500).json({ error: `Erro do Sanity CMS: ${error.message}`, details: error });
         }
+        // Erros genéricos.
         res.status(500).json({ error: 'Falha interna ao gerar ou salvar o curso.', details: error.message });
     }
 };

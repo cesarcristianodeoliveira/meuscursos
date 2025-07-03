@@ -84,7 +84,7 @@ export const register = async (req, res) => {
             password: hashedPassword, // Armazena o hash da senha
             isAdmin: false, // Padrão: novo usuário não é administrador
             plan: 'free',   // Padrão: plano gratuito
-            geminiCredits: 1, // Ajustado: 1 crédito inicial para IA
+            credits: 1, // Ajustado: 1 crédito inicial para IA
             memberLevel: 1,   // Ajustado: Nível inicial do membro
             experiencePoints: 0, // Ajustado: Pontos de experiência iniciais
             
@@ -128,7 +128,7 @@ export const register = async (req, res) => {
                 notificationSettings: createdMember.notificationSettings,
                 memberLevel: createdMember.memberLevel,
                 experiencePoints: createdMember.experiencePoints,
-                geminiCredits: createdMember.geminiCredits,
+                credits: createdMember.credits,
             },
         });
 
@@ -152,7 +152,7 @@ export const login = async (req, res) => {
         // Busca todos os campos do membro, incluindo a senha para a comparação.
         // O campo 'password' será excluído antes de enviar a resposta ao frontend.
         const member = await sanityClient.fetch(
-            `*[_type == "member" && email == $email][0]{_id, name, email, password, isAdmin, plan, memberLevel, experiencePoints, geminiCredits, uiSettings, notificationSettings}`, 
+            `*[_type == "member" && email == $email][0]{_id, name, email, password, isAdmin, plan, memberLevel, experiencePoints, credits, uiSettings, notificationSettings}`, 
             { email }
         );
 
