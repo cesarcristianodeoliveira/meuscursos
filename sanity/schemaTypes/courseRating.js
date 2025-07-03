@@ -19,7 +19,6 @@ export default {
       to: [{ type: 'course' }],
       // validation: Rule => Rule.required(),
       description: 'The course that received this rating.',
-      weak: true // Permite que a avaliação exista mesmo se o curso for deletado (opcional)
     },
     {
       name: 'stars',

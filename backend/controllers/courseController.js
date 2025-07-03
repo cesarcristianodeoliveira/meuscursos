@@ -1,33 +1,26 @@
 // D:\meuscursos\backend\controllers\courseController.js
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createClient } from '@sanity/client'; // Importar createClient aqui também
+import { createClient } from '@sanity/client';
 import { v4 as uuidv4 } from 'uuid';
 
-// Replicar a configuração do Sanity Client e Gemini aqui ou passar como argumento
-// Idealmente, você configuraria o Sanity Client globalmente uma vez e o importaria.
-// Para simplicidade e para não quebrar seu código, vamos redefinir aqui por enquanto,
-// mas em um projeto maior, um arquivo de config.js para Sanity e Gemini seria melhor.
-
-// --- Configuração da Gemini API (repetida para este exemplo, idealmente importada) ---
+// --- Configuração da Gemini API ---
 if (!process.env.GEMINI_API_KEY) {
     console.error("Erro: Variável de ambiente GEMINI_API_KEY não definida em courseController.");
-    // Considere um tratamento de erro mais robusto para produção
-    // throw new Error("GEMINI_API_KEY não definida.");
+    // Em produção, você pode querer lançar um erro ou parar a execução
 }
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 
-// --- Configuração do Sanity Client (repetida para este exemplo, idealmente importada) ---
+// --- Configuração do Sanity Client ---
 if (!process.env.SANITY_PROJECT_ID || !process.env.SANITY_TOKEN) {
     console.error("Erro: Variáveis de ambiente SANITY_PROJECT_ID ou SANITY_TOKEN não definidas em courseController.");
-    // Considere um tratamento de erro mais robusto para produção
-    // throw new Error("SANITY_PROJECT_ID ou SANITY_TOKEN não definidas.");
+    // Em produção, você pode querer lançar um erro ou parar a execução
 }
 const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN) ? createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET || 'production',
-    apiVersion: '2024-06-25',
+    apiVersion: '2024-07-03', // RECOMENDADO: Use a data atual para garantir compatibilidade com patches.
     useCdn: false,
     token: process.env.SANITY_TOKEN,
 }) : null;
@@ -60,11 +53,17 @@ export const generateCourse = async (req, res) => {
         return res.status(500).json({ error: 'Erro de configuração do servidor para geração de cursos.' });
     }
 
-    const { topic, category, subCategory, level } = req.body;
+    // NOVO: req.user.id deve vir do seu middleware de autenticação
+    const { topic, category, subCategory, level, userId } = req.body; // Supondo que userId também possa vir do corpo da requisição ou req.user.id
 
-    if (!topic || !category || !subCategory || !level) {
-        return res.status(400).json({ error: 'Todos os campos (tópico, categoria, subcategoria, nível) são necessários para gerar o curso.' });
+    // MODIFICADO: Use userId do corpo da requisição ou do objeto req.user (se for injetado por um middleware de auth)
+    const creatorId = userId || req.user?.id; // Usar 'req.user?.id' com optional chaining é mais seguro
+
+    if (!topic || !category || !subCategory || !level || !creatorId) {
+        return res.status(400).json({ error: 'Todos os campos (tópico, categoria, subcategoria, nível, userId) são necessários para gerar o curso.' });
     }
+
+    let transaction; // Declare transaction fora do try para que possa ser acessado no catch
 
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); 
@@ -94,13 +93,18 @@ export const generateCourse = async (req, res) => {
             }
         ]`;
 
-        console.log(`Gerando curso para o tópico: "${topic}", categoria: "${category}", subcategoria: "${subCategory}", nível: "${level}" para o usuário ${req.user.id}...`);
+        console.log(`Gerando curso para o tópico: "${topic}", categoria: "${category}", subcategoria: "${subCategory}", nível: "${level}" para o usuário ${creatorId}...`);
         const geminiResponse = await model.generateContent(prompt);
         const text = geminiResponse.response.candidates[0].content.parts[0].text;
 
         let generatedCourseData;
         try {
             let cleanText = text.replace(/```json\n|```json|```/g, '').trim();
+            // Esta linha abaixo pode ser problemática se a IA inserir caracteres especiais que não são UTF-8 válidos
+            // ou se estiver removendo coisas que não deveria.
+            // Para JSON, '\\n' é a representação correta de quebra de linha.
+            // Se a IA não estiver gerando \\n, você pode precisar ajustar o prompt ou a sanitização.
+            // Por enquanto, vamos manter, mas fique atento.
             cleanText = cleanText.replace(/[\u0000-\u001F\u007F-\u009F\u00A0]/g, '').replace(/(\r\n|\n|\r)/gm, '\\n');
             
             generatedCourseData = JSON.parse(cleanText);
@@ -110,9 +114,44 @@ export const generateCourse = async (req, res) => {
             return res.status(500).json({ error: 'Erro ao processar a resposta da IA. Formato JSON inválido.', rawText: text });
         }
 
-        const creatorId = req.user.id; 
         const courseId = `course-${uuidv4()}`; 
-        const transaction = sanityClient.transaction(); 
+        transaction = sanityClient.transaction(); // Inicia a transação aqui
+
+        // NOVO: 1. Obter informações do membro antes de criar o curso
+        const member = await sanityClient.fetch(
+            `*[_id == $creatorId][0]{isAdmin, credits}`,
+            { creatorId }
+        );
+
+        if (!member) {
+            throw new Error(`Member with ID ${creatorId} not found.`);
+        }
+
+        let updatedCredits = member.credits;
+        const isMemberAdmin = member.isAdmin === true; // Garante que é booleano
+
+        // NOVO: 2. Lógica de Consumo de Créditos
+        if (!isMemberAdmin) {
+            if (member.credits <= 0) {
+                throw new Error('Insufficient credits to create a course.');
+            }
+            updatedCredits = member.credits - 1; // Decrementa 1 crédito
+            console.log(`Credits before: ${member.credits}, Credits after: ${updatedCredits} for member ${creatorId}`);
+        } else {
+            console.log(`Admin user ${creatorId} is creating a course. No credits consumed.`);
+        }
+
+        // NOVO: 3. Adicionar operação de atualização de créditos do membro na transação
+        // E também adicionar a referência do curso ao array createdCourses do membro.
+        transaction.patch(creatorId, (patch) =>
+            patch
+                .set({ credits: updatedCredits }) // Atualiza o valor do campo 'credits'
+                .insert('after', 'createdCourses[-1]', [{ // Adiciona a nova referência ao final do array
+                    _ref: courseId, // Usa o ID do curso que será criado
+                    _type: 'reference',
+                    _key: uuidv4(), // Usa um novo uuid para a _key do item no array
+                }])
+        );
 
         const lessonRefs = [];
         const createdLessonIds = []; 
@@ -130,14 +169,14 @@ export const generateCourse = async (req, res) => {
                 estimatedReadingTime: lesson.estimatedReadingTime || 5,
                 status: 'published',
                 course: {
-                    _ref: courseId,
+                    _ref: courseId, // Referencia o curso pai
                     _type: 'reference',
                 },
             };
 
             transaction.create(newLesson);
             lessonRefs.push({
-                _key: uuidv4(),
+                _key: uuidv4(), // Use uuidv4 para o _key da referência no array do curso
                 _ref: lessonId,
                 _type: 'reference',
             });
@@ -156,16 +195,17 @@ export const generateCourse = async (req, res) => {
             price: 0,
             isProContent: false,
             level: level,
-            estimatedDuration: `${generatedCourseData.lessons.length * 10} minutos`,
+            // MODIFICADO: Mantenha estimatedDuration como um número (total de minutos) para facilitar cálculos
+            // É melhor calcular a soma total das estimatedReadingTime das lições
+            estimatedDuration: generatedCourseData.lessons.reduce((sum, l) => sum + (l.estimatedReadingTime || 0), 0), 
             creator: {
                 _ref: creatorId, 
                 _type: 'reference',
-                _weak: true, 
             },
             category: { _ref: category, _type: 'reference' }, 
             subCategory: { _ref: subCategory, _type: 'reference' }, 
             aiGenerationPrompt: prompt, 
-            aiModelUsed: model.model,   
+            aiModelUsed: model.model,   
             generatedAt: new Date().toISOString(),
             lastGenerationRevision: new Date().toISOString(),
         };
@@ -173,18 +213,29 @@ export const generateCourse = async (req, res) => {
         transaction.create(newCourse);
         console.log(`Curso "${newCourse.title}" adicionado à transação (ID: ${courseId}).`);
 
-        await transaction.commit(); 
+        // NOVO: Executa todas as operações em uma única transação atômica
+        const transactionResult = await transaction.commit(); 
         
-        console.log(`Transação concluída. IDs de documentos criados: Curso: ${courseId}, Lições: ${createdLessonIds.join(', ')}`);
+        console.log(`Transação concluída. Documentos criados e atualizados:`, transactionResult);
 
         res.status(201).json({
-            message: 'Curso e lições gerados e salvos com sucesso!',
+            message: 'Curso, lições geradas e salvos com sucesso! Créditos e cursos do membro atualizados.',
             course: newCourse, 
-            lessons: generatedCourseData.lessons 
+            lessons: generatedCourseData.lessons,
+            memberUpdate: transactionResult.results.find(r => r.document._id === creatorId), // Opcional: retornar o membro atualizado
         });
 
     } catch (error) {
         console.error("Erro no processo de geração/salvamento do curso:", error);
+        // NOVO: Se a transação foi iniciada e falhou, Sanity tentará um rollback automático.
+        // Não é necessário chamar transaction.abort() explicitamente a menos que haja um cenário muito específico.
+
+        if (error.message === 'Insufficient credits to create a course.') {
+            return res.status(403).json({ error: error.message }); // 403 Forbidden para falta de créditos
+        }
+        if (error.message.includes('Member not found')) {
+            return res.status(404).json({ error: error.message }); // 404 Not Found para membro
+        }
         if (error.response && error.response.data && error.response.data.error) {
             console.error("Erro da Gemini API:", error.response.data.error);
             return res.status(500).json({ error: `Erro da Gemini API: ${error.response.data.error.message}`, details: error.response.data });

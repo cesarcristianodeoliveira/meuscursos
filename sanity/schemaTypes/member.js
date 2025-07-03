@@ -1,3 +1,4 @@
+// schemas/member.js
 export default {
   name: 'member',
   title: 'Member',
@@ -141,19 +142,27 @@ export default {
       description: 'Total experience points accumulated by the member for various activities.'
     },
     {
-      name: 'geminiCredits',
-      title: 'Gemini Credits',
+      // MODIFICAÇÃO: Renomeado de 'geminiCredits' para 'credits'
+      // O nome 'geminiCredits' pode ser específico demais se você usar outras APIs de IA no futuro.
+      name: 'credits', 
+      title: 'AI Generation Credits',
       type: 'number',
-      // Ajustado: Alinhado com o valor inicial definido no backend para novos registros
-      initialValue: 1, 
-      description: 'Available credits for generating content via Gemini API. Can be manually adjusted by Admin or consumed by AI generation features.'
+      initialValue: 10, // Valor inicial de créditos para novos membros. Ajuste conforme sua política.
+      validation: Rule => Rule.min(0), // Créditos não podem ser negativos
+      description: 'Available credits for generating content via AI APIs. Can be manually adjusted by Admin or consumed by AI generation features.'
     },
     {
       name: 'createdCourses',
       title: 'Courses Created',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'course' }] }],
-      readOnly: true,
+      of: [
+        { 
+          type: 'reference', 
+          to: [{ type: 'course' }],
+          weak: true, // RECOMENDADO: Referência FRACA. Se um curso for deletado, a referência aqui deve se tornar nula sem impedir a exclusão do curso. A referência forte está no `course` para o `creator`.
+        }
+      ],
+      readOnly: true, // Este campo será gerenciado programaticamente (via backend/hooks)
       description: 'List of courses created by this member.'
     },
     {
@@ -169,19 +178,21 @@ export default {
               title: 'Course',
               type: 'reference',
               to: [{ type: 'course' }],
+              weak: true, // Recomendo fraca aqui também. Se um curso for deletado, não precisamos que o histórico de matrícula "trave" a exclusão.
             },
             {
               name: 'currentLesson',
               title: 'Current Lesson',
               type: 'reference',
               to: [{ type: 'lesson' }],
-              description: 'The last lesson the member was studying in this course.'
+              description: 'The last lesson the member was studying in this course.',
+              weak: true, // Também fraca. Se uma lição for deletada, não queremos que isso impeça.
             },
             {
               name: 'completedLessons',
               title: 'Completed Lessons',
               type: 'array',
-              of: [{ type: 'reference', to: [{ type: 'lesson' }] }],
+              of: [{ type: 'reference', to: [{ type: 'lesson' }], weak: true }], // E aqui.
               description: 'List of lessons completed by the member in this specific course.'
             },
             {
@@ -225,14 +236,14 @@ export default {
       name: 'favoriteCourses',
       title: 'Favorite Courses',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'course' }] }],
+      of: [{ type: 'reference', to: [{ type: 'course' }], weak: true }], // Recomendo fraca
       description: 'List of courses favorited by the member for quick access.'
     },
     {
       name: 'createdGroups',
       title: 'Groups Created',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'group' }] }],
+      of: [{ type: 'reference', to: [{ type: 'group' }], weak: true }], // Recomendo fraca
       readOnly: true,
       description: 'List of community groups created by this member.'
     },
@@ -240,7 +251,7 @@ export default {
       name: 'joinedGroups',
       title: 'Groups Joined',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'group' }] }],
+      of: [{ type: 'reference', to: [{ type: 'group' }], weak: true }], // Recomendo fraca
       readOnly: true,
       description: 'List of community groups this member belongs to.'
     },
@@ -250,14 +261,14 @@ export default {
       name: 'badgesEarned',
       title: 'Badges Earned',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'badge' }] }],
+      of: [{ type: 'reference', to: [{ type: 'badge' }], weak: true }], // Recomendo fraca
       description: 'List of achievement badges earned by the member through interaction and progress (e.g., "First Course Completed", "Community Contributor").'
     },
     {
       name: 'certificatesAwarded',
       title: 'Certificates Awarded',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'certificate' }] }],
+      of: [{ type: 'reference', to: [{ type: 'certificate' }], weak: true }], // Recomendo fraca
       readOnly: true,
       description: 'List of course completion certificates awarded to the member.'
     },
@@ -265,7 +276,7 @@ export default {
       name: 'messages',
       title: 'Messages',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'message' }] }],
+      of: [{ type: 'reference', to: [{ type: 'message' }], weak: true }], // Recomendo fraca
       readOnly: true,
       description: 'A collection of internal messages or notifications received by the member.'
     },
@@ -291,8 +302,6 @@ export default {
           initialValue: 'system',
           description: 'Preferred visual theme (light, dark, or system default).'
         },
-        // REMOVIDO: Campo 'primaryColor' foi removido para manter a sincronia com o backend e simplificar.
-        // Se precisar dele, me avise para adicionarmos novamente.
       ],
       description: 'Customizable user interface preferences.'
     },
@@ -339,14 +348,15 @@ export default {
       subtitle: 'email',
       media: 'profileImage',
       isAdmin: 'isAdmin',
-      plan: 'plan', // Adicionado para o preview
-      geminiCredits: 'geminiCredits', // Adicionado para o preview
+      plan: 'plan',
+      credits: 'credits', // MODIFICADO: De 'geminiCredits' para 'credits'
     },
     prepare(selection) {
-      const { title, subtitle, media, isAdmin, plan, geminiCredits } = selection;
+      const { title, subtitle, media, isAdmin, plan, credits } = selection;
       return {
         title: title || 'New Member (Name Pending)',
-        subtitle: `${subtitle || 'No Email'} ${isAdmin ? '(Admin)' : ''} - Plan: ${plan} - Gemini Credits: ${geminiCredits || 0}`,
+        // MODIFICADO: Atualiza o subtitle para refletir 'credits' e 'isAdmin'
+        subtitle: `${subtitle || 'No Email'} ${isAdmin ? '(Admin)' : ''} - Plan: ${plan} - AI Credits: ${credits || 0}`,
         media: media,
       };
     },

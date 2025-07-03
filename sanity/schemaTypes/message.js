@@ -96,7 +96,6 @@ export default {
       type: 'reference',
       to: [{ type: 'message' }],
       description: 'If this message is a reply, link to the original message.',
-      weak: true, // A mensagem original pode ser apagada sem quebrar a referência aqui
     },
   ],
   preview: {

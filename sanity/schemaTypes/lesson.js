@@ -27,7 +27,6 @@ export default {
       title: 'Parent Course',
       type: 'reference',
       to: [{ type: 'course' }],
-      weak: false, // *** CORRETO: REFERÊNCIA FORTE PARA GARANTIR INTEGRIDADE ***
       // validation: Rule => Rule.required(),
       description: 'The course this lesson belongs to.'
     },
