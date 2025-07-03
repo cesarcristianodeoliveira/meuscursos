@@ -12,7 +12,7 @@ dotenv.config(); // Carrega variáveis de ambiente do .env
 const sanityClient = createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET || 'production',
-    apiVersion: '2024-06-25', // Data da API Sanity que você está usando
+    apiVersion: '2025-06-12', // Data da API Sanity que você está usando
     useCdn: false, // O backend sempre acessa a API diretamente, não o CDN
     token: process.env.SANITY_TOKEN, // Token com permissões de escrita (criação/atualização de documentos)
 });
