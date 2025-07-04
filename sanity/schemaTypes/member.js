@@ -159,7 +159,6 @@ export default {
         { 
           type: 'reference', 
           to: [{ type: 'course' }],
-          weak: true, // RECOMENDADO: Referência FRACA. Se um curso for deletado, a referência aqui deve se tornar nula sem impedir a exclusão do curso. A referência forte está no `course` para o `creator`.
         }
       ],
       readOnly: true, // Este campo será gerenciado programaticamente (via backend/hooks)
@@ -178,7 +177,6 @@ export default {
               title: 'Course',
               type: 'reference',
               to: [{ type: 'course' }],
-              weak: true, // Recomendo fraca aqui também. Se um curso for deletado, não precisamos que o histórico de matrícula "trave" a exclusão.
             },
             {
               name: 'currentLesson',
@@ -186,13 +184,12 @@ export default {
               type: 'reference',
               to: [{ type: 'lesson' }],
               description: 'The last lesson the member was studying in this course.',
-              weak: true, // Também fraca. Se uma lição for deletada, não queremos que isso impeça.
             },
             {
               name: 'completedLessons',
               title: 'Completed Lessons',
               type: 'array',
-              of: [{ type: 'reference', to: [{ type: 'lesson' }], weak: true }], // E aqui.
+              of: [{ type: 'reference', to: [{ type: 'lesson' }] }], // E aqui.
               description: 'List of lessons completed by the member in this specific course.'
             },
             {
@@ -236,14 +233,14 @@ export default {
       name: 'favoriteCourses',
       title: 'Favorite Courses',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'course' }], weak: true }], // Recomendo fraca
+      of: [{ type: 'reference', to: [{ type: 'course' }] }], // Recomendo fraca
       description: 'List of courses favorited by the member for quick access.'
     },
     {
       name: 'createdGroups',
       title: 'Groups Created',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'group' }], weak: true }], // Recomendo fraca
+      of: [{ type: 'reference', to: [{ type: 'group' }] }], // Recomendo fraca
       readOnly: true,
       description: 'List of community groups created by this member.'
     },
@@ -251,7 +248,7 @@ export default {
       name: 'joinedGroups',
       title: 'Groups Joined',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'group' }], weak: true }], // Recomendo fraca
+      of: [{ type: 'reference', to: [{ type: 'group' }] }], // Recomendo fraca
       readOnly: true,
       description: 'List of community groups this member belongs to.'
     },
@@ -261,14 +258,14 @@ export default {
       name: 'badgesEarned',
       title: 'Badges Earned',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'badge' }], weak: true }], // Recomendo fraca
+      of: [{ type: 'reference', to: [{ type: 'badge' }] }], // Recomendo fraca
       description: 'List of achievement badges earned by the member through interaction and progress (e.g., "First Course Completed", "Community Contributor").'
     },
     {
       name: 'certificatesAwarded',
       title: 'Certificates Awarded',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'certificate' }], weak: true }], // Recomendo fraca
+      of: [{ type: 'reference', to: [{ type: 'certificate' }] }], // Recomendo fraca
       readOnly: true,
       description: 'List of course completion certificates awarded to the member.'
     },
@@ -276,7 +273,7 @@ export default {
       name: 'messages',
       title: 'Messages',
       type: 'array',
-      of: [{ type: 'reference', to: [{ type: 'message' }], weak: true }], // Recomendo fraca
+      of: [{ type: 'reference', to: [{ type: 'message' }] }], // Recomendo fraca
       readOnly: true,
       description: 'A collection of internal messages or notifications received by the member.'
     },

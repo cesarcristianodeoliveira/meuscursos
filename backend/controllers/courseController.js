@@ -23,7 +23,7 @@ if (!process.env.SANITY_PROJECT_ID || !process.env.SANITY_TOKEN) {
 const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN) ? createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET || 'production',
-    apiVersion: '2024-07-03', // RECOMENDADO: Mantenha a API version atualizada.
+    apiVersion: '2025-06-12', // RECOMENDADO: Mantenha a API version atualizada.
     useCdn: false, // Define para false para garantir que você está interagindo com a API de escrita
     token: process.env.SANITY_TOKEN, // Token com permissões de escrita
 }) : null;

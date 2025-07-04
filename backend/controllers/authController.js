@@ -84,7 +84,7 @@ export const register = async (req, res) => {
             password: hashedPassword, // Armazena o hash da senha
             isAdmin: false, // Padrão: novo usuário não é administrador
             plan: 'free',   // Padrão: plano gratuito
-            credits: 1, // Ajustado: 1 crédito inicial para IA
+            credits: 5, // Ajustado: 5 crédito inicial para IA
             memberLevel: 1,   // Ajustado: Nível inicial do membro
             experiencePoints: 0, // Ajustado: Pontos de experiência iniciais
             

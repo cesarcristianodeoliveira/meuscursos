@@ -79,7 +79,7 @@ export default {
     {
       name: 'estimatedDuration',
       title: 'Estimated Duration',
-      type: 'string', // Ex: "2 hours", "30 minutes", "1 day"
+      type: 'number', // Ex: "2 hours", "30 minutes", "1 day"
       description: 'The estimated time to complete the course.'
     },
     {
