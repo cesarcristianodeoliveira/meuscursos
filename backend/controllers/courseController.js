@@ -243,7 +243,7 @@ export const generateCourse = async (req, res) => {
 
         // --- LOG DE DEBUG: Inspecionando o resultado do patch no membro ---
         const memberPatchResult = transactionResult.results.find(
-            r => r.id === creatorId && r.operation === 'update' && r.type === 'member'
+            r => r.id === creatorId && r.operation === 'update'
         );
         if (memberPatchResult) {
             console.log(`[BACKEND] Resultado da atualização do membro (${creatorId}):`, memberPatchResult);
