@@ -161,7 +161,6 @@ export default {
           to: [{ type: 'course' }],
         }
       ],
-      readOnly: true, // Este campo será gerenciado programaticamente (via backend/hooks)
       description: 'List of courses created by this member.'
     },
     {
