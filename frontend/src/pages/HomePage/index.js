@@ -1,12 +1,12 @@
 import { Typography, Container, Box, Button } from '@mui/material';
 import { Link } from 'react-router-dom';
-import RocketIcon from '@mui/icons-material/Rocket';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 
 function Home() {
   return (
     <Container maxWidth="md" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 4 }}>
       <Box sx={{ textAlign: 'center' }}>
-        <RocketIcon sx={{ fontSize: 64 }} />
+        <RocketLaunchIcon sx={{ fontSize: 64 }} />
         <Typography variant="h3" component="h1" sx={{ mb: .25 }}>
           Meus Cursos
         </Typography>
