@@ -7,7 +7,6 @@ import { v4 as uuidv4 } from 'uuid';
 // --- Configuração da Gemini API ---
 if (!process.env.GEMINI_API_KEY) {
     console.error("Erro: Variável de ambiente GEMINI_API_KEY não definida em courseController.");
-    // Em um ambiente de produção, você pode querer lançar um erro fatal ou parar o processo aqui.
 }
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
@@ -15,32 +14,28 @@ const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GE
 // --- Configuração do Sanity Client ---
 if (!process.env.SANITY_PROJECT_ID || !process.env.SANITY_TOKEN) {
     console.error("Erro: Variáveis de ambiente SANITY_PROJECT_ID ou SANITY_TOKEN não definidas em courseController.");
-    // Em um ambiente de produção, você pode querer lançar um erro fatal ou parar o processo aqui.
 }
 const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN) ? createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET || 'production',
-    apiVersion: '2025-06-12', // RECOMENDADO: Mantenha a API version atualizada.
-    useCdn: false, // Define para false para garantir que você está interagindo com a API de escrita
-    token: process.env.SANITY_TOKEN, // Token com permissões de escrita
+    apiVersion: '2025-06-12', 
+    useCdn: false, 
+    token: process.env.SANITY_TOKEN, 
 }) : null;
 
 
 // --- Função auxiliar para gerar slug amigável para URLs e único ---
 const generateSlug = (text) => {
-  // Normaliza o texto para remover acentos e caracteres diacríticos
   const normalizedText = text
-    .normalize("NFD") // Decompõe caracteres acentuados (ex: 'é' -> 'e', '´')
-    .replace(/[\u0300-\u036f]/g, ""); // Remove os diacríticos resultantes
+    .normalize("NFD") 
+    .replace(/[\u0300-\u036f]/g, ""); 
 
-  // Converte para minúsculas, remove caracteres especiais e formata hífens
   const baseSlug = normalizedText
     .toLowerCase()
-    .replace(/[^a-z0-9 -]/g, '') // Remove tudo que não é letra (a-z), número (0-9), espaço ou hífen
-    .replace(/\s+/g, '-')        // Substitui múltiplos espaços por um único hífen
-    .replace(/-+/g, '-');        // Substitui múltiplos hífens por um único hífen
+    .replace(/[^a-z0-9 -]/g, '') 
+    .replace(/\s+/g, '-')        
+    .replace(/-+/g, '-');        
   
-  // Adiciona um sufixo UUID curto para garantir unicidade
   return `${baseSlug}-${uuidv4().substring(0, 8)}`; 
 };
 
@@ -50,11 +45,11 @@ const convertToPortableText = (text) => {
     const paragraphs = text.split('\n\n').filter(p => p.trim() !== '');
 
     return paragraphs.map(p => ({
-        _key: uuidv4(), // Garante uma chave única para cada bloco
+        _key: uuidv4(), 
         _type: 'block',
         children: [
             {
-                _key: uuidv4(), // Garante uma chave única para cada span
+                _key: uuidv4(), 
                 _type: 'span',
                 marks: [],
                 text: p.trim(),
@@ -66,24 +61,25 @@ const convertToPortableText = (text) => {
 };
 
 export const generateCourse = async (req, res) => {
-    // Verificar se as configurações estão OK antes de prosseguir com qualquer lógica.
     if (!genAI || !sanityClient) {
         return res.status(500).json({ error: 'Erro de configuração do servidor: Chaves de API ou Cliente Sanity não inicializados.' });
     }
 
     const { topic, category, subCategory, level, userId } = req.body; 
-    const creatorId = userId || req.user?.id; // Preferir `req.user.id` injetado pelo middleware de autenticação
+    const creatorId = userId || req.user?.id; 
+
+    // --- LOG DE DEBUG: Verificando o creatorId ---
+    console.log(`[BACKEND] Creator ID sendo utilizado: ${creatorId}`);
 
     if (!topic || !category || !subCategory || !level || !creatorId) {
         return res.status(400).json({ error: 'Dados incompletos: Tópico, Categoria, Subcategoria, Nível e ID do criador são necessários.' });
     }
 
-    let transaction; // Declarada fora do `try` para acessibilidade no `catch`.
+    let transaction; 
 
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); 
 
-        // --- PROMPT APERFEIÇOADO PARA MAIOR UNICIDADE E CRIATIVIDADE ---
         const prompt = `Gere um esquema de curso detalhado em português, garantindo que o **título do curso e os títulos das lições sejam altamente originais e únicos**, mesmo quando os parâmetros iniciais são semelhantes.
 
         O curso deve ser sobre "${topic}", na categoria de ID "${category}" e subcategoria de ID "${subCategory}", e ter um nível de dificuldade "${level}".
@@ -124,8 +120,6 @@ export const generateCourse = async (req, res) => {
             ]
         }
         `;
-        // --- FIM DO PROMPT APERFEIÇOADO ---
-
 
         console.log(`[BACKEND] Gerando curso para o tópico: "${topic}", categoria: "${category}", subcategoria: "${subCategory}", nível: "${level}" para o usuário ${creatorId}...`);
         const geminiResponse = await model.generateContent(prompt);
@@ -133,13 +127,8 @@ export const generateCourse = async (req, res) => {
 
         let generatedCourseData;
         try {
-            // Remove marcadores de código JSON e espaços em branco extras
             let cleanText = text.replace(/```json\n|```json|```/g, '').trim();
-            // Substitui quebras de linha literais por '\n' para garantir JSON válido.
-            // A linha que removia '[\u0000-\u001F\u007F-\u009F\u00A0]' foi removida para evitar problemas
-            // com caracteres válidos que a IA possa gerar e que não são marcadores de código.
-            cleanText = cleanText.replace(/(\r\n|\r)/gm, '\\n'); // Apenas substitui \r\n ou \r por \n
-
+            cleanText = cleanText.replace(/(\r\n|\r)/gm, '\\n'); 
             generatedCourseData = JSON.parse(cleanText);
         } catch (parseError) {
             console.error("[BACKEND] Erro ao parsear JSON da Gemini API:", parseError);
@@ -148,9 +137,8 @@ export const generateCourse = async (req, res) => {
         }
 
         const courseId = `course-${uuidv4()}`; 
-        transaction = sanityClient.transaction(); // Inicia a transação Sanity.
+        transaction = sanityClient.transaction(); 
 
-        // 1. Obter informações do membro criador para verificar créditos e admin status.
         const member = await sanityClient.fetch(
             `*[_id == $creatorId][0]{isAdmin, credits}`,
             { creatorId }
@@ -161,37 +149,33 @@ export const generateCourse = async (req, res) => {
         }
 
         let updatedCredits = member.credits;
-        const isMemberAdmin = member.isAdmin === true; // Garante que seja booleano.
+        const isMemberAdmin = member.isAdmin === true; 
 
-        // 2. Lógica de Consumo de Créditos.
         if (!isMemberAdmin) {
             if (member.credits <= 0) {
                 throw new Error('Insufficient credits to create a course.');
             }
-            updatedCredits = member.credits - 1; // Decrementa 1 crédito.
+            updatedCredits = member.credits - 1; 
             console.log(`[BACKEND] Credits before: ${member.credits}, Credits after: ${updatedCredits} for member ${creatorId}`);
         } else {
             console.log(`[BACKEND] Admin user ${creatorId} is creating a course. No credits consumed.`);
         }
 
-        // 3. Adicionar operação de atualização de créditos do membro e adicionar o novo curso à lista `createdCourses`.
         transaction.patch(creatorId, (patch) =>
             patch
-                .set({ credits: updatedCredits }) // Atualiza o valor do campo 'credits'.
-                .insert('after', 'createdCourses[-1]', [{ // Adiciona a nova referência ao final do array.
-                    _ref: courseId, // Referência ao curso que será criado nesta mesma transação.
+                .set({ credits: updatedCredits }) 
+                .insert('after', 'createdCourses[-1]', [{ 
+                    _ref: courseId, 
                     _type: 'reference',
-                    _key: uuidv4(), // Chave única para o item do array.
+                    _key: uuidv4(), 
                 }])
         );
 
         const lessonRefs = [];
         const createdLessonIds = []; 
-        let totalEstimatedDuration = 0; // Para calcular a duração total do curso.
+        let totalEstimatedDuration = 0; 
 
-        // 4. Criar os documentos das lições e adicionar à transação.
         for (const lesson of generatedCourseData.lessons) {
-            // Garante que o slug da lição seja único
             const lessonSlug = { current: generateSlug(lesson.title) }; 
             const lessonId = `lesson-${uuidv4()}`; 
 
@@ -203,26 +187,24 @@ export const generateCourse = async (req, res) => {
                 content: convertToPortableText(lesson.content),
                 order: lesson.order,
                 estimatedReadingTime: lesson.estimatedReadingTime || 5,
-                status: 'published', // Status inicial das lições.
+                status: 'published', 
                 course: {
-                    _ref: courseId, // Referencia o curso pai que está sendo criado.
+                    _ref: courseId, 
                     _type: 'reference',
                 },
             };
 
             transaction.create(newLesson);
             lessonRefs.push({
-                _key: uuidv4(), // Chave única para a referência no array `lessons` do curso.
+                _key: uuidv4(), 
                 _ref: lessonId,
                 _type: 'reference',
             });
             createdLessonIds.push(lessonId);
-            totalEstimatedDuration += (lesson.estimatedReadingTime || 0); // Soma a duração das lições.
+            totalEstimatedDuration += (lesson.estimatedReadingTime || 0); 
             console.log(`[BACKEND] Lição "${lesson.title}" adicionada à transação (ID: ${lessonId}).`);
         }
 
-        // 5. Criar o documento do curso e adicionar à transação.
-        // Garante que o slug do curso seja único
         const courseSlug = { current: generateSlug(generatedCourseData.title) };
 
         const newCourse = {
@@ -230,21 +212,21 @@ export const generateCourse = async (req, res) => {
             _type: 'course',
             title: generatedCourseData.title,
             description: generatedCourseData.description,
-            slug: courseSlug, // Usa o slug gerado com a função generateSlug
+            slug: courseSlug, 
             lessons: lessonRefs,
-            status: 'published', // Status inicial do curso.
-            price: 0, // Preço padrão para cursos gerados por IA.
-            isProContent: false, // Define se é conteúdo Pro.
+            status: 'published', 
+            price: 0, 
+            isProContent: false, 
             level: level,
-            estimatedDuration: totalEstimatedDuration, // Duração total calculada.
+            estimatedDuration: totalEstimatedDuration, 
             creator: {
                 _ref: creatorId, 
                 _type: 'reference',
             },
             category: { _ref: category, _type: 'reference' }, 
             subCategory: { _ref: subCategory, _type: 'reference' }, 
-            aiGenerationPrompt: prompt, // Salva o prompt usado para gerar o curso.
-            aiModelUsed: model.model,   // Salva o modelo de IA usado.
+            aiGenerationPrompt: prompt, 
+            aiModelUsed: model.model,   
             generatedAt: new Date().toISOString(),
             lastGenerationRevision: new Date().toISOString(),
         };
@@ -252,13 +234,26 @@ export const generateCourse = async (req, res) => {
         transaction.create(newCourse);
         console.log(`[BACKEND] Curso "${newCourse.title}" adicionado à transação (ID: ${courseId}).`);
 
-        // 6. Comitar a transação: todas as operações são executadas atomicamente.
+        // --- LOG DE DEBUG: Confirmando que a transação foi preparada ---
+        console.log("[BACKEND] Transação preparada para criar curso, lições e ATUALIZAR membro.");
+
         const transactionResult = await transaction.commit(); 
         
         console.log(`[BACKEND] Transação concluída. Documentos criados e atualizados:`, transactionResult);
 
-        // 7. Preparar a resposta para o frontend.
-        // Encontra o resultado da atualização do membro para incluir na resposta (opcional).
+        // --- LOG DE DEBUG: Inspecionando o resultado do patch no membro ---
+        const memberPatchResult = transactionResult.results.find(
+            r => r.id === creatorId && r.operation === 'update' && r.type === 'member'
+        );
+        if (memberPatchResult) {
+            console.log(`[BACKEND] Resultado da atualização do membro (${creatorId}):`, memberPatchResult);
+            console.log(`[BACKEND] Campo 'createdCourses' após a transação (verifique o Sanity Studio diretamente).`);
+        } else {
+            console.log(`[BACKEND] Nenhuma operação de atualização encontrada para o membro ${creatorId} na transação. Isso pode ser um problema.`);
+        }
+        // --- FIM DOS LOGS DE DEBUG ---
+
+
         const memberUpdateInfo = transactionResult.results.find(
             r => r.id === creatorId && r.operation === 'update'
         );
