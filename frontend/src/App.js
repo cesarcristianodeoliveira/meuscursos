@@ -10,6 +10,8 @@ import getAppTheme from './theme';
 // Importa o AuthProvider e useAuth do diretório 'contexts'
 import { AuthProvider, useAuth } from './contexts/AuthContext'; 
 
+import Navbar from './components/Navbar'
+
 // Importa suas páginas e o componente de redirecionamento
 import CoursesPage from './pages/CoursesPage';
 import CourseCreatePage from './pages/CoursesPage/CourseCreatePage'; 
@@ -53,6 +55,7 @@ function App() {
     <AuthProvider> 
       <ThemeWrapper>
         <Router>
+          <Navbar />
           <Routes>
             <Route path="/" element={<HomeOrDashboardRedirect />} /> 
             <Route path="/cursos" element={<CoursesPage />} />
