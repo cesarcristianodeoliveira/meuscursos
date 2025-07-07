@@ -142,8 +142,6 @@ export default {
       description: 'Total experience points accumulated by the member for various activities.'
     },
     {
-      // MODIFICAÇÃO: Renomeado de 'geminiCredits' para 'credits'
-      // O nome 'geminiCredits' pode ser específico demais se você usar outras APIs de IA no futuro.
       name: 'credits', 
       title: 'AI Generation Credits',
       type: 'number',

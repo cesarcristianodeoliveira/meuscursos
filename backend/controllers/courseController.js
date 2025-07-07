@@ -161,15 +161,16 @@ export const generateCourse = async (req, res) => {
             console.log(`[BACKEND] Admin user ${creatorId} is creating a course. No credits consumed.`);
         }
 
-        transaction.patch(creatorId, (patch) =>
-            patch
+        transaction.patch(creatorId, (patch) => {
+            return patch
                 .set({ credits: updatedCredits }) 
-                .insert('after', 'createdCourses[-1]', [{ 
+                .setIfMissing({ createdCourses: [] }) // Garante que 'createdCourses' é um array vazio se não existir
+                .append('createdCourses', [{     // Adiciona o novo curso ao final do array 'createdCourses'
                     _ref: courseId, 
                     _type: 'reference',
                     _key: uuidv4(), 
-                }])
-        );
+                }]);
+        });
 
         const lessonRefs = [];
         const createdLessonIds = []; 
