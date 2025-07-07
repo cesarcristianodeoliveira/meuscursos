@@ -5,8 +5,6 @@ import { createClient } from '@sanity/client';
 import { v4 as uuidv4 } from 'uuid';
 
 // --- Configuração da Gemini API ---
-// É uma boa prática centralizar as configurações em um arquivo separado e importá-las.
-// Por enquanto, mantemos aqui, mas considere refatorar em projetos maiores.
 if (!process.env.GEMINI_API_KEY) {
     console.error("Erro: Variável de ambiente GEMINI_API_KEY não definida em courseController.");
     // Em um ambiente de produção, você pode querer lançar um erro fatal ou parar o processo aqui.
@@ -15,7 +13,6 @@ const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GE
 
 
 // --- Configuração do Sanity Client ---
-// Assim como a Gemini API, idealmente centralizado.
 if (!process.env.SANITY_PROJECT_ID || !process.env.SANITY_TOKEN) {
     console.error("Erro: Variáveis de ambiente SANITY_PROJECT_ID ou SANITY_TOKEN não definidas em courseController.");
     // Em um ambiente de produção, você pode querer lançar um erro fatal ou parar o processo aqui.
@@ -28,6 +25,24 @@ const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN)
     token: process.env.SANITY_TOKEN, // Token com permissões de escrita
 }) : null;
 
+
+// --- Função auxiliar para gerar slug amigável para URLs e único ---
+const generateSlug = (text) => {
+  // Normaliza o texto para remover acentos e caracteres diacríticos
+  const normalizedText = text
+    .normalize("NFD") // Decompõe caracteres acentuados (ex: 'é' -> 'e', '´')
+    .replace(/[\u0300-\u036f]/g, ""); // Remove os diacríticos resultantes
+
+  // Converte para minúsculas, remove caracteres especiais e formata hífens
+  const baseSlug = normalizedText
+    .toLowerCase()
+    .replace(/[^a-z0-9 -]/g, '') // Remove tudo que não é letra (a-z), número (0-9), espaço ou hífen
+    .replace(/\s+/g, '-')        // Substitui múltiplos espaços por um único hífen
+    .replace(/-+/g, '-');        // Substitui múltiplos hífens por um único hífen
+  
+  // Adiciona um sufixo UUID curto para garantir unicidade
+  return `${baseSlug}-${uuidv4().substring(0, 8)}`; 
+};
 
 // Helper para converter string de texto para Portable Text básico
 const convertToPortableText = (text) => {
@@ -56,8 +71,6 @@ export const generateCourse = async (req, res) => {
         return res.status(500).json({ error: 'Erro de configuração do servidor: Chaves de API ou Cliente Sanity não inicializados.' });
     }
 
-    // `userId` deve vir do seu middleware de autenticação (ex: `req.user.id`).
-    // Opcionalmente, pode ser enviado no corpo da requisição para testes, mas `req.user.id` é o padrão seguro.
     const { topic, category, subCategory, level, userId } = req.body; 
     const creatorId = userId || req.user?.id; // Preferir `req.user.id` injetado pelo middleware de autenticação
 
@@ -70,30 +83,49 @@ export const generateCourse = async (req, res) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); 
 
-        const prompt = `Gere um esquema de curso detalhado em português.
+        // --- PROMPT APERFEIÇOADO PARA MAIOR UNICIDADE E CRIATIVIDADE ---
+        const prompt = `Gere um esquema de curso detalhado em português, garantindo que o **título do curso e os títulos das lições sejam altamente originais e únicos**, mesmo quando os parâmetros iniciais são semelhantes.
+
         O curso deve ser sobre "${topic}", na categoria de ID "${category}" e subcategoria de ID "${subCategory}", e ter um nível de dificuldade "${level}".
         
+        Considere uma perspectiva ou abordagem ligeiramente diferente para este curso, tornando-o distintivo e não apenas uma repetição de cursos com temas próximos.
+
         O esquema deve conter:
-        - Um campo 'title' (string): Título do curso. O título deve ser criativo, conciso e refletir claramente o conteúdo gerado com base no tópico, categoria, subcategoria e nível.
-        - Um campo 'description' (string): Uma breve descrição do curso (1-2 frases).
-        - Um campo 'slug' (string): Um slug único e formatado para URL (ex: "introducao-a-ia").
-        - Um campo 'lessons' (array de objetos): Uma lista de 5 a 7 lições. Cada lição deve ter:
-            - 'title' (string): Título da lição.
-            - 'slug' (string): Slug único da lição.
+        - Um campo 'title' (string): **Um título altamente criativo, único e atraente** para o curso (idealmente até 10 palavras). Deve refletir claramente o conteúdo gerado com base no tópico, categoria, subcategoria e nível, e destacar a unicidade da abordagem.
+        - Um campo 'description' (string): Uma breve descrição concisa (2-3 frases), que também capture o ângulo único do curso.
+        - Um campo 'slug' (string): Um slug único e formatado para URL, derivado do título. Ex: "introducao-a-inteligencia-artificial-para-iniciantes-inovador" ou "desvendando-a-programacao-python-com-projetos-praticos-essenciais". **É CRÍTICO que este slug seja único.**
+        - Um campo 'lessons' (array de objetos): Uma lista de **5 a 7 lições essenciais e bem estruturadas**. Cada lição deve ter:
+            - 'title' (string): **Um título único e cativante** para a lição, que seja relevante para o curso e não repetitivo em relação a outras lições.
+            - 'slug' (string): Slug único da lição. **É CRÍTICO que este slug seja único e derivado do título da lição.**
             - 'order' (number): A ordem da lição no curso, começando de 1.
-            - 'content' (string): Conteúdo detalhado da lição (3-5 parágrafos de texto corrido, sem formatação Markdown complexa ou HTML).
+            - 'content' (string): Conteúdo detalhado da lição (3-5 parágrafos de texto corrido, sem formatação Markdown complexa ou HTML). Foque em clareza, profundidade adequada ao nível especificado e exemplos práticos quando aplicável.
             - 'estimatedReadingTime' (number): Tempo estimado de leitura em minutos para esta lição (entre 3 e 15).
         A resposta deve ser APENAS um objeto JSON válido, sem nenhum texto introdutório ou explicativo, e sem aspas triplas ('''json) ou outros caracteres extras.
-        Exemplo de formato JSON para as lições:
-        "lessons": [
-            {
-                "title": "Titulo da Licao 1",
-                "slug": "titulo-da-licao-1",
-                "order": 1,
-                "content": "Conteúdo do parágrafo 1.\\n\\nConteúdo do parágrafo 2.",
-                "estimatedReadingTime": 7
-            }
-        ]`;
+        Exemplo de formato JSON para o curso e lições:
+        {
+            "title": "Titulo do Curso Único e Criativo",
+            "description": "Uma descrição breve e engajante que destaca a singularidade.",
+            "slug": "titulo-do-curso-unico-e-criativo-com-sufixo",
+            "lessons": [
+                {
+                    "title": "Titulo da Licao 1 Única",
+                    "slug": "titulo-da-licao-1-unica",
+                    "order": 1,
+                    "content": "Conteúdo do parágrafo 1.\\n\\nConteúdo do parágrafo 2.",
+                    "estimatedReadingTime": 7
+                },
+                {
+                    "title": "Titulo da Licao 2 Diferente",
+                    "slug": "titulo-da-licao-2-diferente",
+                    "order": 2,
+                    "content": "Mais conteúdo aqui.\\n\\nOutro parágrafo.",
+                    "estimatedReadingTime": 10
+                }
+            ]
+        }
+        `;
+        // --- FIM DO PROMPT APERFEIÇOADO ---
+
 
         console.log(`[BACKEND] Gerando curso para o tópico: "${topic}", categoria: "${category}", subcategoria: "${subCategory}", nível: "${level}" para o usuário ${creatorId}...`);
         const geminiResponse = await model.generateContent(prompt);
@@ -103,14 +135,15 @@ export const generateCourse = async (req, res) => {
         try {
             // Remove marcadores de código JSON e espaços em branco extras
             let cleanText = text.replace(/```json\n|```json|```/g, '').trim();
-            // Substitui quebras de linha por '\n' para garantir JSON válido.
-            // Cuidado com a remoção de caracteres de controle, pode ser excessivo dependendo da resposta da IA.
-            cleanText = cleanText.replace(/[\u0000-\u001F\u007F-\u009F\u00A0]/g, '').replace(/(\r\n|\n|\r)/gm, '\\n');
-            
+            // Substitui quebras de linha literais por '\n' para garantir JSON válido.
+            // A linha que removia '[\u0000-\u001F\u007F-\u009F\u00A0]' foi removida para evitar problemas
+            // com caracteres válidos que a IA possa gerar e que não são marcadores de código.
+            cleanText = cleanText.replace(/(\r\n|\r)/gm, '\\n'); // Apenas substitui \r\n ou \r por \n
+
             generatedCourseData = JSON.parse(cleanText);
         } catch (parseError) {
             console.error("[BACKEND] Erro ao parsear JSON da Gemini API:", parseError);
-            console.error("[BACKEND] Texto bruto recebido da Gemini:", text);
+            console.error("[BACKEND] Texto bruto recebido da Gemini (primeiros 500 chars):", text.substring(0, 500) + (text.length > 500 ? '...' : ''));
             return res.status(500).json({ error: 'Erro ao processar a resposta da IA. Formato JSON inválido.', rawText: text });
         }
 
@@ -158,7 +191,8 @@ export const generateCourse = async (req, res) => {
 
         // 4. Criar os documentos das lições e adicionar à transação.
         for (const lesson of generatedCourseData.lessons) {
-            const lessonSlug = { current: lesson.slug || `${generatedCourseData.slug}-${lesson.order}` };
+            // Garante que o slug da lição seja único
+            const lessonSlug = { current: generateSlug(lesson.title) }; 
             const lessonId = `lesson-${uuidv4()}`; 
 
             const newLesson = {
@@ -188,12 +222,15 @@ export const generateCourse = async (req, res) => {
         }
 
         // 5. Criar o documento do curso e adicionar à transação.
+        // Garante que o slug do curso seja único
+        const courseSlug = { current: generateSlug(generatedCourseData.title) };
+
         const newCourse = {
             _id: courseId,
             _type: 'course',
             title: generatedCourseData.title,
             description: generatedCourseData.description,
-            slug: { current: generatedCourseData.slug },
+            slug: courseSlug, // Usa o slug gerado com a função generateSlug
             lessons: lessonRefs,
             status: 'published', // Status inicial do curso.
             price: 0, // Preço padrão para cursos gerados por IA.
@@ -230,32 +267,26 @@ export const generateCourse = async (req, res) => {
             message: 'Curso, lições geradas e salvos com sucesso! Créditos e cursos do membro atualizados.',
             course: newCourse, 
             lessons: generatedCourseData.lessons,
-            memberUpdateId: memberUpdateInfo ? memberUpdateInfo.id : null, // ID do membro atualizado
-            // Se precisar dos *dados completos* do membro atualizado, faria um `sanityClient.getDocument(creatorId)` aqui.
+            memberUpdateId: memberUpdateInfo ? memberUpdateInfo.id : null, 
         });
 
     } catch (error) {
         console.error("[BACKEND] Erro no processo de geração/salvamento do curso:", error);
-        // O Sanity Transaction automaticamente fará o rollback em caso de falha.
         
-        // Tratamento de erros específicos para o frontend.
         if (error.message === 'Insufficient credits to create a course.') {
-            return res.status(403).json({ error: error.message }); // 403 Forbidden: Usuário não tem permissão/créditos.
+            return res.status(403).json({ error: error.message }); 
         }
         if (error.message.includes('Member with ID') && error.message.includes('not found')) {
-            return res.status(404).json({ error: error.message }); // 404 Not Found: Membro inválido.
+            return res.status(404).json({ error: error.message }); 
         }
-        // Erros da Gemini API.
         if (error.response && error.response.data && error.response.data.error) {
             console.error("[BACKEND] Erro da Gemini API:", error.response.data.error);
             return res.status(500).json({ error: `Erro da Gemini API: ${error.response.data.error.message}`, details: error.response.data });
         }
-        // Erros do Sanity CMS.
         if (error.statusCode) { 
             console.error("[BACKEND] Erro do Sanity:", error.message);
             return res.status(500).json({ error: `Erro do Sanity CMS: ${error.message}`, details: error });
         }
-        // Erros genéricos.
         res.status(500).json({ error: 'Falha interna ao gerar ou salvar o curso.', details: error.message });
     }
 };
