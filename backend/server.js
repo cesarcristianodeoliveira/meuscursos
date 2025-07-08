@@ -50,7 +50,7 @@ app.get('/', (req, res) => {
 
 // Rotas de Autenticação
 app.post('/api/auth/register', register); 
-app.post('/api/auth/login', login);      
+app.post('/api/auth/login', login);
 
 // Rota de Geração de Cursos (protegida e modularizada)
 app.post('/api/courses/generate', protect, generateCourse); 
@@ -68,7 +68,7 @@ app.listen(PORT, () => {
     console.log('Endpoints disponíveis:');
     console.log(`GET /`);
     console.log(`POST /api/auth/register`); 
-    console.log(`POST /api/auth/login`);      
+    console.log(`POST /api/auth/login`);
     console.log(`POST /api/courses/generate (protegida)`); 
     console.log(`GET /api/data/categories`); 
     console.log(`GET /api/data/subcategories`);
