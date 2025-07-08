@@ -11,7 +11,7 @@ const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN)
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET || 'production',
     apiVersion: '2025-06-12', // Certifique-se de que esta API version está atualizada ou corresponde à que você está usando
-    useCdn: false,
+    useCdn: false, // Use false para writes/updates
     token: process.env.SANITY_TOKEN,
 }) : null;
 
@@ -48,5 +48,38 @@ export const getCourseSubCategories = async (req, res) => {
     }
 };
 
-// Se você precisar de tags ou outros dados de referência, adicione funções aqui
-// export const getCourseTags = async (req, res) => { ... }
+/**
+ * @desc Busca tags de curso por ID de categoria associada.
+ * @route GET /api/data/tags/byCategory/:categoryId
+ * @access Public (para listar opções no frontend)
+ */
+export const getCourseTagsByCategory = async (req, res) => { // <--- NOVA FUNÇÃO ADICIONADA
+    if (!sanityClient) {
+        return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
+    }
+    try {
+        const { categoryId } = req.params;
+
+        if (!categoryId) {
+            return res.status(400).json({ message: 'Category ID is required.' });
+        }
+
+        // Busca todas as tags que têm uma referência ao categoryId no array 'categories'
+        // 'categories' é o campo array de referências no seu schema courseTag
+        const tags = await sanityClient.fetch(
+            `*[_type == "courseTag" && $categoryId in categories[]._ref]{
+                _id,
+                name,
+                slug,
+                description
+            }`,
+            { categoryId }
+        );
+
+        res.status(200).json(tags);
+
+    } catch (error) {
+        console.error('Erro ao buscar tags por categoria:', error);
+        res.status(500).json({ message: 'Erro interno do servidor ao buscar tags.', error: error.message });
+    }
+};

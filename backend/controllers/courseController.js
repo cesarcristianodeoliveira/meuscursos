@@ -26,17 +26,18 @@ const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN)
 
 // --- Função auxiliar para gerar slug amigável para URLs e único ---
 const generateSlug = (text) => {
-  const normalizedText = text
-    .normalize("NFD") 
-    .replace(/[\u0300-\u036f]/g, ""); 
+    const normalizedText = text
+        .normalize("NFD") 
+        .replace(/[\u0300-\u036f]/g, ""); 
 
-  const baseSlug = normalizedText
-    .toLowerCase()
-    .replace(/[^a-z0-9 -]/g, '') 
-    .replace(/\s+/g, '-')        
-    .replace(/-+/g, '-');        
-  
-  return `${baseSlug}-${uuidv4().substring(0, 8)}`; 
+    const baseSlug = normalizedText
+        .toLowerCase()
+        .replace(/[^a-z0-9 -]/g, '') 
+        .replace(/\s+/g, '-')        
+        .replace(/-+/g, '-');        
+    
+    // Adiciona um sufixo UUID curto para garantir unicidade do slug
+    return `${baseSlug}-${uuidv4().substring(0, 8)}`; 
 };
 
 // Helper para converter string de texto para Portable Text básico
@@ -65,7 +66,8 @@ export const generateCourse = async (req, res) => {
         return res.status(500).json({ error: 'Erro de configuração do servidor: Chaves de API ou Cliente Sanity não inicializados.' });
     }
 
-    const { topic, category, subCategory, level, userId } = req.body; 
+    // Adiciona 'tags' aos dados recebidos do corpo da requisição
+    const { topic, category, subCategory, level, userId, tags } = req.body; 
     const creatorId = userId || req.user?.id; 
 
     // --- LOG DE DEBUG: Verificando o creatorId ---
@@ -80,11 +82,39 @@ export const generateCourse = async (req, res) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); 
 
+        // --- Lógica para buscar detalhes das tags selecionadas ---
+        let tagsContext = '';
+        const courseTagRefs = []; // Array para armazenar as referências das tags para o novo curso
+        
+        if (tags && tags.length > 0) {
+            // Busca os detalhes (name, description) das tags pelos seus _id's
+            const tagDetails = await sanityClient.fetch(
+                `*[_type == "courseTag" && _id in $tags]{_id, name, description}`,
+                { tags } // 'tags' é o array de _id's de tags recebido do frontend
+            );
+
+            if (tagDetails.length > 0) {
+                tagsContext = `Considere também as seguintes tags para o curso e suas lições, utilizando-as para refinar o foco e o vocabulário: \n`;
+                tagDetails.forEach(tag => {
+                    tagsContext += `- **${tag.name}**: ${tag.description || 'Nenhuma descrição fornecida.'}\n`;
+                    // Preenche o array de referências para o novo curso
+                    courseTagRefs.push({
+                        _ref: tag._id,
+                        _type: 'reference',
+                        _key: uuidv4(), // _key é necessário para itens em arrays de Portable Text e arrays de referências
+                    });
+                });
+                tagsContext += `As tags devem ser incorporadas de forma a enriquecer o título, a descrição e o conteúdo das lições.\n\n`;
+            }
+        }
+
         const prompt = `Gere um esquema de curso detalhado em português, garantindo que o **título do curso e os títulos das lições sejam altamente originais e únicos**, mesmo quando os parâmetros iniciais são semelhantes.
 
-        O curso deve ser sobre "${topic}", na categoria de ID "${category}" e subcategoria de ID "${subCategory}", e ter um nível de dificuldade "${level}".
+        ${tagsContext} O curso deve ser sobre "${topic}", na categoria de ID "${category}" e subcategoria de ID "${subCategory}", e ter um nível de dificuldade "${level}".
         
         Considere uma perspectiva ou abordagem ligeiramente diferente para este curso, tornando-o distintivo e não apenas uma repetição de cursos com temas próximos.
+        
+        **Varie o início do título do curso e das lições** com diferentes abordagens e sinônimos (ex: "Fluência em Inglês", "Domine o Inglês", "Inglês na Prática", "Guia Completo de Inglês", "Desvende o Inglês", etc. para títulos de curso de inglês). **Evite repetir as mesmas palavras iniciais nos títulos de cursos e lições.**
 
         O esquema deve conter:
         - Um campo 'title' (string): **Um título altamente criativo, único e atraente** para o curso (idealmente até 10 palavras). Deve refletir claramente o conteúdo gerado com base no tópico, categoria, subcategoria e nível, e destacar a unicidade da abordagem.
@@ -164,8 +194,8 @@ export const generateCourse = async (req, res) => {
         transaction.patch(creatorId, (patch) => {
             return patch
                 .set({ credits: updatedCredits }) 
-                .setIfMissing({ createdCourses: [] }) // Garante que 'createdCourses' é um array vazio se não existir
-                .append('createdCourses', [{     // Adiciona o novo curso ao final do array 'createdCourses'
+                .setIfMissing({ createdCourses: [] }) 
+                .append('createdCourses', [{     
                     _ref: courseId, 
                     _type: 'reference',
                     _key: uuidv4(), 
@@ -187,7 +217,7 @@ export const generateCourse = async (req, res) => {
                 slug: lessonSlug,
                 content: convertToPortableText(lesson.content),
                 order: lesson.order,
-                estimatedReadingTime: lesson.estimatedReadingTime || 5,
+                estimatedReadingTime: lesson.estimatedReadingTime || 5, // Garante um valor padrão
                 status: 'published', 
                 course: {
                     _ref: courseId, 
@@ -226,6 +256,7 @@ export const generateCourse = async (req, res) => {
             },
             category: { _ref: category, _type: 'reference' }, 
             subCategory: { _ref: subCategory, _type: 'reference' }, 
+            courseTags: courseTagRefs, // <--- ADICIONADO: Referências às tags selecionadas
             aiGenerationPrompt: prompt, 
             aiModelUsed: model.model,   
             generatedAt: new Date().toISOString(),
@@ -275,14 +306,21 @@ export const generateCourse = async (req, res) => {
         if (error.message.includes('Member with ID') && error.message.includes('not found')) {
             return res.status(404).json({ error: error.message }); 
         }
-        if (error.response && error.response.data && error.response.data.error) {
+        // Tratamento de erro específico para a Gemini API, incluindo o status code 429
+        if (error.response && error.response.data) {
+            if (error.response.status === 429) { // Too Many Requests
+                console.error("[BACKEND] Gemini API Rate Limit Excedido:", error.response.data.error);
+                return res.status(429).json({ error: "Limite de requisições da IA excedido. Por favor, tente novamente em breve.", details: error.response.data.error.message });
+            }
             console.error("[BACKEND] Erro da Gemini API:", error.response.data.error);
             return res.status(500).json({ error: `Erro da Gemini API: ${error.response.data.error.message}`, details: error.response.data });
         }
+        // Tratamento de erro para Sanity CMS
         if (error.statusCode) { 
             console.error("[BACKEND] Erro do Sanity:", error.message);
             return res.status(500).json({ error: `Erro do Sanity CMS: ${error.message}`, details: error });
         }
+        // Erro genérico
         res.status(500).json({ error: 'Falha interna ao gerar ou salvar o curso.', details: error.message });
     }
 };
