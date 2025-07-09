@@ -21,10 +21,12 @@ import {
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext'; // Ajuste o caminho se necessário
 
+// URL base da sua API de backend
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
+// Propriedades para o Menu de Tags (MUI Select)
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
 const MenuProps = {
@@ -37,33 +39,38 @@ const MenuProps = {
 };
 
 function CourseCreatePage() {
-    const [activeStep, setActiveStep] = useState(0);
+    const [activeStep, setActiveStep] = useState(0); // Controla o passo atual do stepper
 
+    // Estados para os dados do formulário
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedSubCategory, setSelectedSubCategory] = useState('');
-    const [selectedLevel, setSelectedLevel] = useState('beginner');
+    const [selectedLevel, setSelectedLevel] = useState('beginner'); // Valor padrão 'beginner'
     const [selectedTags, setSelectedTags] = useState([]);
 
+    // Estados para os dados carregados do Sanity/Backend
     const [fetchedCategories, setFetchedCategories] = useState([]);
     const [fetchedSubCategories, setFetchedSubCategories] = useState([]);
     const [fetchedTags, setFetchedTags] = useState([]);
 
+    // Níveis de curso disponíveis, memoizado para performance
     const levels = useMemo(() => [
         { value: 'beginner', label: 'Iniciante' },
         { value: 'intermediate', label: 'Intermediário' },
         { value: 'advanced', label: 'Avançado' },
     ], []);
 
-    const [generatedTopic, setGeneratedTopic] = useState('');
-    // Storing the entire coursePreview object from the AI response
-    const [coursePreview, setCoursePreview] = useState(null); 
+    const [generatedTopic, setGeneratedTopic] = useState(''); // Tópico gerado para a IA
+    const [coursePreview, setCoursePreview] = useState(null); // Armazena o objeto de pré-visualização do curso da resposta da IA
 
+    // Estados para feedback da UI
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState({ text: null, courseId: null });
 
-    const { userToken, user } = useAuth(); // Destructure user to get creatorId
+    // Obtém o token do usuário e o objeto 'user' do contexto de autenticação
+    const { userToken, user } = useAuth();
 
+    // Definição dos passos do Stepper
     const steps = [
         {
             label: 'Escolha os Detalhes do Curso',
@@ -83,6 +90,9 @@ function CourseCreatePage() {
         },
     ];
 
+    // --- Funções de Busca de Dados ---
+
+    // Busca categorias e subcategorias do backend/Sanity
     const fetchSanityData = useCallback(async () => {
         setError(null);
         setLoading(true);
@@ -103,12 +113,13 @@ function CourseCreatePage() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, []); // Dependências vazias, pois só carrega uma vez
 
+    // Busca tags filtradas por categoria selecionada
     const fetchTagsByCategory = useCallback(async (categoryId) => {
-        setFetchedTags([]);
-        setSelectedTags([]);
-        if (!categoryId) return;
+        setFetchedTags([]); // Limpa as tags anteriores
+        setSelectedTags([]); // Limpa as tags selecionadas
+        if (!categoryId) return; // Não busca se a categoria não estiver selecionada
 
         setError(null);
         setLoading(true);
@@ -125,19 +136,25 @@ function CourseCreatePage() {
         }
     }, []);
 
+    // --- Efeitos Colaterais (useEffect) ---
+
+    // Efeito para carregar categorias e subcategorias no montagem do componente
     useEffect(() => {
         fetchSanityData();
     }, [fetchSanityData]);
 
+    // Efeito para carregar tags quando a categoria selecionada muda
     useEffect(() => {
         if (selectedCategory) {
             fetchTagsByCategory(selectedCategory);
         } else {
+            // Limpa as tags se nenhuma categoria estiver selecionada
             setFetchedTags([]);
             setSelectedTags([]);
         }
     }, [selectedCategory, fetchTagsByCategory]);
 
+    // Efeito para gerar o tópico de entrada para a IA baseado nas seleções do usuário
     useEffect(() => {
         const categoryTitle = fetchedCategories.find(cat => cat._id === selectedCategory)?.title;
         const subCategoryTitle = fetchedSubCategories.find(sub => sub._id === selectedSubCategory)?.title;
@@ -153,12 +170,15 @@ function CourseCreatePage() {
         setGeneratedTopic(topic);
     }, [selectedCategory, selectedSubCategory, selectedLevel, selectedTags, fetchedCategories, fetchedSubCategories, fetchedTags, levels]);
 
+    // --- Handlers do Stepper ---
+
     const handleNext = () => {
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
     };
 
     const handleBack = () => {
         setActiveStep((prevActiveStep) => prevActiveStep - 1);
+        // Ao voltar do passo de pré-visualização, limpa a pré-visualização e mensagens de sucesso
         if (activeStep === 2) {
             setCoursePreview(null);
             setSuccessMessage({ text: null, courseId: null });
@@ -176,10 +196,14 @@ function CourseCreatePage() {
         setLoading(false);
         setError(null);
         setSuccessMessage({ text: null, courseId: null });
-        setFetchedTags([]);
+        setFetchedTags([]); // Limpa as tags carregadas para forçar recarregamento se a categoria mudar
     };
 
+    // --- Funções Principais de Interação com a API ---
+
+    // Lida com a geração da pré-visualização do curso pela IA
     const handleGenerateCourse = async () => {
+        // Validação básica dos campos antes de enviar para o backend
         if (!selectedCategory || !selectedSubCategory || !selectedLevel || !generatedTopic.trim()) {
             setError('Por favor, preencha todos os campos obrigatórios (Categoria, Subcategoria, Nível).');
             return;
@@ -188,7 +212,7 @@ function CourseCreatePage() {
         setLoading(true);
         setError(null);
         setSuccessMessage({ text: null, courseId: null });
-        setCoursePreview(null); // Clear previous preview
+        setCoursePreview(null); // Limpa qualquer pré-visualização anterior
 
         if (!userToken) {
             setError('Você não está autenticado. Por favor, faça login novamente.');
@@ -214,42 +238,44 @@ function CourseCreatePage() {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.message || errorData.error || 'Falha ao gerar a pré-visualização do curso no backend.');
+                // Melhora o tratamento de erros do backend
+                throw new Error(errorData.message || errorData.error || `Falha ao gerar a pré-visualização. Status: ${response.status}`);
             }
 
             const result = await response.json();
-            console.log('Resposta completa da pré-visualização:', result); 
-            
-            // The AI response directly provides the coursePreview object, as discussed.
-            // Ensure result.coursePreview exists before setting.
+            console.log('Resposta completa da pré-visualização:', result);
+
+            // Verifica se a resposta da IA contém o objeto de pré-visualização esperado
             if (result.coursePreview) {
                 setCoursePreview(result.coursePreview);
                 setSuccessMessage({ text: 'Pré-visualização do curso gerada com sucesso! Revise e confirme.', courseId: null });
                 setLoading(false);
-                handleNext();
+                handleNext(); // Avança para o passo de pré-visualização
             } else {
                 throw new Error('A resposta da IA não contém a pré-visualização esperada (coursePreview).');
             }
         } catch (err) {
             console.error("Erro ao gerar pré-visualização do curso:", err);
-            if (err.message && err.message.includes('401')) {
+            // Mensagens de erro mais amigáveis para o usuário
+            if (err.message.includes('401')) {
                 setError('Não autorizado. Sua sessão pode ter expirado. Por favor, faça login novamente.');
-            } else if (err.message && err.message.includes('403')) {
+            } else if (err.message.includes('403')) {
                 setError('Créditos insuficientes para gerar um curso. Por favor, adicione mais créditos ou entre em contato.');
-            } else if (err.message && err.message.includes('Erro da Gemini API')) {
+            } else if (err.message.includes('Erro da Gemini API')) {
                 setError(`Erro da IA: ${err.message}. Tente novamente.`);
-            } else if (err.message && err.message.includes('JSON inválido')) {
+            } else if (err.message.includes('JSON inválido')) {
                 setError('A resposta da IA está em um formato inesperado. Tente novamente ou ajuste o prompt.');
             } else {
-                setError(`Erro ao gerar curso: ${err.message}. Verifique o console do backend.`);
+                setError(`Erro ao gerar curso: ${err.message}.`);
             }
             setLoading(false);
         }
     };
 
+    // Lida com o salvamento do curso gerado pela IA no Sanity CMS
     const handleSaveGeneratedCourse = async () => {
-        // We now expect coursePreview to hold the complete object from the AI
-        if (!coursePreview || !coursePreview.slug) { 
+        // Verifica se há uma pré-visualização para salvar
+        if (!coursePreview || !coursePreview.slug) {
             setError('Nenhum curso para salvar. Gere uma pré-visualização primeiro.');
             return;
         }
@@ -264,7 +290,8 @@ function CourseCreatePage() {
             return;
         }
 
-        // Get creatorId from user context
+        // **AQUI ESTÁ A CHAVE DA CORREÇÃO**
+        // Obtém o ID do criador do objeto 'user' do AuthContext
         const creatorId = user?.id;
         if (!creatorId) {
             setError('ID do criador não encontrado. Por favor, faça login novamente.');
@@ -280,38 +307,36 @@ function CourseCreatePage() {
                     'Authorization': `Bearer ${userToken}`,
                 },
                 body: JSON.stringify({
-                    // THIS IS THE KEY CHANGE: Sending the coursePreview object directly
-                    // as 'courseData' as expected by your backend
+                    // Envia o objeto courseData conforme esperado pelo seu backend
                     courseData: {
-                        title: coursePreview.courseTitle || coursePreview.title, // Use courseTitle or title
-                        description: coursePreview.courseDescription || coursePreview.description, // Use courseDescription or description
+                        title: coursePreview.courseTitle || coursePreview.title, // Prioriza courseTitle se existir
+                        description: coursePreview.courseDescription || coursePreview.description, // Prioriza courseDescription se existir
                         lessons: coursePreview.lessons,
                         slug: coursePreview.slug,
                     },
-                    // Other metadata are sent at the top level
+                    // Outros metadados são enviados no nível superior
                     category: selectedCategory,
                     subCategory: selectedSubCategory,
                     level: selectedLevel,
                     tags: selectedTags,
-                    creatorId: creatorId // Include the creatorId
+                    creatorId: creatorId // Inclui o creatorId obtido do contexto
                 }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.message || errorData.error || 'Falha ao salvar o curso no backend.');
+                throw new Error(errorData.message || errorData.error || `Falha ao salvar o curso. Status: ${response.status}`);
             }
 
             const result = await response.json();
             console.log('Curso salvo com sucesso no Sanity:', result);
-            
+
             setSuccessMessage({
                 text: 'Curso e lições salvos com sucesso no Sanity CMS! 🎉',
-                // Adjust this based on what your backend returns as the saved course ID
-                courseId: result._id || result.savedCourseId || result.courseId // Using some common options
+                courseId: result._id || result.savedCourseId || result.courseId // Tenta obter o ID do curso salvo
             });
             setLoading(false);
-            handleNext(); // Advance to the completion step
+            handleNext(); // Avança para o passo de conclusão
         } catch (err) {
             console.error("Erro ao salvar curso:", err);
             setError(`Erro ao salvar curso: ${err.message}.`);
@@ -319,6 +344,7 @@ function CourseCreatePage() {
         }
     };
 
+    // Filtra as subcategorias com base na categoria selecionada
     const filteredSubCategories = fetchedSubCategories.filter(
         (subCat) => subCat.categoryRef === selectedCategory
     );
@@ -360,8 +386,8 @@ function CourseCreatePage() {
                                                 label="Categoria"
                                                 onChange={(e) => {
                                                     setSelectedCategory(e.target.value);
-                                                    setSelectedSubCategory('');
-                                                    setSelectedTags([]);
+                                                    setSelectedSubCategory(''); // Reseta subcategoria ao mudar categoria
+                                                    setSelectedTags([]); // Reseta tags ao mudar categoria
                                                 }}
                                                 disabled={fetchedCategories.length === 0}
                                             >
@@ -421,6 +447,7 @@ function CourseCreatePage() {
                                                         target: { value },
                                                     } = event;
                                                     setSelectedTags(
+                                                        // No autofill of MUI, value is a string with comma-separated values
                                                         typeof value === 'string' ? value.split(',') : value,
                                                     );
                                                 }}
@@ -509,7 +536,7 @@ function CourseCreatePage() {
                                                                 Lição {lessonIndex + 1}: {lesson.title}
                                                             </Typography>
                                                             <Typography variant="body2" color="text.secondary">
-                                                                {lesson.content || lesson.description} {/* Use content or description */}
+                                                                {lesson.content || lesson.description}
                                                             </Typography>
                                                         </Box>
                                                     ))
@@ -528,7 +555,7 @@ function CourseCreatePage() {
                                 )}
 
                                 <div>
-                                    {/* Buttons for steps 0 and 1 */}
+                                    {/* Botões para os passos 0 e 1 */}
                                     {index <= 1 && (
                                         <>
                                             <Button
@@ -554,14 +581,14 @@ function CourseCreatePage() {
                                         </>
                                     )}
 
-                                    {/* Buttons for step 2 (Preview and Confirmation) */}
+                                    {/* Botões para o passo 2 (Pré-visualização e Confirmação) */}
                                     {index === 2 && (
                                         <>
                                             <Button
                                                 variant="contained"
                                                 onClick={handleSaveGeneratedCourse}
                                                 sx={{ mt: 1, mr: 1 }}
-                                                disabled={loading || !coursePreview || !coursePreview.slug} 
+                                                disabled={loading || !coursePreview || !coursePreview.slug}
                                                 startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
                                             >
                                                 {loading ? 'Salvando...' : 'Confirmar e Salvar Curso'}
@@ -578,6 +605,7 @@ function CourseCreatePage() {
                                     )}
                                 </div>
 
+                                {/* Mensagens de carregamento e erro */}
                                 {loading && index === 1 && (
                                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                                         Aguarde, a IA está trabalhando para gerar a pré-visualização...
@@ -599,29 +627,28 @@ function CourseCreatePage() {
                 ))}
             </Stepper>
 
+            {/* Renderização da mensagem de sucesso no último passo */}
             {activeStep === steps.length && (
                 <Paper square elevation={0} sx={{ p: 3, mt: 3 }}>
                     <Typography variant="h6" color="success.main" sx={{ mb: 2 }}>
                         {successMessage.text || 'Processo de criação concluído!'}
                     </Typography>
+                    {successMessage.courseId && (
+                        <Typography variant="body1" sx={{ mb: 2 }}>
+                            Você pode visualizar o curso <Link to={`/cursos/${successMessage.courseId}`}>aqui</Link>.
+                        </Typography>
+                    )}
                     {error && (
                         <Alert severity="error" sx={{ mb: 2 }}>
                             {error}
                         </Alert>
                     )}
-                    <Button onClick={handleReset} sx={{ mt: 1, mr: 1}}>
+                    <Button onClick={handleReset} sx={{ mt: 1, mr: 1 }}>
                         Criar Outro Curso
                     </Button>
-                    {successMessage.courseId && (
-                        <Button
-                            component={Link}
-                            to={`/cursos/${successMessage.courseId}`} // Adjust this path if your course detail page has a different URL structure
-                            variant="contained"
-                            sx={{ mt: 1 }}
-                        >
-                            Ver Curso Salvo
-                        </Button>
-                    )}
+                    <Button component={Link} to="/cursos" variant="text" sx={{ mt: 1 }}>
+                        Ver Meus Cursos
+                    </Button>
                 </Paper>
             )}
         </Container>
