@@ -33,10 +33,9 @@ const generateSlug = (text) => {
     const baseSlug = normalizedText
         .toLowerCase()
         .replace(/[^a-z0-9 -]/g, '') 
-        .replace(/\s+/g, '-')        
-        .replace(/-+/g, '-');        
+        .replace(/\s+/g, '-')        
+        .replace(/-+/g, '-');        
     
-    // Adiciona um sufixo UUID curto para garantir unicidade do slug
     return `${baseSlug}-${uuidv4().substring(0, 8)}`; 
 };
 
@@ -66,7 +65,7 @@ export const generateCourse = async (req, res) => {
         return res.status(500).json({ error: 'Erro de configuração do servidor: Chaves de API ou Cliente Sanity não inicializados.' });
     }
 
-    // Adiciona 'tags' aos dados recebidos do corpo da requisição
+    // ADICIONADO 'tags' DE VOLTA AQUI
     const { topic, category, subCategory, level, userId, tags } = req.body; 
     const creatorId = userId || req.user?.id; 
 
@@ -86,6 +85,7 @@ export const generateCourse = async (req, res) => {
         let tagsContext = '';
         const courseTagRefs = []; // Array para armazenar as referências das tags para o novo curso
         
+        // Verifica se 'tags' existe e tem itens
         if (tags && tags.length > 0) {
             // Busca os detalhes (name, description) das tags pelos seus _id's
             const tagDetails = await sanityClient.fetch(
@@ -101,7 +101,8 @@ export const generateCourse = async (req, res) => {
                     courseTagRefs.push({
                         _ref: tag._id,
                         _type: 'reference',
-                        _key: uuidv4(), // _key é necessário para itens em arrays de Portable Text e arrays de referências
+                        _key: uuidv4(), 
+                        _weak: true, // <-- Adicionado: Referência fraca para as tags
                     });
                 });
                 tagsContext += `As tags devem ser incorporadas de forma a enriquecer o título, a descrição e o conteúdo das lições.\n\n`;
@@ -199,6 +200,11 @@ export const generateCourse = async (req, res) => {
                     _ref: courseId, 
                     _type: 'reference',
                     _key: uuidv4(), 
+                    // Removido _weak: true daqui. No schema 'member', createdCourses deve ser weak.
+                    // Se você configurou weak: true no schema 'member' para 'createdCourses',
+                    // o Sanity Studio já tratará essas referências como fracas,
+                    // mesmo que _weak não esteja explicitamente aqui.
+                    // Para evitar redundância ou possíveis conflitos, é melhor confiar no schema.
                 }]);
         });
 
@@ -217,7 +223,7 @@ export const generateCourse = async (req, res) => {
                 slug: lessonSlug,
                 content: convertToPortableText(lesson.content),
                 order: lesson.order,
-                estimatedReadingTime: lesson.estimatedReadingTime || 5, // Garante um valor padrão
+                estimatedReadingTime: lesson.estimatedReadingTime || 5,
                 status: 'published', 
                 course: {
                     _ref: courseId, 
@@ -230,6 +236,7 @@ export const generateCourse = async (req, res) => {
                 _key: uuidv4(), 
                 _ref: lessonId,
                 _type: 'reference',
+                _weak: true, // <-- Adicionado: Referência fraca para lições (no array 'lessons' do curso)
             });
             createdLessonIds.push(lessonId);
             totalEstimatedDuration += (lesson.estimatedReadingTime || 0); 
@@ -253,15 +260,20 @@ export const generateCourse = async (req, res) => {
             creator: {
                 _ref: creatorId, 
                 _type: 'reference',
+                _weak: true, // <-- Adicionado: Referência fraca para o criador do curso
             },
             category: { _ref: category, _type: 'reference' }, 
             subCategory: { _ref: subCategory, _type: 'reference' }, 
-            courseTags: courseTagRefs, // <--- ADICIONADO: Referências às tags selecionadas
+            courseTags: courseTagRefs, // <-- Já estava certo!
             aiGenerationPrompt: prompt, 
             aiModelUsed: model.model,   
             generatedAt: new Date().toISOString(),
             lastGenerationRevision: new Date().toISOString(),
         };
+
+        // --- LOG DE DEBUG: Inspecionando o objeto newCourse antes de enviá-lo ao Sanity ---
+        console.log('[BACKEND] Objeto newCourse para Sanity:', JSON.stringify(newCourse, null, 2));
+
 
         transaction.create(newCourse);
         console.log(`[BACKEND] Curso "${newCourse.title}" adicionado à transação (ID: ${courseId}).`);

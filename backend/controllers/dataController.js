@@ -7,10 +7,14 @@ if (!process.env.SANITY_PROJECT_ID || !process.env.SANITY_TOKEN) {
     console.error("Erro: Variáveis de ambiente SANITY_PROJECT_ID ou SANITY_TOKEN não definidas em dataController.");
     // Em produção, você pode querer lançar um erro ou ter um fallback
 }
+
+// O apiVersion pode ser '2021-03-25' para a maioria dos projetos existentes,
+// '2023-08-01' para funcionalidades mais recentes, ou a data atual se for um projeto novo.
+// Usar uma data futura como 2025-06-12 é ok, mas geralmente usamos a data de lançamento da API que queremos fixar.
 const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN) ? createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET || 'production',
-    apiVersion: '2025-06-12', // Certifique-se de que esta API version está atualizada ou corresponde à que você está usando
+    apiVersion: '2025-06-12', // Mantendo sua versão, apenas uma nota.
     useCdn: false, // Use false para writes/updates
     token: process.env.SANITY_TOKEN,
 }) : null;
@@ -22,7 +26,8 @@ export const getCourseCategories = async (req, res) => {
     }
     try {
         // Query Sanity para buscar todos os documentos do tipo 'courseCategory'
-        const query = `*[_type == "courseCategory"]{_id, title, description}`;
+        // Adicionada ordenação alfabética pelo título
+        const query = `*[_type == "courseCategory"] | order(title asc) {_id, title, description}`;
         const categories = await sanityClient.fetch(query);
         res.status(200).json(categories);
     } catch (error) {
@@ -39,7 +44,8 @@ export const getCourseSubCategories = async (req, res) => {
     try {
         // Query Sanity para buscar todos os documentos do tipo 'courseSubCategory'
         // CORREÇÃO: Usando 'parentCategory._ref' para acessar a referência da categoria pai
-        const query = `*[_type == "courseSubCategory"]{_id, title, description, "categoryRef": parentCategory._ref}`;
+        // Adicionada ordenação alfabética pelo título
+        const query = `*[_type == "courseSubCategory"] | order(title asc) {_id, title, description, "categoryRef": parentCategory._ref}`;
         const subCategories = await sanityClient.fetch(query);
         res.status(200).json(subCategories);
     } catch (error) {
@@ -53,7 +59,7 @@ export const getCourseSubCategories = async (req, res) => {
  * @route GET /api/data/tags/byCategory/:categoryId
  * @access Public (para listar opções no frontend)
  */
-export const getCourseTagsByCategory = async (req, res) => { // <--- NOVA FUNÇÃO ADICIONADA
+export const getCourseTagsByCategory = async (req, res) => {
     if (!sanityClient) {
         return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
     }
@@ -66,8 +72,9 @@ export const getCourseTagsByCategory = async (req, res) => { // <--- NOVA FUNÇ�
 
         // Busca todas as tags que têm uma referência ao categoryId no array 'categories'
         // 'categories' é o campo array de referências no seu schema courseTag
+        // Adicionada ordenação alfabética pelo nome
         const tags = await sanityClient.fetch(
-            `*[_type == "courseTag" && $categoryId in categories[]._ref]{
+            `*[_type == "courseTag" && $categoryId in categories[]._ref] | order(name asc) {
                 _id,
                 name,
                 slug,

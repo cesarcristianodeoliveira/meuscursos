@@ -157,7 +157,6 @@ export default {
         { 
           type: 'reference', 
           to: [{ type: 'course' }],
-          weak: true,
         }
       ],
       description: 'List of courses created by this member.'
