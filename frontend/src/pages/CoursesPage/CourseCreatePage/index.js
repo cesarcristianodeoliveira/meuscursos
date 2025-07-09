@@ -17,7 +17,7 @@ import {
     InputLabel,
     OutlinedInput,
     Chip,
-    Divider, // Adicione este import
+    Divider,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -55,12 +55,12 @@ function CourseCreatePage() {
     ], []);
 
     const [generatedTopic, setGeneratedTopic] = useState('');
-    // NOVO ESTADO: Para armazenar a pré-visualização do curso
     const [coursePreview, setCoursePreview] = useState(null);
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [successMessage, setSuccessMessage] = useState(null);
+    // Modificado para armazenar também o ID do curso para o botão "Visualizar Curso"
+    const [successMessage, setSuccessMessage] = useState({ text: null, courseId: null });
 
     const { userToken } = useAuth();
 
@@ -74,7 +74,7 @@ function CourseCreatePage() {
             description: 'Confirme os detalhes e inicie a geração do curso pela IA. Isso pode levar alguns segundos.'
         },
         {
-            label: 'Pré-visualização e Confirmação', // Etapa alterada
+            label: 'Pré-visualização e Confirmação',
             description: 'Revise a pré-visualização do curso gerada pela IA. Você pode confirmar para salvar ou cancelar.'
         },
         {
@@ -157,12 +157,11 @@ function CourseCreatePage() {
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
     };
 
-    const handleBack = () => { // Renomeado para handleBack para consistência
+    const handleBack = () => {
         setActiveStep((prevActiveStep) => prevActiveStep - 1);
-        // Se voltar da pré-visualização, limpa a pré-visualização
         if (activeStep === 2) {
             setCoursePreview(null);
-            setSuccessMessage(null); // Limpa mensagem de sucesso da pré-visualização
+            setSuccessMessage({ text: null, courseId: null }); // Limpa a mensagem e o ID
         }
     };
 
@@ -173,10 +172,10 @@ function CourseCreatePage() {
         setSelectedLevel('beginner');
         setSelectedTags([]);
         setGeneratedTopic('');
-        setCoursePreview(null); // Limpa a pré-visualização
+        setCoursePreview(null);
         setLoading(false);
         setError(null);
-        setSuccessMessage(null);
+        setSuccessMessage({ text: null, courseId: null }); // Limpa a mensagem e o ID
         setFetchedTags([]);
     };
 
@@ -188,8 +187,8 @@ function CourseCreatePage() {
 
         setLoading(true);
         setError(null);
-        setSuccessMessage(null);
-        setCoursePreview(null); // Limpa pré-visualização anterior
+        setSuccessMessage({ text: null, courseId: null }); // Limpa a mensagem e o ID
+        setCoursePreview(null);
 
         if (!userToken) {
             setError('Você não está autenticado. Por favor, faça login novamente.');
@@ -220,10 +219,10 @@ function CourseCreatePage() {
 
             const result = await response.json();
             console.log('Pré-visualização do curso gerada com sucesso:', result);
-            setCoursePreview(result); // Armazena a pré-visualização
-            setSuccessMessage('Pré-visualização do curso gerada com sucesso! Revise e confirme.');
+            setCoursePreview(result);
+            setSuccessMessage({ text: 'Pré-visualização do curso gerada com sucesso! Revise e confirme.', courseId: null }); // courseId ainda é null aqui
             setLoading(false);
-            handleNext(); // Avança para a etapa de pré-visualização
+            handleNext();
         } catch (err) {
             console.error("Erro ao gerar pré-visualização do curso:", err);
             if (err.message && err.message.includes('401')) {
@@ -241,7 +240,6 @@ function CourseCreatePage() {
         }
     };
 
-    // NOVA FUNÇÃO: Para salvar o curso gerado
     const handleSaveGeneratedCourse = async () => {
         if (!coursePreview || !coursePreview.courseId) {
             setError('Nenhum curso para salvar. Gere uma pré-visualização primeiro.');
@@ -250,7 +248,7 @@ function CourseCreatePage() {
 
         setLoading(true);
         setError(null);
-        setSuccessMessage(null);
+        setSuccessMessage({ text: null, courseId: null });
 
         if (!userToken) {
             setError('Você não está autenticado. Por favor, faça login novamente.');
@@ -284,7 +282,11 @@ function CourseCreatePage() {
 
             const result = await response.json();
             console.log('Curso salvo com sucesso no Sanity:', result);
-            setSuccessMessage('Curso e lições salvos com sucesso no Sanity CMS! 🎉');
+            // Atualiza a mensagem de sucesso e armazena o ID do curso salvo
+            setSuccessMessage({
+                text: 'Curso e lições salvos com sucesso no Sanity CMS! 🎉',
+                courseId: result.courseId || coursePreview.courseId // Usa o ID retornado ou o da pré-visualização
+            });
             setLoading(false);
             handleNext(); // Avança para a etapa de conclusão
         } catch (err) {
@@ -454,42 +456,49 @@ function CourseCreatePage() {
                                             </Box>
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                            Ao clicar em "Gerar Curso Agora", a inteligência artificial irá criar uma pré-visualização do curso e suas lições. Este processo pode levar alguns segundos.
+                                            Ao clicar em "Gerar Pré-visualização", a inteligência artificial irá criar uma pré-visualização do curso e suas lições. Este processo pode levar alguns segundos.
                                         </Typography>
                                     </Box>
                                 )}
-                                {/* NOVO PASSO: Pré-visualização e Botões de Ação */}
-                                {index === 2 && coursePreview && (
+                                {index === 2 && (
                                     <Box sx={{ mt: 2, border: '1px dashed grey', p: 2, borderRadius: '4px' }}>
                                         <Typography variant="h6" gutterBottom>
                                             Pré-visualização do Curso:
                                         </Typography>
-                                        <Typography variant="h5" color="primary.dark" sx={{ mb: 1 }}>
-                                            {coursePreview.courseTitle}
-                                        </Typography>
-                                        <Typography variant="body1" sx={{ mb: 2 }}>
-                                            **Descrição:** {coursePreview.courseDescription}
-                                        </Typography>
+                                        {coursePreview ? (
+                                            <>
+                                                <Typography variant="h5" color="primary.dark" sx={{ mb: 1 }}>
+                                                    {coursePreview.courseTitle || 'Título não disponível'}
+                                                </Typography>
+                                                <Typography variant="body1" sx={{ mb: 2 }}>
+                                                    **Descrição:** {coursePreview.courseDescription || 'Descrição não disponível'}
+                                                </Typography>
 
-                                        <Divider sx={{ my: 2 }} />
+                                                <Divider sx={{ my: 2 }} />
 
-                                        <Typography variant="h6" gutterBottom>
-                                            Estrutura das Lições:
-                                        </Typography>
-                                        {coursePreview.lessons && coursePreview.lessons.length > 0 ? (
-                                            coursePreview.lessons.map((lesson, lessonIndex) => (
-                                                <Box key={lessonIndex} sx={{ mb: 1.5 }}>
-                                                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                                                        Lição {lessonIndex + 1}: {lesson.title}
-                                                    </Typography>
+                                                <Typography variant="h6" gutterBottom>
+                                                    Estrutura das Lições:
+                                                </Typography>
+                                                {coursePreview.lessons && coursePreview.lessons.length > 0 ? (
+                                                    coursePreview.lessons.map((lesson, lessonIndex) => (
+                                                        <Box key={lessonIndex} sx={{ mb: 1.5 }}>
+                                                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                                                                Lição {lessonIndex + 1}: {lesson.title}
+                                                            </Typography>
+                                                            <Typography variant="body2" color="text.secondary">
+                                                                {lesson.description}
+                                                            </Typography>
+                                                        </Box>
+                                                    ))
+                                                ) : (
                                                     <Typography variant="body2" color="text.secondary">
-                                                        {lesson.description}
+                                                        Nenhuma lição gerada para pré-visualização.
                                                     </Typography>
-                                                </Box>
-                                            ))
+                                                )}
+                                            </>
                                         ) : (
-                                            <Typography variant="body2" color="text.secondary">
-                                                Nenhuma lição gerada para pré-visualização.
+                                            <Typography variant="body1" color="text.secondary">
+                                                Nenhum curso para pré-visualizar. Por favor, gere um curso na etapa anterior.
                                             </Typography>
                                         )}
                                     </Box>
@@ -498,29 +507,38 @@ function CourseCreatePage() {
                                 <div>
                                     {/* Botões para as etapas 0 e 1 */}
                                     {index <= 1 && (
-                                        <Button
-                                            variant="contained"
-                                            onClick={index === 1 ? handleGenerateCourse : handleNext}
-                                            sx={{ mt: 1, mr: 1 }}
-                                            disabled={
-                                                loading ||
-                                                (index === 0 && (!selectedCategory || !selectedSubCategory || !selectedLevel)) ||
-                                                (index === 1 && loading)
-                                            }
-                                            startIcon={index === 1 && loading ? <CircularProgress size={20} color="inherit" /> : null}
-                                        >
-                                            {index === 1 ? (loading ? 'Gerando Pré-visualização...' : 'Gerar Pré-visualização') : 'Próximo'}
-                                        </Button>
+                                        <>
+                                            <Button
+                                                variant="contained"
+                                                onClick={index === 1 ? handleGenerateCourse : handleNext}
+                                                sx={{ mt: 1, mr: 1 }}
+                                                disabled={
+                                                    loading ||
+                                                    (index === 0 && (!selectedCategory || !selectedSubCategory || !selectedLevel)) ||
+                                                    (index === 1 && loading)
+                                                }
+                                                startIcon={index === 1 && loading ? <CircularProgress size={20} color="inherit" /> : null}
+                                            >
+                                                {index === 1 ? (loading ? 'Gerando Pré-visualização...' : 'Gerar Pré-visualização') : 'Próximo'}
+                                            </Button>
+                                            <Button // Botão Voltar para as etapas 0 e 1
+                                                disabled={index === 0 || loading}
+                                                onClick={handleBack}
+                                                sx={{ mt: 1, mr: 1 }}
+                                            >
+                                                Voltar
+                                            </Button>
+                                        </>
                                     )}
 
-                                    {/* Botões para a etapa 2 (Pré-visualização) */}
+                                    {/* Botões para a etapa 2 (Pré-visualização e Confirmação) */}
                                     {index === 2 && (
                                         <>
                                             <Button
                                                 variant="contained"
                                                 onClick={handleSaveGeneratedCourse}
                                                 sx={{ mt: 1, mr: 1 }}
-                                                disabled={loading || !coursePreview}
+                                                disabled={loading || !coursePreview || !coursePreview.courseId}
                                                 startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
                                             >
                                                 {loading ? 'Salvando...' : 'Confirmar e Salvar Curso'}
@@ -536,14 +554,7 @@ function CourseCreatePage() {
                                         </>
                                     )}
 
-                                    {/* Botão Voltar (aparece a partir do segundo passo) */}
-                                    <Button
-                                        disabled={index === 0 || loading || activeStep === steps.length} // Não exibe na última etapa
-                                        onClick={handleBack}
-                                        sx={{ mt: 1, mr: 1 }}
-                                    >
-                                        Voltar
-                                    </Button>
+                                    {/* NENHUM BOTÃO VOLTAR PARA index === 2 */}
                                 </div>
 
                                 {loading && index === 1 && (
@@ -567,10 +578,10 @@ function CourseCreatePage() {
                 ))}
             </Stepper>
 
-            {activeStep === steps.length && ( // Esta etapa agora é a 4ª, não a 3ª
+            {activeStep === steps.length && (
                 <Paper square elevation={0} sx={{ p: 3, mt: 3 }}>
                     <Typography variant="h6" color="success.main" sx={{ mb: 2 }}>
-                        {successMessage || 'Processo de criação concluído!'}
+                        {successMessage.text || 'Processo de criação concluído!'}
                     </Typography>
                     {error && (
                         <Alert severity="error" sx={{ mb: 2 }}>
@@ -580,9 +591,25 @@ function CourseCreatePage() {
                     <Button onClick={handleReset} sx={{ mt: 1, mr: 1}}>
                         Criar Outro Curso
                     </Button>
-                    <Button component={Link} to="/cursos" variant="contained" sx={{ mt: 1 }}>
+                    <Button
+                        component={Link}
+                        to="/cursos"
+                        variant="outlined" // Alterado para outlined para diferenciar do "Visualizar"
+                        sx={{ mt: 1, mr: 1 }}
+                    >
                         Ver Todos os Cursos
                     </Button>
+                    {/* NOVO BOTÃO: Visualizar Curso */}
+                    {successMessage.courseId && (
+                        <Button
+                            component={Link}
+                            to={`/cursos/${successMessage.courseId}`} // Assumindo esta rota para detalhes do curso
+                            variant="contained"
+                            sx={{ mt: 1 }}
+                        >
+                            Visualizar Curso
+                        </Button>
+                    )}
                 </Paper>
             )}
         </Container>
