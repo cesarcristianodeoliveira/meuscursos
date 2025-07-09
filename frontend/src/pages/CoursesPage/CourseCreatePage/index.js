@@ -59,7 +59,6 @@ function CourseCreatePage() {
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    // Modificado para armazenar também o ID do curso para o botão "Visualizar Curso"
     const [successMessage, setSuccessMessage] = useState({ text: null, courseId: null });
 
     const { userToken } = useAuth();
@@ -161,7 +160,7 @@ function CourseCreatePage() {
         setActiveStep((prevActiveStep) => prevActiveStep - 1);
         if (activeStep === 2) {
             setCoursePreview(null);
-            setSuccessMessage({ text: null, courseId: null }); // Limpa a mensagem e o ID
+            setSuccessMessage({ text: null, courseId: null });
         }
     };
 
@@ -175,7 +174,7 @@ function CourseCreatePage() {
         setCoursePreview(null);
         setLoading(false);
         setError(null);
-        setSuccessMessage({ text: null, courseId: null }); // Limpa a mensagem e o ID
+        setSuccessMessage({ text: null, courseId: null });
         setFetchedTags([]);
     };
 
@@ -187,7 +186,7 @@ function CourseCreatePage() {
 
         setLoading(true);
         setError(null);
-        setSuccessMessage({ text: null, courseId: null }); // Limpa a mensagem e o ID
+        setSuccessMessage({ text: null, courseId: null });
         setCoursePreview(null);
 
         if (!userToken) {
@@ -218,9 +217,11 @@ function CourseCreatePage() {
             }
 
             const result = await response.json();
-            console.log('Pré-visualização do curso gerada com sucesso:', result);
-            setCoursePreview(result);
-            setSuccessMessage({ text: 'Pré-visualização do curso gerada com sucesso! Revise e confirme.', courseId: null }); // courseId ainda é null aqui
+            console.log('Resposta completa da pré-visualização:', result); // Log para depuração
+            // *** AQUI ESTÁ A CORREÇÃO PRINCIPAL ***
+            // Salve apenas a parte 'coursePreview' da resposta no estado
+            setCoursePreview(result.coursePreview);
+            setSuccessMessage({ text: 'Pré-visualização do curso gerada com sucesso! Revise e confirme.', courseId: null });
             setLoading(false);
             handleNext();
         } catch (err) {
@@ -241,7 +242,8 @@ function CourseCreatePage() {
     };
 
     const handleSaveGeneratedCourse = async () => {
-        if (!coursePreview || !coursePreview.courseId) {
+        // O coursePreview agora já é o objeto direto, então acessamos 'slug'
+        if (!coursePreview || !coursePreview.slug) { // Alterado de courseId para slug
             setError('Nenhum curso para salvar. Gere uma pré-visualização primeiro.');
             return;
         }
@@ -264,10 +266,14 @@ function CourseCreatePage() {
                     'Authorization': `Bearer ${userToken}`,
                 },
                 body: JSON.stringify({
-                    courseId: coursePreview.courseId,
+                    // *** AQUI ESTÃO AS CORREÇÕES ***
+                    // As propriedades agora são acessadas diretamente de coursePreview
+                    courseTitle: coursePreview.title, // 'title' no objeto de resposta
+                    courseDescription: coursePreview.description, // 'description' no objeto de resposta
                     lessons: coursePreview.lessons,
-                    courseTitle: coursePreview.courseTitle,
-                    courseDescription: coursePreview.courseDescription,
+                    // O backend pode precisar do slug ou de um ID gerado. Se o Sanity retornar um _id, use-o.
+                    // Se você precisar enviar o slug para o backend identificar o curso gerado temporariamente:
+                    slug: coursePreview.slug,
                     category: selectedCategory,
                     subCategory: selectedSubCategory,
                     level: selectedLevel,
@@ -285,7 +291,13 @@ function CourseCreatePage() {
             // Atualiza a mensagem de sucesso e armazena o ID do curso salvo
             setSuccessMessage({
                 text: 'Curso e lições salvos com sucesso no Sanity CMS! 🎉',
-                courseId: result.courseId || coursePreview.courseId // Usa o ID retornado ou o da pré-visualização
+                // O Sanity, ao salvar, deve retornar o _id do documento criado.
+                // Ajuste 'result.courseId' para a propriedade correta que o backend retorna com o ID do curso salvo.
+                // Se o backend retorna { _id: "abc..." }, use result._id.
+                // Se o backend retorna { savedCourse: { _id: "abc..." } }, use result.savedCourse._id.
+                // Por agora, vou usar 'result.savedCourseId' como um placeholder comum.
+                // VERIFIQUE SEU BACKEND PARA O NOME CORRETO DA PROPRIEDADE.
+                courseId: result._id || result.savedCourseId || result.courseId // Usando algumas opções comuns
             });
             setLoading(false);
             handleNext(); // Avança para a etapa de conclusão
@@ -467,11 +479,13 @@ function CourseCreatePage() {
                                         </Typography>
                                         {coursePreview ? (
                                             <>
+                                                {/* *** AQUI ESTÁ A CORREÇÃO *** */}
+                                                {/* As propriedades agora são 'title' e 'description' */}
                                                 <Typography variant="h5" color="primary.dark" sx={{ mb: 1 }}>
-                                                    {coursePreview.courseTitle || 'Título não disponível'}
+                                                    {coursePreview.title || 'Título não disponível'}
                                                 </Typography>
                                                 <Typography variant="body1" sx={{ mb: 2 }}>
-                                                    **Descrição:** {coursePreview.courseDescription || 'Descrição não disponível'}
+                                                    **Descrição:** {coursePreview.description || 'Descrição não disponível'}
                                                 </Typography>
 
                                                 <Divider sx={{ my: 2 }} />
@@ -521,7 +535,7 @@ function CourseCreatePage() {
                                             >
                                                 {index === 1 ? (loading ? 'Gerando Pré-visualização...' : 'Gerar Pré-visualização') : 'Próximo'}
                                             </Button>
-                                            <Button // Botão Voltar para as etapas 0 e 1
+                                            <Button
                                                 disabled={index === 0 || loading}
                                                 onClick={handleBack}
                                                 sx={{ mt: 1, mr: 1 }}
@@ -538,14 +552,14 @@ function CourseCreatePage() {
                                                 variant="contained"
                                                 onClick={handleSaveGeneratedCourse}
                                                 sx={{ mt: 1, mr: 1 }}
-                                                disabled={loading || !coursePreview || !coursePreview.courseId}
+                                                disabled={loading || !coursePreview || !coursePreview.slug} // Alterado de courseId para slug
                                                 startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
                                             >
                                                 {loading ? 'Salvando...' : 'Confirmar e Salvar Curso'}
                                             </Button>
                                             <Button
                                                 variant="outlined"
-                                                onClick={handleReset} // Ao cancelar, reinicia o processo
+                                                onClick={handleReset}
                                                 sx={{ mt: 1, mr: 1 }}
                                                 disabled={loading}
                                             >
@@ -553,8 +567,6 @@ function CourseCreatePage() {
                                             </Button>
                                         </>
                                     )}
-
-                                    {/* NENHUM BOTÃO VOLTAR PARA index === 2 */}
                                 </div>
 
                                 {loading && index === 1 && (
@@ -594,16 +606,15 @@ function CourseCreatePage() {
                     <Button
                         component={Link}
                         to="/cursos"
-                        variant="outlined" // Alterado para outlined para diferenciar do "Visualizar"
+                        variant="outlined"
                         sx={{ mt: 1, mr: 1 }}
                     >
                         Ver Todos os Cursos
                     </Button>
-                    {/* NOVO BOTÃO: Visualizar Curso */}
                     {successMessage.courseId && (
                         <Button
                             component={Link}
-                            to={`/cursos/${successMessage.courseId}`} // Assumindo esta rota para detalhes do curso
+                            to={`/cursos/${successMessage.courseId}`}
                             variant="contained"
                             sx={{ mt: 1 }}
                         >
