@@ -292,7 +292,7 @@ function CourseCreatePage() {
 
         // **AQUI ESTÁ A CHAVE DA CORREÇÃO**
         // Obtém o ID do criador do objeto 'user' do AuthContext
-        const creatorId = user?.id;
+        const creatorId = user?._id;
         if (!creatorId) {
             setError('ID do criador não encontrado. Por favor, faça login novamente.');
             setLoading(false);
