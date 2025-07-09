@@ -102,7 +102,6 @@ export const generateCourse = async (req, res) => {
                         _ref: tag._id,
                         _type: 'reference',
                         _key: uuidv4(), 
-                        _weak: true, // <-- Adicionado: Referência fraca para as tags
                     });
                 });
                 tagsContext += `As tags devem ser incorporadas de forma a enriquecer o título, a descrição e o conteúdo das lições.\n\n`;
@@ -200,11 +199,6 @@ export const generateCourse = async (req, res) => {
                     _ref: courseId, 
                     _type: 'reference',
                     _key: uuidv4(), 
-                    // Removido _weak: true daqui. No schema 'member', createdCourses deve ser weak.
-                    // Se você configurou weak: true no schema 'member' para 'createdCourses',
-                    // o Sanity Studio já tratará essas referências como fracas,
-                    // mesmo que _weak não esteja explicitamente aqui.
-                    // Para evitar redundância ou possíveis conflitos, é melhor confiar no schema.
                 }]);
         });
 
@@ -236,7 +230,6 @@ export const generateCourse = async (req, res) => {
                 _key: uuidv4(), 
                 _ref: lessonId,
                 _type: 'reference',
-                _weak: true, // <-- Adicionado: Referência fraca para lições (no array 'lessons' do curso)
             });
             createdLessonIds.push(lessonId);
             totalEstimatedDuration += (lesson.estimatedReadingTime || 0); 
@@ -260,7 +253,6 @@ export const generateCourse = async (req, res) => {
             creator: {
                 _ref: creatorId, 
                 _type: 'reference',
-                _weak: true, // <-- Adicionado: Referência fraca para o criador do curso
             },
             category: { _ref: category, _type: 'reference' }, 
             subCategory: { _ref: subCategory, _type: 'reference' }, 
