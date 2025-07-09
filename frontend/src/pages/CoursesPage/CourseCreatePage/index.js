@@ -1,5 +1,3 @@
-// D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\index.js
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Typography,
@@ -19,12 +17,12 @@ import {
     InputLabel,
     OutlinedInput,
     Chip,
+    Divider, // Adicione este import
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import { useAuth } from '../../../contexts/AuthContext';
 
-// Adiciona a variável de ambiente para a URL base da API
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 const ITEM_HEIGHT = 48;
@@ -57,6 +55,8 @@ function CourseCreatePage() {
     ], []);
 
     const [generatedTopic, setGeneratedTopic] = useState('');
+    // NOVO ESTADO: Para armazenar a pré-visualização do curso
+    const [coursePreview, setCoursePreview] = useState(null);
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -74,6 +74,10 @@ function CourseCreatePage() {
             description: 'Confirme os detalhes e inicie a geração do curso pela IA. Isso pode levar alguns segundos.'
         },
         {
+            label: 'Pré-visualização e Confirmação', // Etapa alterada
+            description: 'Revise a pré-visualização do curso gerada pela IA. Você pode confirmar para salvar ou cancelar.'
+        },
+        {
             label: 'Concluído',
             description: 'O curso foi gerado e salvo no Sanity CMS!'
         },
@@ -81,7 +85,7 @@ function CourseCreatePage() {
 
     const fetchSanityData = useCallback(async () => {
         setError(null);
-        setLoading(true); // Inicia o loading para as categorias e subcategorias
+        setLoading(true);
         try {
             const categoriesResponse = await fetch(`${API_BASE_URL}/api/data/categories`);
             if (!categoriesResponse.ok) throw new Error('Falha ao buscar categorias.');
@@ -97,7 +101,7 @@ function CourseCreatePage() {
             console.error("Erro ao carregar dados do Sanity:", err);
             setError(`Erro ao carregar opções: ${err.message}. Tente recarregar a página.`);
         } finally {
-            setLoading(false); // Finaliza o loading
+            setLoading(false);
         }
     }, []);
 
@@ -107,7 +111,7 @@ function CourseCreatePage() {
         if (!categoryId) return;
 
         setError(null);
-        setLoading(true); // Inicia o loading para as tags
+        setLoading(true);
         try {
             const tagsResponse = await fetch(`${API_BASE_URL}/api/data/tags/byCategory/${categoryId}`);
             if (!tagsResponse.ok) throw new Error('Falha ao buscar tags por categoria.');
@@ -117,7 +121,7 @@ function CourseCreatePage() {
             console.error("Erro ao carregar tags do Sanity:", err);
             setError(`Erro ao carregar tags: ${err.message}.`);
         } finally {
-            setLoading(false); // Finaliza o loading
+            setLoading(false);
         }
     }, []);
 
@@ -153,8 +157,13 @@ function CourseCreatePage() {
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
     };
 
-    const handleBackCorrected = () => {
+    const handleBack = () => { // Renomeado para handleBack para consistência
         setActiveStep((prevActiveStep) => prevActiveStep - 1);
+        // Se voltar da pré-visualização, limpa a pré-visualização
+        if (activeStep === 2) {
+            setCoursePreview(null);
+            setSuccessMessage(null); // Limpa mensagem de sucesso da pré-visualização
+        }
     };
 
     const handleReset = () => {
@@ -164,6 +173,7 @@ function CourseCreatePage() {
         setSelectedLevel('beginner');
         setSelectedTags([]);
         setGeneratedTopic('');
+        setCoursePreview(null); // Limpa a pré-visualização
         setLoading(false);
         setError(null);
         setSuccessMessage(null);
@@ -179,6 +189,7 @@ function CourseCreatePage() {
         setLoading(true);
         setError(null);
         setSuccessMessage(null);
+        setCoursePreview(null); // Limpa pré-visualização anterior
 
         if (!userToken) {
             setError('Você não está autenticado. Por favor, faça login novamente.');
@@ -187,9 +198,7 @@ function CourseCreatePage() {
         }
 
         try {
-            // --- LINHA CORRIGIDA AQUI ---
             const response = await fetch(`${API_BASE_URL}/api/courses/generate-preview`, {
-            // --- FIM DA LINHA CORRIGIDA ---
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -206,29 +215,81 @@ function CourseCreatePage() {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.message || errorData.error || 'Falha ao gerar o curso no backend.');
+                throw new Error(errorData.message || errorData.error || 'Falha ao gerar a pré-visualização do curso no backend.');
             }
 
             const result = await response.json();
-            console.log('Curso gerado com sucesso:', result);
-            setSuccessMessage('Pré-visualização do curso gerada com sucesso! Você pode agora salvar o curso.'); // Mensagem atualizada
+            console.log('Pré-visualização do curso gerada com sucesso:', result);
+            setCoursePreview(result); // Armazena a pré-visualização
+            setSuccessMessage('Pré-visualização do curso gerada com sucesso! Revise e confirme.');
             setLoading(false);
-            handleNext();
-
+            handleNext(); // Avança para a etapa de pré-visualização
         } catch (err) {
-            console.error("Erro ao gerar curso:", err);
+            console.error("Erro ao gerar pré-visualização do curso:", err);
             if (err.message && err.message.includes('401')) {
                 setError('Não autorizado. Sua sessão pode ter expirado. Por favor, faça login novamente.');
             } else if (err.message && err.message.includes('403')) {
                 setError('Créditos insuficientes para gerar um curso. Por favor, adicione mais créditos ou entre em contato.');
-            } else if (err.message && err.message.includes('Erro da Gemini API')) { // Tratamento específico para erros da Gemini
+            } else if (err.message && err.message.includes('Erro da Gemini API')) {
                 setError(`Erro da IA: ${err.message}. Tente novamente.`);
-            } else if (err.message && err.message.includes('JSON inválido')) { // Tratamento para erro de parse JSON da IA
+            } else if (err.message && err.message.includes('JSON inválido')) {
                  setError('A resposta da IA está em um formato inesperado. Tente novamente ou ajuste o prompt.');
-            }
-            else {
+            } else {
                 setError(`Erro ao gerar curso: ${err.message}. Verifique o console do backend.`);
             }
+            setLoading(false);
+        }
+    };
+
+    // NOVA FUNÇÃO: Para salvar o curso gerado
+    const handleSaveGeneratedCourse = async () => {
+        if (!coursePreview || !coursePreview.courseId) {
+            setError('Nenhum curso para salvar. Gere uma pré-visualização primeiro.');
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+        setSuccessMessage(null);
+
+        if (!userToken) {
+            setError('Você não está autenticado. Por favor, faça login novamente.');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/courses/save-generated`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userToken}`,
+                },
+                body: JSON.stringify({
+                    courseId: coursePreview.courseId,
+                    lessons: coursePreview.lessons,
+                    courseTitle: coursePreview.courseTitle,
+                    courseDescription: coursePreview.courseDescription,
+                    category: selectedCategory,
+                    subCategory: selectedSubCategory,
+                    level: selectedLevel,
+                    tags: selectedTags,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || errorData.error || 'Falha ao salvar o curso no backend.');
+            }
+
+            const result = await response.json();
+            console.log('Curso salvo com sucesso no Sanity:', result);
+            setSuccessMessage('Curso e lições salvos com sucesso no Sanity CMS! 🎉');
+            setLoading(false);
+            handleNext(); // Avança para a etapa de conclusão
+        } catch (err) {
+            console.error("Erro ao salvar curso:", err);
+            setError(`Erro ao salvar curso: ${err.message}.`);
             setLoading(false);
         }
     };
@@ -257,7 +318,7 @@ function CourseCreatePage() {
             <Stepper activeStep={activeStep} orientation="vertical">
                 {steps.map((step, index) => (
                     <Step key={step.label}>
-                        <StepLabel optional={index === 2 ? <Typography variant="caption">Conclusão</Typography> : null}>
+                        <StepLabel optional={index === 3 ? <Typography variant="caption">Conclusão</Typography> : null}>
                             {step.label}
                         </StepLabel>
                         <StepContent>
@@ -393,36 +454,106 @@ function CourseCreatePage() {
                                             </Box>
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                            Ao clicar em "Gerar Curso Agora", a inteligência artificial irá criar o curso e suas lições. Este processo pode levar alguns segundos.
+                                            Ao clicar em "Gerar Curso Agora", a inteligência artificial irá criar uma pré-visualização do curso e suas lições. Este processo pode levar alguns segundos.
                                         </Typography>
+                                    </Box>
+                                )}
+                                {/* NOVO PASSO: Pré-visualização e Botões de Ação */}
+                                {index === 2 && coursePreview && (
+                                    <Box sx={{ mt: 2, border: '1px dashed grey', p: 2, borderRadius: '4px' }}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Pré-visualização do Curso:
+                                        </Typography>
+                                        <Typography variant="h5" color="primary.dark" sx={{ mb: 1 }}>
+                                            {coursePreview.courseTitle}
+                                        </Typography>
+                                        <Typography variant="body1" sx={{ mb: 2 }}>
+                                            **Descrição:** {coursePreview.courseDescription}
+                                        </Typography>
+
+                                        <Divider sx={{ my: 2 }} />
+
+                                        <Typography variant="h6" gutterBottom>
+                                            Estrutura das Lições:
+                                        </Typography>
+                                        {coursePreview.lessons && coursePreview.lessons.length > 0 ? (
+                                            coursePreview.lessons.map((lesson, lessonIndex) => (
+                                                <Box key={lessonIndex} sx={{ mb: 1.5 }}>
+                                                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                                                        Lição {lessonIndex + 1}: {lesson.title}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        {lesson.description}
+                                                    </Typography>
+                                                </Box>
+                                            ))
+                                        ) : (
+                                            <Typography variant="body2" color="text.secondary">
+                                                Nenhuma lição gerada para pré-visualização.
+                                            </Typography>
+                                        )}
                                     </Box>
                                 )}
 
                                 <div>
+                                    {/* Botões para as etapas 0 e 1 */}
+                                    {index <= 1 && (
+                                        <Button
+                                            variant="contained"
+                                            onClick={index === 1 ? handleGenerateCourse : handleNext}
+                                            sx={{ mt: 1, mr: 1 }}
+                                            disabled={
+                                                loading ||
+                                                (index === 0 && (!selectedCategory || !selectedSubCategory || !selectedLevel)) ||
+                                                (index === 1 && loading)
+                                            }
+                                            startIcon={index === 1 && loading ? <CircularProgress size={20} color="inherit" /> : null}
+                                        >
+                                            {index === 1 ? (loading ? 'Gerando Pré-visualização...' : 'Gerar Pré-visualização') : 'Próximo'}
+                                        </Button>
+                                    )}
+
+                                    {/* Botões para a etapa 2 (Pré-visualização) */}
+                                    {index === 2 && (
+                                        <>
+                                            <Button
+                                                variant="contained"
+                                                onClick={handleSaveGeneratedCourse}
+                                                sx={{ mt: 1, mr: 1 }}
+                                                disabled={loading || !coursePreview}
+                                                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+                                            >
+                                                {loading ? 'Salvando...' : 'Confirmar e Salvar Curso'}
+                                            </Button>
+                                            <Button
+                                                variant="outlined"
+                                                onClick={handleReset} // Ao cancelar, reinicia o processo
+                                                sx={{ mt: 1, mr: 1 }}
+                                                disabled={loading}
+                                            >
+                                                Cancelar e Recomeçar
+                                            </Button>
+                                        </>
+                                    )}
+
+                                    {/* Botão Voltar (aparece a partir do segundo passo) */}
                                     <Button
-                                        variant="contained"
-                                        onClick={index === 1 ? handleGenerateCourse : handleNext}
-                                        sx={{ mt: 1, mr: 1 }}
-                                        disabled={
-                                            loading ||
-                                            (index === 0 && (!selectedCategory || !selectedSubCategory || !selectedLevel)) ||
-                                            (index === 1 && loading)
-                                        }
-                                        startIcon={index === 1 && loading ? <CircularProgress size={20} color="inherit" /> : null}
-                                    >
-                                        {index === 1 ? (loading ? 'Gerando...' : 'Gerar Curso Agora') : 'Próximo'}
-                                    </Button>
-                                    <Button
-                                        disabled={index === 0 || loading}
-                                        onClick={handleBackCorrected}
+                                        disabled={index === 0 || loading || activeStep === steps.length} // Não exibe na última etapa
+                                        onClick={handleBack}
                                         sx={{ mt: 1, mr: 1 }}
                                     >
                                         Voltar
                                     </Button>
                                 </div>
+
                                 {loading && index === 1 && (
                                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                        Aguarde, a IA está trabalhando...
+                                        Aguarde, a IA está trabalhando para gerar a pré-visualização...
+                                    </Typography>
+                                )}
+                                {loading && index === 2 && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        Salvando o curso no Sanity CMS...
                                     </Typography>
                                 )}
                                 {error && (
@@ -436,7 +567,7 @@ function CourseCreatePage() {
                 ))}
             </Stepper>
 
-            {activeStep === steps.length && (
+            {activeStep === steps.length && ( // Esta etapa agora é a 4ª, não a 3ª
                 <Paper square elevation={0} sx={{ p: 3, mt: 3 }}>
                     <Typography variant="h6" color="success.main" sx={{ mb: 2 }}>
                         {successMessage || 'Processo de criação concluído!'}
