@@ -17,39 +17,38 @@ import {
     Select,
     FormControl,
     InputLabel,
-    OutlinedInput, // Adicionado para o Multi-Select
-    Chip,          // Adicionado para o Multi-Select
+    OutlinedInput,
+    Chip,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import { useAuth } from '../../../contexts/AuthContext'; 
+import { useAuth } from '../../../contexts/AuthContext';
 
 // Adiciona a variável de ambiente para a URL base da API
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
-// Estilos para o Multi-Select, se desejar customizar
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
 const MenuProps = {
-  PaperProps: {
-    style: {
-      maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
-      width: 250,
+    PaperProps: {
+        style: {
+            maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
+            width: 250,
+        },
     },
-  },
 };
 
 function CourseCreatePage() {
     const [activeStep, setActiveStep] = useState(0);
-    
+
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedSubCategory, setSelectedSubCategory] = useState('');
     const [selectedLevel, setSelectedLevel] = useState('beginner');
-    const [selectedTags, setSelectedTags] = useState([]); // NOVO ESTADO para tags selecionadas
+    const [selectedTags, setSelectedTags] = useState([]);
 
     const [fetchedCategories, setFetchedCategories] = useState([]);
     const [fetchedSubCategories, setFetchedSubCategories] = useState([]);
-    const [fetchedTags, setFetchedTags] = useState([]); // NOVO ESTADO para tags disponíveis
+    const [fetchedTags, setFetchedTags] = useState([]);
 
     const levels = useMemo(() => [
         { value: 'beginner', label: 'Iniciante' },
@@ -82,6 +81,7 @@ function CourseCreatePage() {
 
     const fetchSanityData = useCallback(async () => {
         setError(null);
+        setLoading(true); // Inicia o loading para as categorias e subcategorias
         try {
             const categoriesResponse = await fetch(`${API_BASE_URL}/api/data/categories`);
             if (!categoriesResponse.ok) throw new Error('Falha ao buscar categorias.');
@@ -96,16 +96,18 @@ function CourseCreatePage() {
         } catch (err) {
             console.error("Erro ao carregar dados do Sanity:", err);
             setError(`Erro ao carregar opções: ${err.message}. Tente recarregar a página.`);
+        } finally {
+            setLoading(false); // Finaliza o loading
         }
-    }, [setError, setFetchedCategories, setFetchedSubCategories]);
+    }, []);
 
-    // NOVO useEffect para buscar tags quando a categoria é selecionada
     const fetchTagsByCategory = useCallback(async (categoryId) => {
-        setFetchedTags([]); // Limpa as tags anteriores
-        setSelectedTags([]); // Limpa as tags selecionadas
-        if (!categoryId) return; // Não busca se nenhuma categoria for selecionada
+        setFetchedTags([]);
+        setSelectedTags([]);
+        if (!categoryId) return;
 
         setError(null);
+        setLoading(true); // Inicia o loading para as tags
         try {
             const tagsResponse = await fetch(`${API_BASE_URL}/api/data/tags/byCategory/${categoryId}`);
             if (!tagsResponse.ok) throw new Error('Falha ao buscar tags por categoria.');
@@ -114,25 +116,24 @@ function CourseCreatePage() {
         } catch (err) {
             console.error("Erro ao carregar tags do Sanity:", err);
             setError(`Erro ao carregar tags: ${err.message}.`);
+        } finally {
+            setLoading(false); // Finaliza o loading
         }
-    }, [setError]);
+    }, []);
 
-    // Executa a busca inicial de categorias e subcategorias
     useEffect(() => {
         fetchSanityData();
     }, [fetchSanityData]);
 
-    // Executa a busca de tags sempre que a categoria selecionada muda
     useEffect(() => {
         if (selectedCategory) {
             fetchTagsByCategory(selectedCategory);
         } else {
-            setFetchedTags([]); // Limpa as tags se nenhuma categoria estiver selecionada
+            setFetchedTags([]);
             setSelectedTags([]);
         }
     }, [selectedCategory, fetchTagsByCategory]);
 
-    // Atualiza o tópico gerado com base nas seleções
     useEffect(() => {
         const categoryTitle = fetchedCategories.find(cat => cat._id === selectedCategory)?.title;
         const subCategoryTitle = fetchedSubCategories.find(sub => sub._id === selectedSubCategory)?.title;
@@ -144,7 +145,6 @@ function CourseCreatePage() {
         if (subCategoryTitle) topic += (topic ? ' - ' : '') + subCategoryTitle;
         if (levelLabel) topic += (topic ? ' (' : '') + levelLabel + (topic ? ')' : '');
         if (tagsNames) topic += (topic ? ' com foco em: ' : '') + tagsNames;
-
 
         setGeneratedTopic(topic);
     }, [selectedCategory, selectedSubCategory, selectedLevel, selectedTags, fetchedCategories, fetchedSubCategories, fetchedTags, levels]);
@@ -162,12 +162,12 @@ function CourseCreatePage() {
         setSelectedCategory('');
         setSelectedSubCategory('');
         setSelectedLevel('beginner');
-        setSelectedTags([]); // Resetar tags
+        setSelectedTags([]);
         setGeneratedTopic('');
         setLoading(false);
         setError(null);
         setSuccessMessage(null);
-        setFetchedTags([]); // Resetar tags disponíveis
+        setFetchedTags([]);
     };
 
     const handleGenerateCourse = async () => {
@@ -193,12 +193,12 @@ function CourseCreatePage() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${userToken}`,
                 },
-                body: JSON.stringify({ 
-                    topic: generatedTopic, 
-                    category: selectedCategory, 
-                    subCategory: selectedSubCategory, 
-                    level: selectedLevel, 
-                    tags: selectedTags, // ENVIANDO AS TAGS SELECIONADAS PARA O BACKEND
+                body: JSON.stringify({
+                    topic: generatedTopic,
+                    category: selectedCategory,
+                    subCategory: selectedSubCategory,
+                    level: selectedLevel,
+                    tags: selectedTags,
                 }),
             });
 
@@ -217,7 +217,7 @@ function CourseCreatePage() {
             console.error("Erro ao gerar curso:", err);
             if (err.message && err.message.includes('401')) {
                 setError('Não autorizado. Sua sessão pode ter expirado. Por favor, faça login novamente.');
-            } else if (err.message && err.message.includes('403')) { // Créditos insuficientes
+            } else if (err.message && err.message.includes('403')) {
                 setError('Créditos insuficientes para gerar um curso. Por favor, adicione mais créditos ou entre em contato.');
             } else {
                 setError(`Erro ao gerar curso: ${err.message}. Verifique o console do backend.`);
@@ -226,7 +226,6 @@ function CourseCreatePage() {
         }
     };
 
-    // Filtra as subcategorias com base na categoria selecionada
     const filteredSubCategories = fetchedSubCategories.filter(
         (subCat) => subCat.categoryRef === selectedCategory
     );
@@ -259,7 +258,7 @@ function CourseCreatePage() {
                             <Box sx={{ mb: 2 }}>
                                 {index === 0 && (
                                     <>
-                                        <FormControl fullWidth margin="normal">
+                                        <FormControl fullWidth margin="normal" disabled={loading}>
                                             <InputLabel id="category-select-label">Categoria</InputLabel>
                                             <Select
                                                 labelId="category-select-label"
@@ -268,10 +267,10 @@ function CourseCreatePage() {
                                                 label="Categoria"
                                                 onChange={(e) => {
                                                     setSelectedCategory(e.target.value);
-                                                    setSelectedSubCategory(''); // Limpa a subcategoria ao mudar a categoria
-                                                    setSelectedTags([]); // Limpa as tags ao mudar a categoria
+                                                    setSelectedSubCategory('');
+                                                    setSelectedTags([]);
                                                 }}
-                                                disabled={loading || fetchedCategories.length === 0}
+                                                disabled={fetchedCategories.length === 0}
                                             >
                                                 <MenuItem value="">
                                                     <em>Nenhum</em>
@@ -284,9 +283,9 @@ function CourseCreatePage() {
                                             </Select>
                                         </FormControl>
 
-                                        <FormControl 
-                                            fullWidth 
-                                            margin="normal" 
+                                        <FormControl
+                                            fullWidth
+                                            margin="normal"
                                             disabled={!selectedCategory || loading || filteredSubCategories.length === 0}
                                         >
                                             <InputLabel id="sub-category-select-label">Subcategoria</InputLabel>
@@ -313,11 +312,10 @@ function CourseCreatePage() {
                                             )}
                                         </FormControl>
 
-                                        {/* NOVO CAMPO DE SELEÇÃO DE TAGS */}
-                                        <FormControl 
-                                            fullWidth 
+                                        <FormControl
+                                            fullWidth
                                             margin="normal"
-                                            disabled={!selectedCategory || loading || fetchedTags.length === 0} // Desabilitado se não houver categoria ou tags
+                                            disabled={!selectedCategory || loading || fetchedTags.length === 0}
                                         >
                                             <InputLabel id="tags-select-label">Tags (Opcional)</InputLabel>
                                             <Select
@@ -330,7 +328,6 @@ function CourseCreatePage() {
                                                         target: { value },
                                                     } = event;
                                                     setSelectedTags(
-                                                        // No autofill do browser como string, caso contrário como array
                                                         typeof value === 'string' ? value.split(',') : value,
                                                     );
                                                 }}
@@ -361,9 +358,8 @@ function CourseCreatePage() {
                                                 )}
                                             </Select>
                                         </FormControl>
-                                        {/* FIM DO NOVO CAMPO DE SELEÇÃO DE TAGS */}
 
-                                        <FormControl fullWidth margin="normal">
+                                        <FormControl fullWidth margin="normal" disabled={loading}>
                                             <InputLabel id="level-select-label">Nível</InputLabel>
                                             <Select
                                                 labelId="level-select-label"
@@ -371,7 +367,6 @@ function CourseCreatePage() {
                                                 value={selectedLevel}
                                                 label="Nível"
                                                 onChange={(e) => setSelectedLevel(e.target.value)}
-                                                disabled={loading}
                                             >
                                                 {levels.map((lvl) => (
                                                     <MenuItem key={lvl.value} value={lvl.value}>
@@ -385,7 +380,7 @@ function CourseCreatePage() {
                                 {index === 1 && (
                                     <Box sx={{ mt: 2 }}>
                                         <Typography variant="h6" gutterBottom>
-                                            Tópico Gerado: <br/>
+                                            Tópico Gerado: <br />
                                             <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
                                                 "{generatedTopic || 'Selecione a categoria, subcategoria e nível.'}"
                                             </Box>

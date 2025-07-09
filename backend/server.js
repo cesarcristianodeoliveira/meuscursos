@@ -4,14 +4,12 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
-import jwt from 'jsonwebtoken'; // Importar jsonwebtoken para o middleware de proteção
+import jwt from 'jsonwebtoken';
 
-// Importa as funções de registro e login do controlador de autenticação
 import { register, login } from './controllers/authController.js'; 
-// Importa a nova função de geração de cursos
-import { generateCourse } from './controllers/courseController.js';
-// Importa TODAS as funções do dataController, incluindo a nova getCourseTagsByCategory
-import { getCourseCategories, getCourseSubCategories, getCourseTagsByCategory } from './controllers/dataController.js'; // <--- IMPORTAÇÃO ATUALIZADA
+// ATUALIZADO: Importa as duas novas funções do courseController
+import { generateCoursePreview, saveGeneratedCourse } from './controllers/courseController.js'; 
+import { getCourseCategories, getCourseSubCategories, getCourseTagsByCategory } from './controllers/dataController.js'; 
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -52,14 +50,16 @@ app.get('/', (req, res) => {
 app.post('/api/auth/register', register); 
 app.post('/api/auth/login', login);
 
-// Rota de Geração de Cursos (protegida e modularizada)
-app.post('/api/courses/generate', protect, generateCourse); 
+// ATUALIZADO: Rota para gerar PRÉ-VISUALIZAÇÃO de Cursos (protegida)
+app.post('/api/courses/generate-preview', protect, generateCoursePreview); 
+
+// NOVA ROTA: Rota para SALVAR Cursos Gerados e Debitar Créditos (protegida)
+app.post('/api/courses/save-generated', protect, saveGeneratedCourse); 
 
 // --- ROTAS PARA BUSCA DE DADOS ---
 app.get('/api/data/categories', getCourseCategories);
 app.get('/api/data/subcategories', getCourseSubCategories);
-// Rota para buscar tags por categoria
-app.get('/api/data/tags/byCategory/:categoryId', getCourseTagsByCategory); // <--- NOVA ROTA
+app.get('/api/data/tags/byCategory/:categoryId', getCourseTagsByCategory);
 
 // --- Inicia o Servidor ---
 app.listen(PORT, () => {
@@ -69,7 +69,8 @@ app.listen(PORT, () => {
     console.log(`GET /`);
     console.log(`POST /api/auth/register`); 
     console.log(`POST /api/auth/login`);
-    console.log(`POST /api/courses/generate (protegida)`); 
+    console.log(`POST /api/courses/generate-preview (protegida)`);
+    console.log(`POST /api/courses/save-generated (protegida)`);
     console.log(`GET /api/data/categories`); 
     console.log(`GET /api/data/subcategories`);
     console.log(`GET /api/data/tags/byCategory/:categoryId`);
