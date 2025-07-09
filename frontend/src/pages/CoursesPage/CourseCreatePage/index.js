@@ -62,7 +62,7 @@ function CourseCreatePage() {
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState({ text: null, courseId: null });
 
-    const { userToken, currentUser } = useAuth(); // Destructure currentUser to get creatorId
+    const { userToken, user } = useAuth(); // Destructure user to get creatorId
 
     const steps = [
         {
@@ -264,8 +264,8 @@ function CourseCreatePage() {
             return;
         }
 
-        // Get creatorId from currentUser context
-        const creatorId = currentUser?.id;
+        // Get creatorId from user context
+        const creatorId = user?.id;
         if (!creatorId) {
             setError('ID do criador não encontrado. Por favor, faça login novamente.');
             setLoading(false);
