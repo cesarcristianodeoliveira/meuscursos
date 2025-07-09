@@ -226,25 +226,61 @@ export const saveGeneratedCourse = async (req, res) => {
             console.log(`[BACKEND] Admin user ${creatorId} is creating a course. No credits consumed.`);
         }
 
-        transaction = sanityClient.transaction(); 
+        // --- INÍCIO DA LÓGICA DE VALIDAÇÃO DE UNICIDADE DO SLUG DO CURSO ---
+        let courseBaseSlug = generateSlug(courseData.title);
+        let finalCourseSlug = courseBaseSlug;
+        let slugAlreadyExists = true;
+        let attempt = 0;
+        const MAX_SLUG_ATTEMPTS = 5; // Limite para evitar loops infinitos em casos extremos
 
+        while (slugAlreadyExists && attempt < MAX_SLUG_ATTEMPTS) {
+            const existingCourse = await sanityClient.fetch(
+                `*[_type == "course" && slug.current == $slug][0]{_id}`,
+                { slug: finalCourseSlug }
+            );
+
+            if (existingCourse) {
+                attempt++;
+                console.warn(`[BACKEND] Slug "${finalCourseSlug}" já existe. Tentando gerar um novo (tentativa ${attempt}).`);
+                // Adiciona um novo sufixo baseado em UUID e um contador para tentar a unicidade
+                finalCourseSlug = `${courseBaseSlug}-${uuidv4().substring(0, 4)}-${attempt}`; 
+            } else {
+                slugAlreadyExists = false; // Encontrou um slug único!
+            }
+        }
+
+        if (slugAlreadyExists) {
+            // Se chegou aqui, não conseguiu um slug único após várias tentativas
+            throw new Error('Falha ao gerar um slug único para o curso após múltiplas tentativas. Por favor, tente um tópico diferente.');
+        }
+
+        const courseSlug = { current: finalCourseSlug }; // Use o slug validado
+        // --- FIM DA LÓGICA DE VALIDAÇÃO DE UNICIDADE DO SLUG DO CURSO ---
+
+
+        const courseId = `course-${uuidv4()}`; // Gera o ID real do curso aqui
+        const lessonRefs = [];
+        let totalEstimatedDuration = 0; 
+        const createdLessonIds = []; 
+
+        transaction = sanityClient.transaction(); // Inicia a transação aqui
+
+        // Agora, o patch para o membro é adicionado UMA ÚNICA VEZ e usa o courseId real
         transaction.patch(creatorId, (patch) => {
             return patch
                 .set({ credits: updatedCredits }) 
                 .setIfMissing({ createdCourses: [] }) 
                 .append('createdCourses', [{ 
-                    _ref: `course-${uuidv4()}`, // O _ref será atualizado após a criação do curso
+                    _ref: courseId, // Usa o ID real do curso gerado logo acima
                     _type: 'reference',
                     _key: uuidv4(), 
                 }]);
         });
+        console.log(`[BACKEND] Transação iniciada. Member ${creatorId} será atualizado.`);
 
-        const courseId = `course-${uuidv4()}`; 
-        const lessonRefs = [];
-        let totalEstimatedDuration = 0; 
-        const createdLessonIds = []; // Para garantir que podemos referenciá-los
 
         for (const lesson of courseData.lessons) {
+            // Para as lições, mantemos a geração de slug com UUID para alta probabilidade de unicidade.
             const lessonSlug = { current: generateSlug(lesson.title) }; 
             const lessonId = `lesson-${uuidv4()}`; 
 
@@ -274,8 +310,6 @@ export const saveGeneratedCourse = async (req, res) => {
             console.log(`[BACKEND] Lição "${lesson.title}" adicionada à transação (ID: ${lessonId}).`);
         }
 
-        const courseSlug = { current: generateSlug(courseData.title) };
-
         // Lógica para buscar detalhes das tags selecionadas para referências
         const courseTagRefs = []; 
         if (tags && tags.length > 0) {
@@ -293,7 +327,7 @@ export const saveGeneratedCourse = async (req, res) => {
             _type: 'course',
             title: courseData.title,
             description: courseData.description,
-            slug: courseSlug, 
+            slug: courseSlug, // Usa o slug validado e único aqui!
             lessons: lessonRefs,
             status: 'published', 
             price: 0, 
@@ -307,7 +341,7 @@ export const saveGeneratedCourse = async (req, res) => {
             category: { _ref: category, _type: 'reference' }, 
             subCategory: { _ref: subCategory, _type: 'reference' }, 
             courseTags: courseTagRefs, 
-            aiGenerationPrompt: courseData.aiGenerationPrompt || '', // Pode ser opcional se não for persistido da pré-visualização
+            aiGenerationPrompt: courseData.aiGenerationPrompt || '', 
             aiModelUsed: courseData.aiModelUsed || "gemini-2.0-flash",   
             generatedAt: new Date().toISOString(),
             lastGenerationRevision: new Date().toISOString(),
@@ -316,10 +350,6 @@ export const saveGeneratedCourse = async (req, res) => {
         transaction.create(newCourse);
         console.log(`[BACKEND] Curso "${newCourse.title}" adicionado à transação (ID: ${courseId}).`);
 
-        // Atualizar a referência no 'createdCourses' do membro para o curso recém-criado
-        // A _ref no patch inicial do membro precisa ser o ID real do curso que será criado.
-        // Como o ID do curso é gerado antes do patch, podemos usá-lo diretamente.
-        // A lógica do patch inicial já está apontando para o `courseId` correto.
         console.log("[BACKEND] Transação preparada para criar curso, lições e ATUALIZAR membro.");
 
         const transactionResult = await transaction.commit(); 
@@ -345,6 +375,9 @@ export const saveGeneratedCourse = async (req, res) => {
         }
         if (error.message.includes('Member with ID') && error.message.includes('not found')) {
             return res.status(404).json({ error: error.message }); 
+        }
+        if (error.message.includes('Falha ao gerar um slug único')) {
+            return res.status(500).json({ error: error.message }); // Retorna erro específico para o slug
         }
         // Tratamento de erro para Sanity CMS
         if (error.statusCode) { 
