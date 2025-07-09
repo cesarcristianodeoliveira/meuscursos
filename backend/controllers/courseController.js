@@ -143,13 +143,35 @@ export const generateCoursePreview = async (req, res) => {
 
         console.log(`[BACKEND] Gerando pré-visualização para o tópico: "${topic}", categoria: "${category}", subcategoria: "${subCategory}", nível: "${level}"...`);
         const geminiResponse = await model.generateContent(prompt);
-        const text = geminiResponse.response.candidates[0].content.parts[0].text;
+        // Acessar o texto de forma mais segura, verificando se os objetos existem.
+        const text = geminiResponse?.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!text) {
+            console.error("[BACKEND] Resposta vazia ou inesperada da Gemini API.");
+            return res.status(500).json({ error: 'A IA retornou uma resposta vazia ou em formato inesperado.' });
+        }
 
         let generatedCourseData;
         try {
-            let cleanText = text.replace(/```json\n|```json|```/g, '').trim();
-            cleanText = cleanText.replace(/(\r\n|\r)/gm, '\\n'); 
-            generatedCourseData = JSON.parse(cleanText);
+            // Remove as aspas triplas de Markdown e qualquer texto antes/depois do JSON
+            // Ajustado para capturar o JSON completo
+            const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+            let rawJsonString = jsonMatch ? jsonMatch[1] : text.trim();
+
+            // Uma segunda tentativa de limpeza caso a primeira não ache o bloco ```json```
+            // Isso lida com casos onde a IA pode não colocar aspas triplas ou texto extra.
+            // Remove quebras de linha/retornos de carro no início e fim para garantir JSON válido.
+            rawJsonString = rawJsonString.replace(/^[\r\n]+|[\r\n]+$/g, '');
+
+            // Normaliza aspas duplas, se houver problemas de codificação
+            rawJsonString = rawJsonString.replace(/”/g, '"').replace(/“/g, '"');
+
+            // Remove a linha que substitui \r\n por \\n, pois o Gemini já deve formatar corretamente
+            // e essa linha pode causar duplicação de escapes se a string já contiver quebras de linha escapadas.
+            // REMOVIDO: cleanText = cleanText.replace(/(\r\n|\r)/gm, '\\n');
+
+            generatedCourseData = JSON.parse(rawJsonString);
+
         } catch (parseError) {
             console.error("[BACKEND] Erro ao parsear JSON da Gemini API:", parseError);
             console.error("[BACKEND] Texto bruto recebido da Gemini (primeiros 500 chars):", text.substring(0, 500) + (text.length > 500 ? '...' : ''));

@@ -3,40 +3,20 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
-import cors from 'cors'; // Certifique-se de que 'cors' está instalado
-import jwt from 'jsonwebtoken';
+import cors from 'cors';
+import jwt from 'jsonwebtoken'; // Importar jsonwebtoken para o middleware de proteção
 
+// Importa as funções de registro e login do controlador de autenticação
 import { register, login } from './controllers/authController.js'; 
-import { generateCoursePreview, saveGeneratedCourse } from './controllers/courseController.js'; 
-import { getCourseCategories, getCourseSubCategories, getCourseTagsByCategory } from './controllers/dataController.js'; 
+// Importa a nova função de geração de cursos
+import { generateCourse } from './controllers/courseController.js';
+// Importa TODAS as funções do dataController, incluindo a nova getCourseTagsByCategory
+import { getCourseCategories, getCourseSubCategories, getCourseTagsByCategory } from './controllers/dataController.js'; // <--- IMPORTAÇÃO ATUALIZADA
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// --- Configuração CORS ---
-const allowedOrigins = [
-    'https://meuscursos.netlify.app', // Sua URL do frontend no Netlify
-    'http://localhost:3000',          // Se você roda seu frontend localmente em 3000
-    'http://localhost:5173',          // Ou outra porta que você usa em desenvolvimento local (ex: Vite usa 5173)
-    'http://localhost:8080'           // Mais uma opção comum para desenvolvimento local
-];
-
-const corsOptions = {
-    origin: function (origin, callback) {
-        // Permite requisições sem "origin" (como de apps mobile ou ferramentas como Postman)
-        // OU se a origem está na lista de allowedOrigins
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Métodos HTTP que você permite
-    credentials: true, // Importante se você usa cookies ou cabeçalhos de autenticação
-    optionsSuccessStatus: 204 // Para algumas compatibilidades de navegadores antigos
-};
-
-app.use(cors(corsOptions)); // Aplica a configuração CORS com as opções definidas
+app.use(cors()); 
 app.use(express.json()); 
 
 // --- Middleware de Autenticação (JWT Protection) ---
@@ -72,16 +52,14 @@ app.get('/', (req, res) => {
 app.post('/api/auth/register', register); 
 app.post('/api/auth/login', login);
 
-// ATUALIZADO: Rota para gerar PRÉ-VISUALIZAÇÃO de Cursos (protegida)
-app.post('/api/courses/generate-preview', protect, generateCoursePreview); 
-
-// NOVA ROTA: Rota para SALVAR Cursos Gerados e Debitar Créditos (protegida)
-app.post('/api/courses/save-generated', protect, saveGeneratedCourse); 
+// Rota de Geração de Cursos (protegida e modularizada)
+app.post('/api/courses/generate', protect, generateCourse); 
 
 // --- ROTAS PARA BUSCA DE DADOS ---
 app.get('/api/data/categories', getCourseCategories);
 app.get('/api/data/subcategories', getCourseSubCategories);
-app.get('/api/data/tags/byCategory/:categoryId', getCourseTagsByCategory);
+// Rota para buscar tags por categoria
+app.get('/api/data/tags/byCategory/:categoryId', getCourseTagsByCategory); // <--- NOVA ROTA
 
 // --- Inicia o Servidor ---
 app.listen(PORT, () => {
@@ -91,8 +69,7 @@ app.listen(PORT, () => {
     console.log(`GET /`);
     console.log(`POST /api/auth/register`); 
     console.log(`POST /api/auth/login`);
-    console.log(`POST /api/courses/generate-preview (protegida)`);
-    console.log(`POST /api/courses/save-generated (protegida)`);
+    console.log(`POST /api/courses/generate (protegida)`); 
     console.log(`GET /api/data/categories`); 
     console.log(`GET /api/data/subcategories`);
     console.log(`GET /api/data/tags/byCategory/:categoryId`);
