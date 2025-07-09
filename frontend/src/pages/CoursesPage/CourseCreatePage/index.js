@@ -187,7 +187,9 @@ function CourseCreatePage() {
         }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/courses/generate`, {
+            // --- LINHA CORRIGIDA AQUI ---
+            const response = await fetch(`${API_BASE_URL}/api/courses/generate-preview`, {
+            // --- FIM DA LINHA CORRIGIDA ---
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -209,7 +211,7 @@ function CourseCreatePage() {
 
             const result = await response.json();
             console.log('Curso gerado com sucesso:', result);
-            setSuccessMessage('Curso e lições gerados e salvos com sucesso no Sanity CMS! 🎉');
+            setSuccessMessage('Pré-visualização do curso gerada com sucesso! Você pode agora salvar o curso.'); // Mensagem atualizada
             setLoading(false);
             handleNext();
 
@@ -219,7 +221,12 @@ function CourseCreatePage() {
                 setError('Não autorizado. Sua sessão pode ter expirado. Por favor, faça login novamente.');
             } else if (err.message && err.message.includes('403')) {
                 setError('Créditos insuficientes para gerar um curso. Por favor, adicione mais créditos ou entre em contato.');
-            } else {
+            } else if (err.message && err.message.includes('Erro da Gemini API')) { // Tratamento específico para erros da Gemini
+                setError(`Erro da IA: ${err.message}. Tente novamente.`);
+            } else if (err.message && err.message.includes('JSON inválido')) { // Tratamento para erro de parse JSON da IA
+                 setError('A resposta da IA está em um formato inesperado. Tente novamente ou ajuste o prompt.');
+            }
+            else {
                 setError(`Erro ao gerar curso: ${err.message}. Verifique o console do backend.`);
             }
             setLoading(false);
