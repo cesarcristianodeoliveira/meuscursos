@@ -140,7 +140,6 @@ export default {
       title: 'AI Generation Prompt',
       type: 'text',
       description: 'The prompt used to generate this course content via AI. For internal tracking and potential regeneration.',
-      readOnly: true,
     },
     {
       name: 'aiModelUsed',
