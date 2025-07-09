@@ -3,18 +3,40 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
-import cors from 'cors';
+import cors from 'cors'; // Certifique-se de que 'cors' está instalado
 import jwt from 'jsonwebtoken';
 
 import { register, login } from './controllers/authController.js'; 
-// ATUALIZADO: Importa as duas novas funções do courseController
 import { generateCoursePreview, saveGeneratedCourse } from './controllers/courseController.js'; 
 import { getCourseCategories, getCourseSubCategories, getCourseTagsByCategory } from './controllers/dataController.js'; 
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors()); 
+// --- Configuração CORS ---
+const allowedOrigins = [
+    'https://meuscursos.netlify.app', // Sua URL do frontend no Netlify
+    'http://localhost:3000',          // Se você roda seu frontend localmente em 3000
+    'http://localhost:5173',          // Ou outra porta que você usa em desenvolvimento local (ex: Vite usa 5173)
+    'http://localhost:8080'           // Mais uma opção comum para desenvolvimento local
+];
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        // Permite requisições sem "origin" (como de apps mobile ou ferramentas como Postman)
+        // OU se a origem está na lista de allowedOrigins
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Métodos HTTP que você permite
+    credentials: true, // Importante se você usa cookies ou cabeçalhos de autenticação
+    optionsSuccessStatus: 204 // Para algumas compatibilidades de navegadores antigos
+};
+
+app.use(cors(corsOptions)); // Aplica a configuração CORS com as opções definidas
 app.use(express.json()); 
 
 // --- Middleware de Autenticação (JWT Protection) ---
