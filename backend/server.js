@@ -55,9 +55,9 @@ app.post('/api/auth/login', login);
 
 // --- MUDANÇA IMPORTANTE AQUI ---
 // Rota para PRÉ-VISUALIZAÇÃO de Cursos (protegida)
-app.post('/api/courses/preview', protect, generateCoursePreview); 
+app.post('/api/courses/generate-preview', protect, generateCoursePreview); 
 // Rota para SALVAR o Curso GERADO (protegida)
-app.post('/api/courses/save', protect, saveGeneratedCourse);
+app.post('/api/courses/save-preview', protect, saveGeneratedCourse);
 
 // --- ROTAS PARA BUSCA DE DADOS ---
 app.get('/api/data/categories', getCourseCategories);
