@@ -55,13 +55,14 @@ function CourseCreatePage() {
     ], []);
 
     const [generatedTopic, setGeneratedTopic] = useState('');
-    const [coursePreview, setCoursePreview] = useState(null);
+    // Storing the entire coursePreview object from the AI response
+    const [coursePreview, setCoursePreview] = useState(null); 
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState({ text: null, courseId: null });
 
-    const { userToken } = useAuth();
+    const { userToken, currentUser } = useAuth(); // Destructure currentUser to get creatorId
 
     const steps = [
         {
@@ -187,7 +188,7 @@ function CourseCreatePage() {
         setLoading(true);
         setError(null);
         setSuccessMessage({ text: null, courseId: null });
-        setCoursePreview(null);
+        setCoursePreview(null); // Clear previous preview
 
         if (!userToken) {
             setError('Você não está autenticado. Por favor, faça login novamente.');
@@ -217,13 +218,18 @@ function CourseCreatePage() {
             }
 
             const result = await response.json();
-            console.log('Resposta completa da pré-visualização:', result); // Log para depuração
-            // *** AQUI ESTÁ A CORREÇÃO PRINCIPAL ***
-            // Salve apenas a parte 'coursePreview' da resposta no estado
-            setCoursePreview(result.coursePreview);
-            setSuccessMessage({ text: 'Pré-visualização do curso gerada com sucesso! Revise e confirme.', courseId: null });
-            setLoading(false);
-            handleNext();
+            console.log('Resposta completa da pré-visualização:', result); 
+            
+            // The AI response directly provides the coursePreview object, as discussed.
+            // Ensure result.coursePreview exists before setting.
+            if (result.coursePreview) {
+                setCoursePreview(result.coursePreview);
+                setSuccessMessage({ text: 'Pré-visualização do curso gerada com sucesso! Revise e confirme.', courseId: null });
+                setLoading(false);
+                handleNext();
+            } else {
+                throw new Error('A resposta da IA não contém a pré-visualização esperada (coursePreview).');
+            }
         } catch (err) {
             console.error("Erro ao gerar pré-visualização do curso:", err);
             if (err.message && err.message.includes('401')) {
@@ -233,7 +239,7 @@ function CourseCreatePage() {
             } else if (err.message && err.message.includes('Erro da Gemini API')) {
                 setError(`Erro da IA: ${err.message}. Tente novamente.`);
             } else if (err.message && err.message.includes('JSON inválido')) {
-                 setError('A resposta da IA está em um formato inesperado. Tente novamente ou ajuste o prompt.');
+                setError('A resposta da IA está em um formato inesperado. Tente novamente ou ajuste o prompt.');
             } else {
                 setError(`Erro ao gerar curso: ${err.message}. Verifique o console do backend.`);
             }
@@ -242,8 +248,8 @@ function CourseCreatePage() {
     };
 
     const handleSaveGeneratedCourse = async () => {
-        // O coursePreview agora já é o objeto direto, então acessamos 'slug'
-        if (!coursePreview || !coursePreview.slug) { // Alterado de courseId para slug
+        // We now expect coursePreview to hold the complete object from the AI
+        if (!coursePreview || !coursePreview.slug) { 
             setError('Nenhum curso para salvar. Gere uma pré-visualização primeiro.');
             return;
         }
@@ -258,6 +264,14 @@ function CourseCreatePage() {
             return;
         }
 
+        // Get creatorId from currentUser context
+        const creatorId = currentUser?.id;
+        if (!creatorId) {
+            setError('ID do criador não encontrado. Por favor, faça login novamente.');
+            setLoading(false);
+            return;
+        }
+
         try {
             const response = await fetch(`${API_BASE_URL}/api/courses/save-generated`, {
                 method: 'POST',
@@ -266,18 +280,20 @@ function CourseCreatePage() {
                     'Authorization': `Bearer ${userToken}`,
                 },
                 body: JSON.stringify({
-                    // *** AQUI ESTÃO AS CORREÇÕES ***
-                    // As propriedades agora são acessadas diretamente de coursePreview
-                    courseTitle: coursePreview.title, // 'title' no objeto de resposta
-                    courseDescription: coursePreview.description, // 'description' no objeto de resposta
-                    lessons: coursePreview.lessons,
-                    // O backend pode precisar do slug ou de um ID gerado. Se o Sanity retornar um _id, use-o.
-                    // Se você precisar enviar o slug para o backend identificar o curso gerado temporariamente:
-                    slug: coursePreview.slug,
+                    // THIS IS THE KEY CHANGE: Sending the coursePreview object directly
+                    // as 'courseData' as expected by your backend
+                    courseData: {
+                        title: coursePreview.courseTitle || coursePreview.title, // Use courseTitle or title
+                        description: coursePreview.courseDescription || coursePreview.description, // Use courseDescription or description
+                        lessons: coursePreview.lessons,
+                        slug: coursePreview.slug,
+                    },
+                    // Other metadata are sent at the top level
                     category: selectedCategory,
                     subCategory: selectedSubCategory,
                     level: selectedLevel,
                     tags: selectedTags,
+                    creatorId: creatorId // Include the creatorId
                 }),
             });
 
@@ -288,19 +304,14 @@ function CourseCreatePage() {
 
             const result = await response.json();
             console.log('Curso salvo com sucesso no Sanity:', result);
-            // Atualiza a mensagem de sucesso e armazena o ID do curso salvo
+            
             setSuccessMessage({
                 text: 'Curso e lições salvos com sucesso no Sanity CMS! 🎉',
-                // O Sanity, ao salvar, deve retornar o _id do documento criado.
-                // Ajuste 'result.courseId' para a propriedade correta que o backend retorna com o ID do curso salvo.
-                // Se o backend retorna { _id: "abc..." }, use result._id.
-                // Se o backend retorna { savedCourse: { _id: "abc..." } }, use result.savedCourse._id.
-                // Por agora, vou usar 'result.savedCourseId' como um placeholder comum.
-                // VERIFIQUE SEU BACKEND PARA O NOME CORRETO DA PROPRIEDADE.
-                courseId: result._id || result.savedCourseId || result.courseId // Usando algumas opções comuns
+                // Adjust this based on what your backend returns as the saved course ID
+                courseId: result._id || result.savedCourseId || result.courseId // Using some common options
             });
             setLoading(false);
-            handleNext(); // Avança para a etapa de conclusão
+            handleNext(); // Advance to the completion step
         } catch (err) {
             console.error("Erro ao salvar curso:", err);
             setError(`Erro ao salvar curso: ${err.message}.`);
@@ -479,13 +490,11 @@ function CourseCreatePage() {
                                         </Typography>
                                         {coursePreview ? (
                                             <>
-                                                {/* *** AQUI ESTÁ A CORREÇÃO *** */}
-                                                {/* As propriedades agora são 'title' e 'description' */}
                                                 <Typography variant="h5" color="primary.dark" sx={{ mb: 1 }}>
-                                                    {coursePreview.title || 'Título não disponível'}
+                                                    {coursePreview.courseTitle || coursePreview.title || 'Título não disponível'}
                                                 </Typography>
                                                 <Typography variant="body1" sx={{ mb: 2 }}>
-                                                    **Descrição:** {coursePreview.description || 'Descrição não disponível'}
+                                                    **Descrição:** {coursePreview.courseDescription || coursePreview.description || 'Descrição não disponível'}
                                                 </Typography>
 
                                                 <Divider sx={{ my: 2 }} />
@@ -500,7 +509,7 @@ function CourseCreatePage() {
                                                                 Lição {lessonIndex + 1}: {lesson.title}
                                                             </Typography>
                                                             <Typography variant="body2" color="text.secondary">
-                                                                {lesson.description}
+                                                                {lesson.content || lesson.description} {/* Use content or description */}
                                                             </Typography>
                                                         </Box>
                                                     ))
@@ -519,7 +528,7 @@ function CourseCreatePage() {
                                 )}
 
                                 <div>
-                                    {/* Botões para as etapas 0 e 1 */}
+                                    {/* Buttons for steps 0 and 1 */}
                                     {index <= 1 && (
                                         <>
                                             <Button
@@ -545,14 +554,14 @@ function CourseCreatePage() {
                                         </>
                                     )}
 
-                                    {/* Botões para a etapa 2 (Pré-visualização e Confirmação) */}
+                                    {/* Buttons for step 2 (Preview and Confirmation) */}
                                     {index === 2 && (
                                         <>
                                             <Button
                                                 variant="contained"
                                                 onClick={handleSaveGeneratedCourse}
                                                 sx={{ mt: 1, mr: 1 }}
-                                                disabled={loading || !coursePreview || !coursePreview.slug} // Alterado de courseId para slug
+                                                disabled={loading || !coursePreview || !coursePreview.slug} 
                                                 startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
                                             >
                                                 {loading ? 'Salvando...' : 'Confirmar e Salvar Curso'}
@@ -603,22 +612,14 @@ function CourseCreatePage() {
                     <Button onClick={handleReset} sx={{ mt: 1, mr: 1}}>
                         Criar Outro Curso
                     </Button>
-                    <Button
-                        component={Link}
-                        to="/cursos"
-                        variant="outlined"
-                        sx={{ mt: 1, mr: 1 }}
-                    >
-                        Ver Todos os Cursos
-                    </Button>
                     {successMessage.courseId && (
                         <Button
                             component={Link}
-                            to={`/cursos/${successMessage.courseId}`}
+                            to={`/cursos/${successMessage.courseId}`} // Adjust this path if your course detail page has a different URL structure
                             variant="contained"
                             sx={{ mt: 1 }}
                         >
-                            Visualizar Curso
+                            Ver Curso Salvo
                         </Button>
                     )}
                 </Paper>
