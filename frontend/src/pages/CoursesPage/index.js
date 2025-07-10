@@ -134,7 +134,7 @@ function CoursesPage() {
       ) : (
         <Grid container spacing={4}> {/* Aumentei o espaçamento para melhor visual */}
           {courses.map((course) => (
-            <Grid item key={course._id} xs={12} sm={6} md={4}> {/* Item para cada card */}
+            <Grid key={course._id} size={{ xs: 12, sm: 6, md: 4 }}> {/* Item para cada card */}
               <CourseCard course={course} />
             </Grid>
           ))}
