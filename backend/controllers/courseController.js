@@ -185,13 +185,13 @@ export const generateCoursePreview = async (req, res) => {
             subCategory: subCategory,
             level: level,
             tags: tags, // Enviar os IDs das tags de volta,
-            promptUsed: prompt,
+            promptUsed: prompt, // <-- Enviando o prompt gerado
         };
 
         res.status(200).json({
             message: 'Pré-visualização do curso gerada com sucesso!',
-            coursePreview: responseData, 
-            promptUsed: prompt,
+            coursePreview: responseData,
+            // Não é necessário enviar promptUsed aqui separadamente, já está em coursePreview
         });
 
     } catch (error) {
@@ -367,7 +367,7 @@ export const saveGeneratedCourse = async (req, res) => {
             category: { _ref: category, _type: 'reference' }, 
             subCategory: { _ref: subCategory, _type: 'reference' }, 
             courseTags: courseTagRefs, 
-            aiGenerationPrompt: courseData.aiGenerationPrompt || '', 
+            aiGenerationPrompt: courseData.promptUsed || '', // <-- CORREÇÃO AQUI!
             aiModelUsed: courseData.aiModelUsed || "gemini-2.0-flash",   
             generatedAt: new Date().toISOString(),
             lastGenerationRevision: new Date().toISOString(),

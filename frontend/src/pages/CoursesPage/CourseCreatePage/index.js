@@ -290,7 +290,6 @@ function CourseCreatePage() {
             return;
         }
 
-        // **AQUI ESTÁ A CHAVE DA CORREÇÃO**
         // Obtém o ID do criador do objeto 'user' do AuthContext
         const creatorId = user?._id;
         if (!creatorId) {
@@ -309,10 +308,12 @@ function CourseCreatePage() {
                 body: JSON.stringify({
                     // Envia o objeto courseData conforme esperado pelo seu backend
                     courseData: {
-                        title: coursePreview.courseTitle || coursePreview.title, // Prioriza courseTitle se existir
-                        description: coursePreview.courseDescription || coursePreview.description, // Prioriza courseDescription se existir
+                        title: coursePreview.courseTitle || coursePreview.title,
+                        description: coursePreview.courseDescription || coursePreview.description,
                         lessons: coursePreview.lessons,
                         slug: coursePreview.slug,
+                        aiGenerationPrompt: coursePreview.promptUsed || '', // <-- ADIÇÃO CHAVE AQUI!
+                        aiModelUsed: coursePreview.aiModelUsed || "gemini-2.0-flash", // Garante que o modelo também seja salvo
                     },
                     // Outros metadados são enviados no nível superior
                     category: selectedCategory,
@@ -333,10 +334,10 @@ function CourseCreatePage() {
 
             setSuccessMessage({
                 text: 'Curso e lições salvos com sucesso no Sanity CMS! 🎉',
-                courseId: result._id || result.savedCourseId || result.courseId // Tenta obter o ID do curso salvo
+                courseId: result._id || result.savedCourseId || result.courseId
             });
             setLoading(false);
-            handleNext(); // Avança para o passo de conclusão
+            handleNext();
         } catch (err) {
             console.error("Erro ao salvar curso:", err);
             setError(`Erro ao salvar curso: ${err.message}.`);
