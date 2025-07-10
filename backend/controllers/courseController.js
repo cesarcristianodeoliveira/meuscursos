@@ -184,12 +184,14 @@ export const generateCoursePreview = async (req, res) => {
             category: category,
             subCategory: subCategory,
             level: level,
-            tags: tags, // Enviar os IDs das tags de volta
+            tags: tags, // Enviar os IDs das tags de volta,
+            promptUsed: prompt,
         };
 
         res.status(200).json({
             message: 'Pré-visualização do curso gerada com sucesso!',
             coursePreview: responseData, 
+            promptUsed: prompt,
         });
 
     } catch (error) {
