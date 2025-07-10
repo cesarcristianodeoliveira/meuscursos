@@ -3,6 +3,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@sanity/client';
 import { v4 as uuidv4 } from 'uuid';
+import axios from 'axios'; // Certifique-se de ter o axios instalado
 
 // --- Configuração da Gemini API ---
 if (!process.env.GEMINI_API_KEY) {
@@ -22,6 +23,12 @@ const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN)
     token: process.env.SANITY_TOKEN, 
 }) : null;
 
+// --- Configuração da Pixabay API ---
+if (!process.env.PIXABAY_API_KEY) {
+    console.error("Erro: Variável de ambiente PIXABAY_API_KEY não definida em courseController.");
+}
+const pixabayApiKey = process.env.PIXABAY_API_KEY;
+
 // --- Função auxiliar para gerar slug amigável para URLs e único ---
 const generateSlug = (text) => {
     const normalizedText = text
@@ -34,8 +41,6 @@ const generateSlug = (text) => {
         .replace(/\s+/g, '-')
         .replace(/-+/g, '-');
     
-    // Adiciona um UUID curto para ajudar na unicidade imediata, 
-    // mas a verificação no Sanity é o que garante 100%
     return `${baseSlug}-${uuidv4().substring(0, 8)}`; 
 };
 
@@ -59,6 +64,58 @@ const convertToPortableText = (text) => {
         style: 'normal',
     }));
 };
+
+// --- Função auxiliar para buscar imagens na Pixabay (AGORA INTERNA) ---
+const fetchPixabayImages = async (query) => {
+    if (!pixabayApiKey) {
+        console.warn("[BACKEND - Pixabay] Chave da Pixabay API não configurada. Não será possível buscar imagens.");
+        return [];
+    }
+
+    if (!query.trim()) {
+        console.warn("[BACKEND - Pixabay] Query de busca Pixabay vazia. Retornando vazio.");
+        return [];
+    }
+
+    try {
+        console.log(`[BACKEND - Pixabay] Buscando imagens para a query: "${query}"`);
+        const response = await axios.get('https://pixabay.com/api/', {
+            params: {
+                key: pixabayApiKey,
+                q: query,
+                image_type: 'photo',
+                safesearch: true,
+                per_page: 9, // Buscar um pouco mais para ter opções, mas limitar no retorno
+                orientation: 'horizontal' // Imagens mais adequadas para banners de curso
+            }
+        });
+
+        // Filtrar e mapear para obter 3 imagens
+        const images = response.data.hits
+            .filter(hit => hit.webformatURL && hit.largeImageURL) // Garante que temos URLs válidas
+            .slice(0, 3) // Pegar apenas as 3 primeiras
+            .map(hit => ({
+                id: hit.id,
+                pageURL: hit.pageURL,
+                previewURL: hit.previewURL,
+                webformatURL: hit.webformatURL, // URL para exibição em tamanho médio
+                largeImageURL: hit.largeImageURL, // URL da imagem em alta resolução
+                tags: hit.tags,
+                user: hit.user
+            }));
+        
+        console.log(`[BACKEND - Pixabay] Encontradas ${images.length} imagens para "${query}".`);
+        return images;
+
+    } catch (error) {
+        console.error("[BACKEND - Pixabay] Erro ao buscar imagens da Pixabay:", error.message);
+        if (error.response) {
+            console.error("[BACKEND - Pixabay] Detalhes do erro da Pixabay API:", error.response.data);
+        }
+        return []; // Retorna um array vazio em caso de erro
+    }
+};
+
 
 // --- NOVA FUNÇÃO: generateCoursePreview ---
 export const generateCoursePreview = async (req, res) => {
@@ -92,6 +149,21 @@ export const generateCoursePreview = async (req, res) => {
             }
         }
 
+        // --- Fetch category and subCategory names for Pixabay query ---
+        let categoryName = '';
+        let subCategoryName = '';
+        if (category) {
+            const catDoc = await sanityClient.fetch(`*[_id == $category][0]{name}`, { category });
+            categoryName = catDoc?.name || '';
+        }
+        if (subCategory) {
+            const subCatDoc = await sanityClient.fetch(`*[_id == $subCategory][0]{name}`, { subCategory });
+            subCategoryName = subCatDoc?.name || '';
+        }
+
+        // Criar a query para Pixabay baseada na categoria e subcategoria
+        const pixabayQuery = `${categoryName} ${subCategoryName} ${topic}`; // Combina para melhor relevância
+        
         const prompt = `Gere um esquema de curso detalhado em português, garantindo que o **título do curso e os títulos das lições sejam altamente originais e únicos**, mesmo quando os parâmetros iniciais são semelhantes.
 
         ${tagsContext} O curso deve ser sobre "${topic}", na categoria de ID "${category}" e subcategoria de ID "${subCategory}", e ter um nível de dificuldade "${level}".
@@ -148,12 +220,11 @@ export const generateCoursePreview = async (req, res) => {
 
             generatedCourseData = JSON.parse(rawJsonString);
 
-            // --- MUDANÇA IMPORTANTE AQUI: GERAÇÃO DE SLUGS NO BACKEND PARA PRÉ-VISUALIZAÇÃO ---
-            // A IA não gera mais o slug; seu backend o faz.
+            // --- GERAÇÃO DE SLUGS NO BACKEND PARA PRÉ-VISUALIZAÇÃO ---
             if (generatedCourseData.title) {
                 generatedCourseData.slug = {
                     current: generateSlug(generatedCourseData.title),
-                    _type: 'slug' // Sanity exige _type para campo slug
+                    _type: 'slug' 
                 };
             } else {
                 generatedCourseData.slug = { current: `curso-${uuidv4()}` };
@@ -179,20 +250,26 @@ export const generateCoursePreview = async (req, res) => {
             return res.status(500).json({ error: 'Erro ao processar a resposta da IA. Formato JSON inválido ou falha na geração de slug.', rawText: text });
         }
 
+        // --- BUSCA E ADICIONA IMAGENS DA PIXABAY AQUI ---
+        let suggestedImages = [];
+        if (pixabayApiKey) { // Só tenta buscar se a API Key estiver configurada
+            suggestedImages = await fetchPixabayImages(pixabayQuery);
+        }
+        
         const responseData = {
             ...generatedCourseData,
             category: category,
             subCategory: subCategory,
             level: level,
-            tags: tags, // Enviar os IDs das tags de volta,
-            promptUsed: prompt, // <-- Enviando o prompt gerado
-            aiModelUsed: "gemini-2.0-flash" // Adiciona o modelo usado para a preview
+            tags: tags, 
+            promptUsed: prompt, 
+            aiModelUsed: "gemini-2.0-flash", 
+            suggestedImages: suggestedImages, // <-- ADICIONA AS IMAGENS SUGERIDAS AQUI!
         };
 
         res.status(200).json({
             message: 'Pré-visualização do curso gerada com sucesso!',
             coursePreview: responseData,
-            // Não é necessário enviar promptUsed aqui separadamente, já está em coursePreview
         });
 
     } catch (error) {
@@ -216,7 +293,6 @@ export const saveGeneratedCourse = async (req, res) => {
         return res.status(500).json({ error: 'Erro de configuração do servidor: Cliente Sanity não inicializado.' });
     }
 
-    // Adicionado para depuração
     console.log('[BACKEND - saveGeneratedCourse] Dados recebidos na requisição:', JSON.stringify(req.body, null, 2));
 
     const { courseData, category, subCategory, level, tags } = req.body; 
@@ -226,11 +302,10 @@ export const saveGeneratedCourse = async (req, res) => {
         return res.status(400).json({ error: 'Dados incompletos para salvar o curso. Verifique courseData, category, subCategory, level e creatorId.' });
     }
 
-    // Adicionado para depuração
     console.log('[BACKEND - saveGeneratedCourse] Conteúdo de courseData:', JSON.stringify(courseData, null, 2));
     console.log('[BACKEND - saveGeneratedCourse] aiGenerationPrompt de courseData:', courseData.aiGenerationPrompt);
     console.log('[BACKEND - saveGeneratedCourse] aiModelUsed de courseData:', courseData.aiModelUsed);
-
+    console.log('[BACKEND - saveGeneratedCourse] courseImage recebida:', courseData.courseImage); // Novo log para a imagem
 
     let transaction; 
 
@@ -257,9 +332,8 @@ export const saveGeneratedCourse = async (req, res) => {
             console.log(`[BACKEND] Admin user ${creatorId} is creating a course. No credits consumed.`);
         }
 
-        // --- MUDANÇA IMPORTANTE AQUI: LÓGICA DE VALIDAÇÃO DE UNICIDADE DO SLUG DO CURSO ---
-        // O slug já vem do frontend (gerado pela preview), mas validamos e ajustamos aqui se necessário.
-        let initialCourseSlug = courseData.slug.current; // Pega o slug que veio da pré-visualização
+        // --- LÓGICA DE VALIDAÇÃO DE UNICIDADE DO SLUG DO CURSO ---
+        let initialCourseSlug = courseData.slug.current; 
         let finalCourseSlug = initialCourseSlug;
         let slugIsUnique = false;
         let attempt = 0;
@@ -276,8 +350,6 @@ export const saveGeneratedCourse = async (req, res) => {
             } else {
                 attempt++;
                 console.warn(`[BACKEND] Slug "${finalCourseSlug}" já existe no Sanity. Tentando gerar um novo (tentativa ${attempt}).`);
-                // Se o slug da pré-visualização já existe, gera um novo a partir do título original
-                // e garante um sufixo para unicidade.
                 finalCourseSlug = `${generateSlug(courseData.title)}-retry-${uuidv4().substring(0, 4)}`;
             }
         }
@@ -286,12 +358,41 @@ export const saveGeneratedCourse = async (req, res) => {
             throw new Error('Falha ao gerar um slug único para o curso após múltiplas tentativas. Por favor, tente um tópico diferente para o curso.');
         }
 
-        const courseSlugForSanity = { // Objeto slug no formato Sanity
+        const courseSlugForSanity = { 
             _type: 'slug',
             current: finalCourseSlug,
         };
         // --- FIM DA LÓGICA de Validação de Unicidade do SLUG do CURSO ---
 
+        let courseImageRef = null;
+        if (courseData.courseImage && courseData.courseImage.largeImageURL) {
+            try {
+                console.log(`[BACKEND] Tentando fazer upload da imagem para o Sanity: ${courseData.courseImage.largeImageURL}`);
+                
+                // Faz o download da imagem da Pixabay
+                const imageResponse = await axios.get(courseData.courseImage.largeImageURL, {
+                    responseType: 'arraybuffer' // Importante para obter o buffer da imagem
+                });
+
+                // Envia o buffer para o Sanity
+                const uploadedImage = await sanityClient.assets.upload('image', Buffer.from(imageResponse.data), {
+                    filename: `course-image-${courseId}.jpg`, // Nome de arquivo único
+                    contentType: imageResponse.headers['content-type'] || 'image/jpeg'
+                });
+
+                courseImageRef = {
+                    _type: 'image',
+                    asset: {
+                        _type: 'reference',
+                        _ref: uploadedImage._id
+                    }
+                };
+                console.log(`[BACKEND] Imagem carregada para o Sanity com sucesso. ID do asset: ${uploadedImage._id}`);
+            } catch (uploadError) {
+                console.error("[BACKEND] Erro ao carregar imagem para o Sanity:", uploadError);
+                // Se der erro, a imagem não será salva, mas o curso pode continuar
+            }
+        }
 
         const courseId = `course-${uuidv4()}`; 
         const lessonRefs = [];
@@ -313,7 +414,7 @@ export const saveGeneratedCourse = async (req, res) => {
         console.log(`[BACKEND] Transação iniciada. Member ${creatorId} será atualizado.`);
 
         for (const lesson of courseData.lessons) {
-            const lessonSlug = lesson.slug; // Pega o slug que veio da pré-visualização
+            const lessonSlug = lesson.slug; 
 
             const lessonId = `lesson-${uuidv4()}`; 
 
@@ -321,7 +422,7 @@ export const saveGeneratedCourse = async (req, res) => {
                 _id: lessonId,
                 _type: 'lesson',
                 title: lesson.title,
-                slug: lessonSlug, // Usa o slug gerado na pré-visualização (que já é único)
+                slug: lessonSlug, 
                 content: convertToPortableText(lesson.content),
                 order: lesson.order,
                 estimatedReadingTime: lesson.estimatedReadingTime || 5,
@@ -359,7 +460,7 @@ export const saveGeneratedCourse = async (req, res) => {
             _type: 'course',
             title: courseData.title,
             description: courseData.description,
-            slug: courseSlugForSanity, // Usa o slug validado e único aqui!
+            slug: courseSlugForSanity, 
             lessons: lessonRefs,
             status: 'published', 
             price: 0, 
@@ -373,10 +474,11 @@ export const saveGeneratedCourse = async (req, res) => {
             category: { _ref: category, _type: 'reference' }, 
             subCategory: { _ref: subCategory, _type: 'reference' }, 
             courseTags: courseTagRefs, 
-            aiGenerationPrompt: courseData.aiGenerationPrompt || '', // <-- CORRIGIDO AQUI!
-            aiModelUsed: courseData.aiModelUsed || "gemini-2.0-flash",  // <-- CORRIGIDO AQUI!
+            aiGenerationPrompt: courseData.aiGenerationPrompt || '', 
+            aiModelUsed: courseData.aiModelUsed || "gemini-2.0-flash",  
             generatedAt: new Date().toISOString(),
             lastGenerationRevision: new Date().toISOString(),
+            image: courseImageRef, // <-- REFERÊNCIA DA IMAGEM AQUI
         };
 
         transaction.create(newCourse);
