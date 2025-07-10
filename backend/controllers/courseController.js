@@ -60,6 +60,8 @@ const convertToPortableText = (text) => {
     }));
 };
 
+
+
 // --- NOVA FUNÇÃO: generateCoursePreview ---
 export const generateCoursePreview = async (req, res) => {
     if (!genAI || !sanityClient) {
