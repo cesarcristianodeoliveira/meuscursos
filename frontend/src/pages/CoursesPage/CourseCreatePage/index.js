@@ -8,7 +8,6 @@ import {
     StepLabel,
     StepContent,
     Button,
-    Paper,
     CircularProgress,
     Alert,
     MenuItem,
@@ -25,6 +24,7 @@ import { useAuth } from '../../../contexts/AuthContext'; // Ajuste o caminho se 
 import ReactMarkdown from 'react-markdown'; // Importar para renderizar Markdown
 
 // URL base da sua API de backend
+// process.env.REACT_APP_BACKEND_URL será 'https://meuscursos.onrender.com' em produção ou 'http://localhost:3001' em desenvolvimento
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 // Propriedades para o Menu de Tags (MUI Select)
@@ -356,9 +356,11 @@ function CourseCreatePage() {
     };
 
     // Filtra as subcategorias com base na categoria selecionada
-    const filteredSubCategories = fetchedSubCategories.filter(
-        (subCat) => subCat.categoryRef === selectedCategory
-    );
+    const filteredSubCategories = useMemo(() => {
+        return fetchedSubCategories.filter(
+            (subCat) => subCat.categoryRef === selectedCategory
+        );
+    }, [fetchedSubCategories, selectedCategory]);
 
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
@@ -614,12 +616,11 @@ function CourseCreatePage() {
                                                     loading ||
                                                     (index === 0 && (!selectedCategory || !selectedSubCategory || !selectedLevel))
                                                 }
-                                                startIcon={index === 1 && loading ? <CircularProgress size={20} color="inherit" /> : null}
                                             >
-                                                {index === 1 ? (loading ? 'Gerando Pré-visualização...' : 'Gerar Pré-visualização') : 'Próximo'}
+                                                {loading && index === 1 ? <CircularProgress size={24} sx={{ color: 'white' }} /> : (index === 1 ? 'Gerar Pré-visualização' : 'Próximo')}
                                             </Button>
                                             <Button
-                                                disabled={index === 0 || loading}
+                                                disabled={activeStep === 0 || loading}
                                                 onClick={handleBack}
                                                 sx={{ mt: 1, mr: 1 }}
                                             >
@@ -627,34 +628,31 @@ function CourseCreatePage() {
                                             </Button>
                                         </Box>
                                     )}
-
-                                    {/* Botões para o passo 2 (Pré-visualização e Confirmação) */}
+                                    {/* Botões para o passo 2 (Pré-visualização) */}
                                     {index === 2 && (
                                         <Box sx={{ mt: 2 }}>
                                             <Button
                                                 variant="contained"
                                                 onClick={handleSaveGeneratedCourse}
                                                 sx={{ mt: 1, mr: 1 }}
-                                                disabled={loading || !coursePreview || !coursePreview.slug}
-                                                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+                                                disabled={loading || !coursePreview}
                                             >
-                                                {loading ? 'Salvando...' : 'Confirmar e Salvar Curso'}
+                                                {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Confirmar e Salvar Curso'}
                                             </Button>
                                             <Button
-                                                variant="outlined"
-                                                onClick={handleBack} // Volta para o passo de geração se quiser ajustar
-                                                sx={{ mt: 1, mr: 1 }}
                                                 disabled={loading}
+                                                onClick={handleBack}
+                                                sx={{ mt: 1, mr: 1 }}
                                             >
-                                                Voltar e Editar
+                                                Voltar
                                             </Button>
                                             <Button
-                                                variant="text"
+                                                disabled={loading}
                                                 onClick={handleReset}
                                                 sx={{ mt: 1, mr: 1 }}
-                                                disabled={loading}
+                                                variant="outlined"
                                             >
-                                                Cancelar e Recomeçar
+                                                Cancelar e Reiniciar
                                             </Button>
                                         </Box>
                                     )}
