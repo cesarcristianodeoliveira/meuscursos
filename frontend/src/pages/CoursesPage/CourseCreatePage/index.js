@@ -8,6 +8,7 @@ import {
     StepLabel,
     StepContent,
     Button,
+    Paper,
     CircularProgress,
     Alert,
     MenuItem,
@@ -21,10 +22,8 @@ import {
 import { Link } from 'react-router-dom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import { useAuth } from '../../../contexts/AuthContext'; // Ajuste o caminho se necessário
-import ReactMarkdown from 'react-markdown'; // Importar para renderizar Markdown
 
 // URL base da sua API de backend
-// process.env.REACT_APP_BACKEND_URL será 'https://meuscursos.onrender.com' em produção ou 'http://localhost:3001' em desenvolvimento
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 // Propriedades para o Menu de Tags (MUI Select)
@@ -114,7 +113,7 @@ function CourseCreatePage() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, []); // Dependências vazias, pois só carrega uma vez
 
     // Busca tags filtradas por categoria selecionada
     const fetchTagsByCategory = useCallback(async (categoryId) => {
@@ -174,14 +173,6 @@ function CourseCreatePage() {
     // --- Handlers do Stepper ---
 
     const handleNext = () => {
-        // Validação para o primeiro passo
-        if (activeStep === 0) {
-            if (!selectedCategory || !selectedSubCategory || !selectedLevel) {
-                setError('Por favor, preencha todos os campos obrigatórios (Categoria, Subcategoria, Nível).');
-                return;
-            }
-            setError(null); // Limpa erros se a validação passar
-        }
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
     };
 
@@ -192,7 +183,6 @@ function CourseCreatePage() {
             setCoursePreview(null);
             setSuccessMessage({ text: null, courseId: null });
         }
-        setError(null); // Limpa erros ao voltar
     };
 
     const handleReset = () => {
@@ -356,11 +346,9 @@ function CourseCreatePage() {
     };
 
     // Filtra as subcategorias com base na categoria selecionada
-    const filteredSubCategories = useMemo(() => {
-        return fetchedSubCategories.filter(
-            (subCat) => subCat.categoryRef === selectedCategory
-        );
-    }, [fetchedSubCategories, selectedCategory]);
+    const filteredSubCategories = fetchedSubCategories.filter(
+        (subCat) => subCat.categoryRef === selectedCategory
+    );
 
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
@@ -379,21 +367,10 @@ function CourseCreatePage() {
                 Crie um Novo Curso com IA
             </Typography>
 
-            {error && (
-                <Alert severity="error" sx={{ mb: 3 }}>
-                    {error}
-                </Alert>
-            )}
-            {successMessage.text && activeStep !== steps.length - 1 && ( // Exibe sucesso apenas antes do passo final
-                <Alert severity="success" sx={{ mb: 3 }}>
-                    {successMessage.text}
-                </Alert>
-            )}
-
             <Stepper activeStep={activeStep} orientation="vertical">
                 {steps.map((step, index) => (
                     <Step key={step.label}>
-                        <StepLabel optional={index === steps.length - 1 ? <Typography variant="caption">Conclusão</Typography> : null}>
+                        <StepLabel optional={index === 3 ? <Typography variant="caption">Conclusão</Typography> : null}>
                             {step.label}
                         </StepLabel>
                         <StepContent>
@@ -545,7 +522,7 @@ function CourseCreatePage() {
                                                     {coursePreview.courseTitle || coursePreview.title || 'Título não disponível'}
                                                 </Typography>
                                                 <Typography variant="body1" sx={{ mb: 2 }}>
-                                                    **Descrição:** <ReactMarkdown>{coursePreview.courseDescription || coursePreview.description || 'Descrição não disponível'}</ReactMarkdown>
+                                                    **Descrição:** {coursePreview.courseDescription || coursePreview.description || 'Descrição não disponível'}
                                                 </Typography>
 
                                                 <Divider sx={{ my: 2 }} />
@@ -560,7 +537,7 @@ function CourseCreatePage() {
                                                                 Lição {lessonIndex + 1}: {lesson.title}
                                                             </Typography>
                                                             <Typography variant="body2" color="text.secondary">
-                                                                <ReactMarkdown>{lesson.content || lesson.description || 'Conteúdo não disponível'}</ReactMarkdown>
+                                                                {lesson.content || lesson.description}
                                                             </Typography>
                                                         </Box>
                                                     ))
@@ -577,91 +554,104 @@ function CourseCreatePage() {
                                         )}
                                     </Box>
                                 )}
-                                {index === steps.length - 1 && ( // Último passo (Concluído)
-                                    <Box sx={{ mt: 2 }}>
-                                        {successMessage.text && (
-                                            <Alert severity="success" sx={{ mb: 2 }}>
-                                                {successMessage.text}
-                                            </Alert>
-                                        )}
-                                        {successMessage.courseId && (
-                                            <Button
-                                                variant="contained"
-                                                component={Link}
-                                                to={`/cursos/${successMessage.courseId}`}
-                                                sx={{ mt: 1, mr: 1 }}
-                                            >
-                                                Ver Curso Criado
-                                            </Button>
-                                        )}
-                                        <Button
-                                            onClick={handleReset}
-                                            sx={{ mt: 1, mr: 1 }}
-                                            variant="outlined"
-                                        >
-                                            Criar Novo Curso
-                                        </Button>
-                                    </Box>
-                                )}
 
                                 <div>
                                     {/* Botões para os passos 0 e 1 */}
                                     {index <= 1 && (
-                                        <Box sx={{ mt: 2 }}>
+                                        <>
                                             <Button
                                                 variant="contained"
                                                 onClick={index === 1 ? handleGenerateCourse : handleNext}
                                                 sx={{ mt: 1, mr: 1 }}
                                                 disabled={
                                                     loading ||
-                                                    (index === 0 && (!selectedCategory || !selectedSubCategory || !selectedLevel))
+                                                    (index === 0 && (!selectedCategory || !selectedSubCategory || !selectedLevel)) ||
+                                                    (index === 1 && loading)
                                                 }
+                                                startIcon={index === 1 && loading ? <CircularProgress size={20} color="inherit" /> : null}
                                             >
-                                                {loading && index === 1 ? <CircularProgress size={24} sx={{ color: 'white' }} /> : (index === 1 ? 'Gerar Pré-visualização' : 'Próximo')}
+                                                {index === 1 ? (loading ? 'Gerando Pré-visualização...' : 'Gerar Pré-visualização') : 'Próximo'}
                                             </Button>
                                             <Button
-                                                disabled={activeStep === 0 || loading}
+                                                disabled={index === 0 || loading}
                                                 onClick={handleBack}
                                                 sx={{ mt: 1, mr: 1 }}
                                             >
                                                 Voltar
                                             </Button>
-                                        </Box>
+                                        </>
                                     )}
-                                    {/* Botões para o passo 2 (Pré-visualização) */}
+
+                                    {/* Botões para o passo 2 (Pré-visualização e Confirmação) */}
                                     {index === 2 && (
-                                        <Box sx={{ mt: 2 }}>
+                                        <>
                                             <Button
                                                 variant="contained"
                                                 onClick={handleSaveGeneratedCourse}
                                                 sx={{ mt: 1, mr: 1 }}
-                                                disabled={loading || !coursePreview}
+                                                disabled={loading || !coursePreview || !coursePreview.slug}
+                                                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
                                             >
-                                                {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Confirmar e Salvar Curso'}
+                                                {loading ? 'Salvando...' : 'Confirmar e Salvar Curso'}
                                             </Button>
                                             <Button
-                                                disabled={loading}
-                                                onClick={handleBack}
-                                                sx={{ mt: 1, mr: 1 }}
-                                            >
-                                                Voltar
-                                            </Button>
-                                            <Button
-                                                disabled={loading}
+                                                variant="outlined"
                                                 onClick={handleReset}
                                                 sx={{ mt: 1, mr: 1 }}
-                                                variant="outlined"
+                                                disabled={loading}
                                             >
-                                                Cancelar e Reiniciar
+                                                Cancelar e Recomeçar
                                             </Button>
-                                        </Box>
+                                        </>
                                     )}
                                 </div>
+
+                                {/* Mensagens de carregamento e erro */}
+                                {loading && index === 1 && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        Aguarde, a IA está trabalhando para gerar a pré-visualização...
+                                    </Typography>
+                                )}
+                                {loading && index === 2 && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        Salvando o curso no Sanity CMS...
+                                    </Typography>
+                                )}
+                                {error && (
+                                    <Alert severity="error" sx={{ mt: 2 }}>
+                                        {error}
+                                    </Alert>
+                                )}
                             </Box>
                         </StepContent>
                     </Step>
                 ))}
             </Stepper>
+
+            {/* Renderização da mensagem de sucesso no último passo */}
+            {activeStep === steps.length && (
+                <Paper square elevation={0} sx={{ p: 3, mt: 3 }}>
+                    <Typography variant="h6" color="success.main" sx={{ mb: 2 }}>
+                        {successMessage.text || 'Processo de criação concluído!'}
+                    </Typography>
+                    {successMessage.courseId && (
+                        <Typography variant="body1" sx={{ mb: 2 }}>
+                            Você pode visualizar o curso <Link to={`/cursos/${successMessage.courseId}`}>aqui</Link>.
+                        </Typography>
+                    )}
+                    {error && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {error}
+                        </Alert>
+                    )}
+                    <Button onClick={handleReset} sx={{ mt: 1, mr: 1 }}>
+                        Criar Outro Curso
+                    </Button>
+                    <Button component={Link} to="/cursos" variant="text" sx={{ mt: 1 }}>
+                        Ver Meus Cursos
+                    </Button>
+                </Paper>
+            )}
         </Container>
     );
 }
