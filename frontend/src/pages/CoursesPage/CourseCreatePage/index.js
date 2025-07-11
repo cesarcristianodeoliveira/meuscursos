@@ -61,6 +61,8 @@ function CourseCreatePage() {
 
     const [generatedTopic, setGeneratedTopic] = useState(''); // Tópico gerado para a IA
     const [coursePreview, setCoursePreview] = useState(null); // Armazena o objeto de pré-visualização do curso da resposta da IA
+    // NOVO ESTADO: Para armazenar a URL da imagem de capa do Pixabay
+    const [courseCoverImageUrl, setCourseCoverImageUrl] = useState(''); 
 
     // Estados para feedback da UI
     const [loading, setLoading] = useState(false);
@@ -181,6 +183,7 @@ function CourseCreatePage() {
         // Ao voltar do passo de pré-visualização, limpa a pré-visualização e mensagens de sucesso
         if (activeStep === 2) {
             setCoursePreview(null);
+            setCourseCoverImageUrl(''); // NOVO: Limpa a URL da imagem ao voltar
             setSuccessMessage({ text: null, courseId: null });
         }
     };
@@ -193,6 +196,7 @@ function CourseCreatePage() {
         setSelectedTags([]);
         setGeneratedTopic('');
         setCoursePreview(null);
+        setCourseCoverImageUrl(''); // NOVO: Limpa a URL da imagem ao resetar
         setLoading(false);
         setError(null);
         setSuccessMessage({ text: null, courseId: null });
@@ -213,6 +217,7 @@ function CourseCreatePage() {
         setError(null);
         setSuccessMessage({ text: null, courseId: null });
         setCoursePreview(null); // Limpa qualquer pré-visualização anterior
+        setCourseCoverImageUrl(''); // NOVO: Limpa qualquer imagem anterior
 
         if (!userToken) {
             setError('Você não está autenticado. Por favor, faça login novamente.');
@@ -248,6 +253,12 @@ function CourseCreatePage() {
             // Verifica se a resposta da IA contém o objeto de pré-visualização esperado
             if (result.coursePreview) {
                 setCoursePreview(result.coursePreview);
+                // NOVO: Armazena a URL da imagem retornada pelo backend
+                if (result.imageUrl) {
+                    setCourseCoverImageUrl(result.imageUrl);
+                } else {
+                    setCourseCoverImageUrl(''); // Garante que esteja limpo se não houver imagem
+                }
                 setSuccessMessage({ text: 'Pré-visualização do curso gerada com sucesso! Revise e confirme.', courseId: null });
                 setLoading(false);
                 handleNext(); // Avança para o passo de pré-visualização
@@ -312,8 +323,10 @@ function CourseCreatePage() {
                         description: coursePreview.courseDescription || coursePreview.description,
                         lessons: coursePreview.lessons,
                         slug: coursePreview.slug,
-                        aiGenerationPrompt: coursePreview.promptUsed || '', // <-- ADIÇÃO CHAVE AQUI!
-                        aiModelUsed: coursePreview.aiModelUsed || "gemini-2.0-flash", // Garante que o modelo também seja salvo
+                        aiGenerationPrompt: coursePreview.promptUsed || '',
+                        aiModelUsed: coursePreview.aiModelUsed || "gemini-2.0-flash",
+                        // NOVO: Adiciona a URL da imagem ao objeto de dados do curso para salvar
+                        coverImageUrl: courseCoverImageUrl, 
                     },
                     // Outros metadados são enviados no nível superior
                     category: selectedCategory,
@@ -518,6 +531,18 @@ function CourseCreatePage() {
                                         </Typography>
                                         {coursePreview ? (
                                             <>
+                                                {/* NOVO: Exibe a imagem de capa do curso se disponível */}
+                                                {courseCoverImageUrl && (
+                                                    <Box sx={{ mb: 2, width: '100%', display: 'flex', justifyContent: 'center' }}>
+                                                        <img
+                                                            src={courseCoverImageUrl}
+                                                            alt={coursePreview.courseTitle || 'Imagem de capa do curso'}
+                                                            style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', objectFit: 'cover', maxHeight: '250px' }}
+                                                        />
+                                                    </Box>
+                                                )}
+                                                {/* FIM DA NOVIDADE */}
+
                                                 <Typography variant="h5" color="primary.dark" sx={{ mb: 1 }}>
                                                     {coursePreview.courseTitle || coursePreview.title || 'Título não disponível'}
                                                 </Typography>
@@ -604,54 +629,65 @@ function CourseCreatePage() {
                                             </Button>
                                         </>
                                     )}
-                                </div>
 
-                                {/* Mensagens de carregamento e erro */}
-                                {loading && index === 1 && (
-                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                        Aguarde, a IA está trabalhando para gerar a pré-visualização...
-                                    </Typography>
-                                )}
-                                {loading && index === 2 && (
-                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                        Salvando o curso no Sanity CMS...
-                                    </Typography>
-                                )}
-                                {error && (
-                                    <Alert severity="error" sx={{ mt: 2 }}>
-                                        {error}
-                                    </Alert>
-                                )}
+                                    {/* Renderiza a mensagem de sucesso ou erro */}
+                                    {(error || successMessage.text) && (
+                                        <Alert
+                                            severity={error ? "error" : "success"}
+                                            sx={{ mt: 2, mb: 1, width: '100%' }}
+                                        >
+                                            {error || successMessage.text}
+                                            {successMessage.courseId && (
+                                                <Button
+                                                    component={Link}
+                                                    to={`/cursos/${successMessage.courseId}`} // Ajuste para a rota correta de detalhes do curso
+                                                    variant="text"
+                                                    sx={{ ml: 2 }}
+                                                >
+                                                    Ver Curso
+                                                </Button>
+                                            )}
+                                        </Alert>
+                                    )}
+                                </div>
                             </Box>
                         </StepContent>
                     </Step>
                 ))}
-            </Stepper>
-
-            {/* Renderização da mensagem de sucesso no último passo */}
-            {activeStep === steps.length && (
-                <Paper square elevation={0} sx={{ p: 3, mt: 3 }}>
-                    <Typography variant="h6" color="success.main" sx={{ mb: 2 }}>
-                        {successMessage.text || 'Processo de criação concluído!'}
-                    </Typography>
-                    {successMessage.courseId && (
-                        <Typography variant="body1" sx={{ mb: 2 }}>
-                            Você pode visualizar o curso <Link to={`/cursos/${successMessage.courseId}`}>aqui</Link>.
+                {/* Conteúdo do passo "Concluído" */}
+                {activeStep === steps.length && (
+                    <Paper square elevation={0} sx={{ p: 3 }}>
+                        <Typography variant="h6" sx={{ mb: 2 }}>
+                            Seu curso foi gerado e salvo com sucesso!
                         </Typography>
-                    )}
-                    {error && (
-                        <Alert severity="error" sx={{ mb: 2 }}>
-                            {error}
+                        <Alert severity="success" sx={{ mb: 2 }}>
+                            {successMessage.text}
                         </Alert>
-                    )}
-                    <Button onClick={handleReset} sx={{ mt: 1, mr: 1 }}>
-                        Criar Outro Curso
-                    </Button>
-                    <Button component={Link} to="/cursos" variant="text" sx={{ mt: 1 }}>
-                        Ver Meus Cursos
-                    </Button>
-                </Paper>
-            )}
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-start', gap: 2 }}>
+                            {successMessage.courseId && (
+                                <Button
+                                    variant="contained"
+                                    component={Link}
+                                    to={`/cursos/${successMessage.courseId}`}
+                                >
+                                    Ver Curso Criado
+                                </Button>
+                            )}
+                            <Button onClick={handleReset} sx={{ mt: 1, mr: 1 }} variant="outlined">
+                                Criar Outro Curso
+                            </Button>
+                            <Button
+                                component={Link}
+                                to="/cursos"
+                                variant="text"
+                                sx={{ mt: 1 }}
+                            >
+                                Voltar para a Lista de Cursos
+                            </Button>
+                        </Box>
+                    </Paper>
+                )}
+            </Stepper>
         </Container>
     );
 }

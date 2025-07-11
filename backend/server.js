@@ -1,5 +1,3 @@
-// Cesar Oliveira
-
 // D:\meuscursos\backend\server.js
 import dotenv from 'dotenv';
 dotenv.config();
