@@ -38,13 +38,21 @@ export default {
       // validation: Rule => Rule.required().integer().min(1),
     },
     {
-      name: 'mainMedia',
-      title: 'Main Lesson Media',
+      name: 'image',
+      title: 'Lesson Image',
       type: 'image',
       options: {
         hotspot: true,
       },
-      description: 'Main image or visual representation for this lesson, often sourced automatically (e.g., from Pixabay).',
+      description: 'A compelling image to represent the course.',
+    },
+    {
+      name: 'video',
+      title: 'Vídeo',
+      type: 'file',
+      options: {
+        accept: 'video/mp4, video/webm, video/ogg',
+      },
     },
     {
       name: 'content',

@@ -4,18 +4,13 @@ import React, { useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, useMediaQuery } from '@mui/material';
 
-// Importa seu tema personalizado (agora é uma função)
 import getAppTheme from './theme'; 
 
-// Importa o AuthProvider e useAuth do diretório 'contexts'
 import { AuthProvider, useAuth } from './contexts/AuthContext'; 
 
-// --- NOVO: Importa o SEOProvider e o componente SEO ---
-import { SEOProvider } from './contexts/SEOContext'; // Certifique-se de que este caminho está correto
-import SEO from './components/SEO'; // Aponta para src/components/SEO/index.js
-// --------------------------------------------------
-
-import Navbar from './components/Navbar'
+// Importa o SEOProvider e o componente SEO
+import { SEOProvider } from './contexts/SEOContext'; 
+import SEO from './components/SEO'; 
 
 // Importa suas páginas e o componente de redirecionamento
 import CoursesPage from './pages/CoursesPage';
@@ -25,12 +20,12 @@ import LessonPage from './pages/CoursePage/LessonPage';
 import MemberProfilePage from './pages/Member/Profile'; 
 import RegisterPage from './pages/RegisterPage'; 
 import LoginPage from './pages/LoginPage';
+
+// Importa o HomeOrDashboardRedirect que já controla o acesso à DashboardPage
 import HomeOrDashboardRedirect from './components/HomeOrDashboardRedirect'; 
 
-// --- Importa o ProtectedRoute ---
 import ProtectedRoute from './components/ProtectedRoute'; 
 
-// Componente interno para lidar com o tema dinâmico
 const ThemeWrapper = ({ children }) => {
   const { user } = useAuth(); 
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
@@ -59,19 +54,18 @@ function App() {
   return (
     <AuthProvider> 
       <ThemeWrapper>
-        {/* --- NOVO: SEOProvider envolve o Router e o componente SEO --- */}
+        {/* SEOProvider envolve todo o Router para que o SEO seja gerenciado globalmente */}
         <SEOProvider> 
-          {/* O componente SEO agora só precisa ser renderizado uma vez aqui.
-              Ele lerá o estado do contexto para atualizar as meta tags. */}
+          {/* O componente SEO fica aqui, ouvindo as mudanças do contexto */}
           <SEO /> 
 
           <Router>
-            <Navbar />
             <Routes>
+              {/* A rota raiz usa HomeOrDashboardRedirect para decidir Home ou Dashboard */}
               <Route path="/" element={<HomeOrDashboardRedirect />} /> 
+              
               <Route path="/cursos" element={<CoursesPage />} />
               
-              {/* --- ATUALIZADO: Rota para criar curso protegida --- */}
               <Route 
                 path="/cursos/criar" 
                 element={
@@ -80,16 +74,16 @@ function App() {
                   </ProtectedRoute>
                 } 
               /> 
-              {/* -------------------------------------------------- */}
               
               <Route path="/cursos/:courseSlug" element={<CoursePage />} />
               <Route path="/cursos/:courseSlug/aula/:lessonSlug" element={<LessonPage />} />
               <Route path="/membro/perfil" element={<MemberProfilePage />} />
               <Route path="/cadastrar" element={<RegisterPage />} />
               <Route path="/entrar" element={<LoginPage />} />
+              
             </Routes>
           </Router>
-        </SEOProvider> {/* Fim do SEOProvider */}
+        </SEOProvider> 
       </ThemeWrapper>
     </AuthProvider>
   );

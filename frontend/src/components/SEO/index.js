@@ -1,6 +1,6 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
-import { useSEO } from '../contexts/SEOContext'; // Importe o hook do seu contexto
+import { useSEO } from '../../contexts/SEOContext'; // Importe o hook do seu contexto
 
 const SEO = () => {
   // Consome o estado de SEO atual do contexto

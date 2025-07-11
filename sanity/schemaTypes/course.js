@@ -38,6 +38,14 @@ export default {
       description: 'A compelling image to represent the course.'
     },
     {
+      name: 'video',
+      title: 'Vídeo',
+      type: 'file',
+      options: {
+        accept: 'video/mp4, video/webm, video/ogg',
+      },
+    },
+    {
       name: 'category',
       title: 'Category',
       type: 'reference',

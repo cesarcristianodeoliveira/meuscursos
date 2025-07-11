@@ -1,7 +1,7 @@
 import { Typography, Container, Box, Button } from '@mui/material';
 import { Link } from 'react-router-dom';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
-import { useSEO } from '../contexts/SEOContext'; // Importe o useSEO aqui
+import { useSEO } from '../../contexts/SEOContext'; // Importe o useSEO aqui
 
 function Home() {
   // Use o hook useSEO para definir as meta tags desta página
@@ -11,9 +11,9 @@ function Home() {
     keywords: "cursos online, inteligência artificial, IA, aprendizado, desenvolvimento, tecnologia, plataforma de cursos, cursos gerados por IA",
     ogTitle: "Meus Cursos: Aprendizado Acelerado com IA",
     ogDescription: "A plataforma líder para criar e consumir cursos online gerados por inteligência artificial. Transforme seu conhecimento.",
-    ogImage: "https://seusite.com.br/imagens/home-social-share.jpg", // **Mude para uma imagem relevante para sua home page**
-    ogUrl: "https://seusite.com.br/", // **Mude para a URL da sua home page**
-    canonicalUrl: "https://seusite.com.br/", // **Mude para a URL canônica da sua home page**
+    ogImage: "https://meuscursos.netlify.app/imagens/home-social-share.jpg", // **Mude para uma imagem relevante para sua home page**
+    ogUrl: "https://meuscursos.netlify.app/", // **Mude para a URL da sua home page**
+    canonicalUrl: "https://meuscursos.netlify.app/", // **Mude para a URL canônica da sua home page**
   });
 
   return (
