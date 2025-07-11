@@ -128,6 +128,12 @@ const LoginPage = () => {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            // Adicionado inputProps para o teclado numérico e limite de caracteres
+            inputProps={{
+              inputMode: 'numeric',
+              pattern: '[0-9]*',
+              maxLength: 6,
+            }}
           />
           
           <Button

@@ -1,8 +1,21 @@
 import { Typography, Container, Box, Button } from '@mui/material';
 import { Link } from 'react-router-dom';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import { useSEO } from '../contexts/SEOContext'; // Importe o useSEO aqui
 
 function Home() {
+  // Use o hook useSEO para definir as meta tags desta página
+  useSEO({
+    title: "Meus Cursos - Cursos Online com Inteligência Artificial",
+    description: "Crie e aprenda cursos online de forma inovadora com a ajuda da Inteligência Artificial. Desenvolvimento, tecnologia e muito mais.",
+    keywords: "cursos online, inteligência artificial, IA, aprendizado, desenvolvimento, tecnologia, plataforma de cursos, cursos gerados por IA",
+    ogTitle: "Meus Cursos: Aprendizado Acelerado com IA",
+    ogDescription: "A plataforma líder para criar e consumir cursos online gerados por inteligência artificial. Transforme seu conhecimento.",
+    ogImage: "https://seusite.com.br/imagens/home-social-share.jpg", // **Mude para uma imagem relevante para sua home page**
+    ogUrl: "https://seusite.com.br/", // **Mude para a URL da sua home page**
+    canonicalUrl: "https://seusite.com.br/", // **Mude para a URL canônica da sua home page**
+  });
+
   return (
     <Container maxWidth="md" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 4 }}>
       <Box sx={{ textAlign: 'center' }}>

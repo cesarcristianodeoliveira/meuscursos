@@ -10,6 +10,11 @@ import getAppTheme from './theme';
 // Importa o AuthProvider e useAuth do diretório 'contexts'
 import { AuthProvider, useAuth } from './contexts/AuthContext'; 
 
+// --- NOVO: Importa o SEOProvider e o componente SEO ---
+import { SEOProvider } from './contexts/SEOContext'; // Certifique-se de que este caminho está correto
+import SEO from './components/SEO'; // Aponta para src/components/SEO/index.js
+// --------------------------------------------------
+
 import Navbar from './components/Navbar'
 
 // Importa suas páginas e o componente de redirecionamento
@@ -22,7 +27,7 @@ import RegisterPage from './pages/RegisterPage';
 import LoginPage from './pages/LoginPage';
 import HomeOrDashboardRedirect from './components/HomeOrDashboardRedirect'; 
 
-// --- NOVO: Importa o ProtectedRoute ---
+// --- Importa o ProtectedRoute ---
 import ProtectedRoute from './components/ProtectedRoute'; 
 
 // Componente interno para lidar com o tema dinâmico
@@ -54,30 +59,37 @@ function App() {
   return (
     <AuthProvider> 
       <ThemeWrapper>
-        <Router>
-          <Navbar />
-          <Routes>
-            <Route path="/" element={<HomeOrDashboardRedirect />} /> 
-            <Route path="/cursos" element={<CoursesPage />} />
-            
-            {/* --- ATUALIZADO: Rota para criar curso protegida --- */}
-            <Route 
-              path="/cursos/criar" 
-              element={
-                <ProtectedRoute>
-                  <CourseCreatePage />
-                </ProtectedRoute>
-              } 
-            /> 
-            {/* -------------------------------------------------- */}
-            
-            <Route path="/cursos/:courseSlug" element={<CoursePage />} />
-            <Route path="/cursos/:courseSlug/aula/:lessonSlug" element={<LessonPage />} />
-            <Route path="/membro/perfil" element={<MemberProfilePage />} />
-            <Route path="/cadastrar" element={<RegisterPage />} />
-            <Route path="/entrar" element={<LoginPage />} />
-          </Routes>
-        </Router>
+        {/* --- NOVO: SEOProvider envolve o Router e o componente SEO --- */}
+        <SEOProvider> 
+          {/* O componente SEO agora só precisa ser renderizado uma vez aqui.
+              Ele lerá o estado do contexto para atualizar as meta tags. */}
+          <SEO /> 
+
+          <Router>
+            <Navbar />
+            <Routes>
+              <Route path="/" element={<HomeOrDashboardRedirect />} /> 
+              <Route path="/cursos" element={<CoursesPage />} />
+              
+              {/* --- ATUALIZADO: Rota para criar curso protegida --- */}
+              <Route 
+                path="/cursos/criar" 
+                element={
+                  <ProtectedRoute>
+                    <CourseCreatePage />
+                  </ProtectedRoute>
+                } 
+              /> 
+              {/* -------------------------------------------------- */}
+              
+              <Route path="/cursos/:courseSlug" element={<CoursePage />} />
+              <Route path="/cursos/:courseSlug/aula/:lessonSlug" element={<LessonPage />} />
+              <Route path="/membro/perfil" element={<MemberProfilePage />} />
+              <Route path="/cadastrar" element={<RegisterPage />} />
+              <Route path="/entrar" element={<LoginPage />} />
+            </Routes>
+          </Router>
+        </SEOProvider> {/* Fim do SEOProvider */}
       </ThemeWrapper>
     </AuthProvider>
   );
