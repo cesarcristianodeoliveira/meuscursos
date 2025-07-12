@@ -6,6 +6,7 @@ import { jwtDecode } from 'jwt-decode'; // Certifique-se de que jwt-decode está
 export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+
   const [userToken, setUserToken] = useState(localStorage.getItem('userToken'));
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem('user');
@@ -53,17 +54,6 @@ export const AuthProvider = ({ children }) => {
       logout();
     }
   }, [setAuthData, logout]); // Dependências adicionadas aqui, mas agora são funções estáveis
-
-  // O useEffect abaixo pode ser removido, pois setAuthData já cuida da persistência do token
-  /*
-  useEffect(() => {
-    if (userToken) {
-      localStorage.setItem('userToken', userToken);
-    } else {
-      localStorage.removeItem('userToken');
-    }
-  }, [userToken]);
-  */
 
   // Envolver login em useCallback
   const login = useCallback(async (email, password) => {
@@ -114,6 +104,7 @@ export const AuthProvider = ({ children }) => {
       return { success: false, message: 'Não foi possível conectar ao servidor. Verifique sua conexão.' };
     }
   }, [API_BASE_URL, setAuthData]); // register depende de API_BASE_URL e setAuthData
+
 
   const authContextValue = {
     user,

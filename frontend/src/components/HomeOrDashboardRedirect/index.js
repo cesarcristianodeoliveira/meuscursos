@@ -2,7 +2,8 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import HomePage from '../../pages/HomePage';
-import DashboardPage from '../../pages/DashboardPage';
+import DashboardPage from '../../pages/DashboardPage'
+
 
 const HomeOrDashboardRedirect = () => {
   const { isAuthenticated } = useAuth();
