@@ -1,17 +1,39 @@
 import * as React from 'react';
-import { alpha } from '@mui/material/styles'; // Importe alpha para cores transparentes
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
-// InputLabel, Link, TextField, Typography, visuallyHidden, styled foram importados do seu código original,
-// mas alguns podem não ser mais necessários após as mudanças. Vamos manter o que for usado.
+import InputLabel from '@mui/material/InputLabel';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { styled } from '@mui/material/styles'; // Mantido para StyledBox
+import visuallyHidden from '@mui/utils/visuallyHidden';
+import { styled } from '@mui/material/styles';
 
-// Removi o InputLabel, TextField e visuallyHidden por não serem mais usados no Hero
-// Removi também a StyledBox padrão para criar uma mais específica para a imagem de fundo
+const StyledBox = styled('div')(({ theme }) => ({
+  alignSelf: 'center',
+  width: '100%',
+  height: 400,
+  marginTop: theme.spacing(8),
+  borderRadius: (theme.vars || theme).shape.borderRadius,
+  outline: '6px solid',
+  outlineColor: 'hsla(220, 25%, 80%, 0.2)',
+  border: '1px solid',
+  borderColor: (theme.vars || theme).palette.grey[200],
+  boxShadow: '0 0 12px 8px hsla(220, 25%, 80%, 0.2)',
+  backgroundImage: `url(${process.env.TEMPLATE_IMAGE_URL || 'https://mui.com'}/static/screenshots/material-ui/getting-started/templates/dashboard.jpg)`,
+  backgroundSize: 'cover',
+  [theme.breakpoints.up('sm')]: {
+    marginTop: theme.spacing(10),
+    height: 700,
+  },
+  ...theme.applyStyles('dark', {
+    boxShadow: '0 0 24px 12px hsla(210, 100%, 25%, 0.2)',
+    backgroundImage: `url(${process.env.TEMPLATE_IMAGE_URL || 'https://mui.com'}/static/screenshots/material-ui/getting-started/templates/dashboard-dark.jpg)`,
+    outlineColor: 'hsla(220, 20%, 42%, 0.1)',
+    borderColor: (theme.vars || theme).palette.grey[700],
+  }),
+}));
 
 export default function Hero() {
   return (
@@ -19,13 +41,13 @@ export default function Hero() {
       id="hero"
       sx={(theme) => ({
         width: '100%',
-        // Removi o backgroundPattern original e adicionei um gradiente mais suave
-        backgroundImage:
-          theme.palette.mode === 'light'
-            ? 'linear-gradient(180deg, #CEE5FD, #FFF)' // Azul claro para branco
-            : 'linear-gradient(#02294F, #090E10)', // Azul escuro para preto quase
-        backgroundSize: '100% 20%', // Define a área que o gradiente ocupa
         backgroundRepeat: 'no-repeat',
+        backgroundImage:
+          'radial-gradient(ellipse 80% 50% at 50% -20%, hsl(210, 100%, 90%), transparent)',
+        ...theme.applyStyles('dark', {
+          backgroundImage:
+            'radial-gradient(ellipse 80% 50% at 50% -20%, hsl(210, 100%, 16%), transparent)',
+        }),
       })}
     >
       <Container
@@ -40,87 +62,89 @@ export default function Hero() {
         <Stack
           spacing={2}
           useFlexGap
-          sx={{ width: { xs: '100%', sm: '70%' }, alignItems: 'center' }} // Adicionei alignItems para centralizar o Stack
+          sx={{ alignItems: 'center', width: { xs: '100%', sm: '70%' } }}
         >
           <Typography
-            component="h1" // Semântica de cabeçalho principal
             variant="h1"
             sx={{
               display: 'flex',
-              flexDirection: { xs: 'column', md: 'row' }, // Quebra em coluna em telas pequenas
-              alignSelf: 'center', // Centraliza o próprio Typography
-              textAlign: 'center', // Centraliza o texto dentro do Typography
-              fontSize: 'clamp(3rem, 10vw, 3.5rem)', // Mantido do seu código, ajusta o tamanho da fonte
+              flexDirection: { xs: 'column', sm: 'row' },
+              alignItems: 'center',
+              fontSize: 'clamp(3rem, 10vw, 3.5rem)',
             }}
           >
-            Desbloqueie seu potencial com&nbsp;
+            Our&nbsp;latest&nbsp;
             <Typography
               component="span"
               variant="h1"
               sx={(theme) => ({
-                fontSize: 'inherit', // Herda o tamanho da fonte do pai
-                color: 'primary.main', // Cor principal do tema
+                fontSize: 'inherit',
+                color: 'primary.main',
                 ...theme.applyStyles('dark', {
-                  color: 'primary.light', // Cor mais clara no modo escuro
+                  color: 'primary.light',
                 }),
               })}
             >
-              Meus Cursos
+              products
             </Typography>
           </Typography>
-          <Typography variant="body1" textAlign="center" color="text.secondary">
-            A plataforma completa para aprender e criar cursos online.
-            Utilize **inteligência artificial** para gerar conteúdo de forma rápida e eficiente.
-            Seu conhecimento, suas regras, seu futuro!
+          <Typography
+            sx={{
+              textAlign: 'center',
+              color: 'text.secondary',
+              width: { sm: '100%', md: '80%' },
+            }}
+          >
+            Explore our cutting-edge dashboard, delivering high-quality solutions
+            tailored to your needs. Elevate your experience with top-tier features
+            and services.
           </Typography>
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
-            alignSelf="center"
             spacing={1}
             useFlexGap
-            sx={{ pt: 2, width: { xs: '100%', sm: 'auto' } }} // Ajuste de largura para os botões
+            sx={{ pt: 2, width: { xs: '100%', sm: '350px' } }}
           >
-            {/* Botão para explorar cursos */}
-            <Button variant="contained" color="primary" size="large" // Aumentei o tamanho
-            // Você pode adicionar um Link aqui para a página de explorar cursos
-            // component={Link} href="/explore-courses"
+            <InputLabel htmlFor="email-hero" sx={visuallyHidden}>
+              Email
+            </InputLabel>
+            <TextField
+              id="email-hero"
+              hiddenLabel
+              size="small"
+              variant="outlined"
+              aria-label="Enter your email address"
+              placeholder="Your email address"
+              fullWidth
+              slotProps={{
+                htmlInput: {
+                  autoComplete: 'off',
+                  'aria-label': 'Enter your email address',
+                },
+              }}
+            />
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              sx={{ minWidth: 'fit-content' }}
             >
-              Explorar Cursos
-            </Button>
-            {/* Botão para criar um curso */}
-            <Button variant="outlined" color="primary" size="large" // Aumentei o tamanho
-            // Você pode adicionar um Link aqui para a página de criação de cursos
-            // component={Link} href="/create-course"
-            >
-              Criar Meu Curso
+              Start now
             </Button>
           </Stack>
-          {/* Removido o campo de email e o texto de "Terms & Conditions" para simplificar o Hero */}
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ textAlign: 'center' }}
+          >
+            By clicking &quot;Start now&quot; you agree to our&nbsp;
+            <Link href="#" color="primary">
+              Terms & Conditions
+            </Link>
+            .
+          </Typography>
         </Stack>
-        {/* Nova Box para a imagem de destaque, mais simples e direta */}
-        <Box
-          id="image"
-          sx={(theme) => ({
-            mt: { xs: 8, sm: 10 },
-            alignSelf: 'center',
-            height: { xs: 200, sm: 700 }, // Altura da imagem
-            width: '100%',
-            backgroundImage:
-              'url("https://images.unsplash.com/photo-1546410531-bb443309e3e3?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D")', // Imagem de fundo de cursos ou aprendizado
-            backgroundSize: 'cover',
-            backgroundPosition: 'center', // Centraliza a imagem
-            borderRadius: '10px', // Borda arredondada
-            outline: '1px solid', // Contorno sutil
-            outlineColor:
-              theme.palette.mode === 'light'
-                ? alpha('#BFCCD9', 0.5) // Cor do contorno claro
-                : alpha('#9CCCFC', 0.1), // Cor do contorno escuro
-            boxShadow:
-              theme.palette.mode === 'light'
-                ? `0 0 12px 8px ${alpha('#9CCCFC', 0.2)}` // Sombra clara
-                : `0 0 24px 12px ${alpha('#033363', 0.2)}`, // Sombra escura
-          })}
-        />
+        <StyledBox id="image" />
       </Container>
     </Box>
   );
