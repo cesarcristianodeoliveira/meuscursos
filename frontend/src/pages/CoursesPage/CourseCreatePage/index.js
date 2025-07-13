@@ -313,6 +313,8 @@ function CourseCreatePage() {
                         description: coursePreview.courseDescription || coursePreview.description, // Prioriza courseDescription se existir
                         lessons: coursePreview.lessons,
                         slug: coursePreview.slug,
+                        promptUsed: coursePreview.promptUsed,
+                        aiModelUsed: coursePreview.aiModelUsed,
                     },
                     // Outros metadados são enviados no nível superior
                     category: selectedCategory,
