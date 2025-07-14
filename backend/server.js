@@ -9,8 +9,8 @@ import jwt from 'jsonwebtoken'; // Importar jsonwebtoken para o middleware de pr
 // Importa as funções de registro e login do controlador de autenticação
 import { register, login } from './controllers/authController.js'; 
 // --- MUDANÇA IMPORTANTE AQUI ---
-// Importa as funções de pré-visualização e salvamento do curso
-import { generateCoursePreview, saveGeneratedCourse } from './controllers/courseController.js'; 
+// Importa as funções de pré-visualização, salvamento do curso E AGORA A NOVA generateTags
+import { generateCoursePreview, saveGeneratedCourse, generateTags } from './controllers/courseController.js'; 
 // Importa TODAS as funções do dataController, incluindo a nova getCourseTagsByCategory
 import { getCourseCategories, getCourseSubCategories, getCourseTagsByCategory } from './controllers/dataController.js';
 
@@ -58,6 +58,8 @@ app.post('/api/auth/login', login);
 app.post('/api/courses/generate-preview', protect, generateCoursePreview); 
 // Rota para SALVAR o Curso GERADO (protegida)
 app.post('/api/courses/save-generated', protect, saveGeneratedCourse);
+// NOVA Rota para GERAR TAGS com IA (protegida)
+app.post('/api/courses/generate-tags', protect, generateTags); // <--- Adicionada esta linha
 
 // --- ROTAS PARA BUSCA DE DADOS ---
 app.get('/api/data/categories', getCourseCategories);
@@ -73,8 +75,9 @@ app.listen(PORT, () => {
     console.log(`GET /`);
     console.log(`POST /api/auth/register`); 
     console.log(`POST /api/auth/login`);
-    console.log(`POST /api/courses/preview (protegida)`); // Rota de pré-visualização
-    console.log(`POST /api/courses/save (protegida)`);    // Rota de salvamento
+    console.log(`POST /api/courses/generate-preview (protegida)`); 
+    console.log(`POST /api/courses/save-generated (protegida)`); 
+    console.log(`POST /api/courses/generate-tags (protegida)`); // <--- Adicionada esta linha
     console.log(`GET /api/data/categories`); 
     console.log(`GET /api/data/subcategories`);
     console.log(`GET /api/data/tags/byCategory/:categoryId`);

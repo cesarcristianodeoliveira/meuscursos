@@ -32,8 +32,6 @@ const generateSlug = (text) => {
         .replace(/\s+/g, '-')
         .replace(/-+/g, '-');
     
-    // Adiciona um UUID curto para ajudar na unicidade imediata, 
-    // mas a verificação no Sanity é o que garante 100%
     return `${baseSlug}-${uuidv4().substring(0, 8)}`; 
 };
 
@@ -58,14 +56,96 @@ const convertToPortableText = (text) => {
     }));
 };
 
-// --- NOVA FUNÇÃO: generateCoursePreview ---
+// --- MODIFICAÇÕES PARA TAGS VIA IA ---
+
+// NEW FUNCTION: generateTags (Endpoint para gerar sugestões de tags com IA)
+export const generateTags = async (req, res) => {
+    if (!genAI) {
+        return res.status(500).json({ error: 'Erro de configuração do servidor: Chave da Gemini API não inicializada.' });
+    }
+
+    const { topic, category, subCategory, level } = req.body; 
+
+    if (!topic || !category || !subCategory || !level) {
+        return res.status(400).json({ error: 'Dados incompletos: Tópico, Categoria, Subcategoria e Nível são necessários para gerar tags.' });
+    }
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Usar um modelo mais leve para tags, se preferir
+        // Ou mantenha "gemini-2.0-flash" se quiser consistência ou se o 1.5-flash não estiver disponível na sua região
+
+        // Prompt para gerar tags relevantes
+        const prompt = `Gere uma lista de até 10 tags (palavras-chave) em português para um curso com o seguinte tópico principal: "${topic}".
+        Considere a categoria de ID "${category}", subcategoria de ID "${subCategory}", e nível de dificuldade "${level}".
+        As tags devem ser relevantes, concisas (1-3 palavras por tag), e cobrir os principais temas e áreas de interesse do curso.
+        Formate a resposta APENAS como um array JSON de strings, sem nenhum texto introdutório ou explicativo, e sem aspas triplas ('''json) ou outros caracteres extras.
+        Exemplo: ["programacao", "javascript", "frontend", "desenvolvimento web", "react", "iniciante"]
+        `;
+
+        console.log(`[BACKEND] Gerando tags para o tópico: "${topic}"...`);
+        const geminiResponse = await model.generateContent(prompt);
+        const text = geminiResponse?.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!text) {
+            console.error("[BACKEND] Resposta vazia ou inesperada da Gemini API ao gerar tags.");
+            return res.status(500).json({ error: 'A IA retornou uma resposta vazia ou em formato inesperado ao gerar tags.' });
+        }
+
+        let suggestedTags;
+        try {
+            // Tenta parsear JSON puro, ou extrai de bloco de código se IA retornar assim
+            const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+            let rawJsonString = jsonMatch ? jsonMatch[1] : text.trim();
+            // Limpa caracteres problemáticos
+            rawJsonString = rawJsonString.replace(/^[\r\n]+|[\r\n]+$/g, '');
+            rawJsonString = rawJsonString.replace(/”/g, '"').replace(/“/g, '"');
+            
+            suggestedTags = JSON.parse(rawJsonString);
+
+            if (!Array.isArray(suggestedTags) || suggestedTags.some(tag => typeof tag !== 'string')) {
+                throw new Error('Formato de tags sugeridas pela IA inválido: Esperado um array de strings.');
+            }
+            
+            // Opcional: Normalizar tags para minúsculas e remover duplicatas
+            suggestedTags = [...new Set(suggestedTags.map(tag => tag.trim().toLowerCase()))];
+
+        } catch (parseError) {
+            console.error("[BACKEND] Erro ao parsear JSON das tags da Gemini API:", parseError);
+            console.error("[BACKEND] Texto bruto de tags recebido da Gemini (primeiros 500 chars):", text.substring(0, 500) + (text.length > 500 ? '...'': ''));
+            return res.status(500).json({ error: 'Erro ao processar a resposta da IA para tags. Formato JSON inválido.', rawText: text });
+        }
+
+        res.status(200).json({
+            message: 'Tags sugeridas geradas com sucesso!',
+            suggestedTags: suggestedTags,
+        });
+
+    } catch (error) {
+        console.error("[BACKEND] Erro no processo de geração de tags pela IA:", error);
+        if (error.response && error.response.data) {
+            if (error.response.status === 429) { 
+                console.error("[BACKEND] Gemini API Rate Limit Excedido (tags):", error.response.data.error);
+                return res.status(429).json({ error: "Limite de requisições da IA para tags excedido. Tente novamente em breve.", details: error.response.data.error.message });
+            }
+            console.error("[BACKEND] Erro da Gemini API (tags):", error.response.data.error);
+            return res.status(500).json({ error: `Erro da Gemini API ao gerar tags: ${error.response.data.error.message}`, details: error.response.data });
+        }
+        res.status(500).json({ error: 'Falha interna ao gerar tags para o curso.', details: error.message });
+    }
+};
+
+// --- FIM MODIFICAÇÕES PARA TAGS VIA IA ---
+
+
+// --- Função existente: generateCoursePreview (ajustada para remover a busca de tags) ---
 export const generateCoursePreview = async (req, res) => {
     if (!genAI || !sanityClient) {
         return res.status(500).json({ error: 'Erro de configuração do servidor: Chaves de API ou Cliente Sanity não inicializados.' });
     }
 
+    // `tags` agora é um array de NOMES de tags (strings), não IDs
     const { topic, category, subCategory, level, tags } = req.body; 
-    const creatorId = req.user?.id; // Usar o ID do usuário autenticado
+    const creatorId = req.user?.id;
 
     if (!topic || !category || !subCategory || !level || !creatorId) {
         return res.status(400).json({ error: 'Dados incompletos: Tópico, Categoria, Subcategoria, Nível e ID do criador são necessários.' });
@@ -74,20 +154,12 @@ export const generateCoursePreview = async (req, res) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); 
 
+        // O contexto das tags no prompt agora usa os nomes de tags recebidos do frontend
         let tagsContext = '';
         if (tags && tags.length > 0) {
-            const tagDetails = await sanityClient.fetch(
-                `*[_type == "courseTag" && _id in $tags]{name, description}`,
-                { tags }
-            );
-
-            if (tagDetails.length > 0) {
-                tagsContext = `Considere também as seguintes tags para o curso e suas lições, utilizando-as para refinar o foco e o vocabulário: \n`;
-                tagDetails.forEach(tag => {
-                    tagsContext += `- **${tag.name}**: ${tag.description || 'Nenhuma descrição fornecida.'}\n`;
-                });
-                tagsContext += `As tags devem ser incorporadas de forma a enriquecer o título, a descrição e o conteúdo das lições.\n\n`;
-            }
+            tagsContext = `Considere que o curso deve incorporar as seguintes tags/palavras-chave em seu conteúdo, descrição e títulos de lição: "${tags.join(', ')}".
+            As tags devem ser incorporadas de forma a enriquecer o título, a descrição e o conteúdo das lições.
+            `;
         }
 
         const prompt = `Gere um esquema de curso detalhado em português, garantindo que o **título do curso e os títulos das lições sejam altamente originais e únicos**, mesmo quando os parâmetros iniciais são semelhantes.
@@ -146,12 +218,10 @@ export const generateCoursePreview = async (req, res) => {
 
             generatedCourseData = JSON.parse(rawJsonString);
 
-            // --- MUDANÇA IMPORTANTE AQUI: GERAÇÃO DE SLUGS NO BACKEND PARA PRÉ-VISUALIZAÇÃO ---
-            // A IA não gera mais o slug; seu backend o faz.
             if (generatedCourseData.title) {
                 generatedCourseData.slug = {
                     current: generateSlug(generatedCourseData.title),
-                    _type: 'slug' // Sanity exige _type para campo slug
+                    _type: 'slug'
                 };
             } else {
                 generatedCourseData.slug = { current: `curso-${uuidv4()}` };
@@ -182,15 +252,14 @@ export const generateCoursePreview = async (req, res) => {
             category: category,
             subCategory: subCategory,
             level: level,
-            tags: tags, // Enviar os IDs das tags de volta,
-            promptUsed: prompt, // <-- Enviando o prompt gerado
-            aiModelUsed: "gemini-2.0-flash" // Adiciona o modelo usado para a preview
+            tags: tags, // CONTINUA ENVIANDO OS NOMES DAS TAGS
+            promptUsed: prompt,
+            aiModelUsed: "gemini-2.0-flash"
         };
 
         res.status(200).json({
             message: 'Pré-visualização do curso gerada com sucesso!',
             coursePreview: responseData,
-            // Não é necessário enviar promptUsed aqui separadamente, já está em coursePreview
         });
 
     } catch (error) {
@@ -208,40 +277,35 @@ export const generateCoursePreview = async (req, res) => {
     }
 };
 
-// --- NOVA FUNÇÃO: saveGeneratedCourse ---
+// --- Função existente: saveGeneratedCourse (MUITAS MUDANÇAS PARA LIDAR COM AS TAGS) ---
 export const saveGeneratedCourse = async (req, res) => {
     if (!sanityClient) {
         return res.status(500).json({ error: 'Erro de configuração do servidor: Cliente Sanity não inicializado.' });
     }
 
-    // Adicionado para depuração
     console.log('[BACKEND - saveGeneratedCourse] Dados recebidos na requisição:', JSON.stringify(req.body, null, 2));
 
-    // Agora, desestruture promptUsed e aiModelUsed diretamente de courseData
     const { 
         courseData, 
         category, 
         subCategory, 
         level, 
-        tags 
+        tags // AGORA É UM ARRAY DE NOMES DE TAGS (strings)
     } = req.body; 
 
-    // Extrair promptUsed e aiModelUsed da courseData
-    // Use um fallback para string vazia caso o campo não exista inesperadamente,
-    // mas com a correção do frontend, ele deve vir preenchido.
     const aiGenerationPromptFromPreview = courseData.promptUsed || ''; 
     const aiModelUsedFromPreview = courseData.aiModelUsed || 'gemini-2.0-flash';
 
     const creatorId = req.user?.id; 
 
-    if (!courseData || !creatorId || !category || !subCategory || !level) {
-        return res.status(400).json({ error: 'Dados incompletos para salvar o curso. Verifique courseData, category, subCategory, level e creatorId.' });
+    if (!courseData || !creatorId || !category || !subCategory || !level || !Array.isArray(tags)) {
+        return res.status(400).json({ error: 'Dados incompletos para salvar o curso. Verifique courseData, category, subCategory, level, tags (array) e creatorId.' });
     }
 
-    // Adicionado para depuração
     console.log('[BACKEND - saveGeneratedCourse] Conteúdo de courseData:', JSON.stringify(courseData, null, 2));
     console.log('[BACKEND - saveGeneratedCourse] aiGenerationPrompt (a ser salvo):', aiGenerationPromptFromPreview);
     console.log('[BACKEND - saveGeneratedCourse] aiModelUsed (a ser salvo):', aiModelUsedFromPreview);
+    console.log('[BACKEND - saveGeneratedCourse] Tags recebidas (nomes):', tags);
 
 
     let transaction; 
@@ -269,9 +333,7 @@ export const saveGeneratedCourse = async (req, res) => {
             console.log(`[BACKEND] Admin user ${creatorId} is creating a course. No credits consumed.`);
         }
 
-        // --- MUDANÇA IMPORTANTE AQUI: LÓGICA DE VALIDAÇÃO DE UNICIDADE DO SLUG DO CURSO ---
-        // O slug já vem do frontend (gerado pela preview), mas validamos e ajustamos aqui se necessário.
-        let initialCourseSlug = courseData.slug.current; // Pega o slug que veio da pré-visualização
+        let initialCourseSlug = courseData.slug.current;
         let finalCourseSlug = initialCourseSlug;
         let slugIsUnique = false;
         let attempt = 0;
@@ -288,8 +350,6 @@ export const saveGeneratedCourse = async (req, res) => {
             } else {
                 attempt++;
                 console.warn(`[BACKEND] Slug "${finalCourseSlug}" já existe no Sanity. Tentando gerar um novo (tentativa ${attempt}).`);
-                // Se o slug da pré-visualização já existe, gera um novo a partir do título original
-                // e garante um sufixo para unicidade.
                 finalCourseSlug = `${generateSlug(courseData.title)}-retry-${uuidv4().substring(0, 4)}`;
             }
         }
@@ -298,12 +358,10 @@ export const saveGeneratedCourse = async (req, res) => {
             throw new Error('Falha ao gerar um slug único para o curso após múltiplas tentativas. Por favor, tente um tópico diferente para o curso.');
         }
 
-        const courseSlugForSanity = { // Objeto slug no formato Sanity
+        const courseSlugForSanity = {
             _type: 'slug',
             current: finalCourseSlug,
         };
-        // --- FIM DA LÓGICA de Validação de Unicidade do SLUG do CURSO ---
-
 
         const courseId = `course-${uuidv4()}`; 
         const lessonRefs = [];
@@ -333,7 +391,7 @@ export const saveGeneratedCourse = async (req, res) => {
                 _id: lessonId,
                 _type: 'lesson',
                 title: lesson.title,
-                slug: lessonSlug, // Usa o slug gerado na pré-visualização (que já é único)
+                slug: lessonSlug,
                 content: convertToPortableText(lesson.content),
                 order: lesson.order,
                 estimatedReadingTime: lesson.estimatedReadingTime || 5,
@@ -355,23 +413,62 @@ export const saveGeneratedCourse = async (req, res) => {
             console.log(`[BACKEND] Lição "${lesson.title}" adicionada à transação (ID: ${lessonId}).`);
         }
 
+        // --- MODIFICAÇÕES PARA LIDAR COM AS TAGS (CRIAR SE NÃO EXISTE, ASSOCIAR SE EXISTE) ---
         const courseTagRefs = []; 
         if (tags && tags.length > 0) {
-            tags.forEach(tagId => {
+            for (const tagName of tags) {
+                // 1. Normalizar o nome da tag (ex: minúsculas, sem espaços extras)
+                const normalizedTagName = tagName.trim().toLowerCase();
+
+                // 2. Tentar encontrar a tag existente no Sanity pelo nome
+                const existingTag = await sanityClient.fetch(
+                    `*[_type == "courseTag" && name == $tagName][0]{_id}`,
+                    { tagName: normalizedTagName }
+                );
+
+                let tagRefId;
+                if (existingTag) {
+                    // Se a tag existe, usa seu _id
+                    tagRefId = existingTag._id;
+                    console.log(`[BACKEND] Tag existente encontrada: "${normalizedTagName}" (ID: ${tagRefId}).`);
+                } else {
+                    // Se a tag NÃO existe, cria um novo documento de tag no Sanity
+                    const newTagId = `courseTag-${uuidv4()}`;
+                    const newTagSlug = { // Gerar um slug para a nova tag
+                        _type: 'slug',
+                        current: generateSlug(normalizedTagName),
+                    };
+
+                    const newTagDocument = {
+                        _id: newTagId,
+                        _type: 'courseTag',
+                        name: normalizedTagName, // Salva o nome normalizado
+                        slug: newTagSlug,
+                        description: `Tag gerada automaticamente para o tópico: ${normalizedTagName}.`, // Descrição padrão
+                        // Você pode adicionar mais campos aqui se seu schema Sanity de tags tiver
+                    };
+                    
+                    transaction.create(newTagDocument); // Adiciona a criação da nova tag à transação
+                    tagRefId = newTagId;
+                    console.log(`[BACKEND] Nova tag criada e adicionada à transação: "${normalizedTagName}" (ID: ${newTagId}).`);
+                }
+
+                // Adiciona a referência da tag (existente ou nova) à lista do curso
                 courseTagRefs.push({
-                    _ref: tagId,
+                    _ref: tagRefId,
                     _type: 'reference',
                     _key: uuidv4(), 
                 });
-            });
+            }
         }
+        // --- FIM DAS MODIFICAÇÕES DE TAGS ---
 
         const newCourse = {
             _id: courseId,
             _type: 'course',
             title: courseData.title,
             description: courseData.description,
-            slug: courseSlugForSanity, // Usa o slug validado e único aqui!
+            slug: courseSlugForSanity,
             lessons: lessonRefs,
             status: 'published', 
             price: 0, 
@@ -384,9 +481,9 @@ export const saveGeneratedCourse = async (req, res) => {
             },
             category: { _ref: category, _type: 'reference' }, 
             subCategory: { _ref: subCategory, _type: 'reference' }, 
-            courseTags: courseTagRefs, 
-            aiGenerationPrompt: aiGenerationPromptFromPreview, // <-- CORRIGIDO AQUI!
-            aiModelUsed: aiModelUsedFromPreview,  // <-- CORRIGIDO AQUI!
+            courseTags: courseTagRefs, // Agora contém as referências corretas
+            aiGenerationPrompt: aiGenerationPromptFromPreview,
+            aiModelUsed: aiModelUsedFromPreview,
             generatedAt: new Date().toISOString(),
             lastGenerationRevision: new Date().toISOString(),
         };
@@ -394,7 +491,7 @@ export const saveGeneratedCourse = async (req, res) => {
         transaction.create(newCourse);
         console.log(`[BACKEND] Curso "${newCourse.title}" adicionado à transação (ID: ${courseId}).`);
 
-        console.log("[BACKEND] Transação preparada para criar curso, lições e ATUALIZAR membro.");
+        console.log("[BACKEND] Transação preparada para criar curso, lições, tags (se novas) e ATUALIZAR membro.");
 
         const transactionResult = await transaction.commit(); 
         
@@ -405,7 +502,7 @@ export const saveGeneratedCourse = async (req, res) => {
         );
 
         res.status(201).json({
-            message: 'Curso, lições geradas e salvos com sucesso! Créditos e cursos do membro atualizados.',
+            message: 'Curso, lições e tags salvos com sucesso! Créditos e cursos do membro atualizados.',
             course: newCourse, 
             lessons: courseData.lessons,
             memberUpdateId: memberUpdateInfo ? memberUpdateInfo.id : null, 
