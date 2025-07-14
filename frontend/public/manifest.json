@@ -1,11 +1,11 @@
 {
   "name": "Meus Cursos",
-  "short_name": "Cursos",
-  "description": "Comunidade de Cursos por Inteligência Artificial",
-  "start_url": ".",
+  "short_name": "Meus Cursos",
+  "description": "Cursos por Inteligência Artificial",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#1976d2",
+  "background_color": "#FCFCFC",
+  "theme_color": "#0478DA",
   "icons": [
     {
       "src": "/logo192.png",
@@ -13,7 +13,7 @@
       "type": "image/png"
     },
     {
-      "src": "logo512.png",
+      "src": "/logo512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
