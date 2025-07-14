@@ -111,7 +111,7 @@ export const generateTags = async (req, res) => {
 
         } catch (parseError) {
             console.error("[BACKEND] Erro ao parsear JSON das tags da Gemini API:", parseError);
-            console.error("[BACKEND] Texto bruto de tags recebido da Gemini (primeiros 500 chars):", text.substring(0, 500) + (text.length > 500 ? '...'': ''));
+            console.error("[BACKEND] Texto bruto de tags recebido da Gemini (primeiros 500 chars):", text.substring(0, 500) + (text.length > 500 ? '...' : ''));
             return res.status(500).json({ error: 'Erro ao processar a resposta da IA para tags. Formato JSON inválido.', rawText: text });
         }
 
