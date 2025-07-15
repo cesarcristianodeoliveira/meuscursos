@@ -19,16 +19,14 @@ import {
     FormControl,
     InputLabel,
     Select,
-    OutlinedInput,
-    InputAdornment,
-    IconButton,
+    // OutlinedInput, InputAdornment, IconButton não são mais necessários para tags personalizadas via input
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { styled } from '@mui/system';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useRouter } from 'next/router';
-import { Check, Close } from '@mui/icons-material'; // Importar ícones para os Chips
+import { Check } from '@mui/icons-material'; // Apenas Check, Close não é estritamente necessário para o chip de seleção
 
 // Estilos para os chips de tags
 const StyledChip = styled(Chip)(({ theme, selected }) => ({
@@ -38,8 +36,18 @@ const StyledChip = styled(Chip)(({ theme, selected }) => ({
     '&:hover': {
         backgroundColor: selected ? theme.palette.primary.dark : theme.palette.grey[400],
     },
+    // Estilo para o ícone de 'check' quando selecionado
+    // O deleteIcon no MUI é um slot para um ícone no final do chip.
+    // Usamos ele para mostrar o check quando selecionado.
+    '& .MuiChip-deleteIcon': {
+        color: selected ? theme.palette.primary.contrastText : theme.palette.action.active,
+        '&:hover': {
+            color: selected ? theme.palette.primary.contrastText : theme.palette.action.hover,
+        },
+    },
 }));
 
+// Definição dos passos do stepper para criação do curso
 const steps = ['Detalhes Iniciais', 'Gerar Tags com IA', 'Pré-visualização do Curso', 'Confirmação e Publicação'];
 
 const CourseCreatePage = () => {
@@ -50,32 +58,31 @@ const CourseCreatePage = () => {
     const [activeStep, setActiveStep] = useState(0);
     const [courseData, setCourseData] = useState({
         topic: '',
-        category: '',
-        subCategory: '',
+        category: '', // ID da categoria
+        subCategory: '', // ID da subcategoria
         level: '',
     });
-    const [previewData, setPreviewData] = useState(null); // Dados do curso gerados pela IA
-    const [courseCreatedData, setCourseCreatedData] = useState(null); // Dados do curso salvo no Sanity
+    const [previewData, setPreviewData] = useState(null); // Dados do curso gerados pela IA para pré-visualização
+    const [courseCreatedData, setCourseCreatedData] = useState(null); // Dados do curso salvo no Sanity (para exibição final)
 
     // --- Estados de Carregamento e Erro ---
-    const [isLoading, setIsLoading] = useState(false); // Para geração da preview
-    const [isLoadingTags, setIsLoadingTags] = useState(false); // Para geração das tags
-    const [isLoadingSave, setIsLoadingSave] = useState(false); // Para salvar o curso
-    const [errorMessage, setErrorMessage] = useState('');
+    const [isLoading, setIsLoading] = useState(false); // Para geração da preview do curso
+    const [isLoadingTags, setIsLoadingTags] = useState(false); // Para geração das tags pela IA
+    const [isLoadingSave, setIsLoadingSave] = useState(false); // Para salvar o curso no Sanity
+    const [errorMessage, setErrorMessage] = useState(''); // Mensagens de erro para o usuário
 
-    // --- Estados para Seleção de Categorias/Subcategorias/Nível ---
+    // --- Estados para Seleção de Categorias/Subcategorias/Nível (dados do Sanity) ---
     const [categories, setCategories] = useState([]);
     const [subCategories, setSubCategories] = useState([]);
-    const [selectedCategory, setSelectedCategory] = useState('');
-    const [selectedSubCategory, setSelectedSubCategory] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState(''); // Armazena o ID da categoria selecionada
+    const [selectedSubCategory, setSelectedSubCategory] = useState(''); // Armazena o ID da subcategoria selecionada
     const [selectedLevel, setSelectedLevel] = useState('');
 
     // --- Estados para Tags ---
-    const [aiSuggestedTags, setAiSuggestedTags] = useState([]); // Tags sugeridas pela IA
-    const [selectedTags, setSelectedTags] = useState([]); // Tags selecionadas (incluindo as personalizadas)
-    // REMOVIDO: customTagInput e handleAddCustomTag, pois não queremos que o usuário adicione tags customizadas via input.
+    const [aiSuggestedTags, setAiSuggestedTags] = useState([]); // Array de strings de tags sugeridas pela IA
+    const [selectedTags, setSelectedTags] = useState([]); // Array de strings de tags selecionadas pelo usuário
 
-    // --- Efeito para Carregar Categorias e Subcategorias ---
+    // --- Efeito para Carregar Categorias e Subcategorias no carregamento da página ---
     useEffect(() => {
         const fetchCourseData = async () => {
             try {
@@ -92,7 +99,7 @@ const CourseCreatePage = () => {
                 setSubCategories(subCategoriesRes.data.subCategories);
             } catch (error) {
                 console.error('Erro ao buscar categorias/subcategorias:', error);
-                toast.error('Erro ao carregar dados essenciais para o formulário.');
+                toast.error('Erro ao carregar dados essenciais para o formulário. Por favor, recarregue a página.');
             }
         };
         fetchCourseData();
@@ -101,22 +108,25 @@ const CourseCreatePage = () => {
     // --- Funções de Navegação do Stepper ---
     const handleNext = () => {
         setErrorMessage(''); // Limpa mensagens de erro ao avançar
+
         if (activeStep === 0) {
             // Validação do Step 1 (Detalhes Iniciais)
             if (!courseData.topic || !selectedCategory || !selectedSubCategory || !selectedLevel) {
                 setErrorMessage('Por favor, preencha todos os campos obrigatórios.');
                 return;
             }
-            // Se tudo válido, avançar e gerar tags
+            // Se tudo válido, avançar e iniciar a geração de tags
             handleGenerateAITags();
         } else if (activeStep === 1) {
-            // Validação do Step 2 (Gerar Tags com IA)
+            // Validação do Step 2 (Seleção de Tags)
             if (selectedTags.length === 0) {
-                setErrorMessage('Por favor, selecione ou gere pelo menos uma tag.');
+                setErrorMessage('Por favor, selecione pelo menos uma tag para o curso.');
                 return;
             }
+            // Se tags selecionadas, avançar e iniciar a geração do conteúdo do curso
             handleGenerateCourseContent();
-        } else {
+        } else if (activeStep < steps.length - 1) {
+            // Avança para o próximo passo se não for o último (o último passo é acionado por handleSaveGeneratedCourse)
             setActiveStep((prevActiveStep) => prevActiveStep + 1);
         }
     };
@@ -127,10 +137,12 @@ const CourseCreatePage = () => {
     };
 
     const handleReset = () => {
+        // Reinicia todos os estados para permitir a criação de um novo curso
         setActiveStep(0);
         setCourseData({ topic: '', category: '', subCategory: '', level: '' });
         setSelectedCategory('');
         setSelectedSubCategory('');
+        setSelectedLevel('');
         setAiSuggestedTags([]);
         setSelectedTags([]);
         setPreviewData(null);
@@ -141,12 +153,12 @@ const CourseCreatePage = () => {
         setErrorMessage('');
     };
 
-    // --- Função para Gerar Tags com IA (NOVO) ---
+    // --- Função para Gerar Tags com IA ---
     const handleGenerateAITags = async () => {
         setIsLoadingTags(true);
         setErrorMessage('');
-        setAiSuggestedTags([]); // Limpa tags antigas
-        setSelectedTags([]); // Limpa seleções antigas
+        setAiSuggestedTags([]); // Limpa tags sugeridas anteriormente
+        setSelectedTags([]); // Limpa seleções de tags anteriores
 
         try {
             const token = localStorage.getItem('token');
@@ -170,27 +182,29 @@ const CourseCreatePage = () => {
 
             if (response.status === 200 && response.data.suggestedTags) {
                 setAiSuggestedTags(response.data.suggestedTags);
-                // Pré-selecionar todas as tags sugeridas pela IA por padrão
+                // Pré-selecionar todas as tags sugeridas pela IA por padrão para otimizar UX
                 setSelectedTags(response.data.suggestedTags);
                 setActiveStep((prevActiveStep) => prevActiveStep + 1); // Avança para o passo 2
+                toast.success('Tags sugeridas com sucesso!');
             } else {
                 setErrorMessage(response.data.error || 'Não foi possível gerar tags. Tente novamente.');
                 toast.error(response.data.error || 'Erro ao gerar tags.');
             }
         } catch (error) {
             console.error('Erro ao gerar tags com IA:', error);
-            setErrorMessage(error.response?.data?.error || 'Erro de conexão ao gerar tags.');
-            toast.error(error.response?.data?.error || 'Erro de conexão ao gerar tags.');
+            const msg = error.response?.data?.error || 'Erro de conexão ou servidor ao gerar tags.';
+            setErrorMessage(msg);
+            toast.error(msg);
         } finally {
             setIsLoadingTags(false);
         }
     };
 
-    // --- Função para Gerar Conteúdo do Curso com IA (Modificada para usar tags) ---
+    // --- Função para Gerar Conteúdo do Curso com IA ---
     const handleGenerateCourseContent = async () => {
         setIsLoading(true);
         setErrorMessage('');
-        setPreviewData(null); // Limpa preview antiga
+        setPreviewData(null); // Limpa pré-visualização antiga
 
         try {
             const token = localStorage.getItem('token');
@@ -208,7 +222,7 @@ const CourseCreatePage = () => {
                     category: selectedCategory,
                     subCategory: selectedSubCategory,
                     level: selectedLevel,
-                    tags: selectedTags, // AGORA ENVIA OS NOMES DAS TAGS
+                    tags: selectedTags, // Envia os NOMES das tags selecionadas para a IA
                 },
                 config
             );
@@ -216,22 +230,24 @@ const CourseCreatePage = () => {
             if (response.status === 200 && response.data.coursePreview) {
                 setPreviewData(response.data.coursePreview);
                 setActiveStep((prevActiveStep) => prevActiveStep + 1); // Avança para o passo 3
+                toast.success('Pré-visualização do curso gerada!');
             } else {
                 setErrorMessage(response.data.error || 'Não foi possível gerar a pré-visualização do curso. Tente novamente.');
                 toast.error(response.data.error || 'Erro ao gerar curso.');
             }
         } catch (error) {
             console.error('Erro ao gerar pré-visualização do curso:', error);
-            setErrorMessage(error.response?.data?.error || 'Erro de conexão ao gerar curso.');
-            toast.error(error.response?.data?.error || 'Erro de conexão ao gerar curso.');
+            const msg = error.response?.data?.error || 'Erro de conexão ou servidor ao gerar curso.';
+            setErrorMessage(msg);
+            toast.error(msg);
         } finally {
             setIsLoading(false);
         }
     };
 
-    // --- Função para Salvar o Curso Gerado (Modificada para desabilitar botão e mostrar card) ---
+    // --- Função para Salvar o Curso Gerado no Sanity ---
     const handleSaveGeneratedCourse = async () => {
-        if (!previewData || isLoadingSave) return; // Impede múltiplos cliques
+        if (!previewData || isLoadingSave) return; // Impede múltiplos cliques ou salvamento sem dados
 
         setIsLoadingSave(true);
         setErrorMessage('');
@@ -248,11 +264,11 @@ const CourseCreatePage = () => {
             const response = await axios.post(
                 `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses/save-generated`,
                 {
-                    courseData: previewData,
-                    category: selectedCategory,
-                    subCategory: selectedSubCategory,
+                    courseData: previewData, // Dados do curso completos gerados pela IA
+                    category: selectedCategory, // ID da categoria
+                    subCategory: selectedSubCategory, // ID da subcategoria
                     level: selectedLevel,
-                    tags: selectedTags, // Envia os nomes das tags
+                    tags: selectedTags, // Nomes das tags para o backend processar
                 },
                 config
             );
@@ -260,7 +276,7 @@ const CourseCreatePage = () => {
             if (response.status === 201) {
                 toast.success('Curso criado e salvo com sucesso!');
                 console.log('Curso salvo com sucesso:', response.data);
-                setCourseCreatedData(response.data.course); // Guarda os dados do curso criado
+                setCourseCreatedData(response.data.course); // Guarda os dados do curso salvo para exibição no último passo
                 setActiveStep((prevActiveStep) => prevActiveStep + 1); // Avança para o passo final de sucesso
             } else {
                 setErrorMessage(response.data.error || 'Erro ao salvar o curso.');
@@ -268,37 +284,39 @@ const CourseCreatePage = () => {
             }
         } catch (error) {
             console.error('Erro ao salvar o curso:', error);
-            setErrorMessage(error.response?.data?.error || 'Erro de conexão ao salvar o curso.');
-            toast.error(error.response?.data?.error || 'Erro de conexão ao salvar o curso.');
+            const msg = error.response?.data?.error || 'Erro de conexão ou servidor ao salvar o curso.';
+            setErrorMessage(msg);
+            toast.error(msg);
         } finally {
             setIsLoadingSave(false);
         }
     };
 
-    // --- Função para Gerenciar Seleção de Tags ---
+    // --- Função para Gerenciar Seleção/Deseleção de Tags ---
     const handleTagToggle = (tag) => {
         setSelectedTags((prevTags) => {
             if (prevTags.includes(tag)) {
-                return prevTags.filter((t) => t !== tag);
+                return prevTags.filter((t) => t !== tag); // Remove a tag se já estiver selecionada
             } else {
-                return [...prevTags, tag];
+                return [...prevTags, tag]; // Adiciona a tag se não estiver selecionada
             }
         });
     };
 
-    // --- Conteúdo do Stepper por Passo ---
+    // --- Renderização do Conteúdo de Cada Passo do Stepper ---
     const getStepContent = (step) => {
         switch (step) {
             case 0: // Detalhes Iniciais
                 return (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 3 }}>
                         <TextField
-                            label="Tópico do Curso"
+                            label="Tópico do Curso (ex: Programação em React, Finanças Pessoais)"
                             variant="outlined"
                             value={courseData.topic}
                             onChange={(e) => setCourseData({ ...courseData, topic: e.target.value })}
                             fullWidth
                             required
+                            helperText="Descreva o tema principal do curso que você deseja criar."
                         />
                         <FormControl fullWidth required>
                             <InputLabel id="category-label">Categoria</InputLabel>
@@ -308,8 +326,9 @@ const CourseCreatePage = () => {
                                 label="Categoria"
                                 onChange={(e) => {
                                     setSelectedCategory(e.target.value);
-                                    // Resetar subcategoria se a categoria mudar
+                                    // Resetar subcategoria e nível se a categoria mudar para evitar inconsistências
                                     setSelectedSubCategory('');
+                                    setSelectedLevel('');
                                 }}
                             >
                                 {categories.map((cat) => (
@@ -319,7 +338,7 @@ const CourseCreatePage = () => {
                                 ))}
                             </Select>
                         </FormControl>
-                        {selectedCategory && (
+                        {selectedCategory && ( // Somente mostra subcategorias se uma categoria for selecionada
                             <FormControl fullWidth required>
                                 <InputLabel id="subcategory-label">Subcategoria</InputLabel>
                                 <Select
@@ -327,9 +346,11 @@ const CourseCreatePage = () => {
                                     value={selectedSubCategory}
                                     label="Subcategoria"
                                     onChange={(e) => setSelectedSubCategory(e.target.value)}
+                                    // Desabilita se não houver subcategorias para a categoria selecionada
+                                    disabled={subCategories.filter((sub) => sub.category._ref === selectedCategory).length === 0}
                                 >
                                     {subCategories
-                                        .filter((sub) => sub.category._ref === selectedCategory)
+                                        .filter((sub) => sub.category._ref === selectedCategory) // Filtra subcategorias pela categoria selecionada
                                         .map((sub) => (
                                             <MenuItem key={sub._id} value={sub._id}>
                                                 {sub.name}
@@ -359,7 +380,8 @@ const CourseCreatePage = () => {
                         {isLoadingTags ? (
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                                 <CircularProgress />
-                                <Typography>Gerando sugestões de tags com IA...</Typography>
+                                <Typography variant="h6" color="text.secondary">Gerando sugestões de tags com IA...</Typography>
+                                <Typography variant="body2" color="text.secondary">Isso pode levar alguns segundos.</Typography>
                             </Box>
                         ) : (
                             <>
@@ -367,7 +389,8 @@ const CourseCreatePage = () => {
                                     Tags Sugeridas pela IA
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                    Clique para adicionar ou remover tags.
+                                    As tags abaixo foram sugeridas pela nossa inteligência artificial.
+                                    Clique nas tags para adicioná-las ou removê-las do seu curso.
                                 </Typography>
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', mb: 3 }}>
                                     {aiSuggestedTags.length > 0 ? (
@@ -377,17 +400,19 @@ const CourseCreatePage = () => {
                                                 label={tag}
                                                 selected={selectedTags.includes(tag)}
                                                 onClick={() => handleTagToggle(tag)}
+                                                // Exibe um ícone de 'Check' quando a tag está selecionada.
+                                                // O onClick no próprio Chip é usado para alternar a seleção.
                                                 deleteIcon={selectedTags.includes(tag) ? <Check /> : undefined}
                                                 onDelete={selectedTags.includes(tag) ? () => handleTagToggle(tag) : undefined}
                                             />
                                         ))
                                     ) : (
                                         <Typography variant="body1" color="text.secondary">
-                                            Nenhuma tag sugerida. Clique em "Gerar Sugestões" para tentar.
+                                            Nenhuma tag sugerida. Por favor, volte e tente gerar novamente.
                                         </Typography>
                                     )}
                                 </Box>
-                                {/* Removemos o campo e botão de adicionar tag customizada aqui */}
+                                {/* Não há mais campo para adicionar tags customizadas pelo usuário */}
                             </>
                         )}
                     </Box>
@@ -398,56 +423,75 @@ const CourseCreatePage = () => {
                         {isLoading ? (
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                                 <CircularProgress />
-                                <Typography>A IA está gerando o curso para você. Isso pode levar um momento...</Typography>
+                                <Typography variant="h6" color="text.secondary">A IA está gerando o conteúdo do curso e lições para você.</Typography>
+                                <Typography variant="body2" color="text.secondary">Isso pode levar um momento, por favor, aguarde.</Typography>
                             </Box>
                         ) : previewData ? (
-                            <Paper elevation={3} sx={{ p: 3 }}>
-                                <Typography variant="h5" gutterBottom>
+                            <Paper elevation={3} sx={{ p: 3, maxHeight: '60vh', overflowY: 'auto' }}> {/* Adicionado scroll para conteúdo longo */}
+                                <Typography variant="h5" gutterBottom sx={{ color: theme.palette.primary.dark }}>
                                     Pré-visualização do Curso: {previewData.title}
                                 </Typography>
                                 <Typography variant="body1" color="text.secondary" paragraph>
                                     {previewData.description}
                                 </Typography>
-                                <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
-                                    Lições:
+                                <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, color: theme.palette.info.main }}>
+                                    Nível: {previewData.level} | Categoria: {categories.find(c => c._id === selectedCategory)?.name} | Subcategoria: {subCategories.find(s => s._id === selectedSubCategory)?.name}
                                 </Typography>
-                                {previewData.lessons.map((lesson, index) => (
-                                    <Box key={index} sx={{ mb: 2, borderLeft: 4, borderColor: 'primary.main', pl: 2 }}>
-                                        <Typography variant="subtitle1" fontWeight="bold">
-                                            {lesson.order}. {lesson.title}
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                            Tempo estimado: {lesson.estimatedReadingTime} min
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ mt: 1 }}>
-                                            {lesson.content.substring(0, 150)}... {/* Mostra só o início */}
-                                        </Typography>
-                                    </Box>
-                                ))}
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
+                                <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
+                                    Lições do Curso:
+                                </Typography>
+                                {previewData.lessons.length > 0 ? (
+                                    previewData.lessons.map((lesson, index) => (
+                                        <Box key={index} sx={{ mb: 2, borderLeft: 4, borderColor: theme.palette.secondary.main, pl: 2, py: 1 }}>
+                                            <Typography variant="subtitle1" fontWeight="bold">
+                                                {lesson.order}. {lesson.title}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ mt: 0.5 }} color="text.secondary">
+                                                Tempo estimado de leitura: {lesson.estimatedReadingTime} min
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ mt: 1 }}>
+                                                {lesson.content.substring(0, 250)}... {/* Mostra uma porção maior do conteúdo */}
+                                                {lesson.content.length > 250 && <Typography component="span" sx={{ fontStyle: 'italic', color: 'text.disabled' }}> (Conteúdo completo no curso)</Typography>}
+                                            </Typography>
+                                        </Box>
+                                    ))
+                                ) : (
+                                    <Typography variant="body2" color="text.secondary">
+                                        Nenhuma lição gerada. Isso pode indicar um problema com a IA.
+                                    </Typography>
+                                )}
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 3, fontStyle: 'italic' }}>
                                     Tags Associadas: {selectedTags.join(', ')}
                                 </Typography>
                             </Paper>
                         ) : (
                             <Alert severity="info">
-                                Detalhes do curso serão exibidos aqui após a geração.
+                                Detalhes do curso e suas lições serão exibidos aqui após a geração.
                             </Alert>
                         )}
                     </Box>
                 );
-            case 3: // Confirmação e Publicação (Novo Passo de Sucesso)
+            case 3: // Confirmação e Publicação (Passo de Sucesso)
                 return (
                     <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                         {isLoadingSave ? (
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                                 <CircularProgress />
-                                <Typography>Salvando o curso e lições no Sanity...</Typography>
+                                <Typography variant="h6" color="text.secondary">Salvando o curso e lições no Sanity CMS...</Typography>
+                                <Typography variant="body2" color="text.secondary">Isso pode levar alguns instantes.</Typography>
                             </Box>
                         ) : courseCreatedData ? (
                             <>
-                                <Typography variant="h5" gutterBottom align="center">
-                                    Parabéns! Seu curso foi criado com sucesso!
-                                </Typography>
+                                <Alert severity="success" sx={{ mb: 3, width: '100%', maxWidth: 500 }}>
+                                    <AlertTitle>Sucesso!</AlertTitle>
+                                    <Typography variant="h5" gutterBottom align="center">
+                                        Parabéns! Seu curso foi criado e publicado com sucesso!
+                                    </Typography>
+                                    <Typography variant="body1" align="center">
+                                        Seus créditos foram atualizados e o curso está disponível.
+                                    </Typography>
+                                </Alert>
+
                                 <Card sx={{ maxWidth: 400, mt: 2, p: 2, boxShadow: 3 }}>
                                     <CardContent>
                                         <Typography gutterBottom variant="h6" component="div">
@@ -464,6 +508,7 @@ const CourseCreatePage = () => {
                                                 variant="contained"
                                                 color="primary"
                                                 onClick={() => router.push(`/cursos/${courseCreatedData.slug.current}`)}
+                                                sx={{ mt: 2 }}
                                             >
                                                 Ver Curso
                                             </Button>
@@ -484,6 +529,7 @@ const CourseCreatePage = () => {
                             <Alert severity="error">
                                 <AlertTitle>Erro ao Salvar</AlertTitle>
                                 Não foi possível obter os dados do curso salvo. Por favor, tente novamente ou verifique os logs.
+                                {errorMessage && <Typography variant="body2">{errorMessage}</Typography>}
                             </Alert>
                         )}
                     </Box>
@@ -506,7 +552,8 @@ const CourseCreatePage = () => {
                 ))}
             </Stepper>
 
-            <Box sx={{ minHeight: '400px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            {/* Container para o conteúdo do passo, com altura mínima para evitar pulos */}
+            <Box sx={{ minHeight: '400px', display: 'flex', flexDirection: 'column', justifyContent: 'center', px: { xs: 1, md: 5 } }}>
                 {errorMessage && (
                     <Alert severity="error" sx={{ mb: 2 }}>
                         {errorMessage}
@@ -515,7 +562,9 @@ const CourseCreatePage = () => {
                 {getStepContent(activeStep)}
             </Box>
 
-            <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2, justifyContent: 'space-between' }}>
+            {/* Botões de Navegação do Stepper */}
+            <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2, justifyContent: 'space-between', mt: 4 }}>
+                {/* Botão Voltar */}
                 <Button
                     color="inherit"
                     disabled={activeStep === 0 || activeStep === steps.length - 1 || isLoading || isLoadingTags || isLoadingSave}
@@ -524,43 +573,46 @@ const CourseCreatePage = () => {
                 >
                     Voltar
                 </Button>
-                <Box sx={{ flex: '1 1 auto' }} />
+                <Box sx={{ flex: '1 1 auto' }} /> {/* Espaçador flexível */}
 
-                {/* Botão "Gerar Tags com IA" (Passo 1) */}
+                {/* Botão "Gerar Tags com IA" (Passo 0 -> 1) */}
                 {activeStep === 0 && (
                     <Button
                         variant="contained"
                         onClick={handleNext}
+                        // Desabilita se estiver carregando tags OU se campos obrigatórios não estiverem preenchidos
                         disabled={isLoadingTags || !courseData.topic || !selectedCategory || !selectedSubCategory || !selectedLevel}
                     >
                         {isLoadingTags ? <CircularProgress size={24} color="inherit" /> : 'Gerar Tags com IA'}
                     </Button>
                 )}
 
-                {/* Botão "Gerar Pré-visualização do Curso" (Passo 2) */}
+                {/* Botão "Gerar Pré-visualização do Curso" (Passo 1 -> 2) */}
                 {activeStep === 1 && (
                     <Button
                         variant="contained"
-                        onClick={handleNext} // Chama handleNext, que por sua vez chama handleGenerateCourseContent
+                        onClick={handleNext} {/* handleNext chamará handleGenerateCourseContent */}
+                        // Desabilita se estiver carregando preview OU se nenhuma tag foi selecionada
                         disabled={isLoading || selectedTags.length === 0}
                     >
                         {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Gerar Pré-visualização do Curso'}
                     </Button>
                 )}
 
-                {/* Botão "Salvar Curso Gerado" (Passo 3) */}
+                {/* Botão "Salvar Curso Gerado" (Passo 2 -> 3) */}
                 {activeStep === 2 && (
                     <Button
                         variant="contained"
                         color="primary"
                         onClick={handleSaveGeneratedCourse}
-                        disabled={isLoadingSave || !previewData} // Desabilita se estiver salvando ou não houver preview
+                        // Desabilita se estiver salvando OU se não houver dados de preview para salvar
+                        disabled={isLoadingSave || !previewData}
                     >
                         {isLoadingSave ? <CircularProgress size={24} color="inherit" /> : 'Salvar Curso Gerado'}
                     </Button>
                 )}
 
-                {/* No último passo (sucesso), não há botão "Próximo" ou "Salvar" */}
+                {/* Botão "Criar Novo Curso" (Último passo de sucesso) */}
                 {activeStep === steps.length - 1 && (
                     <Button
                         variant="contained"
