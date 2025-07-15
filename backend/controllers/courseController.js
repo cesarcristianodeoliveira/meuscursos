@@ -287,10 +287,10 @@ export const saveGeneratedCourse = async (req, res) => {
 
     const { 
         courseData, 
-        category, 
-        subCategory, 
+        category, // ID da categoria principal do curso
+        subCategory, // ID da subcategoria do curso
         level, 
-        tags // AGORA É UM ARRAY DE NOMES DE TAGS (strings)
+        tags 
     } = req.body; 
 
     const aiGenerationPromptFromPreview = courseData.promptUsed || ''; 
@@ -383,7 +383,7 @@ export const saveGeneratedCourse = async (req, res) => {
         console.log(`[BACKEND] Transação iniciada. Member ${creatorId} será atualizado.`);
 
         for (const lesson of courseData.lessons) {
-            const lessonSlug = lesson.slug; // Pega o slug que veio da pré-visualização
+            const lessonSlug = lesson.slug; 
 
             const lessonId = `lesson-${uuidv4()}`; 
 
@@ -413,14 +413,11 @@ export const saveGeneratedCourse = async (req, res) => {
             console.log(`[BACKEND] Lição "${lesson.title}" adicionada à transação (ID: ${lessonId}).`);
         }
 
-        // --- MODIFICAÇÕES PARA LIDAR COM AS TAGS (CRIAR SE NÃO EXISTE, ASSOCIAR SE EXISTE) ---
         const courseTagRefs = []; 
         if (tags && tags.length > 0) {
             for (const tagName of tags) {
-                // 1. Normalizar o nome da tag (ex: minúsculas, sem espaços extras)
                 const normalizedTagName = tagName.trim().toLowerCase();
 
-                // 2. Tentar encontrar a tag existente no Sanity pelo nome
                 const existingTag = await sanityClient.fetch(
                     `*[_type == "courseTag" && name == $tagName][0]{_id}`,
                     { tagName: normalizedTagName }
@@ -428,32 +425,43 @@ export const saveGeneratedCourse = async (req, res) => {
 
                 let tagRefId;
                 if (existingTag) {
-                    // Se a tag existe, usa seu _id
                     tagRefId = existingTag._id;
                     console.log(`[BACKEND] Tag existente encontrada: "${normalizedTagName}" (ID: ${tagRefId}).`);
                 } else {
-                    // Se a tag NÃO existe, cria um novo documento de tag no Sanity
                     const newTagId = `courseTag-${uuidv4()}`;
-                    const newTagSlug = { // Gerar um slug para a nova tag
+                    const newTagSlug = { 
                         _type: 'slug',
                         current: generateSlug(normalizedTagName),
                     };
 
+                    // --- MUDANÇA AQUI PARA ADICIONAR CATEGORIA NA NOVA TAG ---
                     const newTagDocument = {
                         _id: newTagId,
                         _type: 'courseTag',
-                        name: normalizedTagName, // Salva o nome normalizado
+                        name: normalizedTagName, 
                         slug: newTagSlug,
-                        description: `Tag gerada automaticamente para o tópico: ${normalizedTagName}.`, // Descrição padrão
-                        // Você pode adicionar mais campos aqui se seu schema Sanity de tags tiver
+                        description: `Tag gerada automaticamente para o tópico: ${normalizedTagName}.`,
+                        // Adicionando a categoria do curso à nova tag
+                        categories: [
+                            {
+                                _ref: category, // Usa o ID da categoria do curso
+                                _type: 'reference',
+                                _key: uuidv4() // Sempre bom ter uma key para itens em array
+                            }
+                            // Opcional: Se quiser, pode adicionar também a subcategoria, mas 'categories' é mais genérico
+                            // {
+                            //     _ref: subCategory, // Isso dependeria de subCategory ser um schema separado para tags
+                            //     _type: 'reference',
+                            //     _key: uuidv4()
+                            // }
+                        ]
                     };
                     
-                    transaction.create(newTagDocument); // Adiciona a criação da nova tag à transação
+                    transaction.create(newTagDocument);
                     tagRefId = newTagId;
                     console.log(`[BACKEND] Nova tag criada e adicionada à transação: "${normalizedTagName}" (ID: ${newTagId}).`);
                 }
 
-                // Adiciona a referência da tag (existente ou nova) à lista do curso
                 courseTagRefs.push({
                     _ref: tagRefId,
                     _type: 'reference',
@@ -461,7 +469,6 @@ export const saveGeneratedCourse = async (req, res) => {
                 });
             }
         }
-        // --- FIM DAS MODIFICAÇÕES DE TAGS ---
 
         const newCourse = {
             _id: courseId,
@@ -481,7 +488,7 @@ export const saveGeneratedCourse = async (req, res) => {
             },
             category: { _ref: category, _type: 'reference' }, 
             subCategory: { _ref: subCategory, _type: 'reference' }, 
-            courseTags: courseTagRefs, // Agora contém as referências corretas
+            courseTags: courseTagRefs, 
             aiGenerationPrompt: aiGenerationPromptFromPreview,
             aiModelUsed: aiModelUsedFromPreview,
             generatedAt: new Date().toISOString(),

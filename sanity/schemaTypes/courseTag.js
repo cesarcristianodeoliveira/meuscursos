@@ -9,7 +9,7 @@ export default {
       title: 'Tag Name',
       type: 'string',
       description: 'The display name of the course tag (e.g., "JavaScript", "SEO", "Cloud Computing").',
-      validation: Rule => Rule.required().min(2).max(50).unique() // Adicionei .unique() aqui para garantir nomes únicos
+      validation: Rule => Rule.required().min(2).max(50)
     },
     {
       name: 'slug',
@@ -20,7 +20,7 @@ export default {
         maxLength: 96,
       },
       description: 'A unique, URL-friendly identifier for the course tag.',
-      validation: Rule => Rule.required().unique() // Também garanta que o slug seja único
+      validation: Rule => Rule.required().unique()
     },
     {
       name: 'description',
@@ -39,9 +39,7 @@ export default {
         },
       ],
       description: 'The categories this tag is primarily associated with.',
-      // REMOVIDA A VALIDAÇÃO Rule.required().min(1) para permitir tags sem categoria inicial
-      // Você pode adicionar de volta se quiser que TODAS as tags (incluindo as criadas manualmente)
-      // tenham pelo menos uma categoria. Mas para as geradas por IA, pode ser um problema.
+      validation: Rule => Rule.required().min(1).error('Every tag must be associated with at least one category.'),
     },
   ],
   preview: {
