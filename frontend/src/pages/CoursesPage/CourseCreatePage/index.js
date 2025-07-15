@@ -24,12 +24,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import { useAuth } from '../../../contexts/AuthContext'; // Confirme o caminho
 
-// Removido: A configuração do Sanity Client foi removida daqui,
-// porque o frontend não deve chamar o Sanity diretamente.
-// O backend é que se comunica com o Sanity.
-
 // URL base da sua API de backend (do seu .env)
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
+
+// --- LISTA DE PALAVRAS PROIBIDAS PARA TAGS ---
+// Você pode expandir esta lista. Idealmente, esta lista também existiria no backend.
+const PROHIBITED_TAGS = [
+    'sexo', 'drogas', 'pornografia', 'ilegal', 'violencia', 'racismo', 'odio',
+    'armas', 'terrorismo', 'nudez', 'proibido', 'adulto', 'conteudo adulto'
+];
 
 function CourseCreatePage() {
     const [activeStep, setActiveStep] = useState(0);
@@ -40,7 +43,7 @@ function CourseCreatePage() {
     const [selectedLevel, setSelectedLevel] = useState('beginner');
     const [selectedTags, setSelectedTags] = useState([]);
 
-    // Estados para os dados carregados do Backend (anteriormente Sanity)
+    // Estados para os dados carregados do Backend
     const [fetchedCategories, setFetchedCategories] = useState([]);
     const [fetchedSubCategories, setFetchedSubCategories] = useState([]);
 
@@ -91,15 +94,14 @@ function CourseCreatePage() {
         },
     ], []);
 
-    // --- Funções de Busca de Dados do Backend (que por sua vez busca do Sanity) ---
+    // --- Funções de Busca de Dados do Backend ---
     const fetchInitialDataFromBackend = useCallback(async () => {
         setError(null);
         setLoading(true);
         try {
-            // Requisições para o SEU BACKEND, que então fala com o Sanity
             const categoriesResponse = await fetch(`${API_BASE_URL}/api/data/categories`);
             if (!categoriesResponse.ok) {
-                const errorText = await categoriesResponse.text(); // Pega o texto do erro para mais detalhes
+                const errorText = await categoriesResponse.text();
                 throw new Error(`Falha ao buscar categorias do backend: ${categoriesResponse.status} - ${errorText}`);
             }
             const categoriesData = await categoriesResponse.json();
@@ -145,7 +147,6 @@ function CourseCreatePage() {
     const handleNext = async () => {
         setError(null);
 
-        // Validação e Ação para cada passo
         switch (activeStep) {
             case 0: // Escolha Detalhes Básicos do Curso
                 if (!selectedCategory || !selectedSubCategory || !selectedLevel) {
@@ -153,8 +154,7 @@ function CourseCreatePage() {
                     return;
                 }
                 await handleGenerateAITags();
-                // Só avança se não houve erro na geração das tags
-                if (!error) { // Verifica 'error' após a chamada assíncrona
+                if (!error) {
                     setActiveStep((prevActiveStep) => prevActiveStep + 1);
                 }
                 break;
@@ -163,18 +163,24 @@ function CourseCreatePage() {
                     setError('Por favor, selecione ou adicione ao menos uma tag para prosseguir.');
                     return;
                 }
+                // Validação adicional para tags selecionadas (se houver alguma que passou pela IA mas é proibida)
+                const containsProhibitedSelected = selectedTags.some(tag =>
+                    PROHIBITED_TAGS.some(prohibited => tag.toLowerCase().includes(prohibited))
+                );
+                if (containsProhibitedSelected) {
+                    setError('Uma ou mais tags selecionadas contêm termos proibidos. Por favor, remova-as.');
+                    return;
+                }
                 setActiveStep((prevActiveStep) => prevActiveStep + 1);
                 break;
             case 2: // Gerar Conteúdo do Curso
                 await handleGenerateCourseContent();
-                // Só avança se a pré-visualização foi gerada com sucesso
-                if (!error && coursePreview) { // Verifica 'coursePreview' para garantir que a geração foi bem-sucedida
+                if (!error && coursePreview) {
                     setActiveStep((prevActiveStep) => prevActiveStep + 1);
                 }
                 break;
             case 3: // Pré-visualização e Confirmação
                 await handleSaveGeneratedCourse();
-                // Só avança se o curso foi salvo com sucesso
                 if (!error && successMessage.courseId) {
                     setActiveStep((prevActiveStep) => prevActiveStep + 1);
                 }
@@ -187,18 +193,17 @@ function CourseCreatePage() {
 
     const handleBack = () => {
         setActiveStep((prevActiveStep) => prevActiveStep - 1);
-        setError(null); // Limpa qualquer erro ao voltar
+        setError(null);
 
-        // Lógica para limpar estados ao voltar (ajustada para os novos passos)
-        if (activeStep === 1) { // Voltando de "Gerar e Selecionar Tags" para "Detalhes Básicos"
+        if (activeStep === 1) {
             setAiSuggestedTags([]);
             setSelectedTags([]);
             setCustomTagInput('');
-        } else if (activeStep === 2) { // Voltando de "Gerar Conteúdo" para "Gerar e Selecionar Tags"
+        } else if (activeStep === 2) {
             setCoursePreview(null);
             setSuccessMessage({ text: null, courseId: null, courseTitle: null });
-        } else if (activeStep === 3) { // Voltando de "Pré-visualização" para "Gerar Conteúdo"
-            setCoursePreview(null); // Garante que a pré-visualização seja recarregada ou regenerada se necessário
+        } else if (activeStep === 3) {
+            setCoursePreview(null);
             setSuccessMessage({ text: null, courseId: null, courseTitle: null });
         }
     };
@@ -216,7 +221,7 @@ function CourseCreatePage() {
         setSuccessMessage({ text: null, courseId: null, courseTitle: null });
         setAiSuggestedTags([]);
         setCustomTagInput('');
-        fetchInitialDataFromBackend(); // Recarrega os dados iniciais do backend
+        fetchInitialDataFromBackend();
     };
 
     // --- Lógica de Geração de Tags pela IA (via Backend) ---
@@ -224,7 +229,7 @@ function CourseCreatePage() {
         setLoading(true);
         setError(null);
         setAiSuggestedTags([]);
-        setSelectedTags([]); // Limpa seleções anteriores
+        setSelectedTags([]);
 
         if (!userToken) {
             setError('Você não está autenticado. Por favor, faça login novamente.');
@@ -262,8 +267,16 @@ function CourseCreatePage() {
             console.log('Tags sugeridas pela IA (via backend):', result);
 
             if (result.suggestedTags && Array.isArray(result.suggestedTags) && result.suggestedTags.length > 0) {
-                const uniqueNormalizedTags = Array.from(new Set(result.suggestedTags.map(tag => tag.trim().toLowerCase())));
+                // Filtra tags sugeridas pela IA para remover as proibidas
+                const filteredAiTags = result.suggestedTags.filter(tag =>
+                    !PROHIBITED_TAGS.some(prohibited => tag.toLowerCase().includes(prohibited))
+                );
+                const uniqueNormalizedTags = Array.from(new Set(filteredAiTags.map(tag => tag.trim().toLowerCase())));
                 setAiSuggestedTags(uniqueNormalizedTags);
+
+                if (filteredAiTags.length === 0 && result.suggestedTags.length > 0) {
+                     setError('A IA sugeriu tags, mas todas foram filtradas por conterem termos proibidos. Por favor, adicione tags manualmente no campo abaixo, evitando termos sensíveis.');
+                }
             } else {
                 setError('A IA não conseguiu sugerir tags. Por favor, adicione tags manualmente no campo abaixo.');
             }
@@ -281,8 +294,12 @@ function CourseCreatePage() {
             setError('Por favor, selecione ou adicione ao menos uma tag para gerar o conteúdo do curso.');
             return;
         }
-        if (!generatedTopic.trim()) {
-            setError('Não foi possível gerar um tópico claro para a IA. Verifique as seleções de categoria, subcategoria e nível.');
+        // Validação adicional para tags selecionadas antes de enviar para a geração de conteúdo
+        const containsProhibitedSelected = selectedTags.some(tag =>
+            PROHIBITED_TAGS.some(prohibited => tag.toLowerCase().includes(prohibited))
+        );
+        if (containsProhibitedSelected) {
+            setError('Uma ou mais tags selecionadas contêm termos proibidos. Por favor, remova-as antes de gerar o conteúdo do curso.');
             return;
         }
 
@@ -309,7 +326,7 @@ function CourseCreatePage() {
                     category: selectedCategory,
                     subCategory: selectedSubCategory,
                     level: selectedLevel,
-                    tags: selectedTags, // Envia os nomes de tags selecionados/criados pelo usuário
+                    tags: selectedTags,
                 }),
             });
 
@@ -350,6 +367,14 @@ function CourseCreatePage() {
             setError('Nenhum curso para salvar. Gere uma pré-visualização primeiro.');
             return;
         }
+        // Validação adicional para tags selecionadas antes de salvar
+        const containsProhibitedSelected = selectedTags.some(tag =>
+            PROHIBITED_TAGS.some(prohibited => tag.toLowerCase().includes(prohibited))
+        );
+        if (containsProhibitedSelected) {
+            setError('Uma ou mais tags selecionadas contêm termos proibidos. Por favor, remova-as antes de salvar o curso.');
+            return;
+        }
 
         setLoading(true);
         setError(null);
@@ -369,10 +394,6 @@ function CourseCreatePage() {
         }
 
         try {
-            // Removida a lógica de busca/criação de tags no frontend,
-            // isso deve ser responsabilidade do backend.
-            // O frontend envia apenas os nomes das tags.
-
             const response = await fetch(`${API_BASE_URL}/api/courses/save-generated`, {
                 method: 'POST',
                 headers: {
@@ -390,7 +411,7 @@ function CourseCreatePage() {
                     category: selectedCategory,
                     subCategory: selectedSubCategory,
                     level: selectedLevel,
-                    tags: selectedTags, // Envia os nomes das tags, backend cuidará da referência
+                    tags: selectedTags,
                     creatorId: creatorId
                 }),
             });
@@ -423,19 +444,38 @@ function CourseCreatePage() {
         [fetchedSubCategories, selectedCategory]
     );
 
+    // --- FUNÇÃO CORRIGIDA PARA ADICIONAR TAGS CUSTOMIZADAS ---
     const handleAddCustomTag = () => {
         const trimmedTag = customTagInput.trim();
-        if (trimmedTag !== '') {
-            const normalizedTag = trimmedTag.toLowerCase();
-            if (!selectedTags.map(t => t.toLowerCase()).includes(normalizedTag)) {
-                setSelectedTags(prev => [...prev, trimmedTag]);
-                setCustomTagInput('');
-                setError(null);
-            } else {
-                setError(`A tag "${trimmedTag}" já está selecionada.`);
-            }
+        if (trimmedTag === '') {
+            setError('A tag não pode ser vazia.');
+            return;
         }
+
+        const normalizedTag = trimmedTag.toLowerCase();
+
+        // Validação: Verificar se a tag contém alguma palavra proibida
+        const isProhibited = PROHIBITED_TAGS.some(prohibited =>
+            normalizedTag.includes(prohibited) // Verifica se a tag digitada contém a palavra proibida
+        );
+
+        if (isProhibited) {
+            setError(`A tag "${trimmedTag}" contém termos proibidos. Por favor, escolha outra.`);
+            return;
+        }
+
+        // Validação: Verificar se a tag já existe
+        if (selectedTags.map(t => t.toLowerCase()).includes(normalizedTag)) {
+            setError(`A tag "${trimmedTag}" já está selecionada.`);
+            return;
+        }
+
+        // Se passar nas validações, adiciona a tag
+        setSelectedTags(prev => [...prev, trimmedTag]);
+        setCustomTagInput('');
+        setError(null); // Limpa qualquer erro anterior
     };
+
 
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
@@ -482,9 +522,9 @@ function CourseCreatePage() {
                                                 label="Categoria"
                                                 onChange={(e) => {
                                                     setSelectedCategory(e.target.value);
-                                                    setSelectedSubCategory(''); // Reseta subcategoria
-                                                    setSelectedTags([]); // Limpa tags ao mudar categoria
-                                                    setAiSuggestedTags([]); // Limpa sugestões de IA
+                                                    setSelectedSubCategory('');
+                                                    setSelectedTags([]);
+                                                    setAiSuggestedTags([]);
                                                 }}
                                                 disabled={fetchedCategories.length === 0 || loading}
                                             >
@@ -552,7 +592,7 @@ function CourseCreatePage() {
                                     </>
                                 )}
 
-                                {/* NOVO PASSO 1: Gerar e Selecionar Tags */}
+                                {/* PASSO 1: Gerar e Selecionar Tags */}
                                 {index === 1 && (
                                     <>
                                         <Alert severity="info" sx={{ mb: 2 }}>
@@ -567,7 +607,6 @@ function CourseCreatePage() {
                                             </Box>
                                         )}
 
-                                        {/* Exibe tags sugeridas pela IA como Chips */}
                                         {!loading && aiSuggestedTags.length > 0 && (
                                             <Box sx={{ my: 2 }}>
                                                 <Typography variant="subtitle1" gutterBottom>
@@ -595,11 +634,10 @@ function CourseCreatePage() {
                                         )}
                                         {!loading && aiSuggestedTags.length === 0 && (
                                             <Alert severity="warning" sx={{ mb: 2 }}>
-                                                A IA não sugeriu nenhuma tag. Por favor, adicione tags manualmente no campo abaixo.
+                                                A IA não sugeriu nenhuma tag ou todas as sugestões continham termos proibidos. Por favor, adicione tags manualmente no campo abaixo.
                                             </Alert>
                                         )}
 
-                                        {/* Exibe tags atualmente selecionadas */}
                                         <Box sx={{ my: 2 }}>
                                             <Typography variant="subtitle1" gutterBottom>
                                                 Tags Selecionadas:
@@ -633,7 +671,6 @@ function CourseCreatePage() {
                                             </Box>
                                         </Box>
 
-                                        {/* Input para tags customizadas */}
                                         <FormControl fullWidth margin="normal" disabled={loading}>
                                             <InputLabel htmlFor="custom-tag-input">Adicionar Nova Tag (digite e Enter)</InputLabel>
                                             <OutlinedInput
@@ -661,7 +698,7 @@ function CourseCreatePage() {
                                     </>
                                 )}
 
-                                {/* Passo 2: Gerar Conteúdo do Curso */}
+                                {/* PASSO 2: Gerar Conteúdo do Curso */}
                                 {index === 2 && (
                                     <>
                                         <Typography variant="body1" sx={{ mb: 2 }}>
@@ -682,7 +719,7 @@ function CourseCreatePage() {
                                     </>
                                 )}
 
-                                {/* Passo 3: Pré-visualização e Confirmação */}
+                                {/* PASSO 3: Pré-visualização e Confirmação */}
                                 {index === 3 && (
                                     <>
                                         {loading && (
@@ -743,7 +780,7 @@ function CourseCreatePage() {
                                     </>
                                 )}
 
-                                {/* Passo 4: Concluído */}
+                                {/* PASSO 4: Concluído */}
                                 {index === 4 && (
                                     <Box sx={{ mt: 2 }}>
                                         {successMessage.text && (
