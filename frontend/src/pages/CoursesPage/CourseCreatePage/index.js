@@ -18,13 +18,32 @@ import {
     OutlinedInput,
     Chip,
     Divider,
-    Fade, // Importado para transições mais suaves
+    Fade,
 } from '@mui/material';
-import { Link, useNavigate } from 'react-router-dom'; // Importado useNavigate
+import { Link, useNavigate } from 'react-router-dom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext'; // Certifique-se de que este caminho está correto
+
+// --- Configuração do Sanity (Diretamente neste arquivo, conforme solicitado) ---
+import { createClient } from "@sanity/client";
+import imageUrlBuilder from "@sanity/image-url";
+
+const sanityClient = createClient({
+    projectId: "6frgs9wx",
+    dataset: "production",
+    apiVersion: "2025-06-12",
+    token: "skUmwurjL95gLed6EVsTne8PcJHVlmu0gIFRorelGjtrsebT6NQI2YHFKMWmOCX8emJTBloCQCqBD2PGV47HS82ni610ENSOGMIDMVKeR24fuKuZAQdHtM01hXrKecUvtyRUYl4c6smpcvVsMvlQ", // Por favor, insira sua chave completa aqui
+    useCdn: false,
+    ignoreBrowserTokenWarning: true,
+});
+
+const builder = imageUrlBuilder(sanityClient);
+
+// Função para gerar URLs de imagem do Sanity
+export const urlFor = (source) => builder.image(source);
 
 // URL base da sua API de backend
+// Recomenda-se usar variáveis de ambiente para a URL da API em produção
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 function CourseCreatePage() {
@@ -34,7 +53,7 @@ function CourseCreatePage() {
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedSubCategory, setSelectedSubCategory] = useState('');
     const [selectedLevel, setSelectedLevel] = useState('beginner');
-    const [selectedTags, setSelectedTags] = useState([]); // Armazena nomes de tags (strings)
+    const [selectedTags, setSelectedTags] = useState([]);
 
     // Estados para os dados carregados do Sanity/Backend
     const [fetchedCategories, setFetchedCategories] = useState([]);
@@ -51,17 +70,17 @@ function CourseCreatePage() {
     const [coursePreview, setCoursePreview] = useState(null);
 
     // MODIFICAÇÕES PARA TAGS VIA IA
-    const [aiSuggestedTags, setAiSuggestedTags] = useState([]); // Tags sugeridas pela IA
-    const [customTagInput, setCustomTagInput] = useState(''); // Para o usuário digitar novas tags
+    const [aiSuggestedTags, setAiSuggestedTags] = useState([]);
+    const [customTagInput, setCustomTagInput] = useState('');
 
     // Estados para feedback da UI
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [successMessage, setSuccessMessage] = useState({ text: null, courseId: null, courseTitle: null }); // Adicionado courseTitle
+    const [successMessage, setSuccessMessage] = useState({ text: null, courseId: null, courseTitle: null });
 
     // Obtém o token do usuário e o objeto 'user' do contexto de autenticação
     const { userToken, user } = useAuth();
-    const navigate = useNavigate(); // Hook para navegação
+    const navigate = useNavigate();
 
     // Definição dos passos do Stepper
     const steps = useMemo(() => [
@@ -93,15 +112,18 @@ function CourseCreatePage() {
         setError(null);
         setLoading(true);
         try {
-            const categoriesResponse = await fetch(`${API_BASE_URL}/api/data/categories`);
-            if (!categoriesResponse.ok) throw new Error('Falha ao buscar categorias.');
-            const categoriesData = await categoriesResponse.json();
-            setFetchedCategories(categoriesData);
+            // Buscando categorias do Sanity
+            const categories = await sanityClient.fetch(`*[_type == "category"]{_id, title}`);
+            setFetchedCategories(categories);
 
-            const subCategoriesResponse = await fetch(`${API_BASE_URL}/api/data/subcategories`);
-            if (!subCategoriesResponse.ok) throw new Error('Falha ao buscar subcategorias.');
-            const subCategoriesData = await subCategoriesResponse.json();
-            setFetchedSubCategories(subCategoriesData);
+            // Buscando subcategorias do Sanity
+            const subCategories = await sanityClient.fetch(`*[_type == "subcategory"]{_id, title, categoryRef->{_id}}`);
+            // Ajusta o categoryRef para ser apenas o _id da categoria para facilitar a filtragem
+            const formattedSubCategories = subCategories.map(sub => ({
+                ...sub,
+                categoryRef: sub.categoryRef ? sub.categoryRef._id : null
+            }));
+            setFetchedSubCategories(formattedSubCategories);
 
         } catch (err) {
             console.error("Erro ao carregar dados do Sanity:", err);
@@ -156,10 +178,9 @@ function CourseCreatePage() {
                 setActiveStep((prevActiveStep) => prevActiveStep + 1);
                 break;
             case 2: // Gerar Conteúdo do Curso
-                // handleGenerateCourseContent já contém validação de tags
                 await handleGenerateCourseContent();
                 // Só avança se a pré-visualização foi gerada com sucesso
-                if (!error && coursePreview) { // Verifica 'coursePreview' para garantir que a geração foi bem-sucedida
+                if (!error && coursePreview) {
                     setActiveStep((prevActiveStep) => prevActiveStep + 1);
                 }
                 break;
@@ -189,7 +210,7 @@ function CourseCreatePage() {
             setCoursePreview(null);
             setSuccessMessage({ text: null, courseId: null, courseTitle: null });
         } else if (activeStep === 3) { // Voltando de "Pré-visualização" para "Gerar Conteúdo"
-            setCoursePreview(null); // Garante que a pré-visualização seja recarregada ou regenerada se necessário
+            setCoursePreview(null);
             setSuccessMessage({ text: null, courseId: null, courseTitle: null });
         }
     };
@@ -296,7 +317,7 @@ function CourseCreatePage() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${userToken}`,
                 },
-                body: JSON.stringify({
+                body: JSON.HAVE_FUN({
                     topic: generatedTopic,
                     category: selectedCategory,
                     subCategory: selectedSubCategory,
@@ -315,7 +336,6 @@ function CourseCreatePage() {
 
             if (result.coursePreview) {
                 setCoursePreview(result.coursePreview);
-                // Exemplo de como acessar o título se vier diferente no preview
                 const previewTitle = result.coursePreview.courseTitle || result.coursePreview.title || 'Curso Gerado';
                 setSuccessMessage({ text: 'Pré-visualização do curso gerada com sucesso! Revise e confirme.', courseId: null, courseTitle: previewTitle });
             } else {
@@ -362,6 +382,28 @@ function CourseCreatePage() {
         }
 
         try {
+            // Primeiro, vamos garantir que as tags existam no Sanity ou criá-las
+            // O backend deve lidar com a criação ou busca de tags. Aqui, apenas enviamos os nomes.
+            const tagsToSanity = await Promise.all(selectedTags.map(async (tagName) => {
+                // Tenta buscar a tag existente
+                const existingTag = await sanityClient.fetch(`*[_type == "tag" && title == $tagName][0]`, { tagName });
+                if (existingTag) {
+                    return { _ref: existingTag._id, _type: 'reference' };
+                } else {
+                    // Se não existe, cria a tag
+                    const newTag = await sanityClient.create({
+                        _type: 'tag',
+                        title: tagName,
+                        slug: {
+                            _type: 'slug',
+                            current: tagName.toLowerCase().replace(/\s+/g, '-')
+                        }
+                    });
+                    return { _ref: newTag._id, _type: 'reference' };
+                }
+            }));
+
+
             const response = await fetch(`${API_BASE_URL}/api/courses/save-generated`, {
                 method: 'POST',
                 headers: {
@@ -379,7 +421,7 @@ function CourseCreatePage() {
                     category: selectedCategory,
                     subCategory: selectedSubCategory,
                     level: selectedLevel,
-                    tags: selectedTags, // Envia os nomes de tags para o backend
+                    tags: tagsToSanity, // Envia as referências de tags para o backend
                     creatorId: creatorId
                 }),
             });
@@ -398,10 +440,6 @@ function CourseCreatePage() {
                 courseTitle: coursePreview.courseTitle || coursePreview.title
             });
 
-            // Navega para a página do curso salvo no Sanity, se o ID estiver disponível
-            if (result._id) {
-                // A navegação será no botão no último passo para o usuário decidir
-            }
         } catch (err) {
             console.error("Erro ao salvar curso:", err);
             setError(`Erro ao salvar curso: ${err.message}.`);
@@ -419,11 +457,11 @@ function CourseCreatePage() {
     const handleAddCustomTag = () => {
         const trimmedTag = customTagInput.trim();
         if (trimmedTag !== '') {
-            const normalizedTag = trimmedTag.toLowerCase(); // Normaliza para minúsculas
+            const normalizedTag = trimmedTag.toLowerCase();
             if (!selectedTags.map(t => t.toLowerCase()).includes(normalizedTag)) {
-                setSelectedTags(prev => [...prev, trimmedTag]); // Adiciona a tag original (não normalizada) para exibição
+                setSelectedTags(prev => [...prev, trimmedTag]);
                 setCustomTagInput('');
-                setError(null); // Limpa erro se houver
+                setError(null);
             } else {
                 setError(`A tag "${trimmedTag}" já está selecionada.`);
             }
@@ -576,8 +614,8 @@ function CourseCreatePage() {
                                                             onClick={() => {
                                                                 setSelectedTags(prev =>
                                                                     prev.includes(tag)
-                                                                        ? prev.filter(t => t !== tag) // Desseleciona se já estiver incluída
-                                                                        : [...prev, tag] // Adiciona se não estiver
+                                                                        ? prev.filter(t => t !== tag)
+                                                                        : [...prev, tag]
                                                                 );
                                                             }}
                                                             sx={{ textTransform: 'capitalize' }}
@@ -635,11 +673,11 @@ function CourseCreatePage() {
                                                 onChange={(e) => setCustomTagInput(e.target.value)}
                                                 onKeyPress={(e) => {
                                                     if (e.key === 'Enter') {
-                                                        e.preventDefault(); // Impede o envio do formulário
+                                                        e.preventDefault();
                                                         handleAddCustomTag();
                                                     }
                                                 }}
-                                                endAdornment={ // Adiciona um botão para adicionar a tag
+                                                endAdornment={
                                                     <Button
                                                         variant="contained"
                                                         onClick={handleAddCustomTag}
@@ -755,7 +793,7 @@ function CourseCreatePage() {
                                                 <Button
                                                     variant="contained"
                                                     color="primary"
-                                                    onClick={() => navigate(`/cursos/${successMessage.courseId}`)} // Usa navigate para redirecionar
+                                                    onClick={() => navigate(`/cursos/${successMessage.courseId}`)}
                                                     sx={{ mr: 2 }}
                                                 >
                                                     Ver Curso
@@ -789,9 +827,9 @@ function CourseCreatePage() {
                                         <Button
                                             variant="contained"
                                             onClick={handleNext}
-                                            disabled={loading} // Desabilita enquanto carrega
+                                            disabled={loading}
                                         >
-                                            {loading && (activeStep === 0 || activeStep === 2 || activeStep === 3) ? ( // Progress bar apenas nos passos que chamam a API principal
+                                            {loading && (activeStep === 0 || activeStep === 2 || activeStep === 3) ? (
                                                 <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
                                             ) : null}
                                             {activeStep === steps.length - 2 ? 'Salvar e Concluir' : 'Próximo'}
