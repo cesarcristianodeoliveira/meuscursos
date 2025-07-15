@@ -463,7 +463,7 @@ const CourseCreatePage = () => {
                                                 size="large"
                                                 variant="contained"
                                                 color="primary"
-                                                onClick={() => router.push(`/courses/${courseCreatedData.slug.current}`)}
+                                                onClick={() => router.push(`/cursos/${courseCreatedData.slug.current}`)}
                                             >
                                                 Ver Curso
                                             </Button>
