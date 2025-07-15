@@ -19,14 +19,13 @@ import {
     FormControl,
     InputLabel,
     Select,
-    // OutlinedInput, InputAdornment, IconButton não são mais necessários para tags personalizadas via input
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { styled } from '@mui/system';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useRouter } from 'next/router';
-import { Check } from '@mui/icons-material'; // Apenas Check, Close não é estritamente necessário para o chip de seleção
+import { Check } from '@mui/icons-material';
 
 // Estilos para os chips de tags
 const StyledChip = styled(Chip)(({ theme, selected }) => ({
@@ -37,8 +36,6 @@ const StyledChip = styled(Chip)(({ theme, selected }) => ({
         backgroundColor: selected ? theme.palette.primary.dark : theme.palette.grey[400],
     },
     // Estilo para o ícone de 'check' quando selecionado
-    // O deleteIcon no MUI é um slot para um ícone no final do chip.
-    // Usamos ele para mostrar o check quando selecionado.
     '& .MuiChip-deleteIcon': {
         color: selected ? theme.palette.primary.contrastText : theme.palette.action.active,
         '&:hover': {
