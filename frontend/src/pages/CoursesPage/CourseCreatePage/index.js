@@ -22,28 +22,13 @@ import {
 } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import { useAuth } from '../../../contexts/AuthContext'; // Certifique-se de que este caminho está correto
+import { useAuth } from '../../../contexts/AuthContext'; // Confirme o caminho
 
-// --- Configuração do Sanity (Diretamente neste arquivo, conforme solicitado) ---
-import { createClient } from "@sanity/client";
-import imageUrlBuilder from "@sanity/image-url";
+// Removido: A configuração do Sanity Client foi removida daqui,
+// porque o frontend não deve chamar o Sanity diretamente.
+// O backend é que se comunica com o Sanity.
 
-const sanityClient = createClient({
-    projectId: "6frgs9wx",
-    dataset: "production",
-    apiVersion: "2025-06-12",
-    token: "skUmwurjL95gLed6EVsTne8PcJHVlmu0gIFRorelGjtrsebT6NQI2YHFKMWmOCX8emJTBloCQCqBD2PGV47HS82ni610ENSOGMIDMVKeR24fuKuZAQdHtM01hXrKecUvtyRUYl4c6smpcvVsMvlQ", // Por favor, insira sua chave completa aqui
-    useCdn: false,
-    ignoreBrowserTokenWarning: true,
-});
-
-const builder = imageUrlBuilder(sanityClient);
-
-// Função para gerar URLs de imagem do Sanity
-export const urlFor = (source) => builder.image(source);
-
-// URL base da sua API de backend
-// Recomenda-se usar variáveis de ambiente para a URL da API em produção
+// URL base da sua API de backend (do seu .env)
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 function CourseCreatePage() {
@@ -55,7 +40,7 @@ function CourseCreatePage() {
     const [selectedLevel, setSelectedLevel] = useState('beginner');
     const [selectedTags, setSelectedTags] = useState([]);
 
-    // Estados para os dados carregados do Sanity/Backend
+    // Estados para os dados carregados do Backend (anteriormente Sanity)
     const [fetchedCategories, setFetchedCategories] = useState([]);
     const [fetchedSubCategories, setFetchedSubCategories] = useState([]);
 
@@ -106,28 +91,31 @@ function CourseCreatePage() {
         },
     ], []);
 
-    // --- Funções de Busca de Dados ---
-
-    const fetchSanityData = useCallback(async () => {
+    // --- Funções de Busca de Dados do Backend (que por sua vez busca do Sanity) ---
+    const fetchInitialDataFromBackend = useCallback(async () => {
         setError(null);
         setLoading(true);
         try {
-            // Buscando categorias do Sanity
-            const categories = await sanityClient.fetch(`*[_type == "category"]{_id, title}`);
-            setFetchedCategories(categories);
+            // Requisições para o SEU BACKEND, que então fala com o Sanity
+            const categoriesResponse = await fetch(`${API_BASE_URL}/api/data/categories`);
+            if (!categoriesResponse.ok) {
+                const errorText = await categoriesResponse.text(); // Pega o texto do erro para mais detalhes
+                throw new Error(`Falha ao buscar categorias do backend: ${categoriesResponse.status} - ${errorText}`);
+            }
+            const categoriesData = await categoriesResponse.json();
+            setFetchedCategories(categoriesData);
 
-            // Buscando subcategorias do Sanity
-            const subCategories = await sanityClient.fetch(`*[_type == "subcategory"]{_id, title, categoryRef->{_id}}`);
-            // Ajusta o categoryRef para ser apenas o _id da categoria para facilitar a filtragem
-            const formattedSubCategories = subCategories.map(sub => ({
-                ...sub,
-                categoryRef: sub.categoryRef ? sub.categoryRef._id : null
-            }));
-            setFetchedSubCategories(formattedSubCategories);
+            const subCategoriesResponse = await fetch(`${API_BASE_URL}/api/data/subcategories`);
+            if (!subCategoriesResponse.ok) {
+                const errorText = await subCategoriesResponse.text();
+                throw new Error(`Falha ao buscar subcategorias do backend: ${subCategoriesResponse.status} - ${errorText}`);
+            }
+            const subCategoriesData = await subCategoriesResponse.json();
+            setFetchedSubCategories(subCategoriesData);
 
         } catch (err) {
-            console.error("Erro ao carregar dados do Sanity:", err);
-            setError(`Erro ao carregar opções: ${err.message}. Tente recarregar a página.`);
+            console.error("Erro ao carregar dados iniciais do backend:", err);
+            setError(`Erro ao carregar opções: ${err.message}. Verifique se o seu backend está rodando e as rotas estão configuradas.`);
         } finally {
             setLoading(false);
         }
@@ -135,8 +123,8 @@ function CourseCreatePage() {
 
     // Efeito para carregar categorias e subcategorias na montagem do componente
     useEffect(() => {
-        fetchSanityData();
-    }, [fetchSanityData]);
+        fetchInitialDataFromBackend();
+    }, [fetchInitialDataFromBackend]);
 
     // Efeito para gerar o tópico de entrada para a IA baseado nas seleções do usuário
     useEffect(() => {
@@ -166,7 +154,7 @@ function CourseCreatePage() {
                 }
                 await handleGenerateAITags();
                 // Só avança se não houve erro na geração das tags
-                if (!error) {
+                if (!error) { // Verifica 'error' após a chamada assíncrona
                     setActiveStep((prevActiveStep) => prevActiveStep + 1);
                 }
                 break;
@@ -180,7 +168,7 @@ function CourseCreatePage() {
             case 2: // Gerar Conteúdo do Curso
                 await handleGenerateCourseContent();
                 // Só avança se a pré-visualização foi gerada com sucesso
-                if (!error && coursePreview) {
+                if (!error && coursePreview) { // Verifica 'coursePreview' para garantir que a geração foi bem-sucedida
                     setActiveStep((prevActiveStep) => prevActiveStep + 1);
                 }
                 break;
@@ -210,7 +198,7 @@ function CourseCreatePage() {
             setCoursePreview(null);
             setSuccessMessage({ text: null, courseId: null, courseTitle: null });
         } else if (activeStep === 3) { // Voltando de "Pré-visualização" para "Gerar Conteúdo"
-            setCoursePreview(null);
+            setCoursePreview(null); // Garante que a pré-visualização seja recarregada ou regenerada se necessário
             setSuccessMessage({ text: null, courseId: null, courseTitle: null });
         }
     };
@@ -228,10 +216,10 @@ function CourseCreatePage() {
         setSuccessMessage({ text: null, courseId: null, courseTitle: null });
         setAiSuggestedTags([]);
         setCustomTagInput('');
-        fetchSanityData(); // Recarrega os dados iniciais
+        fetchInitialDataFromBackend(); // Recarrega os dados iniciais do backend
     };
 
-    // --- Lógica de Geração de Tags pela IA ---
+    // --- Lógica de Geração de Tags pela IA (via Backend) ---
     const handleGenerateAITags = async () => {
         setLoading(true);
         setError(null);
@@ -271,24 +259,23 @@ function CourseCreatePage() {
             }
 
             const result = await response.json();
-            console.log('Tags sugeridas pela IA:', result);
+            console.log('Tags sugeridas pela IA (via backend):', result);
 
             if (result.suggestedTags && Array.isArray(result.suggestedTags) && result.suggestedTags.length > 0) {
-                // Normaliza todas as tags para lowercase e remove duplicatas
                 const uniqueNormalizedTags = Array.from(new Set(result.suggestedTags.map(tag => tag.trim().toLowerCase())));
                 setAiSuggestedTags(uniqueNormalizedTags);
             } else {
                 setError('A IA não conseguiu sugerir tags. Por favor, adicione tags manualmente no campo abaixo.');
             }
         } catch (err) {
-            console.error("Erro ao gerar tags da IA:", err);
+            console.error("Erro ao gerar tags da IA (via backend):", err);
             setError(`Erro ao gerar tags: ${err.message}.`);
         } finally {
             setLoading(false);
         }
     };
 
-    // --- Lógica de Geração da Pré-visualização do Curso pela IA ---
+    // --- Lógica de Geração da Pré-visualização do Curso pela IA (via Backend) ---
     const handleGenerateCourseContent = async () => {
         if (selectedTags.length === 0) {
             setError('Por favor, selecione ou adicione ao menos uma tag para gerar o conteúdo do curso.');
@@ -317,7 +304,7 @@ function CourseCreatePage() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${userToken}`,
                 },
-                body: JSON.HAVE_FUN({
+                body: JSON.stringify({
                     topic: generatedTopic,
                     category: selectedCategory,
                     subCategory: selectedSubCategory,
@@ -332,7 +319,7 @@ function CourseCreatePage() {
             }
 
             const result = await response.json();
-            console.log('Resposta completa da pré-visualização:', result);
+            console.log('Resposta completa da pré-visualização (via backend):', result);
 
             if (result.coursePreview) {
                 setCoursePreview(result.coursePreview);
@@ -342,7 +329,7 @@ function CourseCreatePage() {
                 throw new Error('A resposta da IA não contém a pré-visualização esperada (coursePreview).');
             }
         } catch (err) {
-            console.error("Erro ao gerar pré-visualização do curso:", err);
+            console.error("Erro ao gerar pré-visualização do curso (via backend):", err);
             if (err.message.includes('401')) {
                 setError('Não autorizado. Sua sessão pode ter expirado. Por favor, faça login novamente.');
             } else if (err.message.includes('403')) {
@@ -357,7 +344,7 @@ function CourseCreatePage() {
         }
     };
 
-    // --- Lógica de Salvamento do Curso no Sanity CMS ---
+    // --- Lógica de Salvamento do Curso no Sanity CMS (via Backend) ---
     const handleSaveGeneratedCourse = async () => {
         if (!coursePreview || !(coursePreview.slug || coursePreview.courseTitle || coursePreview.title)) {
             setError('Nenhum curso para salvar. Gere uma pré-visualização primeiro.');
@@ -382,27 +369,9 @@ function CourseCreatePage() {
         }
 
         try {
-            // Primeiro, vamos garantir que as tags existam no Sanity ou criá-las
-            // O backend deve lidar com a criação ou busca de tags. Aqui, apenas enviamos os nomes.
-            const tagsToSanity = await Promise.all(selectedTags.map(async (tagName) => {
-                // Tenta buscar a tag existente
-                const existingTag = await sanityClient.fetch(`*[_type == "tag" && title == $tagName][0]`, { tagName });
-                if (existingTag) {
-                    return { _ref: existingTag._id, _type: 'reference' };
-                } else {
-                    // Se não existe, cria a tag
-                    const newTag = await sanityClient.create({
-                        _type: 'tag',
-                        title: tagName,
-                        slug: {
-                            _type: 'slug',
-                            current: tagName.toLowerCase().replace(/\s+/g, '-')
-                        }
-                    });
-                    return { _ref: newTag._id, _type: 'reference' };
-                }
-            }));
-
+            // Removida a lógica de busca/criação de tags no frontend,
+            // isso deve ser responsabilidade do backend.
+            // O frontend envia apenas os nomes das tags.
 
             const response = await fetch(`${API_BASE_URL}/api/courses/save-generated`, {
                 method: 'POST',
@@ -421,7 +390,7 @@ function CourseCreatePage() {
                     category: selectedCategory,
                     subCategory: selectedSubCategory,
                     level: selectedLevel,
-                    tags: tagsToSanity, // Envia as referências de tags para o backend
+                    tags: selectedTags, // Envia os nomes das tags, backend cuidará da referência
                     creatorId: creatorId
                 }),
             });
@@ -432,7 +401,7 @@ function CourseCreatePage() {
             }
 
             const result = await response.json();
-            console.log('Curso salvo com sucesso no Sanity:', result);
+            console.log('Curso salvo com sucesso no Sanity (via backend):', result);
 
             setSuccessMessage({
                 text: 'Curso e lições salvos com sucesso no Sanity CMS! 🎉',
@@ -441,7 +410,7 @@ function CourseCreatePage() {
             });
 
         } catch (err) {
-            console.error("Erro ao salvar curso:", err);
+            console.error("Erro ao salvar curso (via backend):", err);
             setError(`Erro ao salvar curso: ${err.message}.`);
         } finally {
             setLoading(false);
