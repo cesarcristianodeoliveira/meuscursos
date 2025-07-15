@@ -586,9 +586,10 @@ const CourseCreatePage = () => {
 
                 {/* Botão "Gerar Pré-visualização do Curso" (Passo 1 -> 2) */}
                 {activeStep === 1 && (
+                    // handleNext chamará handleGenerateCourseContent
                     <Button
                         variant="contained"
-                        onClick={handleNext} {/* handleNext chamará handleGenerateCourseContent */}
+                        onClick={handleNext}
                         // Desabilita se estiver carregando preview OU se nenhuma tag foi selecionada
                         disabled={isLoading || selectedTags.length === 0}
                     >
