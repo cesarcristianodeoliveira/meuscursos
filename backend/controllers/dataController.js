@@ -1,32 +1,38 @@
 // D:\meuscursos\backend\controllers\dataController.js
 import { createClient } from '@sanity/client';
+import dotenv from 'dotenv'; // Importar dotenv aqui também por segurança
+dotenv.config();
 
-// Replicar a configuração do Sanity Client aqui ou importá-la de um arquivo de configuração central
-// Idealmente, você teria um './config/sanity.js' exportando o client
+// --- Configuração do Sanity Client para LEITURA ---
+// NOTA: Para escritas, useCdn deve ser 'false'.
+// Aqui, para buscar dados, 'true' é geralmente melhor para performance.
 if (!process.env.SANITY_PROJECT_ID || !process.env.SANITY_TOKEN) {
     console.error("Erro: Variáveis de ambiente SANITY_PROJECT_ID ou SANITY_TOKEN não definidas em dataController.");
-    // Em produção, você pode querer lançar um erro ou ter um fallback
+    // Em um ambiente de produção real, você pode querer lançar um erro fatal aqui
+    // throw new Error("SANITY_PROJECT_ID or SANITY_TOKEN not defined.");
 }
 
-// O apiVersion pode ser '2021-03-25' para a maioria dos projetos existentes,
-// '2023-08-01' para funcionalidades mais recentes, ou a data atual se for um projeto novo.
-// Usar uma data futura como 2025-06-12 é ok, mas geralmente usamos a data de lançamento da API que queremos fixar.
 const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN) ? createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET || 'production',
-    apiVersion: '2025-06-12', // Mantendo sua versão, apenas uma nota.
-    useCdn: false, // Use false para writes/updates
-    token: process.env.SANITY_TOKEN,
+    apiVersion: '2025-06-12', // Mantendo sua versão
+    useCdn: true, // Usar CDN para leituras (melhora performance)
+    token: process.env.SANITY_TOKEN, // Token para acesso a rascunhos ou dados privados, se necessário
 }) : null;
 
-// Função para buscar todas as categorias de cursos
+// --- Funções do Controlador de Dados ---
+
+/**
+ * @function getCourseCategories
+ * @description Retorna todas as categorias de cursos do Sanity CMS.
+ * @route GET /api/data/categories
+ * @access Public
+ */
 export const getCourseCategories = async (req, res) => {
     if (!sanityClient) {
         return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
     }
     try {
-        // Query Sanity para buscar todos os documentos do tipo 'courseCategory'
-        // Adicionada ordenação alfabética pelo título
         const query = `*[_type == "courseCategory"] | order(title asc) {_id, title, description}`;
         const categories = await sanityClient.fetch(query);
         res.status(200).json(categories);
@@ -36,15 +42,17 @@ export const getCourseCategories = async (req, res) => {
     }
 };
 
-// Função para buscar todas as subcategorias de cursos
+/**
+ * @function getCourseSubCategories
+ * @description Retorna todas as subcategorias de cursos do Sanity CMS, com referência à categoria pai.
+ * @route GET /api/data/subcategories
+ * @access Public
+ */
 export const getCourseSubCategories = async (req, res) => {
     if (!sanityClient) {
         return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
     }
     try {
-        // Query Sanity para buscar todos os documentos do tipo 'courseSubCategory'
-        // CORREÇÃO: Usando 'parentCategory._ref' para acessar a referência da categoria pai
-        // Adicionada ordenação alfabética pelo título
         const query = `*[_type == "courseSubCategory"] | order(title asc) {_id, title, description, "categoryRef": parentCategory._ref}`;
         const subCategories = await sanityClient.fetch(query);
         res.status(200).json(subCategories);
@@ -55,9 +63,11 @@ export const getCourseSubCategories = async (req, res) => {
 };
 
 /**
- * @desc Busca tags de curso por ID de categoria associada.
+ * @function getCourseTagsByCategory
+ * @description Busca tags existentes do Sanity CMS associadas a uma categoria específica.
  * @route GET /api/data/tags/byCategory/:categoryId
- * @access Public (para listar opções no frontend)
+ * @access Public
+ * @returns {Array<string>} Retorna um array de strings com os nomes das tags.
  */
 export const getCourseTagsByCategory = async (req, res) => {
     if (!sanityClient) {
@@ -67,26 +77,24 @@ export const getCourseTagsByCategory = async (req, res) => {
         const { categoryId } = req.params;
 
         if (!categoryId) {
-            return res.status(400).json({ message: 'Category ID is required.' });
+            return res.status(400).json({ message: 'Category ID é obrigatório para buscar tags.' });
         }
 
         // Busca todas as tags que têm uma referência ao categoryId no array 'categories'
         // 'categories' é o campo array de referências no seu schema courseTag
-        // Adicionada ordenação alfabética pelo nome
         const tags = await sanityClient.fetch(
             `*[_type == "courseTag" && $categoryId in categories[]._ref] | order(name asc) {
-                _id,
-                name,
-                slug,
-                description
+                name // Apenas o nome da tag
             }`,
             { categoryId }
         );
 
-        res.status(200).json(tags);
+        // Mapeia o resultado para retornar apenas um array de strings (nomes das tags)
+        const tagNames = tags.map(tag => tag.name);
 
+        res.status(200).json(tagNames); // Retorna array de strings
     } catch (error) {
         console.error('Erro ao buscar tags por categoria:', error);
-        res.status(500).json({ message: 'Erro interno do servidor ao buscar tags.', error: error.message });
+        res.status(500).json({ message: 'Erro interno do servidor ao buscar tags por categoria.', error: error.message });
     }
 };
