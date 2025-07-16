@@ -16,7 +16,7 @@ const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN)
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET || 'production',
     apiVersion: '2025-06-12', // Mantendo sua versão
-    useCdn: true, // Usar CDN para leituras (melhora performance)
+    useCdn: false, // Usar CDN para leituras (melhora performance)
     token: process.env.SANITY_TOKEN, // Token para acesso a rascunhos ou dados privados, se necessário
 }) : null;
 
