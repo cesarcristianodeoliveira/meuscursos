@@ -6,8 +6,6 @@ dotenv.config();
 // --- Configuração do Sanity Client para LEITURA ---
 if (!process.env.SANITY_PROJECT_ID || !process.env.SANITY_TOKEN) {
     console.error("Erro: Variáveis de ambiente SANITY_PROJECT_ID ou SANITY_TOKEN não definidas em dataController.");
-    // Em um ambiente de produção real, você pode querer lançar um erro fatal aqui
-    // throw new Error("SANITY_PROJECT_ID or SANITY_TOKEN not defined.");
 }
 
 const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN) ? createClient({
@@ -15,8 +13,6 @@ const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN)
     dataset: process.env.SANITY_DATASET || 'production',
     apiVersion: '2025-06-12', // Mantendo sua versão
     useCdn: false, // Usar CDN para leituras (melhora performance), embora para escritas deva ser 'false'.
-    // Para leituras de dados que podem ser sensíveis ou rascunhos, 'token' é necessário.
-    // Se você só busca dados públicos, talvez não precise do token aqui, mas é mais seguro ter.
     token: process.env.SANITY_TOKEN, 
 }) : null;
 
@@ -96,11 +92,7 @@ export const getCourseTagsByCategory = async (req, res) => {
     }
 };
 
----
-
-### **NOVA FUNÇÃO:** `getAllTags`
-
-```javascript
+// --- NOVA FUNÇÃO: getAllTags --- // <-- Apenas um comentário válido
 /**
  * @function getAllTags
  * @description Retorna TODAS as tags de cursos do Sanity CMS.
@@ -114,10 +106,10 @@ export const getAllTags = async (req, res) => {
     }
     try {
         // Query GROQ para buscar todos os documentos do tipo 'courseTag'
-        // Ordena por 'title' (ou 'name') e retorna o _id e o campo do nome da tag
-        const query = `*[_type == "courseTag"] | order(title asc) {
+        // Ordena por 'name' (já que seu schema usa 'name') e retorna o _id e o campo 'name'
+        const query = `*[_type == "courseTag"] | order(name asc) {
             _id, 
-            title // Assumindo que o campo da tag é 'title'. Se for 'name', mude para 'name'
+            name // Usando 'name' de acordo com seu schema courseTag.js
         }`;
         const tags = await sanityClient.fetch(query);
         
@@ -127,3 +119,6 @@ export const getAllTags = async (req, res) => {
         res.status(500).json({ error: 'Erro ao buscar todas as tags de cursos.', details: error.message });
     }
 };
+
+// Se você tiver uma linha de exportação única no final, ela deve incluir getAllTags:
+// export { getCourseCategories, getCourseSubCategories, getCourseTagsByCategory, getAllTags };
