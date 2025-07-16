@@ -64,6 +64,8 @@ export const getCourseSubCategories = async (req, res) => {
  * @route GET /api/data/tags/byCategory/:categoryId
  * @access Public
  * @returns {Array<string>} Retorna um array de strings com os nomes das tags.
+ * * NOTA: Esta função pode ser removida ou adaptada se getAllTags lidar com o filtro.
+ * Por enquanto, mantive para compatibilidade ou caso haja um uso específico.
  */
 export const getCourseTagsByCategory = async (req, res) => {
     if (!sanityClient) {
@@ -92,33 +94,50 @@ export const getCourseTagsByCategory = async (req, res) => {
     }
 };
 
-// --- NOVA FUNÇÃO: getAllTags --- // <-- Apenas um comentário válido
+// --- FUNÇÃO MODIFICADA: getAllTags agora pode filtrar por categoria ---
 /**
  * @function getAllTags
- * @description Retorna TODAS as tags de cursos do Sanity CMS.
+ * @description Retorna TODAS as tags de cursos do Sanity CMS, opcionalmente filtradas por categoria.
  * @route GET /api/data/tags
  * @access Public
- * @returns {Array<Object>} Retorna um array de objetos de tags (ex: {_id: '...', title: '...'}).
+ * @param {string} [req.query.categoryId] - Opcional. ID da categoria para filtrar as tags.
+ * @returns {Array<Object>} Retorna um array de objetos de tags (ex: {_id: '...', name: '...'}).
  */
 export const getAllTags = async (req, res) => {
     if (!sanityClient) {
         return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
     }
     try {
-        // Query GROQ para buscar todos os documentos do tipo 'courseTag'
-        // Ordena por 'name' (já que seu schema usa 'name') e retorna o _id e o campo 'name'
-        const query = `*[_type == "courseTag"] | order(name asc) {
-            _id, 
-            name // Usando 'name' de acordo com seu schema courseTag.js
-        }`;
-        const tags = await sanityClient.fetch(query);
+        const { categoryId } = req.query; // Captura o categoryId da query string
+
+        let query;
+        let params = {};
+
+        if (categoryId) {
+            // Se categoryId é fornecido, filtra as tags que contêm essa categoria na lista de referências
+            query = `*[_type == "courseTag" && $categoryId in categories[]._ref] | order(name asc) {
+                _id, 
+                name 
+            }`;
+            params = { categoryId };
+            console.log(`[BACKEND - getAllTags] Buscando tags para a categoria: ${categoryId}`);
+        } else {
+            // Se categoryId não é fornecido, busca todas as tags
+            query = `*[_type == "courseTag"] | order(name asc) {
+                _id, 
+                name 
+            }`;
+            console.log("[BACKEND - getAllTags] Buscando todas as tags.");
+        }
+
+        const tags = await sanityClient.fetch(query, params);
         
         res.status(200).json(tags);
     } catch (error) {
-        console.error("Erro ao buscar todas as tags do Sanity:", error);
-        res.status(500).json({ error: 'Erro ao buscar todas as tags de cursos.', details: error.message });
+        console.error("Erro ao buscar tags do Sanity (getAllTags):", error);
+        res.status(500).json({ error: 'Erro ao buscar tags de cursos.', details: error.message });
     }
 };
 
-// Se você tiver uma linha de exportação única no final, ela deve incluir getAllTags:
+// Se você tiver uma linha de exportação única no final, ela deve incluir todas:
 // export { getCourseCategories, getCourseSubCategories, getCourseTagsByCategory, getAllTags };
