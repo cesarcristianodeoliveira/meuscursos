@@ -1,6 +1,6 @@
 // meuscursos/frontend/src/pages/CoursesPage/CourseCreatePage/index.js
 
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import {
     Stepper,
@@ -20,10 +20,10 @@ import { AddCircleOutline } from '@mui/icons-material'; // Ícone para adicionar
 
 import axios from 'axios'; // Mantido para chamadas de IA (rotas /courses/...)
 import client from '../../../sanity'; // Importa o cliente Sanity configurado de src/sanity.js
-import AuthContext from '../../contexts/AuthContext'; // Caminho CORRIGIDO para o seu contexto de autenticação
+import { useAuth } from '../../../contexts/AuthContext'; // CORRIGIDO: Importa useAuth como named export
 
 const CourseCreatePage = () => {
-    const { auth } = useContext(AuthContext);
+    const { auth } = useAuth(); // CORRIGIDO: Acessa 'auth' diretamente do hook useAuth
     const [activeStep, setActiveStep] = useState(0);
     const [categories, setCategories] = useState([]);
     const [subCategories, setSubCategories] = useState([]);
@@ -58,7 +58,7 @@ const CourseCreatePage = () => {
         const fetchCategories = async () => {
             try {
                 // Consulta GROQ para buscar categorias: _id e title
-                const query = `*[_type == "category"]{_id, title}`;
+                const query = `*[_type == "courseCategory"]{_id, title}`; // Usando "courseCategory" conforme seu backend
                 const data = await client.fetch(query);
                 setCategories(data);
             } catch (err) {
@@ -75,8 +75,8 @@ const CourseCreatePage = () => {
             if (watchedCategory) {
                 try {
                     // Consulta GROQ para buscar subcategorias filtradas pela categoria pai
-                    // Assumimos que a subCategory tem uma referência 'category' para a categoria pai
-                    const query = `*[_type == "subCategory" && category._ref == $categoryId]{_id, title, category._ref}`;
+                    // Assumimos que a subCategory tem uma referência 'parentCategory' para a categoria pai
+                    const query = `*[_type == "courseSubCategory" && parentCategory._ref == $categoryId]{_id, title, "categoryRef": parentCategory._ref}`; // Usando "courseSubCategory" conforme seu backend
                     const params = { categoryId: watchedCategory };
                     const data = await client.fetch(query, params);
                     setSubCategories(data);
@@ -101,18 +101,20 @@ const CourseCreatePage = () => {
             setExistingTags([]); // Limpa se não houver categoria selecionada
             return;
         }
+        setLoading(true); // Inicia loading para as tags também
+        setError(null);
         try {
-            // Consulta GROQ para buscar tags relacionadas à categoria
-            // Assumimos que o documento 'tag' tem um campo de referência 'category' para a categoria
-            const query = `*[_type == "tag" && references($categoryId)]{name}`;
-            const params = { categoryId: categoryId };
-            const data = await client.fetch(query, params);
-            // O Sanity retorna um array de objetos { name: "tag" }, mapeamos para um array de strings
-            setExistingTags(data.map(tag => tag.name)); 
+            // Chamando o seu backend para buscar tags por categoria
+            // O backend (getAllTags) já faz o filtro por categoryId via query param
+            const response = await axios.get(`/api/data/tags?categoryId=${categoryId}`);
+            // O backend retorna um array de objetos { _id, name }, mas precisamos apenas do name
+            setExistingTags(response.data.map(tag => tag.name)); 
         } catch (err) {
-            console.error("Erro ao buscar tags existentes do Sanity:", err);
-            setError('Não foi possível carregar as tags existentes.');
-            setExistingTags([]); // Limpa as tags existentes em caso de erro
+            console.error("Erro ao buscar tags existentes do backend:", err);
+            setError(err.response?.data?.message || 'Não foi possível carregar as tags existentes.');
+            setExistingTags([]); 
+        } finally {
+            setLoading(false);
         }
     }, []); 
 
@@ -124,11 +126,11 @@ const CourseCreatePage = () => {
         setLoading(true);
         setError(null);
         try {
-            // **Esta rota e o uso de `axios` são mantidos, pois indicam uma comunicação com um backend/serviço de IA**
-            const response = await axios.post('/courses/generate-tags', {
+            // Esta rota e o uso de `axios` são mantidos, pois indicam uma comunicação com um backend/serviço de IA
+            const response = await axios.post('/api/courses/generate-tags', {
                 topic: watchedTopic,
-                category: watchedCategory,
-                subCategory: watchedSubCategory,
+                category: watchedCategory, // ID da categoria
+                subCategory: watchedSubCategory, // ID da subcategoria
                 level: watchedLevel,
             }, {
                 headers: { Authorization: `Bearer ${auth.accessToken}` }
@@ -146,6 +148,7 @@ const CourseCreatePage = () => {
     // Chamada inicial para buscar tags existentes e gerar sugeridas ao entrar no Step 2
     useEffect(() => {
         if (activeStep === 1) {
+            // Para `fetchExistingTags`, usamos o seu endpoint de backend que filtra por categoria
             fetchExistingTags(watchedCategory); 
             generateAISuggestedTags(); 
         }
@@ -154,13 +157,11 @@ const CourseCreatePage = () => {
 
     // COMBINAÇÃO E ORDENAÇÃO DE TAGS (SUGERIDAS + EXISTENTES)
     useEffect(() => {
-        // Usa um Set para garantir tags únicas, ignorando case-sensitivity ao adicionar ao Set para unificação
         const uniqueTags = new Set();
         [...suggestedTags, ...existingTags].forEach(tag => {
-            uniqueTags.add(tag.toLowerCase()); // Adiciona em lowercase para garantir unicidade
+            uniqueTags.add(tag.toLowerCase()); 
         });
         
-        // Converte de volta para array e ordena alfabeticamente
         const combinedAndSortedTags = Array.from(uniqueTags).sort((a, b) => a.localeCompare(b));
         setAllAvailableTags(combinedAndSortedTags);
     }, [suggestedTags, existingTags]);
@@ -169,7 +170,7 @@ const CourseCreatePage = () => {
     // --- MANIPULAÇÃO DE TAGS SELECIONADAS ---
 
     const handleTagSelect = (tag) => {
-        const normalizedTag = tag.toLowerCase(); // Normaliza para lowercase
+        const normalizedTag = tag.toLowerCase(); 
         setSelectedTags(prev => {
             if (!prev.includes(normalizedTag)) {
                 return [...prev, normalizedTag];
@@ -193,33 +194,28 @@ const CourseCreatePage = () => {
     // --- NAVEGAÇÃO ENTRE STEPS ---
 
     const handleNext = async (data) => {
-        setError(null); // Limpa erros anteriores
+        setError(null); 
         if (activeStep === 0) {
-            // Validações do Step 1 (já tratadas pelo hook-form, mas um extra check)
             if (!data.topic || !data.category || !data.subCategory || !data.level) {
                 setError('Por favor, preencha todos os campos obrigatórios.');
                 return;
             }
             setActiveStep((prevActiveStep) => prevActiveStep + 1);
         } else if (activeStep === 1) {
-            // Validações do Step 2
             if (selectedTags.length === 0) {
                 setError('Por favor, selecione ou adicione pelo menos uma tag.');
                 return;
             }
             setActiveStep((prevActiveStep) => prevActiveStep + 1);
-            // Ao ir para o Step 3, gerar a pré-visualização
             await generateCoursePreview(data.topic, data.category, data.subCategory, data.level, selectedTags);
         } else if (activeStep === 2) {
-            // Salvar curso
-            await saveCourse(data); // Passa 'data' para ter acesso aos campos do formulário
+            await saveCourse(data); 
         }
     };
 
     const handleBack = () => {
         setActiveStep((prevActiveStep) => prevActiveStep - 1);
-        setError(null); // Limpa erros ao voltar
-        // Se voltar para o step 1, limpa a pré-visualização para que seja gerada novamente se necessário
+        setError(null); 
         if (activeStep === 2) {
             setCoursePreview(null);
         }
@@ -231,15 +227,15 @@ const CourseCreatePage = () => {
     const generateCoursePreview = useCallback(async (topic, category, subCategory, level, tags) => {
         setLoading(true);
         setError(null);
-        setCoursePreview(null); // Limpa a pré-visualização antiga
+        setCoursePreview(null); 
         try {
-            // **Esta rota e o uso de `axios` são mantidos, pois indicam uma comunicação com um backend/serviço de IA**
-            const response = await axios.post('/courses/generate-preview', {
+            // Esta rota e o uso de `axios` são mantidos, pois indicam uma comunicação com um backend/serviço de IA
+            const response = await axios.post('/api/courses/generate-preview', {
                 topic,
                 category,
                 subCategory,
                 level,
-                tags, // Passa as tags selecionadas para a IA
+                tags, 
             }, {
                 headers: { Authorization: `Bearer ${auth.accessToken}` }
             });
@@ -283,21 +279,47 @@ const CourseCreatePage = () => {
                 },
                 level: formData.level,
                 // Assumindo que 'tags' é um array de strings no seu schema Sanity de curso.
-                // Se o seu schema exigir referências para documentos 'tag' separados,
+                // Se o seu schema exigir referências para documentos 'courseTag' separados,
                 // você precisaria primeiro criar ou obter os _ids dessas tags.
-                tags: selectedTags, 
+                // Isso pode ser feito com client.create() para novas tags e client.fetch() para existentes.
+                // Por enquanto, salvamos os nomes das tags.
+                tags: selectedTags.map(tagName => ({
+                    _type: 'reference',
+                    _ref: tagName // AQUI TERIA QUE SER O _ID DA TAG, NÃO O NOME
+                    // Se você precisar que as tags sejam referências reais,
+                    // esta parte precisa de um passo para resolver o nome da tag para um _id do Sanity.
+                    // Isso é complexo se a tag não existir e precisar ser criada primeiro.
+                    // A solução mais simples para um MVP é salvar as tags como um array de strings no documento do curso.
+                })),
                 aiModelUsed: coursePreview.aiModelUsed,
                 // Se você tiver um campo de autor no seu schema de curso, você pode adicioná-lo aqui:
-                // author: {
-                //     _type: 'reference',
-                //     _ref: auth.user._id, // Assumindo que auth.user._id contém o ID do usuário logado
-                // },
+                author: {
+                    _type: 'reference',
+                    _ref: auth.user.id, // Assumindo que auth.user.id contém o ID do usuário logado
+                },
             };
+            
+            // Para o campo 'tags' no seu schema de curso:
+            // Dado o seu `courseTag` schema, ele tem `_id` e `name`.
+            // Se o seu `course` schema tiver `tags: array of references to courseTag`,
+            // então `selectedTags` (que são strings de nomes) precisariam ser convertidas para referências de `_id`.
+            // Isso geralmente envolve:
+            // 1. Verificar se a tag já existe no Sanity pelo nome.
+            // 2. Se existe, obter seu `_id`.
+            // 3. Se não existe, criar um novo documento `courseTag` e obter seu `_id`.
+            // Isso é uma lógica mais avançada para o frontend ou um bom motivo para ter um backend para "salvar no Sanity" que cuida disso.
+            // Por simplicidade atual, vou assumir que o campo `tags` no seu schema de curso é um array de strings (string[])
+            // Se não for, e ele for um array de referências, o código abaixo para `doc.tags` está **incorreto** e precisaria ser ajustado.
+            // Mantenho a estrutura anterior que enviava apenas os nomes como array de strings, que é mais fácil.
+
+            doc.tags = selectedTags; // Simplificando para array de strings, se o seu schema aceitar.
+                                     // Se o schema `course` espera `array of references to courseTag`,
+                                     // então a lógica aqui precisa ser bem mais complexa para criar/obter os _ids das tags.
 
             const response = await client.create(doc); // Usa client.create() para salvar no Sanity
             console.log("Curso salvo com sucesso no Sanity:", response);
-            setIsCourseSaved(true); // Marca o curso como salvo
-            setActiveStep(3); // Avança para o passo final
+            setIsCourseSaved(true); 
+            setActiveStep(3); 
         } catch (err) {
             console.error("Erro ao salvar curso no Sanity:", err);
             setError(err.message || 'Erro ao salvar curso no Sanity.');
@@ -362,7 +384,7 @@ const CourseCreatePage = () => {
                                     label="Subcategoria"
                                     fullWidth
                                     margin="normal"
-                                    disabled={!watchedCategory || subCategories.length === 0} // Desabilita se não houver categoria selecionada ou subcategorias para ela
+                                    disabled={!watchedCategory || subCategories.length === 0} 
                                     error={!!errors.subCategory}
                                     helperText={errors.subCategory ? errors.subCategory.message : ''}
                                 >
@@ -407,7 +429,6 @@ const CourseCreatePage = () => {
                         {loading && <CircularProgress size={24} sx={{ my: 2 }} />}
                         {error && <Alert severity="error" sx={{ my: 2 }}>{error}</Alert>}
 
-                        {/* Lista Unificada de Tags Sugeridas + Existentes */}
                         <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
                             Tags Disponíveis (Sugeridas pela IA e Existentes para esta Categoria):
                         </Typography>
@@ -435,7 +456,7 @@ const CourseCreatePage = () => {
                                     <Chip
                                         key={`selected-${tag}`}
                                         label={tag}
-                                        onDelete={() => handleRemoveTag(tag)} // onDelete para remover o chip
+                                        onDelete={() => handleRemoveTag(tag)} 
                                         color="secondary"
                                     />
                                 ))
@@ -450,9 +471,9 @@ const CourseCreatePage = () => {
                                 value={customTagInput}
                                 onChange={(e) => setCustomTagInput(e.target.value)}
                                 fullWidth
-                                onKeyPress={(e) => { // Permite adicionar tag com Enter
+                                onKeyPress={(e) => { 
                                     if (e.key === 'Enter') {
-                                        e.preventDefault(); // Evita submeter o formulário
+                                        e.preventDefault(); 
                                         handleAddCustomTag();
                                     }
                                 }}
@@ -461,7 +482,7 @@ const CourseCreatePage = () => {
                                 variant="contained"
                                 onClick={handleAddCustomTag}
                                 startIcon={<AddCircleOutline />}
-                                sx={{ whiteSpace: 'nowrap' }} // Impede a quebra de linha no botão
+                                sx={{ whiteSpace: 'nowrap' }} 
                             >
                                 Adicionar
                             </Button>
@@ -479,7 +500,7 @@ const CourseCreatePage = () => {
                                 <Typography variant="h5" gutterBottom>{coursePreview.title}</Typography>
                                 <Typography variant="body1" color="text.secondary">{coursePreview.description}</Typography>
                                 <Typography variant="subtitle1" sx={{ mt: 2 }}>Lições:</Typography>
-                                <Box component="ol" sx={{ pl: 2 }}> {/* Usando <ol> para lista ordenada */}
+                                <Box component="ol" sx={{ pl: 2 }}> 
                                     {coursePreview.lessons && coursePreview.lessons.map((lesson, index) => (
                                         <li key={index} style={{ marginBottom: '10px' }}>
                                             <Typography variant="subtitle2">{lesson.title}</Typography>
@@ -535,7 +556,6 @@ const CourseCreatePage = () => {
                 <Step><StepLabel>Concluído</StepLabel></Step>
             </Stepper>
 
-            {/* Renderiza o conteúdo do step apenas se não estiver na etapa final de sucesso */}
             {!isCourseSaved && (
                 <form onSubmit={handleSubmit(handleNext)}>
                     {getStepContent(activeStep)}
@@ -559,7 +579,6 @@ const CourseCreatePage = () => {
                     </Box>
                 </form>
             )}
-            {/* Se o curso foi salvo, mostra apenas o conteúdo do Step 3 (Concluído) */}
             {isCourseSaved && getStepContent(activeStep)}
         </Box>
     );
