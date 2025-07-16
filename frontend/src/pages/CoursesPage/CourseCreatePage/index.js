@@ -20,7 +20,7 @@ import { AddCircleOutline } from '@mui/icons-material'; // Ícone para adicionar
 
 import axios from 'axios'; // Mantido para chamadas de IA (rotas /courses/...)
 import client from '../../../sanity'; // Importa o cliente Sanity configurado de src/sanity.js
-import { useAuth } from '../../../contexts/AuthContext'; // CORRIGIDO: Importa useAuth como named export
+import { useAuth } from '../../../contexts/AuthContext'; // Importa useAuth como named export
 
 const CourseCreatePage = () => {
     const { auth } = useAuth(); // Acessa 'auth' diretamente do hook useAuth
@@ -39,7 +39,7 @@ const CourseCreatePage = () => {
 
     const { handleSubmit, control, watch, setValue, formState: { errors } } = useForm({
         defaultValues: {
-            topic: '',
+            topic: '', // Tópico do curso está de volta aqui!
             category: '',
             subCategory: '',
             level: 'iniciante', // Default para iniciante
@@ -47,7 +47,7 @@ const CourseCreatePage = () => {
     });
 
     const watchedCategory = watch('category');
-    const watchedTopic = watch('topic');
+    const watchedTopic = watch('topic'); // O tópico assistido para as chamadas de IA
     const watchedSubCategory = watch('subCategory');
     const watchedLevel = watch('level');
 
@@ -209,7 +209,6 @@ const CourseCreatePage = () => {
                 return;
             }
             setActiveStep((prevActiveStep) => prevActiveStep + 1);
-            // Ao ir para o Step 3, gerar a pré-visualização
             await generateCoursePreview(data.topic, data.category, data.subCategory, data.level, selectedTags);
         } else if (activeStep === 2) {
             await saveCourse(data); 
