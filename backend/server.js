@@ -11,8 +11,8 @@ import { register, login } from './controllers/authController.js';
 // --- MUDANÇA IMPORTANTE AQUI ---
 // Importa as funções de pré-visualização, salvamento do curso E AGORA A NOVA generateTags
 import { generateCoursePreview, saveGeneratedCourse, generateTags } from './controllers/courseController.js'; 
-// Importa TODAS as funções do dataController, incluindo a nova getCourseTagsByCategory
-import { getCourseCategories, getCourseSubCategories, getCourseTagsByCategory } from './controllers/dataController.js';
+// Importa TODAS as funções do dataController, incluindo a nova getCourseTagsByCategory E A NOVA getAllTags
+import { getCourseCategories, getCourseSubCategories, getCourseTagsByCategory, getAllTags } from './controllers/dataController.js'; // ALTERAÇÃO: Adicionado getAllTags
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -59,12 +59,12 @@ app.post('/api/courses/generate-preview', protect, generateCoursePreview);
 // Rota para SALVAR o Curso GERADO (protegida)
 app.post('/api/courses/save-generated', protect, saveGeneratedCourse);
 // NOVA Rota para GERAR TAGS com IA (protegida)
-app.post('/api/courses/generate-tags', protect, generateTags); // <--- Adicionada esta linha
+app.post('/api/courses/generate-tags', protect, generateTags); 
 
 // --- ROTAS PARA BUSCA DE DADOS ---
 app.get('/api/data/categories', getCourseCategories);
 app.get('/api/data/subcategories', getCourseSubCategories);
-// Rota para buscar tags por categoria
+app.get('/api/data/tags', getAllTags); // NOVA Rota: Para buscar TODAS as tags do Sanity
 app.get('/api/data/tags/byCategory/:categoryId', getCourseTagsByCategory);
 
 // --- Inicia o Servidor ---
@@ -77,8 +77,9 @@ app.listen(PORT, () => {
     console.log(`POST /api/auth/login`);
     console.log(`POST /api/courses/generate-preview (protegida)`); 
     console.log(`POST /api/courses/save-generated (protegida)`); 
-    console.log(`POST /api/courses/generate-tags (protegida)`); // <--- Adicionada esta linha
+    console.log(`POST /api/courses/generate-tags (protegida)`); 
     console.log(`GET /api/data/categories`); 
     console.log(`GET /api/data/subcategories`);
+    console.log(`GET /api/data/tags`); // ALTERAÇÃO: Adicionada esta linha para documentação
     console.log(`GET /api/data/tags/byCategory/:categoryId`);
 });

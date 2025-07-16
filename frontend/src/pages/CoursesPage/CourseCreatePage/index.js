@@ -46,6 +46,8 @@ function CourseCreatePage() {
     // Estados para os dados carregados do Backend
     const [fetchedCategories, setFetchedCategories] = useState([]);
     const [fetchedSubCategories, setFetchedSubCategories] = useState([]);
+    // NOVO: Estado para tags do Sanity
+    const [sanityTags, setSanityTags] = useState([]);
 
     // Níveis de curso disponíveis, memoizado para performance
     const levels = useMemo(() => [
@@ -59,6 +61,7 @@ function CourseCreatePage() {
 
     // MODIFICAÇÕES PARA TAGS VIA IA
     const [aiSuggestedTags, setAiSuggestedTags] = useState([]);
+    // MANUTENÇÃO: customTagInput para uso do admin
     const [customTagInput, setCustomTagInput] = useState('');
 
     // Estados para feedback da UI
@@ -68,6 +71,8 @@ function CourseCreatePage() {
 
     // Obtém o token do usuário e o objeto 'user' do contexto de autenticação
     const { userToken, user } = useAuth();
+    // NOVO: Verifica se o usuário é admin
+    const isAdmin = user?.isAdmin || false;
     const navigate = useNavigate();
 
     // Definição dos passos do Stepper
@@ -95,6 +100,29 @@ function CourseCreatePage() {
     ], []);
 
     // --- Funções de Busca de Dados do Backend ---
+
+    // NOVO: Função para buscar tags existentes no Sanity
+    const fetchSanityTags = useCallback(async () => {
+        // Sem loading/error global aqui, pois fetchInitialDataFromBackend já faz isso
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/data/tags`); // ESTE ENDPOINT É NECESSÁRIO NO BACKEND
+            if (!response.ok) {
+                const errorText = await response.text();
+                // Não setar erro global aqui para não sobrescrever erros de categoria/subcategoria
+                console.error(`Falha ao buscar tags do Sanity: ${response.status} - ${errorText}`);
+                return; // Apenas sai da função
+            }
+            const data = await response.json();
+            // Mapeie para obter apenas os nomes das tags, normalizando para minúsculas
+            const tagNames = data.map(tag => tag.name || tag.title || tag);
+            const uniqueNormalizedTags = Array.from(new Set(tagNames.map(tag => tag.trim().toLowerCase())));
+            setSanityTags(uniqueNormalizedTags);
+        } catch (err) {
+            console.error("Erro ao carregar tags do Sanity:", err);
+            // Não setar erro global
+        }
+    }, []);
+
     const fetchInitialDataFromBackend = useCallback(async () => {
         setError(null);
         setLoading(true);
@@ -123,10 +151,11 @@ function CourseCreatePage() {
         }
     }, []);
 
-    // Efeito para carregar categorias e subcategorias na montagem do componente
+    // Efeito para carregar categorias, subcategorias E tags do Sanity na montagem do componente
     useEffect(() => {
         fetchInitialDataFromBackend();
-    }, [fetchInitialDataFromBackend]);
+        fetchSanityTags(); // CHAMA A FUNÇÃO DE BUSCA DE TAGS DO SANITY
+    }, [fetchInitialDataFromBackend, fetchSanityTags]);
 
     // Efeito para gerar o tópico de entrada para a IA baseado nas seleções do usuário
     useEffect(() => {
@@ -154,6 +183,7 @@ function CourseCreatePage() {
                     return;
                 }
                 await handleGenerateAITags();
+                // Verifica se o erro foi setado por handleGenerateAITags
                 if (!error) {
                     setActiveStep((prevActiveStep) => prevActiveStep + 1);
                 }
@@ -198,6 +228,7 @@ function CourseCreatePage() {
         if (activeStep === 1) {
             setAiSuggestedTags([]);
             setSelectedTags([]);
+            // Reinicia o input manual do admin ao voltar
             setCustomTagInput('');
         } else if (activeStep === 2) {
             setCoursePreview(null);
@@ -222,6 +253,7 @@ function CourseCreatePage() {
         setAiSuggestedTags([]);
         setCustomTagInput('');
         fetchInitialDataFromBackend();
+        fetchSanityTags(); // Reseta também as tags do Sanity
     };
 
     // --- Lógica de Geração de Tags pela IA (via Backend) ---
@@ -229,7 +261,7 @@ function CourseCreatePage() {
         setLoading(true);
         setError(null);
         setAiSuggestedTags([]);
-        setSelectedTags([]);
+        // Não reseta selectedTags aqui, pois o usuário pode ter tags já selecionadas do Sanity.
 
         if (!userToken) {
             setError('Você não está autenticado. Por favor, faça login novamente.');
@@ -271,14 +303,15 @@ function CourseCreatePage() {
                 const filteredAiTags = result.suggestedTags.filter(tag =>
                     !PROHIBITED_TAGS.some(prohibited => tag.toLowerCase().includes(prohibited))
                 );
-                const uniqueNormalizedTags = Array.from(new Set(filteredAiTags.map(tag => tag.trim().toLowerCase())));
-                setAiSuggestedTags(uniqueNormalizedTags);
+                // Normaliza e remove duplicatas
+                const uniqueNormalizedAiTags = Array.from(new Set(filteredAiTags.map(tag => tag.trim().toLowerCase())));
+                setAiSuggestedTags(uniqueNormalizedAiTags);
 
                 if (filteredAiTags.length === 0 && result.suggestedTags.length > 0) {
-                     setError('A IA sugeriu tags, mas todas foram filtradas por conterem termos proibidos. Por favor, adicione tags manualmente no campo abaixo, evitando termos sensíveis.');
+                     setError('A IA sugeriu tags, mas todas foram filtradas por conterem termos proibidos. Por favor, selecione tags das opções existentes ou, se for admin, adicione manualmente.');
                 }
             } else {
-                setError('A IA não conseguiu sugerir tags. Por favor, adicione tags manualmente no campo abaixo.');
+                setError('A IA não conseguiu sugerir tags. Por favor, selecione tags das opções existentes ou, se for admin, adicione manualmente.');
             }
         } catch (err) {
             console.error("Erro ao gerar tags da IA (via backend):", err);
@@ -438,13 +471,8 @@ function CourseCreatePage() {
         }
     };
 
-    // Filtra as subcategorias com base na categoria selecionada
-    const filteredSubCategories = useMemo(() =>
-        fetchedSubCategories.filter((subCat) => subCat.categoryRef === selectedCategory),
-        [fetchedSubCategories, selectedCategory]
-    );
-
     // --- FUNÇÃO CORRIGIDA PARA ADICIONAR TAGS CUSTOMIZADAS ---
+    // Esta função será usada apenas pelo admin
     const handleAddCustomTag = () => {
         const trimmedTag = customTagInput.trim();
         if (trimmedTag === '') {
@@ -464,9 +492,21 @@ function CourseCreatePage() {
             return;
         }
 
-        // Validação: Verificar se a tag já existe
+        // Validação: Verificar se a tag já existe nas selecionadas
         if (selectedTags.map(t => t.toLowerCase()).includes(normalizedTag)) {
             setError(`A tag "${trimmedTag}" já está selecionada.`);
+            return;
+        }
+
+        // Validação: Verificar se a tag já existe nas tags do Sanity (para evitar duplicidade visual)
+        if (sanityTags.map(t => t.toLowerCase()).includes(normalizedTag)) {
+            setError(`A tag "${trimmedTag}" já existe no Sanity. Selecione-a na lista de tags existentes.`);
+            return;
+        }
+
+        // Validação: Verificar se a tag já existe nas tags sugeridas pela IA (para evitar duplicidade visual)
+        if (aiSuggestedTags.map(t => t.toLowerCase()).includes(normalizedTag)) {
+            setError(`A tag "${trimmedTag}" já foi sugerida pela IA. Selecione-a na lista de tags sugeridas.`);
             return;
         }
 
@@ -476,385 +516,368 @@ function CourseCreatePage() {
         setError(null); // Limpa qualquer erro anterior
     };
 
+    // Função para adicionar/remover tag da lista de selecionadas
+    const handleToggleTag = (tagToToggle) => {
+        const normalizedTagToToggle = tagToToggle.trim().toLowerCase();
 
-    return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
-            <Box sx={{ mb: 4 }}>
-                <Button
-                    component={Link}
-                    to="/cursos"
-                    startIcon={<ChevronLeftIcon />}
-                    variant="outlined"
-                >
-                    Voltar para a Lista de Cursos
-                </Button>
-            </Box>
+        // Verifica se a tag contém alguma palavra proibida antes de adicionar
+        const isProhibited = PROHIBITED_TAGS.some(prohibited =>
+            normalizedTagToToggle.includes(prohibited)
+        );
 
-            <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ mb: 4 }}>
-                Crie um Novo Curso com IA
-            </Typography>
+        if (isProhibited) {
+            setError(`A tag "${tagToToggle}" contém termos proibidos e não pode ser selecionada.`);
+            return;
+        }
 
-            {/* Feedback de erro global */}
-            {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                    {error}
-                </Alert>
-            )}
+        setSelectedTags(prevSelectedTags => {
+            const normalizedPrevSelectedTags = prevSelectedTags.map(t => t.toLowerCase());
+            if (normalizedPrevSelectedTags.includes(normalizedTagToToggle)) {
+                // Remove a tag
+                return prevSelectedTags.filter(tag => tag.toLowerCase() !== normalizedTagToToggle);
+            } else {
+                // Adiciona a tag
+                return [...prevSelectedTags, tagToToggle];
+            }
+        });
+        setError(null); // Limpa o erro se uma tag válida for selecionada
+    };
 
-            <Stepper activeStep={activeStep} orientation="vertical">
-                {steps.map((step, index) => (
-                    <Step key={step.label}>
-                        <StepLabel optional={index === steps.length - 1 ? <Typography variant="caption">Conclusão</Typography> : null}>
-                            {step.label}
-                        </StepLabel>
-                        <StepContent>
-                            <Typography>{step.description}</Typography>
-                            <Box sx={{ mb: 2 }}>
-                                {/* Passo 0: Escolha Detalhes Básicos do Curso */}
-                                {index === 0 && (
-                                    <>
-                                        <FormControl fullWidth margin="normal" disabled={loading}>
-                                            <InputLabel id="category-select-label">Categoria</InputLabel>
-                                            <Select
-                                                labelId="category-select-label"
-                                                id="category-select"
-                                                value={selectedCategory}
-                                                label="Categoria"
-                                                onChange={(e) => {
-                                                    setSelectedCategory(e.target.value);
-                                                    setSelectedSubCategory('');
-                                                    setSelectedTags([]);
-                                                    setAiSuggestedTags([]);
-                                                }}
-                                                disabled={fetchedCategories.length === 0 || loading}
-                                            >
-                                                <MenuItem value="">
-                                                    <em>Nenhum</em>
-                                                </MenuItem>
-                                                {fetchedCategories.map((cat) => (
-                                                    <MenuItem key={cat._id} value={cat._id}>
-                                                        {cat.title}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                            {fetchedCategories.length === 0 && !loading && (
-                                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, ml: 1 }}>
-                                                    Nenhuma categoria disponível.
-                                                </Typography>
-                                            )}
-                                        </FormControl>
+    // Filtra as subcategorias com base na categoria selecionada
+    const filteredSubCategories = useMemo(() =>
+        fetchedSubCategories.filter((subCat) => subCat.categoryRef === selectedCategory),
+        [fetchedSubCategories, selectedCategory]
+    );
 
-                                        <FormControl
-                                            fullWidth
-                                            margin="normal"
-                                            disabled={!selectedCategory || loading || filteredSubCategories.length === 0}
-                                        >
-                                            <InputLabel id="sub-category-select-label">Subcategoria</InputLabel>
-                                            <Select
-                                                labelId="sub-category-select-label"
-                                                id="sub-category-select"
-                                                value={selectedSubCategory}
-                                                label="Subcategoria"
-                                                onChange={(e) => setSelectedSubCategory(e.target.value)}
-                                            >
-                                                <MenuItem value="">
-                                                    <em>Nenhum</em>
-                                                </MenuItem>
-                                                {filteredSubCategories.map((subCat) => (
-                                                    <MenuItem key={subCat._id} value={subCat._id}>
-                                                        {subCat.title}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                            {!loading && selectedCategory && filteredSubCategories.length === 0 && (
-                                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, ml: 1 }}>
-                                                    Não há subcategorias disponíveis para esta categoria.
-                                                </Typography>
-                                            )}
-                                        </FormControl>
+    // --- Get Step Content (Renderiza o conteúdo de cada passo do Stepper) ---
+    const getStepContent = (step) => {
+        switch (step) {
+            case 0:
+                return (
+                    <Box sx={{ mb: 2 }}>
+                        <FormControl fullWidth sx={{ mb: 2 }}>
+                            <InputLabel id="category-label">Categoria</InputLabel>
+                            <Select
+                                labelId="category-label"
+                                id="category-select"
+                                value={selectedCategory}
+                                label="Categoria"
+                                onChange={(e) => {
+                                    setSelectedCategory(e.target.value);
+                                    setSelectedSubCategory(''); // Reseta subcategoria ao mudar categoria
+                                }}
+                                disabled={loading}
+                            >
+                                <MenuItem value="">
+                                    <em>Nenhum</em>
+                                </MenuItem>
+                                {fetchedCategories.map((category) => (
+                                    <MenuItem key={category._id} value={category._id}>
+                                        {category.title}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
 
-                                        <FormControl fullWidth margin="normal" disabled={loading}>
-                                            <InputLabel id="level-select-label">Nível do Curso</InputLabel>
-                                            <Select
-                                                labelId="level-select-label"
-                                                id="level-select"
-                                                value={selectedLevel}
-                                                label="Nível do Curso"
-                                                onChange={(e) => setSelectedLevel(e.target.value)}
-                                            >
-                                                {levels.map((level) => (
-                                                    <MenuItem key={level.value} value={level.value}>
-                                                        {level.label}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </>
+                        <FormControl fullWidth sx={{ mb: 2 }} disabled={!selectedCategory}>
+                            <InputLabel id="sub-category-label">Subcategoria</InputLabel>
+                            <Select
+                                labelId="sub-category-label"
+                                id="sub-category-select"
+                                value={selectedSubCategory}
+                                label="Subcategoria"
+                                onChange={(e) => setSelectedSubCategory(e.target.value)}
+                                disabled={loading || !selectedCategory}
+                            >
+                                <MenuItem value="">
+                                    <em>Nenhum</em>
+                                </MenuItem>
+                                {filteredSubCategories.map((subCategory) => (
+                                    <MenuItem key={subCategory._id} value={subCategory._id}>
+                                        {subCategory.title}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+
+                        <FormControl fullWidth sx={{ mb: 2 }}>
+                            <InputLabel id="level-label">Nível</InputLabel>
+                            <Select
+                                labelId="level-label"
+                                id="level-select"
+                                value={selectedLevel}
+                                label="Nível"
+                                onChange={(e) => setSelectedLevel(e.target.value)}
+                                disabled={loading}
+                            >
+                                {levels.map((level) => (
+                                    <MenuItem key={level.value} value={level.value}>
+                                        {level.label}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Box>
+                );
+            case 1: // ONDE AS ALTERAÇÕES ESTÃO CONCENTRADAS
+                return (
+                    <Box sx={{ mb: 2 }}>
+                        {loading && (activeStep === 1) ? (
+                            <Box display="flex" justifyContent="center" alignItems="center" height={150}>
+                                <CircularProgress />
+                                <Typography ml={2}>Gerando tags e buscando tags existentes...</Typography>
+                            </Box>
+                        ) : (
+                            <>
+                                <Typography variant="h6" gutterBottom>Tags Sugeridas pela IA:</Typography>
+                                {aiSuggestedTags.length > 0 ? (
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                                        {aiSuggestedTags.map((tag) => (
+                                            <Chip
+                                                key={`ai-${tag}`}
+                                                label={tag}
+                                                onClick={() => handleToggleTag(tag)}
+                                                color={selectedTags.includes(tag) ? 'primary' : 'default'}
+                                                variant={selectedTags.includes(tag) ? 'filled' : 'outlined'}
+                                            />
+                                        ))}
+                                    </Box>
+                                ) : (
+                                    <Typography color="textSecondary">Nenhuma tag sugerida pela IA. Verifique as seleções do passo anterior ou tente novamente.</Typography>
                                 )}
 
-                                {/* PASSO 1: Gerar e Selecionar Tags */}
-                                {index === 1 && (
-                                    <>
-                                        <Alert severity="info" sx={{ mb: 2 }}>
-                                            Clique nas tags sugeridas pela IA para selecioná-las ou adicione suas próprias tags no campo abaixo.
-                                            **Mínimo de 1 tag é necessário.**
-                                        </Alert>
+                                <Divider sx={{ my: 3 }} />
 
-                                        {loading && (
-                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', my: 2 }}>
-                                                <CircularProgress size={24} sx={{ mr: 1 }} />
-                                                <Typography>Gerando sugestões de tags com IA...</Typography>
-                                            </Box>
-                                        )}
+                                <Typography variant="h6" gutterBottom>Tags Existentes no Sanity:</Typography>
+                                {sanityTags.length > 0 ? (
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                                        {sanityTags.map((tag) => (
+                                            <Chip
+                                                key={`sanity-${tag}`}
+                                                label={tag}
+                                                onClick={() => handleToggleTag(tag)}
+                                                color={selectedTags.includes(tag) ? 'primary' : 'default'}
+                                                variant={selectedTags.includes(tag) ? 'filled' : 'outlined'}
+                                            />
+                                        ))}
+                                    </Box>
+                                ) : (
+                                    <Typography color="textSecondary">Nenhuma tag existente encontrada no Sanity.</Typography>
+                                )}
 
-                                        {!loading && aiSuggestedTags.length > 0 && (
-                                            <Box sx={{ my: 2 }}>
-                                                <Typography variant="subtitle1" gutterBottom>
-                                                    Tags Sugeridas pela IA:
-                                                </Typography>
-                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                                    {aiSuggestedTags.map((tag) => (
-                                                        <Chip
-                                                            key={tag}
-                                                            label={tag}
-                                                            clickable
-                                                            color={selectedTags.includes(tag) ? 'primary' : 'default'}
-                                                            onClick={() => {
-                                                                setSelectedTags(prev =>
-                                                                    prev.includes(tag)
-                                                                        ? prev.filter(t => t !== tag)
-                                                                        : [...prev, tag]
-                                                                );
-                                                            }}
-                                                            sx={{ textTransform: 'capitalize' }}
-                                                        />
-                                                    ))}
-                                                </Box>
-                                            </Box>
-                                        )}
-                                        {!loading && aiSuggestedTags.length === 0 && (
-                                            <Alert severity="warning" sx={{ mb: 2 }}>
-                                                A IA não sugeriu nenhuma tag ou todas as sugestões continham termos proibidos. Por favor, adicione tags manualmente no campo abaixo.
-                                            </Alert>
-                                        )}
+                                <Divider sx={{ my: 3 }} />
 
-                                        <Box sx={{ my: 2 }}>
-                                            <Typography variant="subtitle1" gutterBottom>
-                                                Tags Selecionadas:
-                                            </Typography>
-                                            <Box sx={{
-                                                display: 'flex',
-                                                flexWrap: 'wrap',
-                                                gap: 1,
-                                                minHeight: '40px',
-                                                border: '1px solid lightgrey',
-                                                borderRadius: '4px',
-                                                p: 1,
-                                                alignItems: 'center'
-                                            }}>
-                                                {selectedTags.length > 0 ? (
-                                                    selectedTags.map((tag) => (
-                                                        <Chip
-                                                            key={tag}
-                                                            label={tag}
-                                                            onDelete={() => setSelectedTags(prev => prev.filter(t => t !== tag))}
-                                                            color="primary"
-                                                            variant="outlined"
-                                                            sx={{ textTransform: 'capitalize' }}
-                                                        />
-                                                    ))
-                                                ) : (
-                                                    <Typography variant="body2" color="text.secondary">
-                                                        Nenhuma tag selecionada ainda.
-                                                    </Typography>
-                                                )}
-                                            </Box>
-                                        </Box>
-
-                                        <FormControl fullWidth margin="normal" disabled={loading}>
-                                            <InputLabel htmlFor="custom-tag-input">Adicionar Nova Tag (digite e Enter)</InputLabel>
+                                {/* NOVO: INPUT DE TAG MANUAL APENAS PARA ADMIN */}
+                                {isAdmin && (
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography variant="h6" gutterBottom>Adicionar Tags Manuais (Apenas Admin):</Typography>
+                                        <FormControl fullWidth>
                                             <OutlinedInput
                                                 id="custom-tag-input"
+                                                placeholder="Adicionar nova tag (ex: JavaScript, Front-end)"
                                                 value={customTagInput}
                                                 onChange={(e) => setCustomTagInput(e.target.value)}
                                                 onKeyPress={(e) => {
                                                     if (e.key === 'Enter') {
-                                                        e.preventDefault();
                                                         handleAddCustomTag();
                                                     }
                                                 }}
                                                 endAdornment={
                                                     <Button
-                                                        variant="contained"
                                                         onClick={handleAddCustomTag}
                                                         disabled={customTagInput.trim() === ''}
+                                                        variant="contained"
+                                                        size="small"
                                                     >
                                                         Adicionar
                                                     </Button>
                                                 }
-                                                label="Adicionar Nova Tag (digite e Enter)"
                                             />
                                         </FormControl>
-                                    </>
-                                )}
-
-                                {/* PASSO 2: Gerar Conteúdo do Curso */}
-                                {index === 2 && (
-                                    <>
-                                        <Typography variant="body1" sx={{ mb: 2 }}>
-                                            Quase lá! Confirme para que a IA gere a pré-visualização do seu curso.
-                                            Isso pode levar um tempo, dependendo da complexidade do tópico e do nível.
-                                        </Typography>
-                                        {loading && (
-                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', my: 2 }}>
-                                                <CircularProgress size={24} sx={{ mr: 1 }} />
-                                                <Typography>Gerando conteúdo do curso com IA...</Typography>
-                                            </Box>
-                                        )}
-                                        {coursePreview && (
-                                            <Alert severity="success" sx={{ my: 2 }}>
-                                                Pré-visualização gerada! Clique em "Próximo" para revisar.
-                                            </Alert>
-                                        )}
-                                    </>
-                                )}
-
-                                {/* PASSO 3: Pré-visualização e Confirmação */}
-                                {index === 3 && (
-                                    <>
-                                        {loading && (
-                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', my: 2 }}>
-                                                <CircularProgress size={24} sx={{ mr: 1 }} />
-                                                <Typography>Carregando pré-visualização...</Typography>
-                                            </Box>
-                                        )}
-                                        {!loading && coursePreview ? (
-                                            <Fade in={true} timeout={500}>
-                                                <Paper elevation={3} sx={{ p: 3, mt: 2, border: '1px solid #e0e0e0' }}>
-                                                    <Typography variant="h5" gutterBottom color="primary">
-                                                        {coursePreview.courseTitle || coursePreview.title}
-                                                    </Typography>
-                                                    <Typography variant="body1" paragraph>
-                                                        {coursePreview.courseDescription || coursePreview.description}
-                                                    </Typography>
-                                                    <Divider sx={{ my: 2 }} />
-                                                    <Typography variant="h6" gutterBottom>
-                                                        Lições Propostas:
-                                                    </Typography>
-                                                    {coursePreview.lessons && coursePreview.lessons.length > 0 ? (
-                                                        coursePreview.lessons.map((lesson, i) => (
-                                                            <Box key={i} sx={{ mb: 1.5, pl: 2, borderLeft: '3px solid #1976d2', pb: 1 }}>
-                                                                <Typography variant="subtitle1" component="h3">
-                                                                    {i + 1}. {lesson.title}
-                                                                </Typography>
-                                                                {lesson.description && (
-                                                                    <Typography variant="body2" color="text.secondary">
-                                                                        {lesson.description}
-                                                                    </Typography>
-                                                                )}
-                                                            </Box>
-                                                        ))
-                                                    ) : (
-                                                        <Typography variant="body2" color="text.secondary">
-                                                            Nenhuma lição detalhada gerada para pré-visualização.
-                                                        </Typography>
-                                                    )}
-                                                    <Divider sx={{ my: 2 }} />
-                                                    <Typography variant="h6" gutterBottom>
-                                                        Tags Selecionadas:
-                                                    </Typography>
-                                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                                        {selectedTags.map((tag) => (
-                                                            <Chip key={tag} label={tag} variant="filled" color="primary" size="small" />
-                                                        ))}
-                                                    </Box>
-                                                </Paper>
-                                            </Fade>
-                                        ) : (
-                                            !loading && (
-                                                <Alert severity="info" sx={{ my: 2 }}>
-                                                    Gere a pré-visualização do curso no passo anterior para visualizá-la aqui.
-                                                </Alert>
-                                            )
-                                        )}
-                                    </>
-                                )}
-
-                                {/* PASSO 4: Concluído */}
-                                {index === 4 && (
-                                    <Box sx={{ mt: 2 }}>
-                                        {successMessage.text && (
-                                            <Alert severity="success" sx={{ mb: 2 }}>
-                                                {successMessage.text}
-                                            </Alert>
-                                        )}
-                                        {successMessage.courseId && successMessage.courseTitle && (
-                                            <Paper elevation={3} sx={{ p: 3, my: 3, textAlign: 'center', border: '1px solid #4caf50' }}>
-                                                <Typography variant="h6" gutterBottom>
-                                                    Curso Criado:
-                                                </Typography>
-                                                <Typography variant="h5" color="primary" sx={{ mb: 2 }}>
-                                                    "{successMessage.courseTitle}"
-                                                </Typography>
-                                                <Button
-                                                    variant="contained"
-                                                    color="primary"
-                                                    onClick={() => navigate(`/cursos/${successMessage.courseId}`)}
-                                                    sx={{ mr: 2 }}
-                                                >
-                                                    Ver Curso
-                                                </Button>
-                                                <Button
-                                                    onClick={handleReset}
-                                                    variant="outlined"
-                                                    color="secondary"
-                                                >
-                                                    Criar Novo Curso
-                                                </Button>
-                                            </Paper>
-                                        )}
-                                        {!successMessage.courseId && !loading && (
-                                            <Alert severity="error" sx={{ mb: 2 }}>
-                                                Ocorreu um erro e o curso não foi salvo ou o ID não foi retornado. Tente novamente.
-                                            </Alert>
-                                        )}
                                     </Box>
                                 )}
+                                {/* FIM DO BLOCO ADMIN */}
 
-                                <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
+                                <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Tags Selecionadas para o Curso:</Typography>
+                                {selectedTags.length > 0 ? (
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                        {selectedTags.map((tag) => (
+                                            <Chip
+                                                key={`selected-${tag}`}
+                                                label={tag}
+                                                onDelete={() => handleToggleTag(tag)} // Usa toggle para desmarcar
+                                                color="primary"
+                                                variant="filled"
+                                            />
+                                        ))}
+                                    </Box>
+                                ) : (
+                                    <Typography color="textSecondary">Selecione tags sugeridas pela IA ou tags existentes.</Typography>
+                                )}
+                            </>
+                        )}
+                        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+                    </Box>
+                );
+            case 2:
+                return (
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="body1" sx={{ mb: 2 }}>
+                            Você está prestes a gerar o conteúdo do curso com base em suas seleções.
+                            Isso utilizará seus créditos de IA.
+                        </Typography>
+                        <Typography variant="subtitle1" gutterBottom>Tópico de Entrada para IA:</Typography>
+                        <Typography variant="body2" sx={{ mb: 2, p: 1, border: '1px dashed grey' }}>
+                            {generatedTopic || 'Nenhum tópico gerado. Volte ao passo 1 para selecionar.'}
+                        </Typography>
+                        <Typography variant="subtitle1" gutterBottom>Tags Selecionadas:</Typography>
+                        {selectedTags.length > 0 ? (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                                {selectedTags.map((tag, index) => (
+                                    <Chip key={index} label={tag} color="primary" variant="outlined" size="small" />
+                                ))}
+                            </Box>
+                        ) : (
+                            <Typography color="textSecondary">Nenhuma tag selecionada. Volte ao passo 2.</Typography>
+                        )}
+                    </Box>
+                );
+            case 3:
+                return (
+                    <Box sx={{ mb: 2 }}>
+                        {loading ? (
+                            <Box display="flex" justifyContent="center" alignItems="center" height={200}>
+                                <CircularProgress />
+                                <Typography ml={2}>Carregando pré-visualização...</Typography>
+                            </Box>
+                        ) : coursePreview ? (
+                            <Paper elevation={3} sx={{ p: 3, mb: 2 }}>
+                                <Typography variant="h5" gutterBottom>{coursePreview.courseTitle || coursePreview.title || 'Título do Curso Não Definido'}</Typography>
+                                <Typography variant="body1" color="textSecondary" sx={{ mb: 2 }}>
+                                    {coursePreview.courseDescription || coursePreview.description || 'Descrição não disponível.'}
+                                </Typography>
+                                <Divider sx={{ my: 2 }} />
+                                <Typography variant="h6" gutterBottom>Lições Sugeridas:</Typography>
+                                {coursePreview.lessons && coursePreview.lessons.length > 0 ? (
+                                    <Box>
+                                        {coursePreview.lessons.map((lesson, index) => (
+                                            <Box key={index} sx={{ mb: 1.5, pl: 2, borderLeft: '3px solid #1976d2' }}>
+                                                <Typography variant="subtitle1">{`${index + 1}. ${lesson.title || 'Lição sem título'}`}</Typography>
+                                                {lesson.objectives && lesson.objectives.length > 0 && (
+                                                    <Box component="ul" sx={{ mt: 0.5, pl: 2 }}>
+                                                        {lesson.objectives.map((obj, objIndex) => (
+                                                            <Typography component="li" variant="body2" key={objIndex}>
+                                                                {obj}
+                                                            </Typography>
+                                                        ))}
+                                                    </Box>
+                                                )}
+                                            </Box>
+                                        ))}
+                                    </Box>
+                                ) : (
+                                    <Typography color="textSecondary">Nenhuma lição gerada.</Typography>
+                                )}
+                            </Paper>
+                        ) : (
+                            !error && <Typography>Nenhuma pré-visualização disponível. Clique em "Próximo" para gerar.</Typography>
+                        )}
+                        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+                    </Box>
+                );
+            case 4:
+                return (
+                    <Box sx={{ mb: 2 }}>
+                        {successMessage.text ? (
+                            <Fade in={true} timeout={1000}>
+                                <Alert severity="success" sx={{ mb: 2 }}>
+                                    <Typography variant="h6">{successMessage.text}</Typography>
+                                    {successMessage.courseId && successMessage.courseTitle && (
+                                        <Typography variant="body2">
+                                            O curso "{successMessage.courseTitle}" (ID: {successMessage.courseId}) foi salvo com sucesso.
+                                        </Typography>
+                                    )}
+                                </Alert>
+                            </Fade>
+                        ) : (
+                            <Alert severity="info">
+                                <Typography>O curso foi gerado. Você pode redefinir para criar um novo.</Typography>
+                            </Alert>
+                        )}
+                        <Button
+                            variant="contained"
+                            onClick={() => navigate('/meus-cursos')} // Ou para a página do curso recém-criado
+                            sx={{ mt: 1, mr: 1 }}
+                        >
+                            Ver Meus Cursos
+                        </Button>
+                        <Button onClick={handleReset} sx={{ mt: 1, mr: 1 }}>
+                            Criar Novo Curso
+                        </Button>
+                    </Box>
+                );
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+            <Button
+                component={Link}
+                to="/meus-cursos"
+                startIcon={<ChevronLeftIcon />}
+                sx={{ mb: 3 }}
+            >
+                Voltar para Meus Cursos
+            </Button>
+            <Typography variant="h4" component="h1" gutterBottom align="center">
+                Criar Novo Curso com IA
+            </Typography>
+
+            <Stepper activeStep={activeStep} orientation="vertical" sx={{ mt: 4 }}>
+                {steps.map((step, index) => (
+                    <Step key={step.label}>
+                        <StepLabel
+                            optional={
+                                index === 2 ? (
+                                    <Typography variant="caption">Isso pode levar alguns segundos.</Typography>
+                                ) : null
+                            }
+                        >
+                            {step.label}
+                        </StepLabel>
+                        <StepContent>
+                            <Typography>{step.description}</Typography>
+                            {getStepContent(index)}
+                            <Box sx={{ mb: 2 }}>
+                                <div>
+                                    <Button
+                                        variant="contained"
+                                        onClick={handleNext}
+                                        sx={{ mt: 1, mr: 1 }}
+                                        disabled={loading}
+                                    >
+                                        {activeStep === steps.length - 1 ? 'Finalizar' : 'Próximo'}
+                                    </Button>
                                     <Button
                                         disabled={activeStep === 0 || loading}
                                         onClick={handleBack}
-                                        sx={{ mr: 1 }}
+                                        sx={{ mt: 1, mr: 1 }}
                                     >
                                         Voltar
                                     </Button>
-                                    {activeStep !== steps.length - 1 ? (
-                                        <Button
-                                            variant="contained"
-                                            onClick={handleNext}
-                                            disabled={loading}
-                                        >
-                                            {loading && (activeStep === 0 || activeStep === 2 || activeStep === 3) ? (
-                                                <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
-                                            ) : null}
-                                            {activeStep === steps.length - 2 ? 'Salvar e Concluir' : 'Próximo'}
-                                        </Button>
-                                    ) : (
-                                        <Button
-                                            variant="contained"
-                                            onClick={handleReset}
-                                            disabled={loading}
-                                        >
-                                            Criar Novo Curso
-                                        </Button>
-                                    )}
-                                </Box>
+                                </div>
                             </Box>
                         </StepContent>
                     </Step>
                 ))}
             </Stepper>
+            {activeStep === steps.length && (
+                <Paper square elevation={0} sx={{ p: 3, mt: 2 }}>
+                    {getStepContent(activeStep)}
+                </Paper>
+            )}
         </Container>
     );
 }

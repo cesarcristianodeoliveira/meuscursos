@@ -10,10 +10,8 @@ if (!process.env.GEMINI_API_KEY) {
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 // --- Configuração do Sanity Client para ESCRITA ---
-// NOTA: Para leituras, useCdn pode ser 'true' para melhor performance.
-// Aqui, para writes/updates, useCdn deve ser 'false'.
 if (!process.env.SANITY_PROJECT_ID || !process.env.SANITY_TOKEN) {
-    console.error("Erro: Variáveis de ambiente SANITY_PROJECT_ID ou SANITY_TOKEN não definidas em courseController.");
+    console.error("Erro: Variável de ambiente SANITY_PROJECT_ID ou SANITY_TOKEN não definidas em courseController.");
 }
 const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN) ? createClient({
     projectId: process.env.SANITY_PROJECT_ID,
@@ -81,10 +79,11 @@ export const generateTags = async (req, res) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); 
 
+        // ALTERAÇÃO NO PROMPT: Removido o ```json para instruir a IA a não incluir isso na resposta
         const prompt = `Gere uma lista de até 10 tags (palavras-chave) em português para um curso com o seguinte tópico principal: "${topic}".
         Considere que a categoria de ID "${category}", subcategoria de ID "${subCategory}", e nível de dificuldade "${level}".
         As tags devem ser relevantes, concisas (1-3 palavras por tag), e cobrir os principais temas e áreas de interesse do curso.
-        Formate a resposta APENAS como um array JSON de strings, sem nenhum texto introdutório ou explicativo, e sem aspas triplas ('''json) ou outros caracteres extras.
+        Formate a resposta APENAS como um array JSON de strings, sem nenhum texto introdutório ou explicativo.
         Exemplo: ["programacao", "javascript", "frontend", "desenvolvimento web", "react", "iniciante"]
         `;
 
@@ -99,6 +98,7 @@ export const generateTags = async (req, res) => {
 
         let suggestedTags;
         try {
+            // Ajusta o regex para tentar remover ```json caso a IA ainda os envie (redundante com o novo prompt, mas seguro)
             const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
             let rawJsonString = jsonMatch ? jsonMatch[1] : text.trim();
             rawJsonString = rawJsonString.replace(/^[\r\n]+|[\r\n]+$/g, '');
@@ -179,6 +179,7 @@ export const generateCoursePreview = async (req, res) => {
             `;
         }
 
+        // ALTERAÇÃO NO PROMPT: Removido o ```json para instruir a IA a não incluir isso na resposta
         const prompt = `Gere um esquema de curso detalhado em português, garantindo que o **título do curso e os títulos das lições sejam altamente originais e únicos**, mesmo quando os parâmetros iniciais são semelhantes.
 
         ${tagsContext} O curso deve ser sobre "${topic}", na categoria de ID "${category}" e subcategoria de ID "${subCategory}", e ter um nível de dificuldade "${level}".
@@ -195,7 +196,7 @@ export const generateCoursePreview = async (req, res) => {
             - 'order' (number): A ordem da lição no curso, começando de 1.
             - 'content' (string): Conteúdo detalhado da lição (3-5 parágrafos de texto corrido, sem formatação Markdown complexa ou HTML). Foque em clareza, profundidade adequada ao nível especificado e exemplos práticos quando aplicável.
             - 'estimatedReadingTime' (number): Tempo estimado de leitura em minutos para esta lição (entre 3 e 15).
-        A resposta deve ser APENAS um objeto JSON válido, sem nenhum texto introdutório ou explicativo, e sem aspas triplas ('''json) ou outros caracteres extras.
+        A resposta deve ser APENAS um objeto JSON válido, sem nenhum texto introdutório ou explicativo.
         Exemplo de formato JSON para o curso e lições (o slug será gerado pelo backend):
         {
             "title": "Titulo do Curso Único e Criativo",
@@ -228,6 +229,7 @@ export const generateCoursePreview = async (req, res) => {
 
         let generatedCourseData;
         try {
+            // Ajusta o regex para tentar remover ```json caso a IA ainda os envie (redundante com o novo prompt, mas seguro)
             const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
             let rawJsonString = jsonMatch ? jsonMatch[1] : text.trim();
             rawJsonString = rawJsonString.replace(/^[\r\n]+|[\r\n]+$/g, '');
@@ -442,8 +444,9 @@ export const saveGeneratedCourse = async (req, res) => {
             for (const tagName of tags) {
                 const normalizedTagName = tagName.trim().toLowerCase();
 
+                // Busca a tag existente pelo campo 'name' ou 'title'
                 const existingTag = await sanityClient.fetch(
-                    `*[_type == "courseTag" && name == $tagName][0]{_id}`,
+                    `*[_type == "courseTag" && (name == $tagName || title == $tagName)][0]{_id, categories[]->{_id}}`, // Inclui categorias existentes
                     { tagName: normalizedTagName }
                 );
 
@@ -451,7 +454,22 @@ export const saveGeneratedCourse = async (req, res) => {
                 if (existingTag) {
                     tagRefId = existingTag._id;
                     console.log(`[BACKEND] Tag existente encontrada: "${normalizedTagName}" (ID: ${tagRefId}).`);
+
+                    // Verifica se a categoria do curso já está associada a esta tag
+                    const categoryAlreadyLinked = existingTag.categories && existingTag.categories.some(cat => cat._id === category);
+
+                    if (!categoryAlreadyLinked) {
+                        // Se a tag existe e a categoria atual não está linkada, adiciona a categoria à tag
+                        console.log(`[BACKEND] Adicionando referência à categoria "${category}" na tag existente "${normalizedTagName}".`);
+                        transaction.patch(tagRefId).append('categories', [{
+                            _ref: category,
+                            _type: 'reference',
+                            _key: uuidv4()
+                        }]);
+                    }
+
                 } else {
+                    // Se a tag não existe, cria uma nova
                     const newTagId = `courseTag-${uuidv4()}`;
                     const newTagSlug = { 
                         _type: 'slug',
@@ -461,7 +479,7 @@ export const saveGeneratedCourse = async (req, res) => {
                     const newTagDocument = {
                         _id: newTagId,
                         _type: 'courseTag',
-                        name: normalizedTagName, 
+                        name: normalizedTagName, // Use 'name' se seu schema de tag usa 'name', caso contrário, 'title'
                         slug: newTagSlug,
                         description: `Tag gerada automaticamente para o tópico: ${normalizedTagName}.`,
                         categories: [
@@ -537,7 +555,6 @@ export const saveGeneratedCourse = async (req, res) => {
         if (error.message === 'Créditos insuficientes para criar um curso.') {
             return res.status(403).json({ error: error.message });
         }
-        // Tratamento para erro genérico (importante para capturar erros não específicos acima)
         res.status(500).json({ error: 'Erro interno do servidor ao salvar o curso.', details: error.message });
     }
 };
