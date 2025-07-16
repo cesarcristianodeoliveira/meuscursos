@@ -23,7 +23,7 @@ import client from '../../../sanity'; // Importa o cliente Sanity configurado de
 import { useAuth } from '../../../contexts/AuthContext'; // CORRIGIDO: Importa useAuth como named export
 
 const CourseCreatePage = () => {
-    const { auth } = useAuth(); // CORRIGIDO: Acessa 'auth' diretamente do hook useAuth
+    const { auth } = useAuth(); // Acessa 'auth' diretamente do hook useAuth
     const [activeStep, setActiveStep] = useState(0);
     const [categories, setCategories] = useState([]);
     const [subCategories, setSubCategories] = useState([]);
@@ -120,13 +120,14 @@ const CourseCreatePage = () => {
 
     // Função para gerar tags via IA (mantendo axios para esta API externa/backend de IA)
     const generateAISuggestedTags = useCallback(async () => {
-        if (!watchedTopic || !watchedCategory || !watchedSubCategory || !watchedLevel) {
+        // Adicionada verificação para garantir que auth.accessToken existe antes de prosseguir
+        if (!auth?.accessToken || !watchedTopic || !watchedCategory || !watchedSubCategory || !watchedLevel) {
+            // console.warn("Dados incompletos ou token de acesso indisponível para gerar tags.");
             return; 
         }
         setLoading(true);
         setError(null);
         try {
-            // Esta rota e o uso de `axios` são mantidos, pois indicam uma comunicação com um backend/serviço de IA
             const response = await axios.post('/api/courses/generate-tags', {
                 topic: watchedTopic,
                 category: watchedCategory, // ID da categoria
@@ -143,17 +144,18 @@ const CourseCreatePage = () => {
         } finally {
             setLoading(false);
         }
-    }, [watchedTopic, watchedCategory, watchedSubCategory, watchedLevel, auth.accessToken]);
+    }, [watchedTopic, watchedCategory, watchedSubCategory, watchedLevel, auth?.accessToken]); // Dependência ajustada
 
     // Chamada inicial para buscar tags existentes e gerar sugeridas ao entrar no Step 2
     useEffect(() => {
         if (activeStep === 1) {
-            // Para `fetchExistingTags`, usamos o seu endpoint de backend que filtra por categoria
             fetchExistingTags(watchedCategory); 
-            generateAISuggestedTags(); 
+            // Chamar generateAISuggestedTags APENAS se o token de acesso estiver disponível
+            if (auth?.accessToken) { 
+                generateAISuggestedTags();
+            }
         }
-    }, [activeStep, watchedCategory, fetchExistingTags, generateAISuggestedTags]);
-
+    }, [activeStep, watchedCategory, fetchExistingTags, generateAISuggestedTags, auth?.accessToken]); // Dependência do auth.accessToken adicionada
 
     // COMBINAÇÃO E ORDENAÇÃO DE TAGS (SUGERIDAS + EXISTENTES)
     useEffect(() => {
@@ -207,6 +209,7 @@ const CourseCreatePage = () => {
                 return;
             }
             setActiveStep((prevActiveStep) => prevActiveStep + 1);
+            // Ao ir para o Step 3, gerar a pré-visualização
             await generateCoursePreview(data.topic, data.category, data.subCategory, data.level, selectedTags);
         } else if (activeStep === 2) {
             await saveCourse(data); 
@@ -225,11 +228,16 @@ const CourseCreatePage = () => {
 
     // Função para gerar pré-visualização do curso via IA (mantendo axios)
     const generateCoursePreview = useCallback(async (topic, category, subCategory, level, tags) => {
+        // Adicionada verificação para garantir que auth.accessToken existe antes de prosseguir
+        if (!auth?.accessToken) {
+            console.warn("Token de acesso indisponível para gerar pré-visualização.");
+            setError('Autenticação necessária para gerar pré-visualização do curso.');
+            return;
+        }
         setLoading(true);
         setError(null);
         setCoursePreview(null); 
         try {
-            // Esta rota e o uso de `axios` são mantidos, pois indicam uma comunicação com um backend/serviço de IA
             const response = await axios.post('/api/courses/generate-preview', {
                 topic,
                 category,
@@ -247,76 +255,54 @@ const CourseCreatePage = () => {
         } finally {
             setLoading(false);
         }
-    }, [auth.accessToken]);
+    }, [auth?.accessToken]); // Dependência ajustada
 
     const saveCourse = async (formData) => {
         if (!coursePreview) {
             setError('Nenhuma pré-visualização do curso para salvar.');
             return;
         }
+        // Adicionada verificação para garantir que auth.accessToken existe antes de prosseguir
+        if (!auth?.accessToken || !auth.user?.id) {
+            setError('Autenticação necessária para salvar o curso.');
+            return;
+        }
+
         setLoading(true);
         setError(null);
         try {
-            // Prepara o documento para ser salvo no Sanity
-            // Certifique-se de que o '_type' corresponde ao seu schema de curso no Sanity
             const doc = {
-                _type: 'course', // O tipo de documento 'course' no seu schema Sanity
+                _type: 'course', 
                 title: coursePreview.title,
                 description: coursePreview.description,
                 lessons: coursePreview.lessons.map(lesson => ({
-                    _type: 'lessonBlock', // Exemplo: se suas lições são um array de objetos com um tipo específico
+                    _type: 'lessonBlock', 
                     title: lesson.title,
                     content: lesson.content,
                     estimatedReadingTime: lesson.estimatedReadingTime,
                 })),
                 category: {
-                    _type: 'reference', // Indica que é uma referência a outro documento
-                    _ref: formData.category, // O _id da categoria selecionada
+                    _type: 'reference', 
+                    _ref: formData.category, 
                 },
                 subCategory: {
                     _type: 'reference',
-                    _ref: formData.subCategory, // O _id da subcategoria selecionada
+                    _ref: formData.subCategory, 
                 },
                 level: formData.level,
                 // Assumindo que 'tags' é um array de strings no seu schema Sanity de curso.
-                // Se o seu schema exigir referências para documentos 'courseTag' separados,
-                // você precisaria primeiro criar ou obter os _ids dessas tags.
-                // Isso pode ser feito com client.create() para novas tags e client.fetch() para existentes.
-                // Por enquanto, salvamos os nomes das tags.
-                tags: selectedTags.map(tagName => ({
-                    _type: 'reference',
-                    _ref: tagName // AQUI TERIA QUE SER O _ID DA TAG, NÃO O NOME
-                    // Se você precisar que as tags sejam referências reais,
-                    // esta parte precisa de um passo para resolver o nome da tag para um _id do Sanity.
-                    // Isso é complexo se a tag não existir e precisar ser criada primeiro.
-                    // A solução mais simples para um MVP é salvar as tags como um array de strings no documento do curso.
-                })),
+                // Se o seu schema `course` tem `tags: array of references to courseTag`,
+                // esta parte precisará ser mais complexa para converter nomes em _ids.
+                tags: selectedTags, // <<< MANTEVE COMO ARRAY DE STRINGS PARA SIMPLICIDADE. REVER SE O SCHEMA DE CURSO ESPERA REFERÊNCIAS.
                 aiModelUsed: coursePreview.aiModelUsed,
-                // Se você tiver um campo de autor no seu schema de curso, você pode adicioná-lo aqui:
+                // Adiciona o autor do curso
                 author: {
                     _type: 'reference',
                     _ref: auth.user.id, // Assumindo que auth.user.id contém o ID do usuário logado
                 },
             };
             
-            // Para o campo 'tags' no seu schema de curso:
-            // Dado o seu `courseTag` schema, ele tem `_id` e `name`.
-            // Se o seu `course` schema tiver `tags: array of references to courseTag`,
-            // então `selectedTags` (que são strings de nomes) precisariam ser convertidas para referências de `_id`.
-            // Isso geralmente envolve:
-            // 1. Verificar se a tag já existe no Sanity pelo nome.
-            // 2. Se existe, obter seu `_id`.
-            // 3. Se não existe, criar um novo documento `courseTag` e obter seu `_id`.
-            // Isso é uma lógica mais avançada para o frontend ou um bom motivo para ter um backend para "salvar no Sanity" que cuida disso.
-            // Por simplicidade atual, vou assumir que o campo `tags` no seu schema de curso é um array de strings (string[])
-            // Se não for, e ele for um array de referências, o código abaixo para `doc.tags` está **incorreto** e precisaria ser ajustado.
-            // Mantenho a estrutura anterior que enviava apenas os nomes como array de strings, que é mais fácil.
-
-            doc.tags = selectedTags; // Simplificando para array de strings, se o seu schema aceitar.
-                                     // Se o schema `course` espera `array of references to courseTag`,
-                                     // então a lógica aqui precisa ser bem mais complexa para criar/obter os _ids das tags.
-
-            const response = await client.create(doc); // Usa client.create() para salvar no Sanity
+            const response = await client.create(doc); 
             console.log("Curso salvo com sucesso no Sanity:", response);
             setIsCourseSaved(true); 
             setActiveStep(3); 
