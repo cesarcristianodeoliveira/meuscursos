@@ -2,6 +2,7 @@
 import { createClient } from '@sanity/client';
 import dotenv from 'dotenv';
 dotenv.config();
+import axios from 'axios'; // Importar axios para requisições à Gemini API
 
 // --- Configuração do Sanity Client para LEITURA ---
 if (!process.env.SANITY_PROJECT_ID || !process.env.SANITY_TOKEN) {
@@ -11,19 +12,20 @@ if (!process.env.SANITY_PROJECT_ID || !process.env.SANITY_TOKEN) {
 const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN) ? createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET || 'production',
-    apiVersion: '2025-06-12', // Mantendo sua versão
+    apiVersion: '2025-06-12',
     useCdn: true, // Usar CDN para leituras (melhora performance)
     token: process.env.SANITY_TOKEN, // Seu token é necessário mesmo para leituras se o dataset for privado
 }) : null;
 
+// --- Configuração da Gemini API ---
+if (!process.env.GEMINI_API_KEY) {
+    console.error("Erro: Variável de ambiente GEMINI_API_KEY não definida em dataController.");
+}
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
 // --- Funções do Controlador de Dados ---
 
-/**
- * @function getCourseCategories
- * @description Retorna todas as categorias de cursos do Sanity CMS.
- * @route GET /api/data/categories
- * @access Public
- */
+// Funções existentes (mantidas, mas não são as "top" que combinam com Gemini)
 export const getCourseCategories = async (req, res) => {
     if (!sanityClient) {
         return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
@@ -38,12 +40,6 @@ export const getCourseCategories = async (req, res) => {
     }
 };
 
-/**
- * @function getCourseSubCategories
- * @description Retorna todas as subcategorias de cursos do Sanity CMS, com referência à categoria pai.
- * @route GET /api/data/subcategories
- * @access Public
- */
 export const getCourseSubCategories = async (req, res) => {
     if (!sanityClient) {
         return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
@@ -58,87 +54,54 @@ export const getCourseSubCategories = async (req, res) => {
     }
 };
 
-/**
- * @function getCourseTagsByCategory
- * @description Busca tags existentes do Sanity CMS associadas a uma categoria específica.
- * @route GET /api/data/tags/byCategory/:categoryId
- * @access Public
- * @returns {Array<string>} Retorna um array de strings com os nomes das tags.
- */
 export const getCourseTagsByCategory = async (req, res) => {
     if (!sanityClient) {
         return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
     }
     try {
         const { categoryId } = req.params;
-
         if (!categoryId) {
             return res.status(400).json({ message: 'Category ID é obrigatório para buscar tags.' });
         }
-
         const tags = await sanityClient.fetch(
-            `*[_type == "courseTag" && $categoryId in categories[]._ref] | order(name asc) {
-                name
-            }`,
+            `*[_type == "courseTag" && $categoryId in categories[]._ref] | order(name asc) { name }`,
             { categoryId }
         );
-
         const tagNames = tags.map(tag => tag.name);
-
-        res.status(200).json(tagNames); // Retorna um ARRAY de strings como esperado
+        res.status(200).json(tagNames);
     } catch (error) {
         console.error('Erro ao buscar tags por categoria:', error);
         res.status(500).json({ message: 'Erro interno do servidor ao buscar tags por categoria.', error: error.message });
     }
 };
 
-/**
- * @function getAllTags
- * @description Retorna TODAS as tags de cursos do Sanity CMS, opcionalmente filtradas por categoria.
- * @route GET /api/data/tags
- * @access Public
- * @param {string} [req.query.categoryId] - Opcional. ID da categoria para filtrar as tags.
- * @returns {Array<Object>} Retorna um array de objetos de tags (ex: {_id: '...', name: '...'}).
- */
 export const getAllTags = async (req, res) => {
     if (!sanityClient) {
         return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
     }
     try {
-        const { categoryId } = req.query; // Captura o categoryId da query string
-
+        const { categoryId } = req.query;
         let query;
         let params = {};
-
         if (categoryId) {
-            query = `*[_type == "courseTag" && $categoryId in categories[]._ref] | order(name asc) {
-                _id,
-                name
-            }`;
+            query = `*[_type == "courseTag" && $categoryId in categories[]._ref] | order(name asc) { _id, name }`;
             params = { categoryId };
             console.log(`[BACKEND - getAllTags] Buscando tags para a categoria: ${categoryId}`);
         } else {
-            query = `*[_type == "courseTag"] | order(name asc) {
-                _id,
-                name
-            }`;
+            query = `*[_type == "courseTag"] | order(name asc) { _id, name }`;
             console.log("[BACKEND - getAllTags] Buscando todas as tags.");
         }
-
         const tags = await sanityClient.fetch(query, params);
-
-        res.status(200).json(tags); // Retorna um ARRAY de objetos como esperado
+        res.status(200).json(tags);
     } catch (error) {
         console.error("Erro ao buscar tags do Sanity (getAllTags):", error);
         res.status(500).json({ error: 'Erro ao buscar tags de cursos.', details: error.message });
     }
 };
 
-
 /**
  * @function getTopCategories
- * @description Retorna as 10 categorias de cursos mais procuradas do Sanity CMS.
- * Atualmente, busca todas e limita, idealmente seria um campo de popularidade.
+ * @description Retorna categorias de cursos combinando Sanity e Gemini, sem duplicatas.
  * @route GET /api/courses/create/top-categories
  * @access Protected
  */
@@ -147,22 +110,88 @@ export const getTopCategories = async (req, res) => {
         return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
     }
     try {
-        // ASSUNÇÃO: Se você tiver um campo de "popularidade" ou "contador de buscas" no schema courseCategory,
-        // você pode ordenar por ele para ter categorias realmente "mais procuradas".
-        // Ex: `*[_type == "courseCategory"] | order(popularity desc) [0...10] {_id, title}`
-        const query = `*[_type == "courseCategory"] | order(title asc) [0...10] {_id, title}`;
-        const categories = await sanityClient.fetch(query);
-        res.status(200).json(categories);
+        // 1. Buscar categorias existentes do Sanity
+        const sanityCategories = await sanityClient.fetch(`*[_type == "courseCategory"] | order(title asc) {_id, title}`);
+
+        // 2. Buscar 10 categorias populares da Gemini API
+        let geminiSuggestedCategories = [];
+        if (GEMINI_API_KEY) { // Apenas chama a Gemini se a chave estiver disponível
+            try {
+                const geminiResponse = await axios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+                    {
+                        contents: [
+                            {
+                                parts: [
+                                    {
+                                        text: "Liste 10 categorias populares para cursos online, no formato JSON, como uma lista de strings, sem descrições ou textos adicionais. Exemplo: [\"Desenvolvimento Web\", \"Marketing Digital\"]"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        timeout: 15000 // Aumenta o timeout para 15 segundos
+                    }
+                );
+
+                const geminiText = geminiResponse.data.candidates[0]?.content?.parts[0]?.text;
+                if (geminiText) {
+                    const jsonMatch = geminiText.match(/\[.*\]/s);
+                    if (jsonMatch && jsonMatch[0]) {
+                        try {
+                            const parsedCategories = JSON.parse(jsonMatch[0]);
+                            if (Array.isArray(parsedCategories)) {
+                                geminiSuggestedCategories = parsedCategories.map(name => ({
+                                    _id: `gemini-${name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`, // ID temporário para Gemini
+                                    title: name
+                                }));
+                            }
+                        } catch (parseError) {
+                            console.error('Erro ao parsear JSON da Gemini para categorias:', parseError);
+                        }
+                    }
+                }
+            } catch (geminiError) {
+                console.error('Erro ao chamar Gemini API para categorias:', geminiError.response?.data?.error || geminiError.message);
+                // Continua mesmo se a Gemini API falhar
+            }
+        } else {
+            console.warn("GEMINI_API_KEY não definida. Sugestões de categorias da Gemini serão ignoradas.");
+        }
+
+
+        // 3. Combinar e remover duplicatas (case-insensitive para o título)
+        const combinedCategoriesMap = new Map();
+
+        // Adiciona categorias do Sanity primeiro
+        sanityCategories.forEach(cat => {
+            combinedCategoriesMap.set(cat.title.toLowerCase(), cat);
+        });
+
+        // Adiciona categorias sugeridas pela Gemini, se ainda não existirem
+        geminiSuggestedCategories.forEach(geminiCat => {
+            if (!combinedCategoriesMap.has(geminiCat.title.toLowerCase())) {
+                combinedCategoriesMap.set(geminiCat.title.toLowerCase(), geminiCat);
+            }
+        });
+
+        const finalCategories = Array.from(combinedCategoriesMap.values());
+
+        res.status(200).json({ categories: finalCategories }); // Retorna um objeto com a chave 'categories'
+
     } catch (error) {
-        console.error("Erro ao buscar as 10 categorias mais procuradas do Sanity:", error);
-        res.status(500).json({ error: 'Erro ao buscar as categorias mais procuradas.', details: error.message });
+        console.error('Erro no controller getTopCategories:', error);
+        res.status(500).json({ message: 'Erro interno do servidor ao buscar categorias combinadas.' });
     }
 };
 
 /**
  * @function getTopSubCategories
- * @description Retorna as 10 subcategorias mais procuradas para uma categoria específica do Sanity CMS.
- * Atualmente, busca todas relacionadas à categoria e limita.
+ * @description Retorna subcategorias combinando Sanity e Gemini, sem duplicatas.
  * @route GET /api/courses/create/top-subcategories
  * @access Protected
  * @param {string} req.query.categoryId - O ID da categoria selecionada.
@@ -171,60 +200,187 @@ export const getTopSubCategories = async (req, res) => {
     if (!sanityClient) {
         return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
     }
-    try {
-        const { categoryId } = req.query;
+    const { categoryId } = req.query;
 
-        if (!categoryId) {
-            return res.status(400).json({ message: 'Category ID é obrigatório para buscar subcategorias.' });
+    if (!categoryId) {
+        return res.status(400).json({ message: 'ID da categoria é necessário para buscar subcategorias.' });
+    }
+
+    try {
+        // 1. Buscar subcategorias existentes do Sanity para a categoria específica
+        const sanitySubCategories = await sanityClient.fetch(`*[_type == "courseSubCategory" && parentCategory._ref == $categoryId] | order(title asc) {_id, title, "categoryRef": parentCategory._ref}`, { categoryId });
+
+        // 2. Buscar 10 subcategorias populares da Gemini API
+        let geminiSuggestedSubCategories = [];
+        if (GEMINI_API_KEY) {
+            try {
+                const categoryTitle = await sanityClient.fetch(`*[_id == $categoryId][0].title`, { categoryId });
+
+                const geminiResponse = await axios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+                    {
+                        contents: [
+                            {
+                                parts: [
+                                    {
+                                        text: `Liste 10 subcategorias populares para cursos online na categoria "${categoryTitle || 'geral'}", no formato JSON, como uma lista de strings. Exemplo: [\"Front-end\", \"Back-end\", \"Mobile Development\"].`
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        timeout: 15000
+                    }
+                );
+
+                const geminiText = geminiResponse.data.candidates[0]?.content?.parts[0]?.text;
+                if (geminiText) {
+                    const jsonMatch = geminiText.match(/\[.*\]/s);
+                    if (jsonMatch && jsonMatch[0]) {
+                        try {
+                            const parsedSubCategories = JSON.parse(jsonMatch[0]);
+                            if (Array.isArray(parsedSubCategories)) {
+                                geminiSuggestedSubCategories = parsedSubCategories.map(name => ({
+                                    _id: `gemini-${name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
+                                    title: name,
+                                    categoryRef: categoryId // Anexa a categoria para consistência
+                                }));
+                            }
+                        } catch (parseError) {
+                            console.error('Erro ao parsear JSON da Gemini para subcategorias:', parseError);
+                        }
+                    }
+                }
+            } catch (geminiError) {
+                console.error('Erro ao chamar Gemini API para subcategorias:', geminiError.response?.data?.error || geminiError.message);
+            }
+        } else {
+            console.warn("GEMINI_API_KEY não definida. Sugestões de subcategorias da Gemini serão ignoradas.");
         }
 
-        // ASSUNÇÃO: Similar às categorias, se houver um campo de popularidade em courseSubCategory,
-        // use-o para ordenar. Caso contrário, ordem alfabética e limite.
-        const query = `*[_type == "courseSubCategory" && parentCategory._ref == $categoryId] | order(title asc) [0...10] {_id, title, "categoryRef": parentCategory._ref}`;
-        const subCategories = await sanityClient.fetch(query, { categoryId });
-        res.status(200).json(subCategories);
+
+        // 3. Combinar e remover duplicatas
+        const combinedSubCategoriesMap = new Map();
+
+        sanitySubCategories.forEach(subCat => {
+            combinedSubCategoriesMap.set(subCat.title.toLowerCase(), subCat);
+        });
+
+        geminiSuggestedSubCategories.forEach(geminiSubCat => {
+            if (!combinedSubCategoriesMap.has(geminiSubCat.title.toLowerCase())) {
+                combinedSubCategoriesMap.set(geminiSubCat.title.toLowerCase(), geminiSubCat);
+            }
+        });
+
+        const finalSubCategories = Array.from(combinedSubCategoriesMap.values());
+
+        res.status(200).json({ subCategories: finalSubCategories }); // Retorna um objeto com a chave 'subCategories'
+
     } catch (error) {
-        console.error("Erro ao buscar as 10 subcategorias mais procuradas do Sanity:", error);
-        res.status(500).json({ error: 'Erro ao buscar as subcategorias mais procuradas.', details: error.message });
+        console.error('Erro no controller getTopSubCategories:', error);
+        res.status(500).json({ message: 'Erro interno do servidor ao buscar subcategorias combinadas.' });
     }
 };
 
 /**
  * @function getTopTags
- * @description Retorna as 10 tags mais procuradas relacionadas a uma categoria e subcategoria.
- * Prioriza tags com base em referências e limita a 10.
+ * @description Retorna tags combinando Sanity e Gemini, sem duplicatas.
  * @route GET /api/courses/create/top-tags
  * @access Protected
  * @param {string} req.query.categoryId - O ID da categoria selecionada.
  * @param {string} req.query.subCategoryId - O ID da subcategoria selecionada.
- * @returns {Array<string>} Retorna um array de strings com os nomes das tags.
  */
 export const getTopTags = async (req, res) => {
     if (!sanityClient) {
         return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
     }
-    try {
-        const { categoryId, subCategoryId } = req.query;
+    const { categoryId, subCategoryId } = req.query;
 
-        if (!categoryId || !subCategoryId) {
-            return res.status(400).json({ message: 'Category ID e Subcategory ID são obrigatórios para buscar tags.' });
+    if (!categoryId || !subCategoryId) {
+        return res.status(400).json({ message: 'IDs de categoria e subcategoria são obrigatórios para buscar tags.' });
+    }
+
+    try {
+        // 1. Buscar tags existentes do Sanity para a categoria e subcategoria específicas
+        // Ajuste a query GROQ para refletir seu schema de courseTag
+        const sanityTags = await sanityClient.fetch(`*[_type == "courseTag" && $categoryId in categories[]._ref && $subCategoryId in subCategories[]._ref] | order(name asc) {_id, name}`, { categoryId, subCategoryId });
+
+        // 2. Buscar 10 tags populares da Gemini API
+        let geminiSuggestedTags = [];
+        if (GEMINI_API_KEY) {
+            try {
+                const categoryTitle = await sanityClient.fetch(`*[_id == $categoryId][0].title`, { categoryId });
+                const subCategoryTitle = await sanityClient.fetch(`*[_id == $subCategoryId][0].title`, { subCategoryId });
+
+                const geminiResponse = await axios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+                    {
+                        contents: [
+                            {
+                                parts: [
+                                    {
+                                        text: `Liste 10 tags populares para cursos online na categoria "${categoryTitle || 'geral'}" e subcategoria "${subCategoryTitle || 'geral'}", no formato JSON, como uma lista de strings. Exemplo: [\"JavaScript\", \"React\", \"Node.js\"].`
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        timeout: 15000
+                    }
+                );
+
+                const geminiText = geminiResponse.data.candidates[0]?.content?.parts[0]?.text;
+                if (geminiText) {
+                    const jsonMatch = geminiText.match(/\[.*\]/s);
+                    if (jsonMatch && jsonMatch[0]) {
+                        try {
+                            const parsedTags = JSON.parse(jsonMatch[0]);
+                            if (Array.isArray(parsedTags)) {
+                                geminiSuggestedTags = parsedTags.map(name => ({
+                                    _id: `gemini-${name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
+                                    name: name
+                                }));
+                            }
+                        } catch (parseError) {
+                            console.error('Erro ao parsear JSON da Gemini para tags:', parseError);
+                        }
+                    }
+                }
+            } catch (geminiError) {
+                console.error('Erro ao chamar Gemini API para tags:', geminiError.response?.data?.error || geminiError.message);
+            }
+        } else {
+            console.warn("GEMINI_API_KEY não definida. Sugestões de tags da Gemini serão ignoradas.");
         }
 
-        // Esta query busca tags que estejam associadas à CATEGORIA E (opcionalmente) à SUBCATEGORIA.
-        // Se suas tags no Sanity tiverem um campo para popularidade ou se forem referenciadas por muitos cursos,
-        // você pode usar essa informação para ordenar. Aqui, estamos buscando por relevância e limitando.
-        const query = `
-            *[_type == "courseTag" && $categoryId in categories[]._ref && $subCategoryId in subCategories[]._ref]
-            | order(name asc) [0...10] {
-                name
-            }
-        `;
-        const tags = await sanityClient.fetch(query, { categoryId, subCategoryId });
 
-        const tagNames = tags.map(tag => tag.name);
-        res.status(200).json(tagNames);
+        // 3. Combinar e remover duplicatas
+        const combinedTagsMap = new Map();
+
+        sanityTags.forEach(tag => {
+            combinedTagsMap.set(tag.name.toLowerCase(), tag);
+        });
+
+        geminiSuggestedTags.forEach(geminiTag => {
+            if (!combinedTagsMap.has(geminiTag.name.toLowerCase())) {
+                combinedTagsMap.set(geminiTag.name.toLowerCase(), geminiTag);
+            }
+        });
+
+        const finalTags = Array.from(combinedTagsMap.values());
+
+        res.status(200).json({ tags: finalTags }); // Retorna um objeto com a chave 'tags'
+
     } catch (error) {
-        console.error('Erro ao buscar as 10 tags mais procuradas:', error);
-        res.status(500).json({ message: 'Erro interno do servidor ao buscar as tags mais procuradas.', error: error.message });
+        console.error('Erro no controller getTopTags:', error);
+        res.status(500).json({ message: 'Erro interno do servidor ao buscar tags combinadas.', error: error.message });
     }
 };
