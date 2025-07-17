@@ -12,8 +12,8 @@ const sanityClient = (process.env.SANITY_PROJECT_ID && process.env.SANITY_TOKEN)
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET || 'production',
     apiVersion: '2025-06-12', // Mantendo sua versão
-    useCdn: false, // Usar CDN para leituras (melhora performance), embora para escritas deva ser 'false'.
-    token: process.env.SANITY_TOKEN, 
+    useCdn: true, // Usar CDN para leituras (melhora performance)
+    token: process.env.SANITY_TOKEN, // Seu token é necessário mesmo para leituras se o dataset for privado
 }) : null;
 
 // --- Funções do Controlador de Dados ---
@@ -64,8 +64,6 @@ export const getCourseSubCategories = async (req, res) => {
  * @route GET /api/data/tags/byCategory/:categoryId
  * @access Public
  * @returns {Array<string>} Retorna um array de strings com os nomes das tags.
- * * NOTA: Esta função pode ser removida ou adaptada se getAllTags lidar com o filtro.
- * Por enquanto, mantive para compatibilidade ou caso haja um uso específico.
  */
 export const getCourseTagsByCategory = async (req, res) => {
     if (!sanityClient) {
@@ -80,21 +78,20 @@ export const getCourseTagsByCategory = async (req, res) => {
 
         const tags = await sanityClient.fetch(
             `*[_type == "courseTag" && $categoryId in categories[]._ref] | order(name asc) {
-                name // Apenas o nome da tag
+                name
             }`,
             { categoryId }
         );
 
         const tagNames = tags.map(tag => tag.name);
 
-        res.status(200).json(tagNames);
+        res.status(200).json(tagNames); // Retorna um ARRAY de strings como esperado
     } catch (error) {
         console.error('Erro ao buscar tags por categoria:', error);
         res.status(500).json({ message: 'Erro interno do servidor ao buscar tags por categoria.', error: error.message });
     }
 };
 
-// --- FUNÇÃO MODIFICADA: getAllTags agora pode filtrar por categoria ---
 /**
  * @function getAllTags
  * @description Retorna TODAS as tags de cursos do Sanity CMS, opcionalmente filtradas por categoria.
@@ -114,30 +111,120 @@ export const getAllTags = async (req, res) => {
         let params = {};
 
         if (categoryId) {
-            // Se categoryId é fornecido, filtra as tags que contêm essa categoria na lista de referências
             query = `*[_type == "courseTag" && $categoryId in categories[]._ref] | order(name asc) {
-                _id, 
-                name 
+                _id,
+                name
             }`;
             params = { categoryId };
             console.log(`[BACKEND - getAllTags] Buscando tags para a categoria: ${categoryId}`);
         } else {
-            // Se categoryId não é fornecido, busca todas as tags
             query = `*[_type == "courseTag"] | order(name asc) {
-                _id, 
-                name 
+                _id,
+                name
             }`;
             console.log("[BACKEND - getAllTags] Buscando todas as tags.");
         }
 
         const tags = await sanityClient.fetch(query, params);
-        
-        res.status(200).json(tags);
+
+        res.status(200).json(tags); // Retorna um ARRAY de objetos como esperado
     } catch (error) {
         console.error("Erro ao buscar tags do Sanity (getAllTags):", error);
         res.status(500).json({ error: 'Erro ao buscar tags de cursos.', details: error.message });
     }
 };
 
-// Se você tiver uma linha de exportação única no final, ela deve incluir todas:
-// export { getCourseCategories, getCourseSubCategories, getCourseTagsByCategory, getAllTags };
+
+/**
+ * @function getTopCategories
+ * @description Retorna as 10 categorias de cursos mais procuradas do Sanity CMS.
+ * Atualmente, busca todas e limita, idealmente seria um campo de popularidade.
+ * @route GET /api/courses/create/top-categories
+ * @access Protected
+ */
+export const getTopCategories = async (req, res) => {
+    if (!sanityClient) {
+        return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
+    }
+    try {
+        // ASSUNÇÃO: Se você tiver um campo de "popularidade" ou "contador de buscas" no schema courseCategory,
+        // você pode ordenar por ele para ter categorias realmente "mais procuradas".
+        // Ex: `*[_type == "courseCategory"] | order(popularity desc) [0...10] {_id, title}`
+        const query = `*[_type == "courseCategory"] | order(title asc) [0...10] {_id, title}`;
+        const categories = await sanityClient.fetch(query);
+        res.status(200).json(categories);
+    } catch (error) {
+        console.error("Erro ao buscar as 10 categorias mais procuradas do Sanity:", error);
+        res.status(500).json({ error: 'Erro ao buscar as categorias mais procuradas.', details: error.message });
+    }
+};
+
+/**
+ * @function getTopSubCategories
+ * @description Retorna as 10 subcategorias mais procuradas para uma categoria específica do Sanity CMS.
+ * Atualmente, busca todas relacionadas à categoria e limita.
+ * @route GET /api/courses/create/top-subcategories
+ * @access Protected
+ * @param {string} req.query.categoryId - O ID da categoria selecionada.
+ */
+export const getTopSubCategories = async (req, res) => {
+    if (!sanityClient) {
+        return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
+    }
+    try {
+        const { categoryId } = req.query;
+
+        if (!categoryId) {
+            return res.status(400).json({ message: 'Category ID é obrigatório para buscar subcategorias.' });
+        }
+
+        // ASSUNÇÃO: Similar às categorias, se houver um campo de popularidade em courseSubCategory,
+        // use-o para ordenar. Caso contrário, ordem alfabética e limite.
+        const query = `*[_type == "courseSubCategory" && parentCategory._ref == $categoryId] | order(title asc) [0...10] {_id, title, "categoryRef": parentCategory._ref}`;
+        const subCategories = await sanityClient.fetch(query, { categoryId });
+        res.status(200).json(subCategories);
+    } catch (error) {
+        console.error("Erro ao buscar as 10 subcategorias mais procuradas do Sanity:", error);
+        res.status(500).json({ error: 'Erro ao buscar as subcategorias mais procuradas.', details: error.message });
+    }
+};
+
+/**
+ * @function getTopTags
+ * @description Retorna as 10 tags mais procuradas relacionadas a uma categoria e subcategoria.
+ * Prioriza tags com base em referências e limita a 10.
+ * @route GET /api/courses/create/top-tags
+ * @access Protected
+ * @param {string} req.query.categoryId - O ID da categoria selecionada.
+ * @param {string} req.query.subCategoryId - O ID da subcategoria selecionada.
+ * @returns {Array<string>} Retorna um array de strings com os nomes das tags.
+ */
+export const getTopTags = async (req, res) => {
+    if (!sanityClient) {
+        return res.status(500).json({ error: 'Configuração do Sanity Client indisponível.' });
+    }
+    try {
+        const { categoryId, subCategoryId } = req.query;
+
+        if (!categoryId || !subCategoryId) {
+            return res.status(400).json({ message: 'Category ID e Subcategory ID são obrigatórios para buscar tags.' });
+        }
+
+        // Esta query busca tags que estejam associadas à CATEGORIA E (opcionalmente) à SUBCATEGORIA.
+        // Se suas tags no Sanity tiverem um campo para popularidade ou se forem referenciadas por muitos cursos,
+        // você pode usar essa informação para ordenar. Aqui, estamos buscando por relevância e limitando.
+        const query = `
+            *[_type == "courseTag" && $categoryId in categories[]._ref && $subCategoryId in subCategories[]._ref]
+            | order(name asc) [0...10] {
+                name
+            }
+        `;
+        const tags = await sanityClient.fetch(query, { categoryId, subCategoryId });
+
+        const tagNames = tags.map(tag => tag.name);
+        res.status(200).json(tagNames);
+    } catch (error) {
+        console.error('Erro ao buscar as 10 tags mais procuradas:', error);
+        res.status(500).json({ message: 'Erro interno do servidor ao buscar as tags mais procuradas.', error: error.message });
+    }
+};

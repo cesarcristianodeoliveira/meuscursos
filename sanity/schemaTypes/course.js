@@ -29,8 +29,8 @@ export default {
       description: 'A brief overview of what the course covers.'
     },
     {
-      name: 'image',
-      title: 'Course Image',
+      name: 'mainImage',
+      title: 'Course Main Image',
       type: 'image',
       options: {
         hotspot: true, // Allows selecting focal point for image crops
@@ -188,7 +188,7 @@ export default {
       subCategoryTitle: 'subCategory.title',
       // ADICIONE ISTO para que as tags apareçam no preview do Studio, se desejar
       courseTags: 'courseTags',
-      media: 'image',
+      media: 'mainImage',
       status: 'status',
       creatorName: 'creator.name',
     },

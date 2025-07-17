@@ -126,7 +126,7 @@ export default {
       courseTitle: 'course.title',
       order: 'order',
       status: 'status',
-      media: 'mainMedia',
+      media: 'image',
     },
     prepare(selection) {
       const { title, courseTitle, order, status, media } = selection;
