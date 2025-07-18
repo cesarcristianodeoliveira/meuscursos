@@ -1,13 +1,14 @@
 // D:\meuscursos\backend\controllers\dataController.js
 
 import axios from 'axios';
-// *** REMOVIDAS AS IMPORTAÇÕES DOS MODELOS MONGODB PARA A VERSÃO 0.1 ***
-// import Category from '../models/Category.js';
-// import SubCategory from '../models/SubCategory.js';
-// import Tag from '../models/Tag.js';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-1.5-flash'; // <<< Modelo Gemini 1.5 Flash >>>
+const GEMINI_MODEL = 'gemini-1.5-flash'; // Mantendo o modelo correto: gemini-1.5-flash
+
+// --- Variáveis para Cache da Gemini Categories ---
+let cachedGeminiCategories = null;
+const CATEGORY_CACHE_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 horas em milissegundos
+let categoryCacheTimestamp = 0;
 
 // Helper para parsear a resposta JSON do Gemini
 const parseGeminiResponse = (response) => {
@@ -32,17 +33,23 @@ const parseGeminiResponse = (response) => {
     }
 };
 
-// --- Funções para Categorias (Adaptada para a v0.1: sem Mongoose, apenas Gemini) ---
-
-// Esta função agora usa a Gemini API para gerar nomes de categorias
-// e os retorna com IDs mockados, sem interagir com um banco de dados.
+// --- Funções para Categorias (Com Cache e Gemini) ---
 export const getTopCategories = async (req, res) => {
     if (!GEMINI_API_KEY) {
         return res.status(500).json({ message: 'GEMINI_API_KEY não configurada no .env.' });
     }
 
+    const now = Date.now();
+
+    // 1. Tenta servir do cache se ele for válido
+    if (cachedGeminiCategories && (now - categoryCacheTimestamp < CATEGORY_CACHE_LIFETIME_MS)) {
+        console.log("[Backend] Servindo categorias da Gemini do cache.");
+        return res.status(200).json(cachedGeminiCategories);
+    }
+
+    // 2. Se o cache expirou ou não existe, chama a Gemini API
+    console.log("[Backend] Cache de categorias expirado ou não definido. Chamando Gemini API...");
     try {
-        // Prompt para gerar categorias de cursos populares
         const geminiPrompt = `Liste 10 categorias de cursos populares e em alta demanda (por exemplo: "Tecnologia", "Marketing", "Arte e Design", "Idiomas", "Negócios", "Saúde e Bem-estar", "Finanças", "Desenvolvimento Pessoal", "Fotografia", "Culinária"). Responda APENAS com uma lista JSON de strings, sem descrições ou textos adicionais, sem markdown. Exemplo: ["Programação", "Marketing Digital"]`;
 
         const geminiResponse = await axios.post(
@@ -62,7 +69,7 @@ export const getTopCategories = async (req, res) => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                timeout: 20000 // Aumenta o timeout para 20 segundos
+                timeout: 20000 
             }
         );
 
@@ -74,10 +81,29 @@ export const getTopCategories = async (req, res) => {
             name: name
         }));
 
+        // 3. Atualiza o cache e o timestamp
+        cachedGeminiCategories = categories;
+        categoryCacheTimestamp = now;
+        console.log(`[Backend] Geradas e cacheadas ${categories.length} categorias da Gemini.`);
+
         res.status(200).json(categories);
 
     } catch (geminiError) {
         console.error('Erro ao chamar Gemini API para categorias:', geminiError.response?.data || geminiError.message);
-        res.status(500).json({ message: 'Erro ao gerar categorias com Gemini API.', error: geminiError.message });
+        
+        // --- NOVO TRATAMENTO DE ERRO PARA COTA EXCEDIDA (429) ---
+        if (geminiError.response && geminiError.response.status === 429) {
+            // Se a Gemini API retornou 429, repassa essa informação
+            return res.status(429).json({ message: 'Cota da Gemini API excedida. Por favor, verifique seu plano e tente novamente mais tarde.' });
+        }
+
+        // Se a Gemini falhar por outro motivo, tenta servir do cache antigo se ele existir, ou vazio se não
+        if (cachedGeminiCategories) {
+            console.warn("[Backend] Gemini API call failed, serving stale cache if available.");
+            return res.status(200).json(cachedGeminiCategories); // Serve o cache antigo para não quebrar a aplicação
+        } else {
+            console.warn("[Backend] Gemini API call failed and no cache available.");
+            return res.status(500).json({ message: 'Erro ao gerar categorias com Gemini API e sem cache disponível.', error: geminiError.message });
+        }
     }
 };
