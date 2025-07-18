@@ -11,23 +11,20 @@ import {
     Button,
     Alert,
     Snackbar,
-    // REMOVIDOS daqui, pois são usados apenas dentro de SelectCategoryStep:
-    // CircularProgress, List, ListItem, ListItemText
 } from '@mui/material';
 
-// Importa os componentes de cada passo
-// Agora importamos SelectCategoryStep como um componente normal
-import SelectCategoryStep from './components/SelectCategoryStep';
-import SelectSubCategoryStep from './components/SelectSubCategoryStep';
-import SelectTagsStep from './components/SelectTagsStep';
-import ReviewAndCreateStep from './components/ReviewAndCreateStep';
+import {
+    SelectCategoryStep, 
+    SelectSubCategoryStep,
+    SelectTagsStep,
+    ReviewAndCreateStep
+} from './components'; 
 
 import axios from 'axios';
-import { useAuth } from '../../../contexts/AuthContext'; // Importa o hook de autenticação
+import { useAuth } from '../../../contexts/AuthContext'; 
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
-// Define os passos do Stepper. Para a v0.1, os outros passos são "Em Breve".
 const steps = ['Selecione a Categoria', 'Passo 2 (Em Breve)', 'Passo 3 (Em Breve)', 'Passo 4 (Em Breve)'];
 
 function CourseCreatePage() {
@@ -150,7 +147,7 @@ function CourseCreatePage() {
         switch (step) {
             case 0:
                 return (
-                    // AGORA RENDERIZAMOS O COMPONENTE SelectCategoryStep
+                    // AGORA RENDERIZAMOS O COMPONENTE SelectCategoryStep CORRETAMENTE
                     <SelectCategoryStep
                         categories={categories}
                         selectedCategory={selectedCategory}
