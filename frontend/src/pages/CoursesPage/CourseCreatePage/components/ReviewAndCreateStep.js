@@ -1,8 +1,9 @@
-// D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\ReviewAndCreateStep.js
+// D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\components\ReviewAndCreateStep.js
 import React from 'react';
+// CORRIGIDO: Removido '=>' aqui
 import { Box, Typography, Alert } from '@mui/material';
 
-function ReviewAndCreateStep({ /* props desativadas na v0.1 */ }) {
+function ReviewAndCreateStep() {
     return (
         <Box sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>

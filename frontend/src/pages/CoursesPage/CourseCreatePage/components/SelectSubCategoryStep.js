@@ -1,8 +1,9 @@
-// D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\SelectSubCategoryStep.js
+// D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\components\SelectSubCategoryStep.js
 import React from 'react';
+// CORRIGIDO: Removido '=>' aqui
 import { Box, Typography, Alert } from '@mui/material';
 
-function SelectSubCategoryStep({ /* props desativadas na v0.1 */ }) {
+function SelectSubCategoryStep() {
     return (
         <Box sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
