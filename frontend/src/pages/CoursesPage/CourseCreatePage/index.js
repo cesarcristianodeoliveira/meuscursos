@@ -9,17 +9,16 @@ import {
     Step,
     StepLabel,
     Button,
-    // CircularProgress, // REMOVIDO AQUI, já que é usado dentro de SelectCategoryStep
     Alert,
     Snackbar,
 } from '@mui/material';
 
 // IMPORTANTE: Estes arquivos DEVEM existir na mesma pasta
 // E agora as props vazias foram corrigidas nos próprios componentes
-import SelectCategoryStep from './SelectCategoryStep';
-import SelectSubCategoryStep from './SelectSubCategoryStep';
-import SelectTagsStep from './SelectTagsStep';
-import ReviewAndCreateStep from './ReviewAndCreateStep';
+import SelectCategoryStep from './components/SelectCategoryStep';
+import SelectSubCategoryStep from './components/SelectSubCategoryStep';
+import SelectTagsStep from './components/SelectTagsStep';
+import ReviewAndCreateStep from './components/ReviewAndCreateStep';
 
 import axios from 'axios';
 
