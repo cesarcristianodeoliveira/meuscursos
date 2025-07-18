@@ -14,10 +14,10 @@ import {
     Snackbar,
 } from '@mui/material';
 
-import SelectCategoryStep from './SelectCategoryStep';
-import SelectSubCategoryStep from './SelectSubCategoryStep';
-import SelectTagsStep from './SelectTagsStep';
-import ReviewAndCreateStep from './ReviewAndCreateStep';
+import SelectCategoryStep from './components/SelectCategoryStep';
+import SelectSubCategoryStep from './components/SelectSubCategoryStep';
+import SelectTagsStep from './components/SelectTagsStep';
+import ReviewAndCreateStep from './components/ReviewAndCreateStep';
 
 import axios from 'axios';
 
