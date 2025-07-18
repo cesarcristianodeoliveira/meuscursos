@@ -18,7 +18,7 @@ import {
 } from './controllers/dataController.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3001; // <--- PORTA 3001 AQUI
 
 app.use(cors());
 app.use(express.json());
@@ -59,7 +59,7 @@ app.post('/api/auth/login', login);
 // --- ROTAS PARA CRIAÇÃO DE CURSOS (PROTEGIDAS) ---
 
 // Passo 1: Busca as categorias combinadas (Sanity + Gemini)
-app.get('/api/courses/create/top-categories', protect, getTopCategories);
+app.get('/api/courses/create/top-categories', protect, getTopCategories); // <--- ROTA ESPECÍFICA AQUI
 
 // --- Rotas de DADOS GERAIS e outros passos de criação de curso REMOVIDOS TEMPORARIAMENTE ---
 // Serão adicionadas de volta conforme a necessidade em cada passo.

@@ -1,204 +1,174 @@
-// frontend\src\pages\CoursesPage\CourseCreatePage\index.js
+// D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\index.js
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
+    Container,
+    Typography,
     Box,
     Stepper,
     Step,
     StepLabel,
     Button,
-    Typography,
     CircularProgress,
     Alert,
-    List,
-    ListItem,
-    ListItemButton,
-    ListItemText,
-    ListItemIcon
+    Snackbar,
 } from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'; // Ícone de seleção visual
-import { useAuth } from '../../../contexts/AuthContext'; // Importa o hook de autenticação
-import axios from 'axios'; // Para fazer requisições HTTP ao backend
 
-// Define a URL base do backend a partir do .env
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
+import SelectCategoryStep from './SelectCategoryStep';
+import SelectSubCategoryStep from './SelectSubCategoryStep';
+import SelectTagsStep from './SelectTagsStep';
+import ReviewAndCreateStep from './ReviewAndCreateStep';
 
-// --- Componente Principal: CourseCreatePage ---
-const CourseCreatePage = () => {
-    // Estados para o Stepper
+import axios from 'axios';
+
+const steps = ['Selecione a Categoria', 'Passo 2 (Em Breve)', 'Passo 3 (Em Breve)', 'Passo 4 (Em Breve)'];
+
+function CourseCreatePage() {
     const [activeStep, setActiveStep] = useState(0);
-    const steps = [
-        'Selecionar Categoria',
-        'Detalhes do Curso', // Próximos passos
-        'Conteúdo do Curso',
-        'Publicar Curso',
-    ];
-
-    // Estados para o Passo 1: Seleção de Categoria
     const [selectedCategory, setSelectedCategory] = useState(null);
+
     const [categories, setCategories] = useState([]);
     const [loadingCategories, setLoadingCategories] = useState(false);
     const [errorCategories, setErrorCategories] = useState(null);
 
-    const { isAuthenticated, userToken } = useAuth(); // Obtém o estado de autenticação e o token do contexto
+    const [snackbarOpen, setSnackbarOpen] = useState(false);
+    const [snackbarMessage, setSnackbarMessage] = useState('');
+    const [snackbarSeverity, setSnackbarSeverity] = useState('success');
 
-    // Função para buscar categorias do backend
-    const fetchCategories = useCallback(async () => {
-        if (!isAuthenticated) {
-            setErrorCategories("Você precisa estar logado para criar um curso. Redirecionando...");
-            // Opcional: Redirecionar para login após um pequeno atraso
-            // setTimeout(() => navigate('/login'), 2000);
+    const handleSnackbarClose = (event, reason) => {
+        if (reason === 'clickaway') {
             return;
         }
+        setSnackbarOpen(false);
+    };
 
+    const showSnackbar = (message, severity) => {
+        setSnackbarMessage(message);
+        setSnackbarSeverity(severity);
+        setSnackbarOpen(true);
+    };
+
+    // --- Funções de Fetch ---
+
+    const fetchCategories = useCallback(async () => {
         setLoadingCategories(true);
-        setErrorCategories(null); // Limpa erros anteriores
+        setErrorCategories(null);
         try {
-            console.log(`[Frontend] Buscando categorias em: ${API_BASE_URL}/api/courses/create/top-categories`);
-            const response = await axios.get(`${API_BASE_URL}/api/courses/create/top-categories`, {
-                headers: {
-                    Authorization: `Bearer ${userToken}`, // Envia o token de autenticação
-                },
+            // *** CORREÇÃO AQUI: PORTA E ROTA ATUALIZADAS PARA BATER COM SEU BACKEND ***
+            const response = await axios.get('http://localhost:3001/api/courses/create/top-categories', {
+                // Se o seu login estiver funcionando, você precisará adicionar o token JWT aqui:
+                // headers: {
+                //     Authorization: `Bearer ${localStorage.getItem('token')}` // Exemplo: se você guarda o token no localStorage
+                // }
             });
-            console.log("[Frontend] Categorias recebidas:", response.data.categories);
-            if (response.data && Array.isArray(response.data.categories)) {
-                setCategories(response.data.categories);
+            setCategories(response.data);
+        } catch (err) {
+            console.error('Erro ao buscar categorias:', err);
+            // Mensagem de erro mais útil para o usuário
+            if (axios.isAxiosError(err) && err.code === 'ERR_NETWORK') {
+                setErrorCategories('Erro de rede: O servidor backend pode não estar rodando ou está inacessível. Verifique se o backend está iniciado na porta 3001.');
+                showSnackbar('Erro de conexão com o servidor. Tente novamente.', 'error');
+            } else if (err.response) {
+                // Erro do servidor (e.g., 401 Unauthorized, 500 Internal Server Error)
+                setErrorCategories(`Erro do servidor: ${err.response.status} - ${err.response.data.message || 'Erro desconhecido.'}`);
+                showSnackbar(`Erro: ${err.response.data.message || 'Algo deu errado no servidor.'}`, 'error');
             } else {
-                setCategories([]);
-                setErrorCategories("Formato de dados de categorias inesperado ou vazio.");
+                // Outros erros
+                setErrorCategories('Ocorreu um erro desconhecido ao carregar categorias.');
+                showSnackbar('Ocorreu um erro inesperado.', 'error');
             }
-        } catch (error) {
-            console.error('[Frontend] Erro ao buscar categorias:', error);
-            if (error.response) {
-                // Erro de resposta do servidor (e.g., 401, 403, 500)
-                setErrorCategories(`Erro do servidor: ${error.response.status} - ${error.response.data.message || 'Ocorreu um erro'}`);
-            } else if (error.request) {
-                // Requisição feita, mas nenhuma resposta recebida
-                setErrorCategories('Nenhuma resposta do servidor. Verifique sua conexão ou se o backend está rodando.');
-            } else {
-                // Algo aconteceu na configuração da requisição que disparou um erro
-                setErrorCategories(`Erro ao configurar a requisição: ${error.message}`);
-            }
-            setCategories([]); // Limpa as categorias em caso de erro
         } finally {
             setLoadingCategories(false);
         }
-    }, [isAuthenticated, userToken]); // Dependências para re-executar a busca
+    }, []);
 
-    // Efeito para carregar as categorias quando o componente monta ou o estado de autenticação muda
+    // --- Efeitos de Carregamento de Dados ---
+
     useEffect(() => {
-        if (isAuthenticated && categories.length === 0 && !loadingCategories && !errorCategories) {
-            fetchCategories();
-        }
-    }, [isAuthenticated, categories.length, loadingCategories, errorCategories, fetchCategories]);
+        fetchCategories();
+    }, [fetchCategories]);
 
+    // --- Lógica de Navegação do Stepper ---
 
-    // Funções de navegação do Stepper
     const handleNext = () => {
-        // Validação para o Passo 1
         if (activeStep === 0 && !selectedCategory) {
-            setErrorCategories("Por favor, selecione uma categoria para continuar.");
+            showSnackbar('Por favor, selecione uma categoria para continuar.', 'warning');
             return;
         }
-        setErrorCategories(null); // Limpa o erro se a validação passar
-        setActiveStep((prevActiveStep) => prevActiveStep + 1);
+        // Se for o Passo 0 e a categoria estiver selecionada, avança para o próximo passo (que estará desativado)
+        if (activeStep === 0 && selectedCategory) {
+            setActiveStep((prevActiveStep) => prevActiveStep + 1);
+            showSnackbar('Funções de Subcategoria, Tags e Criação em desenvolvimento. Fique no Passo 1 por enquanto!', 'info');
+            return;
+        }
+        // Os botões "Próximo" nos passos 1, 2, 3 estão desabilitados na UI, então esta parte
+        // teoricamente não será alcançada, mas mantemos a validação defensiva.
+        if (activeStep < steps.length - 1) {
+            setActiveStep((prevActiveStep) => prevActiveStep + 1);
+        }
     };
 
     const handleBack = () => {
-        setErrorCategories(null); // Limpa erros ao voltar
         setActiveStep((prevActiveStep) => prevActiveStep - 1);
     };
 
-    const handleReset = () => {
-        setActiveStep(0);
-        setSelectedCategory(null);
-        setCategories([]);
-        setLoadingCategories(false);
-        setErrorCategories(null);
-    };
-
-    // Conteúdo de cada passo do Stepper
     const getStepContent = (step) => {
         switch (step) {
             case 0:
                 return (
-                    <Box sx={{ p: 3 }}>
-                        <Typography variant="h6" gutterBottom>
-                            Passo 1: Selecione a Categoria Principal do Curso
-                        </Typography>
-
-                        {/* Exibição de Erros */}
-                        {errorCategories && (
-                            <Alert severity="error" sx={{ my: 2 }}>
-                                {errorCategories}
-                                {!loadingCategories && ( // Oferece botão de tentar novamente se não estiver carregando
-                                    <Button onClick={fetchCategories} sx={{ mt: 1 }}>Tentar Novamente</Button>
-                                )}
-                            </Alert>
-                        )}
-
-                        {/* Indicador de Carregamento */}
-                        {loadingCategories ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', my: 4 }}>
-                                <CircularProgress />
-                                <Typography sx={{ mt: 2 }}>Buscando categorias...</Typography>
-                            </Box>
-                        ) : (
-                            // Lista de Categorias
-                            <List sx={{ width: '100%', bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                                {categories.length > 0 ? (
-                                    categories.map((category) => (
-                                        <ListItem
-                                            key={category._id}
-                                            disablePadding
-                                            selected={selectedCategory && selectedCategory._id === category._id}
-                                            sx={{
-                                                borderBottom: '1px solid',
-                                                borderColor: 'divider',
-                                                '&:last-child': { borderBottom: 'none' },
-                                            }}
-                                        >
-                                            <ListItemButton onClick={() => setSelectedCategory(category)}>
-                                                <ListItemText primary={category.title} />
-                                                {selectedCategory && selectedCategory._id === category._id && (
-                                                    <ListItemIcon sx={{ minWidth: 40, justifyContent: 'flex-end' }}>
-                                                        <CheckCircleIcon color="primary" />
-                                                    </ListItemIcon>
-                                                )}
-                                            </ListItemButton>
-                                        </ListItem>
-                                    ))
-                                ) : (
-                                    !errorCategories && ( // Mostra mensagem apenas se não houver erro
-                                        <Typography sx={{ p: 2, textAlign: 'center' }}>Nenhuma categoria disponível.</Typography>
-                                    )
-                                )}
-                            </List>
-                        )}
-                    </Box>
+                    <SelectCategoryStep
+                        categories={categories}
+                        selectedCategory={selectedCategory}
+                        setSelectedCategory={setSelectedCategory}
+                        loading={loadingCategories}
+                        error={errorCategories}
+                    />
                 );
             case 1:
-                return <Typography sx={{ p: 3 }}>Passo 2: Configurar Detalhes do Curso (Em Breve)</Typography>;
+                return (
+                    <Box sx={{ p: 3 }}>
+                        <Typography variant="h6" gutterBottom>
+                            Passo 2: Selecione a Subcategoria
+                        </Typography>
+                        <Alert severity="info">
+                            Funcionalidade de Subcategorias em desenvolvimento para esta versão 0.1.
+                            Por favor, volte para o Passo 1 ou aguarde as próximas atualizações.
+                        </Alert>
+                    </Box>
+                );
             case 2:
-                return <Typography sx={{ p: 3 }}>Passo 3: Adicionar Conteúdo do Curso (Em Breve)</Typography>;
+                return (
+                    <Box sx={{ p: 3 }}>
+                        <Typography variant="h6" gutterBottom>
+                            Passo 3: Selecione as Tags
+                        </Typography>
+                        <Alert severity="info">
+                            Funcionalidade de Tags em desenvolvimento para esta versão 0.1.
+                            Por favor, volte para o Passo 1 ou aguarde as próximas atualizações.
+                        </Alert>
+                    </Box>
+                );
             case 3:
-                return <Typography sx={{ p: 3 }}>Passo 4: Revisar e Publicar (Em Breve)</Typography>;
+                return (
+                    <Box sx={{ p: 3 }}>
+                        <Typography variant="h6" gutterBottom>
+                            Passo 4: Revisar e Criar
+                        </Typography>
+                        <Alert severity="info">
+                            Funcionalidade de Criação de Curso em desenvolvimento para esta versão 0.1.
+                            Por favor, volte para o Passo 1 ou aguarde as próximas atualizações.
+                        </Alert>
+                    </Box>
+                );
             default:
-                return <Typography sx={{ p: 3 }}>Passo desconhecido</Typography>;
+                return 'Passo desconhecido';
         }
     };
 
-    // Determina se o botão "Próximo" deve estar desabilitado
-    const isNextButtonDisabled = () => {
-        if (loadingCategories) return true; // Desabilitar enquanto carrega
-        if (activeStep === 0 && !selectedCategory) return true; // Requer seleção no passo 1
-        // Adicionar outras validações para futuros passos aqui
-        return false;
-    };
-
     return (
-        <Box sx={{ width: '100%', p: 4 }}>
-            <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 4, textAlign: 'center' }}>
-                Criar Novo Curso
+        <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+            <Typography variant="h4" component="h1" gutterBottom align="center">
+                Criar Novo Curso (v0.1 - Foco em Categorias)
             </Typography>
 
             <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
@@ -209,46 +179,46 @@ const CourseCreatePage = () => {
                 ))}
             </Stepper>
 
-            <Box>
-                {activeStep === steps.length ? (
-                    // Conteúdo quando todos os passos são concluídos
-                    <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <Typography variant="h5" sx={{ mb: 2 }}>
-                            Processo de Criação Concluído!
-                        </Typography>
-                        <Typography>Os detalhes finais do curso serão adicionados aqui.</Typography>
-                        <Button onClick={handleReset} sx={{ mt: 2 }} variant="contained">
-                            Criar Outro Curso
+            <Box sx={{ p: 3, border: '1px solid #e0e0e0', borderRadius: '8px', minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                {getStepContent(activeStep)}
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+                    <Button
+                        disabled={activeStep === 0 || activeStep > 0} // Desabilita o "Voltar" no primeiro passo e o "Próximo" nos outros para a v0.1
+                        onClick={handleBack}
+                        variant="outlined"
+                    >
+                        Voltar
+                    </Button>
+                    {activeStep === steps.length - 1 ? (
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            disabled // Sempre desabilitado na v0.1
+                            startIcon={null}
+                        >
+                            Criar Curso (Em Breve)
                         </Button>
-                    </Box>
-                ) : (
-                    // Conteúdo do passo atual e botões de navegação
-                    <>
-                        {getStepContent(activeStep)}
-                        <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
-                            <Button
-                                color="inherit"
-                                disabled={activeStep === 0}
-                                onClick={handleBack}
-                                sx={{ mr: 1 }}
-                            >
-                                Voltar
-                            </Button>
-                            <Box sx={{ flex: '1 1 auto' }} /> {/* Espaçador */}
-                            <Button
-                                onClick={handleNext}
-                                variant="contained"
-                                disabled={isNextButtonDisabled()}
-                            >
-                                {activeStep === steps.length - 1 ? 'Finalizar' : 'Próximo'}
-                                {isNextButtonDisabled() && loadingCategories && <CircularProgress size={20} sx={{ ml: 1, color: 'white' }} />} {/* Indicador no botão */}
-                            </Button>
-                        </Box>
-                    </>
-                )}
+                    ) : (
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={handleNext}
+                            disabled={activeStep > 0} // Desabilita o "Próximo" após o primeiro passo
+                        >
+                            Próximo
+                        </Button>
+                    )}
+                </Box>
             </Box>
-        </Box>
+
+            <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>
+                <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+                    {snackbarMessage}
+                </Alert>
+            </Snackbar>
+        </Container>
     );
-};
+}
 
 export default CourseCreatePage;
