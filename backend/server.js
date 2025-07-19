@@ -10,8 +10,10 @@ import jwt from 'jsonwebtoken';
 import { register, login } from './controllers/authController.js';
 
 // --- Importa funções do dataController ---
+// Agora importamos getTopCategories e createCategory
 import {
     getTopCategories, 
+    createCategory // NOVO: Importa a função createCategory
 } from './controllers/dataController.js';
 
 const app = express();
@@ -66,6 +68,15 @@ const protect = (req, res, next) => {
     }
 };
 
+// --- Middleware para verificar se o usuário é Admin ---
+const adminProtect = (req, res, next) => {
+    if (!req.user || !req.user.isAdmin) {
+        return res.status(403).json({ message: 'Acesso negado. Apenas administradores podem realizar esta ação.' });
+    }
+    next();
+};
+
+
 // --- Rotas da API ---
 app.get('/', (req, res) => {
     res.send('Servidor do backend "Meus Cursos" está rodando! 🙌');
@@ -77,7 +88,11 @@ app.post('/api/auth/login', login);
 
 // --- ROTAS PARA CRIAÇÃO DE CURSOS (PROTEGIDAS) ---
 
+// Rota para buscar as categorias (protegida)
 app.get('/api/courses/create/top-categories', protect, getTopCategories); 
+
+// NOVO: Rota para criar uma nova categoria (protegida por adminProtect)
+app.post('/api/categories', protect, adminProtect, createCategory); // Protegida por usuário e admin
 
 // --- Inicia o Servidor ---
 app.listen(PORT, () => {
@@ -88,4 +103,5 @@ app.listen(PORT, () => {
     console.log(`POST /api/auth/register`); 
     console.log(`POST /api/auth/login`);
     console.log(`GET /api/courses/create/top-categories (protegida)`); 
+    console.log(`POST /api/categories (protegida por admin)`); // Adicionado ao log de endpoints
 });

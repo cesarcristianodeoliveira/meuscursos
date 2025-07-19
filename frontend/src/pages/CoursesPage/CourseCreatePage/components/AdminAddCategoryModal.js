@@ -9,13 +9,15 @@ import {
     Button,
     CircularProgress
 } from '@mui/material';
-// axios REMOVIDO: Não é usado na simulação atual
+import axios from 'axios'; // AGORA AXIOS É USADO!
 
 // Este componente será responsável por criar uma nova categoria
 // e notificar o componente pai sobre o sucesso/falha
 function AdminAddCategoryModal({ open, onClose, isAuthenticated, userToken, onCategoryCreated, onShowAlert }) {
     const [newCategoryTitle, setNewCategoryTitle] = useState('');
     const [addingCategory, setAddingCategory] = useState(false);
+
+    const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
     const handleCreateCategory = async () => {
         if (!newCategoryTitle.trim()) {
@@ -29,26 +31,26 @@ function AdminAddCategoryModal({ open, onClose, isAuthenticated, userToken, onCa
 
         setAddingCategory(true);
         try {
-            // FUTURO: Aqui você faria a chamada real para o seu backend para salvar no Sanity
-            // Exemplo de como seria a chamada real (você precisaria criar esta rota no backend):
-            /*
-            const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/categories`, 
-                { title: newCategoryTitle }, // Envia o título da nova categoria
-                { headers: { Authorization: `Bearer ${userToken}` } }
+            // CHAMADA REAL PARA O BACKEND
+            const response = await axios.post(`${API_BASE_URL}/api/categories`, 
+                { title: newCategoryTitle.trim() }, // Envia o título da nova categoria
+                { 
+                    headers: { 
+                        Authorization: `Bearer ${userToken}`,
+                        'Content-Type': 'application/json' // Garante que o tipo de conteúdo é JSON
+                    } 
+                }
             );
-            const createdCategory = response.data; // Assumindo que o backend retorna a categoria criada
-            */
+            const createdCategory = response.data; // Assumindo que o backend retorna a categoria criada {_id, name}
 
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Simula API call
-            const createdCategory = { _id: `temp-${Date.now()}`, name: newCategoryTitle }; // Simula categoria criada
-
-            onShowAlert(`Categoria "${newCategoryTitle}" criada com sucesso!`, 'success');
+            onShowAlert(`Categoria "${createdCategory.name}" criada com sucesso!`, 'success');
             onCategoryCreated(createdCategory); // Notifica o pai com a categoria criada
             onClose(); // Fecha o modal
 
         } catch (error) {
-            console.error('Erro ao criar categoria:', error);
-            onShowAlert('Erro ao criar categoria. Tente novamente.', 'error');
+            console.error('Erro ao criar categoria:', error.response?.data || error.message);
+            const errorMessage = error.response?.data?.message || 'Erro ao criar categoria. Tente novamente.';
+            onShowAlert(errorMessage, 'error');
         } finally {
             setAddingCategory(false);
         }

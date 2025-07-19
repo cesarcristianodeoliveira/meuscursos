@@ -16,9 +16,9 @@ let geminiCategoryCacheTimestamp = 0;
 const sanityClient = createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET,
-    apiVersion: process.env.SANITY_API_VERSION, 
-    token: process.env.SANITY_TOKEN, // Apenas se o acesso exigir autenticação
-    useCdn: true, // Use CDN para leituras mais rápidas
+    apiVersion: process.env.SANITY_API_VERSION || '2023-05-03', // Use a API version mais recente ou a sua
+    token: process.env.SANITY_TOKEN, // O token é NECESSÁRIO para operações de ESCRITA
+    useCdn: false, // Para escrita, é melhor não usar CDN para garantir que a escrita vá para o ponto de origem
 });
 
 // Helper para parsear a resposta JSON do Gemini
@@ -102,7 +102,6 @@ export const getTopCategories = async (req, res) => {
                 console.error('Erro ao chamar Gemini API para categorias:', geminiError.response?.data || geminiError.message);
                 geminiErrorFlag = true; // Marca que houve um erro na Gemini
 
-                // Se a Gemini falhar (incluindo 429), tenta servir do cache antigo
                 if (cachedGeminiCategories) {
                     console.warn("[Backend] Gemini API call failed, serving stale cache if available.");
                     geminiSuggestedCategories = cachedGeminiCategories; // Serve o cache antigo
@@ -110,7 +109,6 @@ export const getTopCategories = async (req, res) => {
                     console.warn("[Backend] Gemini API call failed and no cache available. Gemini categories will be empty.");
                     geminiSuggestedCategories = []; // Garante que é um array vazio se não houver cache
                 }
-                // *** REMOVIDO: NENHUM RETORNO DE ERRO AQUI. CONTINUA PARA COMBINAR. ***
             }
         }
     }
@@ -141,10 +139,55 @@ export const getTopCategories = async (req, res) => {
 
     console.log(`[Backend] Total de ${finalCategories.length} categorias combinadas (Sanity + Gemini).`);
     
-    // --- NOVO: Retorna as categorias combinadas e uma flag de erro da Gemini ---
-    // O frontend usará esta flag para exibir o Snackbar de cota excedida
     res.status(200).json({ 
         categories: finalCategories,
         geminiQuotaExceeded: geminiErrorFlag 
     });
+};
+
+// NOVO: Função para criar uma nova categoria no Sanity
+export const createCategory = async (req, res) => {
+    const { title } = req.body; // Espera receber 'title' do frontend
+
+    if (!title || typeof title !== 'string' || title.trim() === '') {
+        return res.status(400).json({ message: 'O título da categoria é obrigatório e deve ser uma string não vazia.' });
+    }
+
+    // Opcional: Verificar se a categoria já existe para evitar duplicatas
+    try {
+        const existingCategory = await sanityClient.fetch(`*[_type == "courseCategory" && title == $title][0]`, { title });
+        if (existingCategory) {
+            return res.status(409).json({ message: 'Esta categoria já existe.' });
+        }
+    } catch (error) {
+        console.error('Erro ao verificar categoria existente no Sanity:', error.message);
+        // Continua mesmo com erro na verificação para não bloquear a criação
+    }
+
+    const newCategoryDoc = {
+        _type: 'courseCategory',
+        title: title.trim(),
+        // Sanity irá gerar o _id automaticamente. O slug pode ser gerado no Sanity Studio
+        // ou você pode gerar aqui se quiser controle total:
+        // slug: {
+        //     _type: 'slug',
+        //     current: title.toLowerCase().replace(/\s+/g, '-').slice(0, 96)
+        // }
+    };
+
+    try {
+        const createdDoc = await sanityClient.create(newCategoryDoc);
+        console.log(`[Backend] Categoria "${createdDoc.title}" criada no Sanity com ID: ${createdDoc._id}`);
+        
+        // Invalida o cache da Gemini para que a próxima requisição busque a nova categoria
+        cachedGeminiCategories = null; 
+        geminiCategoryCacheTimestamp = 0;
+
+        // Retorna a categoria criada no formato que o frontend espera (_id, name)
+        res.status(201).json({ _id: createdDoc._id, name: createdDoc.title });
+
+    } catch (error) {
+        console.error('Erro ao criar categoria no Sanity:', error.message);
+        res.status(500).json({ message: 'Erro ao criar categoria no Sanity.', error: error.message });
+    }
 };
