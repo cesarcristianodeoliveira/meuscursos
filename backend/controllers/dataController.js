@@ -16,7 +16,7 @@ let geminiCategoryCacheTimestamp = 0;
 const sanityClient = createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET,
-    apiVersion: '2025-06-12', // Use a API version mais recente ou a sua
+    apiVersion: process.env.SANITY_API_VERSION || '2025-06-12', // Use a API version mais recente ou a sua
     token: process.env.SANITY_TOKEN, // Apenas se o acesso exigir autenticação
     useCdn: true, // Use CDN para leituras mais rápidas
 });
@@ -49,14 +49,17 @@ export const getTopCategories = async (req, res) => {
 
     // 1. Buscar Categorias do Sanity
     try {
-        // CORRIGIDO: Tipo de documento Sanity para "courseCategory"
-        const query = `*[_type == "courseCategory"]{_id, name}`;
+        // CORRIGIDO: Buscar o campo 'title' do Sanity
+        const query = `*[_type == "courseCategory"]{_id, title}`;
         const rawSanityCategories = await sanityClient.fetch(query);
         
-        // FILTRAR CATEGORIAS DO SANITY COM _ID OU NAME NULOS/UNDEFINED/VAZIOS
+        // FILTRAR CATEGORIAS DO SANITY E MAPEÁ-LAS PARA O FORMATO ESPERADO (_id, name)
         sanityCategories = rawSanityCategories.filter(cat => 
-            cat && typeof cat._id === 'string' && typeof cat.name === 'string' && cat.name.trim() !== ''
-        );
+            cat && typeof cat._id === 'string' && typeof cat.title === 'string' && cat.title.trim() !== ''
+        ).map(cat => ({
+            _id: cat._id,
+            name: cat.title // Mapeia 'title' do Sanity para 'name'
+        }));
         
         console.log(`[Backend] Buscadas ${sanityCategories.length} categorias válidas do Sanity.`);
     } catch (error) {
@@ -117,7 +120,7 @@ export const getTopCategories = async (req, res) => {
 
     // Adiciona categorias do Sanity (prioridade)
     sanityCategories.forEach(cat => {
-        // A verificação de validade já foi feita no filtro acima, mas garantimos o tipo aqui
+        // A verificação de validade e o mapeamento já foram feitos acima
         if (cat && typeof cat.name === 'string' && cat.name.trim() !== '') {
             const normalizedName = cat.name.toLowerCase();
             combinedCategoriesMap.set(normalizedName, { _id: cat._id, name: cat.name });
