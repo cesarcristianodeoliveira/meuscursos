@@ -16,7 +16,7 @@ let geminiCategoryCacheTimestamp = 0;
 const sanityClient = createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET,
-    apiVersion: process.env.SANITY_API_VERSION || '2023-05-03', // Use a API version mais recente ou a sua
+    apiVersion: '2025-06-12', // Use a API version mais recente ou a sua
     token: process.env.SANITY_TOKEN, // Apenas se o acesso exigir autenticação
     useCdn: true, // Use CDN para leituras mais rápidas
 });
@@ -49,13 +49,13 @@ export const getTopCategories = async (req, res) => {
 
     // 1. Buscar Categorias do Sanity
     try {
-        // CORRIGIDO: Alterado o tipo de documento de "category" para "courseCategory"
+        // CORRIGIDO: Tipo de documento Sanity para "courseCategory"
         const query = `*[_type == "courseCategory"]{_id, name}`;
         const rawSanityCategories = await sanityClient.fetch(query);
         
-        // FILTRAR CATEGORIAS DO SANITY COM _ID OU NAME NULOS/UNDEFINED
+        // FILTRAR CATEGORIAS DO SANITY COM _ID OU NAME NULOS/UNDEFINED/VAZIOS
         sanityCategories = rawSanityCategories.filter(cat => 
-            cat && typeof cat._id === 'string' && typeof cat.name === 'string'
+            cat && typeof cat._id === 'string' && typeof cat.name === 'string' && cat.name.trim() !== ''
         );
         
         console.log(`[Backend] Buscadas ${sanityCategories.length} categorias válidas do Sanity.`);
@@ -84,10 +84,13 @@ export const getTopCategories = async (req, res) => {
                 );
 
                 const suggestedNames = parseGeminiResponse(geminiResponse);
-                geminiSuggestedCategories = suggestedNames.map(name => ({
-                    _id: `gemini-${name.toLowerCase().replace(/\s/g, '-')}`, // ID para categorias Gemini
-                    name: name
-                }));
+                // Filtrar nomes vazios ou não strings da Gemini também
+                geminiSuggestedCategories = suggestedNames
+                    .filter(name => typeof name === 'string' && name.trim() !== '')
+                    .map(name => ({
+                        _id: `gemini-${name.toLowerCase().replace(/\s/g, '-')}`, // ID para categorias Gemini
+                        name: name
+                    }));
 
                 cachedGeminiCategories = geminiSuggestedCategories;
                 geminiCategoryCacheTimestamp = now;
@@ -115,7 +118,7 @@ export const getTopCategories = async (req, res) => {
     // Adiciona categorias do Sanity (prioridade)
     sanityCategories.forEach(cat => {
         // A verificação de validade já foi feita no filtro acima, mas garantimos o tipo aqui
-        if (typeof cat.name === 'string') {
+        if (cat && typeof cat.name === 'string' && cat.name.trim() !== '') {
             const normalizedName = cat.name.toLowerCase();
             combinedCategoriesMap.set(normalizedName, { _id: cat._id, name: cat.name });
         }
@@ -123,7 +126,8 @@ export const getTopCategories = async (req, res) => {
 
     // Adiciona categorias sugeridas pela Gemini se não existirem já pelo nome
     geminiSuggestedCategories.forEach(cat => {
-        if (typeof cat.name === 'string') { // Garantir que o nome da Gemini também é string
+        // Garantir que o nome da Gemini também é string e não está vazio
+        if (cat && typeof cat.name === 'string' && cat.name.trim() !== '') { 
             const normalizedName = cat.name.toLowerCase();
             if (!combinedCategoriesMap.has(normalizedName)) {
                 combinedCategoriesMap.set(normalizedName, { _id: cat._id, name: cat.name });
