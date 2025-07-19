@@ -16,7 +16,7 @@ let geminiCategoryCacheTimestamp = 0;
 const sanityClient = createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET,
-    apiVersion: '2025-06-12', // Use a API version mais recente ou a sua
+    apiVersion: process.env.SANITY_API_VERSION || '2023-05-03', // Use a API version mais recente ou a sua
     token: process.env.SANITY_TOKEN, // Apenas se o acesso exigir autenticação
     useCdn: true, // Use CDN para leituras mais rápidas
 });
@@ -49,11 +49,14 @@ export const getTopCategories = async (req, res) => {
 
     // 1. Buscar Categorias do Sanity
     try {
-        const query = `*[_type == "category"]{_id, name}`;
+        // CORRIGIDO: Alterado o tipo de documento de "category" para "courseCategory"
+        const query = `*[_type == "courseCategory"]{_id, name}`;
         const rawSanityCategories = await sanityClient.fetch(query);
         
-        // FILTRAR CATEGORIAS DO SANITY COM NOME NULO/UNDEFINED AQUI
-        sanityCategories = rawSanityCategories.filter(cat => cat && typeof cat.name === 'string');
+        // FILTRAR CATEGORIAS DO SANITY COM _ID OU NAME NULOS/UNDEFINED
+        sanityCategories = rawSanityCategories.filter(cat => 
+            cat && typeof cat._id === 'string' && typeof cat.name === 'string'
+        );
         
         console.log(`[Backend] Buscadas ${sanityCategories.length} categorias válidas do Sanity.`);
     } catch (error) {
@@ -111,7 +114,7 @@ export const getTopCategories = async (req, res) => {
 
     // Adiciona categorias do Sanity (prioridade)
     sanityCategories.forEach(cat => {
-        // A verificação já foi feita acima, mas aqui garantimos que o nome é uma string
+        // A verificação de validade já foi feita no filtro acima, mas garantimos o tipo aqui
         if (typeof cat.name === 'string') {
             const normalizedName = cat.name.toLowerCase();
             combinedCategoriesMap.set(normalizedName, { _id: cat._id, name: cat.name });
