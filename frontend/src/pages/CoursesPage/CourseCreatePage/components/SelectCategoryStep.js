@@ -4,57 +4,59 @@ import {
     Box,
     Typography,
     List,
-    ListItem,
+    ListItemButton, // Alterado de ListItem para ListItemButton
     ListItemText,
     CircularProgress,
     Alert,
-    // Button REMOVIDO
 } from '@mui/material';
 
 // onCategorySelectAndAdvance é a única função de clique
-// isAdmin e onAddCategoryClick REMOVIDOS
 function SelectCategoryStep({ categories, selectedCategory, onCategorySelectAndAdvance, loading, error }) {
     return (
-        <Box>
-            <Typography variant="h6" gutterBottom>
+        <Box sx={{ width: '100%', bgcolor: 'background.paper', borderRadius: '8px', overflow: 'hidden' }}>
+            <Typography variant="h6" gutterBottom sx={{ p: 2, pb: 0 }}>
                 Selecione a Categoria Principal do Curso
             </Typography>
             {loading ? (
-                <CircularProgress />
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '150px' }}>
+                    <CircularProgress />
+                </Box>
             ) : error ? (
-                <Alert severity="error">{error}</Alert>
+                <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>
             ) : (
                 <>
-                    <List>
+                    <List component="nav" aria-label="main course categories">
                         {categories.length === 0 ? (
-                            <Typography variant="body2" color="textSecondary">
+                            <Typography variant="body2" color="textSecondary" sx={{ p: 2 }}>
                                 Nenhuma categoria disponível. Verifique o backend ou sua conexão.
                             </Typography>
                         ) : (
                             categories.map((category) => (
-                                <ListItem
-                                    button
+                                <ListItemButton
                                     key={category._id}
                                     selected={selectedCategory && selectedCategory._id === category._id}
                                     onClick={() => onCategorySelectAndAdvance(category)} 
                                     sx={{
-                                        border: '1px solid #e0e0e0',
-                                        borderRadius: '4px',
-                                        marginBottom: '8px',
+                                        // Estilo baseado no exemplo, mas mantendo a seleção visível
                                         '&.Mui-selected': {
-                                            backgroundColor: 'primary.light',
+                                            backgroundColor: 'primary.main', // Cor de destaque para selecionado
+                                            color: 'white', // Texto branco para contraste
                                             '&:hover': {
-                                                backgroundColor: 'primary.light',
+                                                backgroundColor: 'primary.dark', // Escurece no hover
                                             },
                                         },
+                                        '&:hover': {
+                                            backgroundColor: 'action.hover', // Cor padrão de hover
+                                        },
+                                        borderRadius: '4px', // Mantém bordas arredondadas
+                                        margin: '4px 8px', // Adiciona um pequeno espaçamento entre os itens
                                     }}
                                 >
                                     <ListItemText primary={category.name} />
-                                </ListItem>
+                                </ListItemButton>
                             ))
                         )}
                     </List>
-                    {/* O botão "Criar Nova Categoria (Admin)" foi movido para o index.js */}
                 </>
             )}
         </Box>
