@@ -13,6 +13,7 @@ import {
     Snackbar,
 } from '@mui/material';
 
+// Importa os componentes de cada passo
 import {
     SelectCategoryStep, 
     SelectSubCategoryStep,
@@ -21,10 +22,11 @@ import {
 } from './components'; 
 
 import axios from 'axios';
-import { useAuth } from '../../../contexts/AuthContext'; 
+import { useAuth } from '../../../contexts/AuthContext'; // Importa o hook de autenticação
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
+// Define os passos do Stepper. Para a v0.1, os outros passos são "Em Breve".
 const steps = ['Selecione a Categoria', 'Passo 2 (Em Breve)', 'Passo 3 (Em Breve)', 'Passo 4 (Em Breve)'];
 
 function CourseCreatePage() {
