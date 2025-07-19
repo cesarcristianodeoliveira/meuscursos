@@ -10,15 +10,37 @@ import jwt from 'jsonwebtoken';
 import { register, login } from './controllers/authController.js';
 
 // --- Importa funções do dataController ---
-// Agora importamos getTopCategories
 import {
     getTopCategories, 
 } from './controllers/dataController.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001; // Porta 3001, como você especificou
+const PORT = process.env.PORT || 3001; 
 
-app.use(cors()); 
+// --- Configuração CORS para Produção ---
+// Permite requisições da sua URL do Netlify.
+// Se você estiver testando localmente, adicione 'http://localhost:3000' também.
+const allowedOrigins = [
+    'https://meuscursos.netlify.app', // Sua URL do Netlify
+    'http://localhost:3000',          // Para desenvolvimento local do frontend
+    // Adicione outras origens se necessário
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // Permite requisições sem 'origin' (ex: mobile apps, curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true, // Permite o envio de cookies de autenticação
+    optionsSuccessStatus: 204, // Para requisições OPTIONS
+}));
+
 app.use(express.json()); 
 
 // --- Middleware de Autenticação (JWT Protection) ---
@@ -55,8 +77,6 @@ app.post('/api/auth/login', login);
 
 // --- ROTAS PARA CRIAÇÃO DE CURSOS (PROTEGIDAS) ---
 
-// Rota para buscar as categorias (agora importada e definida)
-// O frontend chamará esta rota para obter as categorias da Gemini
 app.get('/api/courses/create/top-categories', protect, getTopCategories); 
 
 // --- Inicia o Servidor ---
@@ -67,5 +87,5 @@ app.listen(PORT, () => {
     console.log(`GET /`);
     console.log(`POST /api/auth/register`); 
     console.log(`POST /api/auth/login`);
-    console.log(`GET /api/courses/create/top-categories (protegida)`); // Adicionado ao log de endpoints
+    console.log(`GET /api/courses/create/top-categories (protegida)`); 
 });
