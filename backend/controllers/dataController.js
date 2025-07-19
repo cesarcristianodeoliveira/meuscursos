@@ -51,7 +51,7 @@ export const getTopCategories = async (req, res) => {
     try {
         // Assume que você tem um tipo de documento 'category' no Sanity
         // e que ele tem um campo 'name' e talvez um 'slug' ou 'id'
-        const query = `*[_type == "category"]{_id, name}`;
+        const query = `*[_type == "courseCategory"]{_id, name}`;
         sanityCategories = await sanityClient.fetch(query);
         console.log(`[Backend] Buscadas ${sanityCategories.length} categorias do Sanity.`);
     } catch (error) {
