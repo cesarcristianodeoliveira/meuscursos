@@ -62,79 +62,64 @@ function CourseCreatePage() {
 
     // --- Função para buscar categorias do backend ---
     const fetchCategories = useCallback(async () => {
-        // Verifica se o usuário está autenticado antes de fazer a requisição
         if (!isAuthenticated) {
             setErrorCategories("Você precisa estar logado para criar um curso.");
             showSnackbar("Você precisa estar logado para criar um curso.", "warning");
             return;
         }
 
-        setLoadingCategories(true); // Ativa o estado de carregamento
-        setErrorCategories(null); // Limpa erros anteriores
+        setLoadingCategories(true);
+        setErrorCategories(null);
         try {
-            // URL do backend: http://localhost:3001, rota: /api/courses/create/top-categories
             const response = await axios.get(`${API_BASE_URL}/api/courses/create/top-categories`, {
                 headers: {
-                    Authorization: `Bearer ${userToken}` // Envia o token de autenticação
+                    Authorization: `Bearer ${userToken}`
                 }
             });
-            setCategories(response.data); // Atualiza o estado com as categorias recebidas
+            
+            // NOVO: A resposta agora é um objeto com 'categories' e 'geminiQuotaExceeded'
+            setCategories(response.data.categories); 
+            if (response.data.geminiQuotaExceeded) {
+                showSnackbar('Cota da Gemini API excedida. As categorias sugeridas podem não estar completas.', 'warning');
+            }
+
         } catch (err) {
             console.error('Erro ao buscar categorias:', err);
-            // Tratamento de erros mais detalhado para feedback ao usuário
             if (axios.isAxiosError(err)) {
                 if (err.code === 'ERR_NETWORK') {
                     setErrorCategories('Erro de rede: O servidor backend pode não estar rodando ou está inacessível. Verifique se o backend está iniciado na porta 3001.');
                     showSnackbar('Erro de conexão com o servidor. Tente novamente.', 'error');
                 } else if (err.response) {
-                    // --- TRATAMENTO PARA ERRO 429 (Cota Excedida) ---
-                    if (err.response.status === 429) {
-                        setErrorCategories('Cota da Gemini API excedida. Por favor, tente novamente mais tarde ou verifique seu plano.');
-                        showSnackbar('Cota da Gemini API excedida. Tente mais tarde.', 'error');
-                    } else {
-                        // Outros erros de resposta do servidor
-                        setErrorCategories(`Erro do servidor: ${err.response.status} - ${err.response.data.message || 'Erro desconhecido.'}`);
-                        showSnackbar(`Erro: ${err.response.data.message || 'Algo deu errado no servidor.'}`, 'error');
-                    }
+                    // Se o backend retornou um erro (ex: 401 Unauthorized, 500 Internal Server Error)
+                    setErrorCategories(`Erro do servidor: ${err.response.status} - ${err.response.data.message || 'Erro desconhecido.'}`);
+                    showSnackbar(`Erro: ${err.response.data.message || 'Algo deu errado no servidor.'}`, 'error');
                 }
             } else {
-                // Outros erros inesperados
                 setErrorCategories('Ocorreu um erro desconhecido ao carregar categorias.');
                 showSnackbar('Ocorreu um erro inesperado.', 'error');
             }
         } finally {
-            setLoadingCategories(false); // Desativa o estado de carregamento
+            setLoadingCategories(false);
         }
-    }, [isAuthenticated, userToken]); // Dependências: re-executa se `isAuthenticated` ou `userToken` mudar
+    }, [isAuthenticated, userToken]);
 
-    // Efeito para carregar as categorias quando o componente monta ou o estado de autenticação muda
     useEffect(() => {
-        // Só tenta buscar se estiver autenticado e ainda não tiver categorias carregadas
         if (isAuthenticated && categories.length === 0 && !loadingCategories && !errorCategories) {
             fetchCategories();
         }
     }, [isAuthenticated, categories.length, loadingCategories, errorCategories, fetchCategories]);
 
 
-    // --- Lógica de Navegação do Stepper (Simplificada para a v0.1) ---
-
     const handleNext = () => {
-        // Validação para o Passo 1: Categoria deve ser selecionada
         if (activeStep === 0 && !selectedCategory) {
             showSnackbar('Por favor, selecione uma categoria para continuar.', 'warning');
-            return; // Impede o avanço se a categoria não estiver selecionada
+            return;
         }
-        
-        // Se a categoria foi selecionada no Passo 0, avança para o próximo passo
-        // e exibe uma mensagem informando que os próximos passos estão em desenvolvimento.
         if (activeStep === 0 && selectedCategory) {
             setActiveStep((prevActiveStep) => prevActiveStep + 1);
             showSnackbar('Funções de Subcategoria, Tags e Criação em desenvolvimento. Fique no Passo 1 por enquanto!', 'info');
-            return; // Retorna para não executar o resto da função
+            return;
         }
-
-        // Para a v0.1, os botões "Próximo" nos passos 1, 2, 3 estão desabilitados na UI.
-        // Esta parte do código é mais defensiva e não deve ser alcançada se os botões estiverem desabilitados corretamente.
         if (activeStep < steps.length - 1) {
             setActiveStep((prevActiveStep) => prevActiveStep + 1);
         }
@@ -144,12 +129,10 @@ function CourseCreatePage() {
         setActiveStep((prevActiveStep) => prevActiveStep - 1);
     };
 
-    // Renderiza o conteúdo de cada passo do Stepper
     const getStepContent = (step) => {
         switch (step) {
             case 0:
                 return (
-                    // AGORA RENDERIZAMOS O COMPONENTE SelectCategoryStep CORRETAMENTE
                     <SelectCategoryStep
                         categories={categories}
                         selectedCategory={selectedCategory}
@@ -160,17 +143,14 @@ function CourseCreatePage() {
                 );
             case 1:
                 return (
-                    // Renderiza o componente esqueleto para o Passo 2
                     <SelectSubCategoryStep />
                 );
             case 2:
                 return (
-                    // Renderiza o componente esqueleto para o Passo 3
                     <SelectTagsStep />
                 );
             case 3:
                 return (
-                    // Renderiza o componente esqueleto para o Passo 4
                     <ReviewAndCreateStep />
                 );
             default:
@@ -197,7 +177,6 @@ function CourseCreatePage() {
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
                     <Button
-                        // Desabilita o botão "Voltar" no primeiro passo e em todos os outros na v0.1
                         disabled={activeStep === 0 || activeStep > 0} 
                         onClick={handleBack}
                         variant="outlined"
@@ -205,7 +184,6 @@ function CourseCreatePage() {
                         Voltar
                     </Button>
                     {activeStep === steps.length - 1 ? (
-                        // Botão "Criar Curso" sempre desabilitado na v0.1
                         <Button
                             variant="contained"
                             color="primary"
@@ -215,12 +193,11 @@ function CourseCreatePage() {
                             Criar Curso (Em Breve)
                         </Button>
                     ) : (
-                        // Botão "Próximo" ativo apenas para o Passo 0, se a categoria for selecionada
                         <Button
                             variant="contained"
                             color="primary"
                             onClick={handleNext}
-                            disabled={activeStep > 0 || loadingCategories || !selectedCategory} // Desabilita se não for Passo 0, estiver carregando ou categoria não selecionada
+                            disabled={activeStep > 0 || loadingCategories || !selectedCategory} 
                         >
                             Próximo
                         </Button>
@@ -228,7 +205,6 @@ function CourseCreatePage() {
                 </Box>
             </Box>
 
-            {/* Snackbar reintroduzido */}
             <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>
                 <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
                     {snackbarMessage}

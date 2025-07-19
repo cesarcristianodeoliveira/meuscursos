@@ -16,7 +16,7 @@ let geminiCategoryCacheTimestamp = 0;
 const sanityClient = createClient({
     projectId: process.env.SANITY_PROJECT_ID,
     dataset: process.env.SANITY_DATASET,
-    apiVersion: process.env.SANITY_API_VERSION || '2025-06-12', // Use a API version mais recente ou a sua
+    apiVersion: process.env.SANITY_API_VERSION, 
     token: process.env.SANITY_TOKEN, // Apenas se o acesso exigir autenticação
     useCdn: true, // Use CDN para leituras mais rápidas
 });
@@ -46,14 +46,13 @@ const parseGeminiResponse = (response) => {
 export const getTopCategories = async (req, res) => {
     let sanityCategories = [];
     let geminiSuggestedCategories = [];
+    let geminiErrorFlag = false; // Flag para indicar erro na Gemini
 
     // 1. Buscar Categorias do Sanity
     try {
-        // CORRIGIDO: Buscar o campo 'title' do Sanity
-        const query = `*[_type == "courseCategory"]{_id, title}`;
+        const query = `*[_type == "courseCategory"]{_id, title}`; // Usando 'title' como no seu schema
         const rawSanityCategories = await sanityClient.fetch(query);
         
-        // FILTRAR CATEGORIAS DO SANITY E MAPEÁ-LAS PARA O FORMATO ESPERADO (_id, name)
         sanityCategories = rawSanityCategories.filter(cat => 
             cat && typeof cat._id === 'string' && typeof cat.title === 'string' && cat.title.trim() !== ''
         ).map(cat => ({
@@ -64,12 +63,13 @@ export const getTopCategories = async (req, res) => {
         console.log(`[Backend] Buscadas ${sanityCategories.length} categorias válidas do Sanity.`);
     } catch (error) {
         console.error('Erro ao buscar categorias do Sanity:', error.message);
-        // Não falha a requisição inteira se o Sanity falhar, apenas continua sem as categorias do Sanity
+        // Não falha a requisição inteira se o Sanity falhar
     }
 
     // 2. Buscar Categorias da Gemini (com cache)
     if (!GEMINI_API_KEY) {
         console.warn("[Backend] GEMINI_API_KEY não configurada. Não será possível gerar categorias com Gemini.");
+        geminiErrorFlag = true; // Marca que a Gemini não pôde ser usada
     } else {
         const now = Date.now();
         if (cachedGeminiCategories && (now - geminiCategoryCacheTimestamp < GEMINI_CATEGORY_CACHE_LIFETIME_MS)) {
@@ -87,11 +87,10 @@ export const getTopCategories = async (req, res) => {
                 );
 
                 const suggestedNames = parseGeminiResponse(geminiResponse);
-                // Filtrar nomes vazios ou não strings da Gemini também
                 geminiSuggestedCategories = suggestedNames
                     .filter(name => typeof name === 'string' && name.trim() !== '')
                     .map(name => ({
-                        _id: `gemini-${name.toLowerCase().replace(/\s/g, '-')}`, // ID para categorias Gemini
+                        _id: `gemini-${name.toLowerCase().replace(/\s/g, '-')}`,
                         name: name
                     }));
 
@@ -101,26 +100,26 @@ export const getTopCategories = async (req, res) => {
 
             } catch (geminiError) {
                 console.error('Erro ao chamar Gemini API para categorias:', geminiError.response?.data || geminiError.message);
-                if (geminiError.response && geminiError.response.status === 429) {
-                    return res.status(429).json({ message: 'Cota da Gemini API excedida. Por favor, verifique seu plano e tente novamente mais tarde.' });
-                }
+                geminiErrorFlag = true; // Marca que houve um erro na Gemini
+
+                // Se a Gemini falhar (incluindo 429), tenta servir do cache antigo
                 if (cachedGeminiCategories) {
                     console.warn("[Backend] Gemini API call failed, serving stale cache if available.");
                     geminiSuggestedCategories = cachedGeminiCategories; // Serve o cache antigo
                 } else {
-                    console.warn("[Backend] Gemini API call failed and no cache available.");
-                    // Não retorna erro 500 aqui para permitir que as categorias do Sanity sejam exibidas
+                    console.warn("[Backend] Gemini API call failed and no cache available. Gemini categories will be empty.");
+                    geminiSuggestedCategories = []; // Garante que é um array vazio se não houver cache
                 }
+                // *** REMOVIDO: NENHUM RETORNO DE ERRO AQUI. CONTINUA PARA COMBINAR. ***
             }
         }
     }
 
     // 3. Combinar, Remover Duplicatas e Ordenar
-    const combinedCategoriesMap = new Map(); // Usar Map para garantir unicidade pelo nome
+    const combinedCategoriesMap = new Map();
 
     // Adiciona categorias do Sanity (prioridade)
     sanityCategories.forEach(cat => {
-        // A verificação de validade e o mapeamento já foram feitos acima
         if (cat && typeof cat.name === 'string' && cat.name.trim() !== '') {
             const normalizedName = cat.name.toLowerCase();
             combinedCategoriesMap.set(normalizedName, { _id: cat._id, name: cat.name });
@@ -129,7 +128,6 @@ export const getTopCategories = async (req, res) => {
 
     // Adiciona categorias sugeridas pela Gemini se não existirem já pelo nome
     geminiSuggestedCategories.forEach(cat => {
-        // Garantir que o nome da Gemini também é string e não está vazio
         if (cat && typeof cat.name === 'string' && cat.name.trim() !== '') { 
             const normalizedName = cat.name.toLowerCase();
             if (!combinedCategoriesMap.has(normalizedName)) {
@@ -138,12 +136,15 @@ export const getTopCategories = async (req, res) => {
         }
     });
 
-    // Converte o Map de volta para um array
     const finalCategories = Array.from(combinedCategoriesMap.values());
-
-    // Ordena alfabeticamente pelo nome
     finalCategories.sort((a, b) => a.name.localeCompare(b.name));
 
     console.log(`[Backend] Total de ${finalCategories.length} categorias combinadas (Sanity + Gemini).`);
-    res.status(200).json(finalCategories);
+    
+    // --- NOVO: Retorna as categorias combinadas e uma flag de erro da Gemini ---
+    // O frontend usará esta flag para exibir o Snackbar de cota excedida
+    res.status(200).json({ 
+        categories: finalCategories,
+        geminiQuotaExceeded: geminiErrorFlag 
+    });
 };
