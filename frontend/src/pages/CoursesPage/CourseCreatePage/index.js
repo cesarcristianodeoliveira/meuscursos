@@ -8,9 +8,8 @@ import {
     Stepper,
     Step,
     StepLabel,
-    Button,
-    Alert,
-    Snackbar,
+    Alert, // Mantido para exibir mensagens diretamente
+    Button // Mantido para o botão de admin
 } from '@mui/material';
 
 // Importa os componentes de cada passo
@@ -18,7 +17,8 @@ import {
     SelectCategoryStep, 
     SelectSubCategoryStep,
     SelectTagsStep,
-    ReviewAndCreateStep
+    ReviewAndCreateStep,
+    AdminAddCategoryModal // NOVO: Importa o componente do modal de admin
 } from './components'; 
 
 import axios from 'axios';
@@ -26,8 +26,8 @@ import { useAuth } from '../../../contexts/AuthContext'; // Importa o hook de au
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
-// Define os passos do Stepper. Para a v0.1, os outros passos são "Em Breve".
-const steps = ['Selecione a Categoria', 'Passo 2 (Em Breve)', 'Passo 3 (Em Breve)', 'Passo 4 (Em Breve)'];
+// Define os passos do Stepper. O segundo passo agora é "Selecione a Subcategoria".
+const steps = ['Selecione a Categoria', 'Selecione a Subcategoria', 'Passo 3 (Em Breve)', 'Passo 4 (Em Breve)'];
 
 function CourseCreatePage() {
     // Estados para o Stepper e o Passo 1 (Categorias)
@@ -38,33 +38,29 @@ function CourseCreatePage() {
     const [loadingCategories, setLoadingCategories] = useState(false);
     const [errorCategories, setErrorCategories] = useState(null);
 
-    // Estados para o Snackbar
-    const [snackbarOpen, setSnackbarOpen] = useState(false);
-    const [snackbarMessage, setSnackbarMessage] = useState('');
-    const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+    // NOVO: Estado para controlar a exibição do Alert (substituindo Snackbar)
+    const [alertInfo, setAlertInfo] = useState({ message: null, severity: null });
 
-    // Obtém o estado de autenticação e o token do contexto
-    const { isAuthenticated, userToken } = useAuth(); 
+    // Obtém o estado de autenticação e o token do contexto, incluindo isAdmin
+    const { isAuthenticated, userToken, user } = useAuth(); 
+    const isAdmin = user?.isAdmin || false; // Define isAdmin com base no usuário logado
 
-    // Funções para gerenciar o Snackbar
-    const handleSnackbarClose = (event, reason) => {
-        if (reason === 'clickaway') {
-            return;
-        }
-        setSnackbarOpen(false);
-    };
+    // Estados para o modal de criação de categoria
+    const [openAddCategoryModal, setOpenAddCategoryModal] = useState(false);
 
-    const showSnackbar = (message, severity) => {
-        setSnackbarMessage(message);
-        setSnackbarSeverity(severity);
-        setSnackbarOpen(true);
-    };
+    // NOVO: Função para exibir o Alert (substitui showSnackbar)
+    const handleShowAlert = useCallback((message, severity) => {
+        setAlertInfo({ message, severity });
+        // O Alert não fecha automaticamente, então podemos adicionar um timer se quisermos,
+        // mas por enquanto, ele permanecerá visível até ser "limpo" ou substituído.
+        setTimeout(() => setAlertInfo({ message: null, severity: null }), 6000); // Limpa após 6 segundos
+    }, []); // showSnackbar não é mais uma dependência aqui
 
     // --- Função para buscar categorias do backend ---
     const fetchCategories = useCallback(async () => {
         if (!isAuthenticated) {
             setErrorCategories("Você precisa estar logado para criar um curso.");
-            showSnackbar("Você precisa estar logado para criar um curso.", "warning");
+            handleShowAlert("Você precisa estar logado para criar um curso.", "warning");
             return;
         }
 
@@ -77,10 +73,9 @@ function CourseCreatePage() {
                 }
             });
             
-            // NOVO: A resposta agora é um objeto com 'categories' e 'geminiQuotaExceeded'
             setCategories(response.data.categories); 
             if (response.data.geminiQuotaExceeded) {
-                showSnackbar('Cota da Gemini API excedida. As categorias sugeridas podem não estar completas.', 'warning');
+                handleShowAlert('Cota da Gemini API excedida. As categorias sugeridas podem não estar completas.', 'warning');
             }
 
         } catch (err) {
@@ -88,20 +83,19 @@ function CourseCreatePage() {
             if (axios.isAxiosError(err)) {
                 if (err.code === 'ERR_NETWORK') {
                     setErrorCategories('Erro de rede: O servidor backend pode não estar rodando ou está inacessível. Verifique se o backend está iniciado na porta 3001.');
-                    showSnackbar('Erro de conexão com o servidor. Tente novamente.', 'error');
+                    handleShowAlert('Erro de conexão com o servidor. Tente novamente.', 'error');
                 } else if (err.response) {
-                    // Se o backend retornou um erro (ex: 401 Unauthorized, 500 Internal Server Error)
                     setErrorCategories(`Erro do servidor: ${err.response.status} - ${err.response.data.message || 'Erro desconhecido.'}`);
-                    showSnackbar(`Erro: ${err.response.data.message || 'Algo deu errado no servidor.'}`, 'error');
+                    handleShowAlert(`Erro: ${err.response.data.message || 'Algo deu errado no servidor.'}`, 'error');
                 }
             } else {
                 setErrorCategories('Ocorreu um erro desconhecido ao carregar categorias.');
-                showSnackbar('Ocorreu um erro inesperado.', 'error');
+                handleShowAlert('Ocorreu um erro inesperado.', 'error');
             }
         } finally {
             setLoadingCategories(false);
         }
-    }, [isAuthenticated, userToken]);
+    }, [isAuthenticated, userToken, handleShowAlert]); // handleShowAlert é uma dependência, mas agora é estável
 
     useEffect(() => {
         if (isAuthenticated && categories.length === 0 && !loadingCategories && !errorCategories) {
@@ -110,40 +104,61 @@ function CourseCreatePage() {
     }, [isAuthenticated, categories.length, loadingCategories, errorCategories, fetchCategories]);
 
 
-    const handleNext = () => {
-        if (activeStep === 0 && !selectedCategory) {
-            showSnackbar('Por favor, selecione uma categoria para continuar.', 'warning');
-            return;
-        }
-        if (activeStep === 0 && selectedCategory) {
-            setActiveStep((prevActiveStep) => prevActiveStep + 1);
-            showSnackbar('Funções de Subcategoria, Tags e Criação em desenvolvimento. Fique no Passo 1 por enquanto!', 'info');
-            return;
-        }
-        if (activeStep < steps.length - 1) {
-            setActiveStep((prevActiveStep) => prevActiveStep + 1);
-        }
+    // --- Função para selecionar categoria e avançar ---
+    const handleCategorySelectAndAdvance = useCallback((category) => {
+        setSelectedCategory(category);
+        setActiveStep((prevActiveStep) => prevActiveStep + 1);
+        handleShowAlert(`Categoria "${category.name}" selecionada. Avançando para Subcategorias.`, 'info');
+    }, [handleShowAlert]); // handleShowAlert é uma dependência, mas agora é estável
+
+    // --- Funções para o Modal de Criação de Categoria ---
+    const handleOpenAddCategoryModal = () => {
+        setOpenAddCategoryModal(true);
     };
 
-    const handleBack = () => {
-        setActiveStep((prevActiveStep) => prevActiveStep - 1);
+    const handleCloseAddCategoryModal = () => {
+        setOpenAddCategoryModal(false);
     };
 
+    // NOVO: Callback quando uma categoria é criada no modal do admin
+    const handleAdminCategoryCreated = useCallback(async (newCategory) => {
+        // Recarrega as categorias para incluir a nova
+        await fetchCategories(); 
+        // Seleciona a categoria recém-criada e avança
+        handleCategorySelectAndAdvance(newCategory);
+    }, [fetchCategories, handleCategorySelectAndAdvance]);
+
+
+    // Renderiza o conteúdo de cada passo do Stepper
     const getStepContent = (step) => {
         switch (step) {
             case 0:
                 return (
-                    <SelectCategoryStep
-                        categories={categories}
-                        selectedCategory={selectedCategory}
-                        setSelectedCategory={setSelectedCategory}
-                        loading={loadingCategories}
-                        error={errorCategories}
-                    />
+                    <>
+                        <SelectCategoryStep
+                            categories={categories}
+                            selectedCategory={selectedCategory}
+                            onCategorySelectAndAdvance={handleCategorySelectAndAdvance} 
+                            loading={loadingCategories}
+                            error={errorCategories}
+                        />
+                        {/* Botão para Criar Nova Categoria (Admin) - AGORA AQUI, FORA DO SelectCategoryStep */}
+                        {isAdmin && (
+                            <Box sx={{ mt: 2, textAlign: 'center' }}>
+                                <Button
+                                    variant="outlined"
+                                    color="primary"
+                                    onClick={handleOpenAddCategoryModal}
+                                >
+                                    Criar Nova Categoria (Admin)
+                                </Button>
+                            </Box>
+                        )}
+                    </>
                 );
             case 1:
                 return (
-                    <SelectSubCategoryStep />
+                    <SelectSubCategoryStep selectedCategory={selectedCategory} />
                 );
             case 2:
                 return (
@@ -175,41 +190,25 @@ function CourseCreatePage() {
             <Box sx={{ p: 3, border: '1px solid #e0e0e0', borderRadius: '8px', minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 {getStepContent(activeStep)}
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                    <Button
-                        disabled={activeStep === 0 || activeStep > 0} 
-                        onClick={handleBack}
-                        variant="outlined"
-                    >
-                        Voltar
-                    </Button>
-                    {activeStep === steps.length - 1 ? (
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            disabled 
-                            startIcon={null}
-                        >
-                            Criar Curso (Em Breve)
-                        </Button>
-                    ) : (
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={handleNext}
-                            disabled={activeStep > 0 || loadingCategories || !selectedCategory} 
-                        >
-                            Próximo
-                        </Button>
-                    )}
-                </Box>
+                {/* REMOVIDOS OS BOTÕES DE NAVEGAÇÃO DO STEPPER */}
             </Box>
 
-            <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>
-                <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
-                    {snackbarMessage}
+            {/* Alert para mensagens de feedback */}
+            {alertInfo.message && (
+                <Alert severity={alertInfo.severity} sx={{ mt: 2, width: '100%' }}>
+                    {alertInfo.message}
                 </Alert>
-            </Snackbar>
+            )}
+
+            {/* Modal para Criar Nova Categoria (agora componente separado) */}
+            <AdminAddCategoryModal
+                open={openAddCategoryModal}
+                onClose={handleCloseAddCategoryModal}
+                isAuthenticated={isAuthenticated}
+                userToken={userToken}
+                onCategoryCreated={handleAdminCategoryCreated} // Callback para quando a categoria é criada
+                onShowAlert={handleShowAlert} // Passa a função de alert para o modal
+            />
         </Container>
     );
 }
