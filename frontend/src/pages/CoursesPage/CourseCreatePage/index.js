@@ -8,8 +8,8 @@ import {
     Stepper,
     Step,
     StepLabel,
-    Alert, // Mantido para exibir mensagens diretamente
-    Button // Mantido para o botão de admin
+    Alert,
+    Button
 } from '@mui/material';
 
 // Importa os componentes de cada passo
@@ -18,19 +18,17 @@ import {
     SelectSubCategoryStep,
     SelectTagsStep,
     ReviewAndCreateStep,
-    AdminAddCategoryModal // NOVO: Importa o componente do modal de admin
+    AdminAddCategoryModal
 } from './components'; 
 
 import axios from 'axios';
-import { useAuth } from '../../../contexts/AuthContext'; // Importa o hook de autenticação
+import { useAuth } from '../../../contexts/AuthContext';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
-// Define os passos do Stepper. O segundo passo agora é "Selecione a Subcategoria".
 const steps = ['Selecione a Categoria', 'Selecione a Subcategoria', 'Passo 3 (Em Breve)', 'Passo 4 (Em Breve)'];
 
 function CourseCreatePage() {
-    // Estados para o Stepper e o Passo 1 (Categorias)
     const [activeStep, setActiveStep] = useState(0);
     const [selectedCategory, setSelectedCategory] = useState(null);
 
@@ -38,25 +36,18 @@ function CourseCreatePage() {
     const [loadingCategories, setLoadingCategories] = useState(false);
     const [errorCategories, setErrorCategories] = useState(null);
 
-    // NOVO: Estado para controlar a exibição do Alert (substituindo Snackbar)
     const [alertInfo, setAlertInfo] = useState({ message: null, severity: null });
 
-    // Obtém o estado de autenticação e o token do contexto, incluindo isAdmin
     const { isAuthenticated, userToken, user } = useAuth(); 
-    const isAdmin = user?.isAdmin || false; // Define isAdmin com base no usuário logado
+    const isAdmin = user?.isAdmin || false;
 
-    // Estados para o modal de criação de categoria
     const [openAddCategoryModal, setOpenAddCategoryModal] = useState(false);
 
-    // NOVO: Função para exibir o Alert (substitui showSnackbar)
     const handleShowAlert = useCallback((message, severity) => {
         setAlertInfo({ message, severity });
-        // O Alert não fecha automaticamente, então podemos adicionar um timer se quisermos,
-        // mas por enquanto, ele permanecerá visível até ser "limpo" ou substituído.
-        setTimeout(() => setAlertInfo({ message: null, severity: null }), 6000); // Limpa após 6 segundos
-    }, []); // showSnackbar não é mais uma dependência aqui
+        setTimeout(() => setAlertInfo({ message: null, severity: null }), 6000);
+    }, []);
 
-    // --- Função para buscar categorias do backend ---
     const fetchCategories = useCallback(async () => {
         if (!isAuthenticated) {
             setErrorCategories("Você precisa estar logado para criar um curso.");
@@ -73,13 +64,17 @@ function CourseCreatePage() {
                 }
             });
             
-            setCategories(response.data.categories); 
+            // Certifica-se de que response.data.categories é um array
+            setCategories(Array.isArray(response.data.categories) ? response.data.categories : []); 
+            
             if (response.data.geminiQuotaExceeded) {
                 handleShowAlert('Cota da Gemini API excedida. As categorias sugeridas podem não estar completas.', 'warning');
             }
 
         } catch (err) {
             console.error('Erro ao buscar categorias:', err);
+            // NOVO: Resetar categories para um array vazio em caso de erro
+            setCategories([]); 
             if (axios.isAxiosError(err)) {
                 if (err.code === 'ERR_NETWORK') {
                     setErrorCategories('Erro de rede: O servidor backend pode não estar rodando ou está inacessível. Verifique se o backend está iniciado na porta 3001.');
@@ -95,7 +90,7 @@ function CourseCreatePage() {
         } finally {
             setLoadingCategories(false);
         }
-    }, [isAuthenticated, userToken, handleShowAlert]); // handleShowAlert é uma dependência, mas agora é estável
+    }, [isAuthenticated, userToken, handleShowAlert]);
 
     useEffect(() => {
         if (isAuthenticated && categories.length === 0 && !loadingCategories && !errorCategories) {
@@ -104,14 +99,12 @@ function CourseCreatePage() {
     }, [isAuthenticated, categories.length, loadingCategories, errorCategories, fetchCategories]);
 
 
-    // --- Função para selecionar categoria e avançar ---
     const handleCategorySelectAndAdvance = useCallback((category) => {
         setSelectedCategory(category);
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
         handleShowAlert(`Categoria "${category.name}" selecionada. Avançando para Subcategorias.`, 'info');
-    }, [handleShowAlert]); // handleShowAlert é uma dependência, mas agora é estável
+    }, [handleShowAlert]);
 
-    // --- Funções para o Modal de Criação de Categoria ---
     const handleOpenAddCategoryModal = () => {
         setOpenAddCategoryModal(true);
     };
@@ -120,16 +113,12 @@ function CourseCreatePage() {
         setOpenAddCategoryModal(false);
     };
 
-    // NOVO: Callback quando uma categoria é criada no modal do admin
     const handleAdminCategoryCreated = useCallback(async (newCategory) => {
-        // Recarrega as categorias para incluir a nova
         await fetchCategories(); 
-        // Seleciona a categoria recém-criada e avança
         handleCategorySelectAndAdvance(newCategory);
     }, [fetchCategories, handleCategorySelectAndAdvance]);
 
 
-    // Renderiza o conteúdo de cada passo do Stepper
     const getStepContent = (step) => {
         switch (step) {
             case 0:
@@ -142,7 +131,6 @@ function CourseCreatePage() {
                             loading={loadingCategories}
                             error={errorCategories}
                         />
-                        {/* Botão para Criar Nova Categoria (Admin) - AGORA AQUI, FORA DO SelectCategoryStep */}
                         {isAdmin && (
                             <Box sx={{ mt: 2, textAlign: 'center' }}>
                                 <Button
@@ -189,25 +177,21 @@ function CourseCreatePage() {
 
             <Box sx={{ p: 3, border: '1px solid #e0e0e0', borderRadius: '8px', minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 {getStepContent(activeStep)}
-
-                {/* REMOVIDOS OS BOTÕES DE NAVEGAÇÃO DO STEPPER */}
             </Box>
 
-            {/* Alert para mensagens de feedback */}
             {alertInfo.message && (
                 <Alert severity={alertInfo.severity} sx={{ mt: 2, width: '100%' }}>
                     {alertInfo.message}
                 </Alert>
             )}
 
-            {/* Modal para Criar Nova Categoria (agora componente separado) */}
             <AdminAddCategoryModal
                 open={openAddCategoryModal}
                 onClose={handleCloseAddCategoryModal}
                 isAuthenticated={isAuthenticated}
                 userToken={userToken}
-                onCategoryCreated={handleAdminCategoryCreated} // Callback para quando a categoria é criada
-                onShowAlert={handleShowAlert} // Passa a função de alert para o modal
+                onCategoryCreated={handleAdminCategoryCreated}
+                onShowAlert={handleShowAlert}
             />
         </Container>
     );
