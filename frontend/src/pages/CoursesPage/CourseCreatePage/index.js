@@ -18,7 +18,8 @@ import {
     SelectSubCategoryStep,
     SelectTagsStep,
     ReviewAndCreateStep,
-    AdminAddCategoryModal
+    AdminAddCategoryModal,
+    AdminAddSubCategoryModal // NOVO: Importa o componente do modal de adição de subcategoria
 } from './components'; 
 
 import axios from 'axios';
@@ -26,13 +27,14 @@ import { useAuth } from '../../../contexts/AuthContext';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
-// Define os passos do Stepper. O segundo passo agora é "Selecione a Subcategoria".
+// Define os passos do Stepper.
 const steps = ['Selecione a Categoria', 'Selecione a Subcategoria', 'Passo 3 (Em Breve)', 'Passo 4 (Em Breve)'];
 
 function CourseCreatePage() {
     // Estados para o Stepper e o Passo 1 (Categorias)
     const [activeStep, setActiveStep] = useState(0);
     const [selectedCategory, setSelectedCategory] = useState(null);
+    const [selectedSubcategory, setSelectedSubcategory] = useState(null); // NOVO: Estado para subcategoria selecionada
 
     const [categories, setCategories] = useState([]);
     const [loadingCategories, setLoadingCategories] = useState(false);
@@ -45,8 +47,10 @@ function CourseCreatePage() {
     const { isAuthenticated, userToken, user } = useAuth(); 
     const isAdmin = user?.isAdmin || false;
 
-    // Estados para o modal de criação de categoria
+    // Estados para os modais de criação
     const [openAddCategoryModal, setOpenAddCategoryModal] = useState(false);
+    const [openAddSubCategoryModal, setOpenAddSubCategoryModal] = useState(false); // NOVO: Estado para modal de subcategoria
+    const [parentCategoryForSubModal, setParentCategoryForSubModal] = useState(null); // NOVO: Categoria pai para o modal de subcategoria
 
     // Função para exibir o Alert
     const handleShowAlert = useCallback((message, severity) => {
@@ -71,7 +75,6 @@ function CourseCreatePage() {
                 }
             });
             
-            // Certifica-se de que response.data.categories é um array
             setCategories(Array.isArray(response.data.categories) ? response.data.categories : []); 
             
             if (response.data.geminiQuotaExceeded) {
@@ -80,7 +83,6 @@ function CourseCreatePage() {
 
         } catch (err) {
             console.error('Erro ao buscar categorias:', err);
-            // NOVO: Resetar categories para um array vazio em caso de erro
             setCategories([]); 
             if (axios.isAxiosError(err)) {
                 if (err.code === 'ERR_NETWORK') {
@@ -106,14 +108,30 @@ function CourseCreatePage() {
     }, [isAuthenticated, categories.length, loadingCategories, errorCategories, fetchCategories]);
 
 
+    // --- Funções de Navegação e Seleção ---
+
     // Função para selecionar categoria e avançar
     const handleCategorySelectAndAdvance = useCallback((category) => {
         setSelectedCategory(category);
+        setSelectedSubcategory(null); // Reseta a subcategoria ao mudar a categoria principal
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
         handleShowAlert(`Categoria "${category.name}" selecionada. Avançando para Subcategorias.`, 'info');
     }, [handleShowAlert]);
 
-    // Funções para o Modal de Criação de Categoria
+    // NOVO: Função para selecionar subcategoria e avançar
+    const handleSubcategorySelectAndAdvance = useCallback((subCategory) => {
+        setSelectedSubcategory(subCategory);
+        setActiveStep((prevActiveStep) => prevActiveStep + 1); // Avança para o próximo passo (tags)
+        handleShowAlert(`Subcategoria "${subCategory.name}" selecionada. Avançando para Tags.`, 'info');
+    }, [handleShowAlert]);
+
+    // NOVO: Função para voltar ao passo anterior
+    const handleGoBack = useCallback(() => {
+        setActiveStep((prevActiveStep) => prevActiveStep - 1);
+    }, []);
+
+
+    // --- Funções para o Modal de Criação de Categoria ---
     const handleOpenAddCategoryModal = () => {
         setOpenAddCategoryModal(true);
     };
@@ -127,6 +145,29 @@ function CourseCreatePage() {
         await fetchCategories(); 
         handleCategorySelectAndAdvance(newCategory);
     }, [fetchCategories, handleCategorySelectAndAdvance]);
+
+
+    // --- Funções para o Modal de Criação de Subcategoria ---
+    const handleOpenAddSubCategoryModal = useCallback((parentCat) => {
+        setParentCategoryForSubModal(parentCat);
+        setOpenAddSubCategoryModal(true);
+    }, []);
+
+    const handleCloseAddSubCategoryModal = () => {
+        setOpenAddSubCategoryModal(false);
+        setParentCategoryForSubModal(null); // Limpa a categoria pai ao fechar
+    };
+
+    // NOVO: Callback quando uma subcategoria é criada no modal do admin
+    const handleAdminSubcategoryCreated = useCallback((newSubcategory) => {
+        // Não precisamos refetchar todas as subcategorias aqui,
+        // o SelectSubCategoryStep já fará isso reagindo à mudança da categoria pai
+        // ou você pode adicionar a nova subcategoria diretamente ao estado de subcategorias
+        // se preferir uma atualização mais rápida sem refetch completo.
+        // Por enquanto, vamos confiar que o SelectSubCategoryStep vai se atualizar.
+        setSelectedSubcategory(newSubcategory); // Seleciona a subcategoria recém-criada
+        handleSubcategorySelectAndAdvance(newSubcategory); // Avança para o próximo passo
+    }, [handleSubcategorySelectAndAdvance]);
 
 
     // Renderiza o conteúdo de cada passo do Stepper
@@ -156,9 +197,16 @@ function CourseCreatePage() {
                     </>
                 );
             case 1:
-                // NOVO: Passando selectedCategory para SelectSubCategoryStep
                 return (
-                    <SelectSubCategoryStep selectedCategory={selectedCategory} />
+                    <SelectSubCategoryStep 
+                        selectedCategory={selectedCategory}
+                        selectedSubcategory={selectedSubcategory} // Passa a subcategoria selecionada
+                        onSubcategorySelectAndAdvance={handleSubcategorySelectAndAdvance}
+                        onGoBack={handleGoBack}
+                        isAdmin={isAdmin}
+                        onOpenAddSubCategoryModal={handleOpenAddSubCategoryModal}
+                        onShowAlert={handleShowAlert}
+                    />
                 );
             case 2:
                 return (
@@ -204,6 +252,17 @@ function CourseCreatePage() {
                 userToken={userToken}
                 onCategoryCreated={handleAdminCategoryCreated}
                 onShowAlert={handleShowAlert}
+            />
+
+            {/* NOVO: Modal para adicionar subcategorias */}
+            <AdminAddSubCategoryModal
+                open={openAddSubCategoryModal}
+                onClose={handleCloseAddSubCategoryModal}
+                isAuthenticated={isAuthenticated}
+                userToken={userToken}
+                onSubcategoryCreated={handleAdminSubcategoryCreated}
+                onShowAlert={handleShowAlert}
+                parentCategory={parentCategoryForSubModal} // Passa a categoria pai selecionada
             />
         </Container>
     );
