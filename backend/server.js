@@ -10,18 +10,18 @@ import jwt from 'jsonwebtoken';
 import { register, login } from './controllers/authController.js';
 
 // --- Importa funções do dataController ---
-// Agora importamos getTopCategories e createCategory
+// Agora importamos getTopCategories, createCategory, getSubcategories e createSubcategory
 import {
     getTopCategories, 
-    createCategory // NOVO: Importa a função createCategory
+    createCategory,
+    getSubcategories, // NOVO: Importa a função getSubcategories
+    createSubcategory // NOVO: Importa a função createSubcategory
 } from './controllers/dataController.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001; 
 
 // --- Configuração CORS para Produção ---
-// Permite requisições da sua URL do Netlify.
-// Se você estiver testando localmente, adicione 'http://localhost:3000' também.
 const allowedOrigins = [
     'https://meuscursos.netlify.app', // Sua URL do Netlify
     'http://localhost:3000',          // Para desenvolvimento local do frontend
@@ -91,8 +91,14 @@ app.post('/api/auth/login', login);
 // Rota para buscar as categorias (protegida)
 app.get('/api/courses/create/top-categories', protect, getTopCategories); 
 
-// NOVO: Rota para criar uma nova categoria (protegida por adminProtect)
-app.post('/api/categories', protect, adminProtect, createCategory); // Protegida por usuário e admin
+// Rota para criar uma nova categoria (protegida por adminProtect)
+app.post('/api/categories', protect, adminProtect, createCategory); 
+
+// NOVO: Rota para buscar subcategorias (protegida)
+app.get('/api/courses/create/subcategories', protect, getSubcategories);
+
+// NOVO: Rota para criar uma nova subcategoria (protegida por adminProtect)
+app.post('/api/subcategories', protect, adminProtect, createSubcategory);
 
 // --- Inicia o Servidor ---
 app.listen(PORT, () => {
@@ -103,5 +109,7 @@ app.listen(PORT, () => {
     console.log(`POST /api/auth/register`); 
     console.log(`POST /api/auth/login`);
     console.log(`GET /api/courses/create/top-categories (protegida)`); 
-    console.log(`POST /api/categories (protegida por admin)`); // Adicionado ao log de endpoints
+    console.log(`POST /api/categories (protegida por admin)`);
+    console.log(`GET /api/courses/create/subcategories?categoryId=[id]&categoryName=[name] (protegida)`); // Adicionado ao log
+    console.log(`POST /api/subcategories (protegida por admin)`); // Adicionado ao log
 });

@@ -26,9 +26,11 @@ import { useAuth } from '../../../contexts/AuthContext';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
+// Define os passos do Stepper. O segundo passo agora é "Selecione a Subcategoria".
 const steps = ['Selecione a Categoria', 'Selecione a Subcategoria', 'Passo 3 (Em Breve)', 'Passo 4 (Em Breve)'];
 
 function CourseCreatePage() {
+    // Estados para o Stepper e o Passo 1 (Categorias)
     const [activeStep, setActiveStep] = useState(0);
     const [selectedCategory, setSelectedCategory] = useState(null);
 
@@ -36,18 +38,23 @@ function CourseCreatePage() {
     const [loadingCategories, setLoadingCategories] = useState(false);
     const [errorCategories, setErrorCategories] = useState(null);
 
+    // Estado para controlar a exibição do Alert
     const [alertInfo, setAlertInfo] = useState({ message: null, severity: null });
 
+    // Obtém o estado de autenticação e o token do contexto, incluindo isAdmin
     const { isAuthenticated, userToken, user } = useAuth(); 
     const isAdmin = user?.isAdmin || false;
 
+    // Estados para o modal de criação de categoria
     const [openAddCategoryModal, setOpenAddCategoryModal] = useState(false);
 
+    // Função para exibir o Alert
     const handleShowAlert = useCallback((message, severity) => {
         setAlertInfo({ message, severity });
         setTimeout(() => setAlertInfo({ message: null, severity: null }), 6000);
     }, []);
 
+    // Função para buscar categorias do backend
     const fetchCategories = useCallback(async () => {
         if (!isAuthenticated) {
             setErrorCategories("Você precisa estar logado para criar um curso.");
@@ -99,12 +106,14 @@ function CourseCreatePage() {
     }, [isAuthenticated, categories.length, loadingCategories, errorCategories, fetchCategories]);
 
 
+    // Função para selecionar categoria e avançar
     const handleCategorySelectAndAdvance = useCallback((category) => {
         setSelectedCategory(category);
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
         handleShowAlert(`Categoria "${category.name}" selecionada. Avançando para Subcategorias.`, 'info');
     }, [handleShowAlert]);
 
+    // Funções para o Modal de Criação de Categoria
     const handleOpenAddCategoryModal = () => {
         setOpenAddCategoryModal(true);
     };
@@ -113,12 +122,14 @@ function CourseCreatePage() {
         setOpenAddCategoryModal(false);
     };
 
+    // Callback quando uma categoria é criada no modal do admin
     const handleAdminCategoryCreated = useCallback(async (newCategory) => {
         await fetchCategories(); 
         handleCategorySelectAndAdvance(newCategory);
     }, [fetchCategories, handleCategorySelectAndAdvance]);
 
 
+    // Renderiza o conteúdo de cada passo do Stepper
     const getStepContent = (step) => {
         switch (step) {
             case 0:
@@ -145,6 +156,7 @@ function CourseCreatePage() {
                     </>
                 );
             case 1:
+                // NOVO: Passando selectedCategory para SelectSubCategoryStep
                 return (
                     <SelectSubCategoryStep selectedCategory={selectedCategory} />
                 );
@@ -164,7 +176,7 @@ function CourseCreatePage() {
     return (
         <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
             <Typography variant="h4" component="h1" gutterBottom align="center">
-                Criar Novo Curso (v0.1 - Foco em Categorias)
+                Criar Novo Curso (v0.1 - Foco em Categorias e Subcategorias)
             </Typography>
 
             <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>

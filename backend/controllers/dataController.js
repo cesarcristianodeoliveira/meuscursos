@@ -7,10 +7,15 @@ import { createClient } from '@sanity/client'; // Importa o cliente Sanity
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = 'gemini-1.5-flash';
 
-// --- Variáveis para Cache da Gemini Categories ---
+// --- Variáveis para Cache da Gemini Categories e Subcategories ---
 let cachedGeminiCategories = null;
 const GEMINI_CATEGORY_CACHE_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 horas em milissegundos
 let geminiCategoryCacheTimestamp = 0;
+
+// NOVO: Cache para subcategorias (pode ser mais granular por categoria pai se necessário)
+let cachedGeminiSubcategories = {}; // Objeto para armazenar cache por categoryId
+const GEMINI_SUBCATEGORY_CACHE_LIFETIME_MS = 12 * 60 * 60 * 1000; // 12 horas
+let geminiSubcategoryCacheTimestamps = {}; // Objeto para armazenar timestamps por categoryId
 
 // --- Configurações do Sanity Client ---
 const sanityClient = createClient({
@@ -129,7 +134,7 @@ export const getTopCategories = async (req, res) => {
         if (cat && typeof cat.name === 'string' && cat.name.trim() !== '') { 
             const normalizedName = cat.name.toLowerCase();
             if (!combinedCategoriesMap.has(normalizedName)) {
-                combinedCategoriesMap.set(normalizedName, { _id: cat._id, name: cat.name });
+                combinedCategoriesMap.set(normalizedName, cat);
             }
         }
     });
@@ -145,7 +150,7 @@ export const getTopCategories = async (req, res) => {
     });
 };
 
-// NOVO: Função para criar uma nova categoria no Sanity
+// Função para criar uma nova categoria no Sanity
 export const createCategory = async (req, res) => {
     const { title } = req.body; // Espera receber 'title' do frontend
 
@@ -190,5 +195,181 @@ export const createCategory = async (req, res) => {
     } catch (error) {
         console.error('Erro ao criar categoria no Sanity:', error.message);
         res.status(500).json({ message: 'Erro ao criar categoria no Sanity.', error: error.message });
+    }
+};
+
+// NOVO: Função para buscar subcategorias com base na categoria pai
+export const getSubcategories = async (req, res) => {
+    const { categoryId, categoryName } = req.query; // Recebe o ID e o nome da categoria pai
+
+    if (!categoryId) {
+        return res.status(400).json({ message: 'ID da categoria é obrigatório para buscar subcategorias.' });
+    }
+
+    let sanitySubcategories = [];
+    let geminiSuggestedSubcategories = [];
+    let geminiErrorFlag = false;
+
+    // 1. Buscar Subcategorias do Sanity (filtradas pela categoria pai)
+    try {
+        // Query para buscar subcategorias que referenciam a categoryId
+        const query = `*[_type == "courseSubCategory" && parentCategory._ref == $categoryId]{_id, title, parentCategory->{_id, title}}`;
+        const rawSanitySubcategories = await sanityClient.fetch(query, { categoryId });
+        
+        sanitySubcategories = rawSanitySubcategories.filter(subCat => 
+            subCat && typeof subCat._id === 'string' && typeof subCat.title === 'string' && subCat.title.trim() !== ''
+        ).map(subCat => ({
+            _id: subCat._id,
+            name: subCat.title, // Mapeia 'title' para 'name'
+            parentCategoryId: subCat.parentCategory._id,
+            parentCategoryName: subCat.parentCategory.title
+        }));
+        
+        console.log(`[Backend] Buscadas ${sanitySubcategories.length} subcategorias válidas do Sanity para a categoria "${categoryName || categoryId}".`);
+    } catch (error) {
+        console.error(`Erro ao buscar subcategorias do Sanity para ${categoryId}:`, error.message);
+    }
+
+    // 2. Buscar Subcategorias da Gemini (com cache)
+    if (!GEMINI_API_KEY) {
+        console.warn("[Backend] GEMINI_API_KEY não configurada. Não será possível gerar subcategorias com Gemini.");
+        geminiErrorFlag = true;
+    } else {
+        const now = Date.now();
+        const cacheKey = categoryId; // Usa o ID da categoria como chave de cache
+        
+        if (cachedGeminiSubcategories[cacheKey] && (now - geminiSubcategoryCacheTimestamps[cacheKey] < GEMINI_SUBCATEGORY_CACHE_LIFETIME_MS)) {
+            console.log(`[Backend] Servindo subcategorias da Gemini do cache para "${categoryName || categoryId}".`);
+            geminiSuggestedSubcategories = cachedGeminiSubcategories[cacheKey];
+        } else {
+            console.log(`[Backend] Cache de subcategorias Gemini expirado ou não definido para "${categoryName || categoryId}". Chamando Gemini API...`);
+            try {
+                const geminiPrompt = `Liste 10 subcategorias populares e em alta demanda para a categoria principal "${categoryName || 'geral'}". Responda APENAS com uma lista JSON de strings, sem descrições ou textos adicionais, sem markdown. Exemplo para "Tecnologia": ["Desenvolvimento Web", "Inteligência Artificial", "Cibersegurança"]`;
+
+                const geminiResponse = await axios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+                    { contents: [{ parts: [{ text: geminiPrompt }] }] },
+                    { headers: { 'Content-Type': 'application/json' }, timeout: 20000 }
+                );
+
+                const suggestedNames = parseGeminiResponse(geminiResponse);
+                geminiSuggestedSubcategories = suggestedNames
+                    .filter(name => typeof name === 'string' && name.trim() !== '')
+                    .map(name => ({
+                        _id: `gemini-sub-${name.toLowerCase().replace(/\s/g, '-')}-${categoryId}`, // ID único para subcategorias Gemini
+                        name: name,
+                        parentCategoryId: categoryId,
+                        parentCategoryName: categoryName
+                    }));
+
+                cachedGeminiSubcategories[cacheKey] = geminiSuggestedSubcategories;
+                geminiSubcategoryCacheTimestamps[cacheKey] = now;
+                console.log(`[Backend] Geradas e cacheadas ${geminiSuggestedSubcategories.length} subcategorias da Gemini para "${categoryName || categoryId}".`);
+
+            } catch (geminiError) {
+                console.error(`Erro ao chamar Gemini API para subcategorias de "${categoryName || categoryId}":`, geminiError.response?.data || geminiError.message);
+                geminiErrorFlag = true;
+
+                if (cachedGeminiSubcategories[cacheKey]) {
+                    console.warn("[Backend] Gemini API call failed, serving stale subcategory cache if available.");
+                    geminiSuggestedSubcategories = cachedGeminiSubcategories[cacheKey];
+                } else {
+                    console.warn("[Backend] Gemini API call failed and no subcategory cache available. Gemini subcategories will be empty.");
+                    geminiSuggestedSubcategories = [];
+                }
+            }
+        }
+    }
+
+    // 3. Combinar, Remover Duplicatas e Ordenar
+    const combinedSubcategoriesMap = new Map();
+
+    // Adiciona subcategorias do Sanity (prioridade)
+    sanitySubcategories.forEach(subCat => {
+        if (subCat && typeof subCat.name === 'string' && subCat.name.trim() !== '') {
+            const normalizedName = subCat.name.toLowerCase();
+            combinedSubcategoriesMap.set(normalizedName, subCat);
+        }
+    });
+
+    // Adiciona subcategorias sugeridas pela Gemini se não existirem já pelo nome
+    geminiSuggestedSubcategories.forEach(subCat => {
+        if (subCat && typeof subCat.name === 'string' && subCat.name.trim() !== '') { 
+            const normalizedName = subCat.name.toLowerCase();
+            if (!combinedSubcategoriesMap.has(normalizedName)) {
+                combinedSubcategoriesMap.set(normalizedName, subCat);
+            }
+        }
+    });
+
+    const finalSubcategories = Array.from(combinedSubcategoriesMap.values());
+    finalSubcategories.sort((a, b) => a.name.localeCompare(b.name));
+
+    console.log(`[Backend] Total de ${finalSubcategories.length} subcategorias combinadas para "${categoryName || categoryId}" (Sanity + Gemini).`);
+    
+    res.status(200).json({ 
+        subcategories: finalSubcategories,
+        geminiQuotaExceeded: geminiErrorFlag 
+    });
+};
+
+// NOVO: Função para criar uma nova subcategoria no Sanity
+export const createSubcategory = async (req, res) => {
+    const { title, parentCategoryId } = req.body;
+
+    if (!title || typeof title !== 'string' || title.trim() === '') {
+        return res.status(400).json({ message: 'O título da subcategoria é obrigatório e deve ser uma string não vazia.' });
+    }
+    if (!parentCategoryId || typeof parentCategoryId !== 'string' || parentCategoryId.trim() === '') {
+        return res.status(400).json({ message: 'O ID da categoria pai é obrigatório para criar uma subcategoria.' });
+    }
+
+    // Opcional: Verificar se a subcategoria já existe para esta categoria pai
+    try {
+        const existingSubcategory = await sanityClient.fetch(`*[_type == "courseSubCategory" && title == $title && parentCategory._ref == $parentCategoryId][0]`, { title, parentCategoryId });
+        if (existingSubcategory) {
+            return res.status(409).json({ message: 'Esta subcategoria já existe para esta categoria principal.' });
+        }
+    } catch (error) {
+        console.error('Erro ao verificar subcategoria existente no Sanity:', error.message);
+    }
+
+    const slugValue = title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+
+    const newSubcategoryDoc = {
+        _type: 'courseSubCategory',
+        title: title.trim(),
+        slug: {
+            _type: 'slug',
+            current: slugValue
+        },
+        parentCategory: {
+            _type: 'reference',
+            _ref: parentCategoryId
+        }
+    };
+
+    try {
+        const createdDoc = await sanityClient.create(newSubcategoryDoc);
+        console.log(`[Backend] Subcategoria "${createdDoc.title}" criada no Sanity com ID: ${createdDoc._id}, Slug: ${createdDoc.slug.current}, Categoria Pai: ${parentCategoryId}`);
+        
+        // Invalida o cache de subcategorias para a categoria pai específica
+        delete cachedGeminiSubcategories[parentCategoryId];
+        delete geminiSubcategoryCacheTimestamps[parentCategoryId];
+
+        // Retorna a subcategoria criada no formato que o frontend espera (_id, name, parentCategoryId, parentCategoryName)
+        // Precisamos buscar o nome da categoria pai para retornar completo
+        const parentCat = await sanityClient.fetch(`*[_id == $parentCategoryId][0]{title}`, { parentCategoryId });
+
+        res.status(201).json({ 
+            _id: createdDoc._id, 
+            name: createdDoc.title,
+            parentCategoryId: createdDoc.parentCategory._ref,
+            parentCategoryName: parentCat ? parentCat.title : 'Desconhecida'
+        });
+
+    } catch (error) {
+        console.error('Erro ao criar subcategoria no Sanity:', error.message);
+        res.status(500).json({ message: 'Erro ao criar subcategoria no Sanity.', error: error.message });
     }
 };
