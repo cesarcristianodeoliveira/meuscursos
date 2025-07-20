@@ -164,20 +164,21 @@ export const createCategory = async (req, res) => {
         // Continua mesmo com erro na verificação para não bloquear a criação
     }
 
+    // Geração do slug a partir do título
+    const slugValue = title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+
     const newCategoryDoc = {
         _type: 'courseCategory',
         title: title.trim(),
-        // Sanity irá gerar o _id automaticamente. O slug pode ser gerado no Sanity Studio
-        // ou você pode gerar aqui se quiser controle total:
-        // slug: {
-        //     _type: 'slug',
-        //     current: title.toLowerCase().replace(/\s+/g, '-').slice(0, 96)
-        // }
+        slug: {
+            _type: 'slug',
+            current: slugValue
+        }
     };
 
     try {
         const createdDoc = await sanityClient.create(newCategoryDoc);
-        console.log(`[Backend] Categoria "${createdDoc.title}" criada no Sanity com ID: ${createdDoc._id}`);
+        console.log(`[Backend] Categoria "${createdDoc.title}" criada no Sanity com ID: ${createdDoc._id}, Slug: ${createdDoc.slug.current}`);
         
         // Invalida o cache da Gemini para que a próxima requisição busque a nova categoria
         cachedGeminiCategories = null; 

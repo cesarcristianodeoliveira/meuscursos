@@ -20,6 +20,7 @@ function AdminAddCategoryModal({ open, onClose, isAuthenticated, userToken, onCa
     const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
     const handleCreateCategory = async () => {
+        // Validação de campo vazio no frontend
         if (!newCategoryTitle.trim()) {
             onShowAlert('O título da categoria não pode ser vazio.', 'warning');
             return;
@@ -49,6 +50,7 @@ function AdminAddCategoryModal({ open, onClose, isAuthenticated, userToken, onCa
 
         } catch (error) {
             console.error('Erro ao criar categoria:', error.response?.data || error.message);
+            // Captura a mensagem de erro do backend (ex: "Esta categoria já existe.")
             const errorMessage = error.response?.data?.message || 'Erro ao criar categoria. Tente novamente.';
             onShowAlert(errorMessage, 'error');
         } finally {
