@@ -9,9 +9,9 @@ import {
     Button,
     CircularProgress
 } from '@mui/material';
-import axios from 'axios'; // AGORA AXIOS É USADO!
+import axios from 'axios';
 
-// Este componente será responsável por criar uma nova categoria
+// Este componente é responsável por criar uma nova categoria
 // e notificar o componente pai sobre o sucesso/falha
 function AdminAddCategoryModal({ open, onClose, isAuthenticated, userToken, onCategoryCreated, onShowAlert }) {
     const [newCategoryTitle, setNewCategoryTitle] = useState('');
@@ -19,8 +19,13 @@ function AdminAddCategoryModal({ open, onClose, isAuthenticated, userToken, onCa
 
     const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
+    // Condição para habilitar/desabilitar o botão "Criar"
+    // Ele será desabilitado se estiver adicionando OU se o título (sem espaços) tiver menos de 3 caracteres
+    const isCreateButtonDisabled = addingCategory || newCategoryTitle.trim().length < 3;
+
     const handleCreateCategory = async () => {
-        // Validação de campo vazio no frontend
+        // A validação de campo vazio (newCategoryTitle.trim() === '') já está coberta
+        // pela condição isCreateButtonDisabled (pois 0 < 3), mas mantemos o onShowAlert explícito.
         if (!newCategoryTitle.trim()) {
             onShowAlert('O título da categoria não pode ser vazio.', 'warning');
             return;
@@ -73,13 +78,21 @@ function AdminAddCategoryModal({ open, onClose, isAuthenticated, userToken, onCa
                     value={newCategoryTitle}
                     onChange={(e) => setNewCategoryTitle(e.target.value)}
                     disabled={addingCategory}
+                    // Adiciona helperText e error para feedback visual ao usuário
+                    helperText={
+                        newCategoryTitle.trim().length > 0 && newCategoryTitle.trim().length < 3
+                            ? "Mínimo de 3 caracteres"
+                            : ""
+                    }
+                    error={newCategoryTitle.trim().length > 0 && newCategoryTitle.trim().length < 3}
                 />
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose} disabled={addingCategory}>
                     Cancelar
                 </Button>
-                <Button onClick={handleCreateCategory} disabled={addingCategory}>
+                {/* O botão "Criar" agora usa a nova condição de desabilitação */}
+                <Button onClick={handleCreateCategory} disabled={isCreateButtonDisabled}>
                     {addingCategory ? <CircularProgress size={24} /> : 'Criar'}
                 </Button>
             </DialogActions>

@@ -7,15 +7,19 @@ import { createClient } from '@sanity/client'; // Importa o cliente Sanity
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = 'gemini-1.5-flash';
 
-// --- Variáveis para Cache da Gemini Categories e Subcategories ---
+// --- Variáveis para Cache da Gemini Categories, Subcategories e Tags ---
 let cachedGeminiCategories = null;
 const GEMINI_CATEGORY_CACHE_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 horas em milissegundos
 let geminiCategoryCacheTimestamp = 0;
 
-// NOVO: Cache para subcategorias (pode ser mais granular por categoria pai se necessário)
 let cachedGeminiSubcategories = {}; // Objeto para armazenar cache por categoryId
 const GEMINI_SUBCATEGORY_CACHE_LIFETIME_MS = 12 * 60 * 60 * 1000; // 12 horas
 let geminiSubcategoryCacheTimestamps = {}; // Objeto para armazenar timestamps por categoryId
+
+// NOVO: Cache para tags (pode ser mais granular por subcategoria/categoria)
+let cachedGeminiTags = {}; // Objeto para armazenar cache por subcategoryId ou categoryId
+const GEMINI_TAG_CACHE_LIFETIME_MS = 6 * 60 * 60 * 1000; // 6 horas
+let geminiTagCacheTimestamps = {}; // Objeto para armazenar timestamps por cacheKey
 
 // --- Configurações do Sanity Client ---
 const sanityClient = createClient({
@@ -198,7 +202,7 @@ export const createCategory = async (req, res) => {
     }
 };
 
-// NOVO: Função para buscar subcategorias com base na categoria pai
+// Função para buscar subcategorias com base na categoria pai
 export const getSubcategories = async (req, res) => {
     const { categoryId, categoryName } = req.query; // Recebe o ID e o nome da categoria pai
 
@@ -371,5 +375,167 @@ export const createSubcategory = async (req, res) => {
     } catch (error) {
         console.error('Erro ao criar subcategoria no Sanity:', error.message);
         res.status(500).json({ message: 'Erro ao criar subcategoria no Sanity.', error: error.message });
+    }
+};
+
+// NOVO: Função para buscar tags com base na categoria ou subcategoria
+export const getTags = async (req, res) => {
+    const { categoryId, categoryName, subcategoryId, subcategoryName } = req.query;
+
+    let sanityTags = [];
+    let geminiSuggestedTags = [];
+    let geminiErrorFlag = false;
+
+    // Determina a chave de cache e o contexto para o prompt da Gemini
+    let cacheKey = 'general_tags'; // Fallback para tags gerais
+    let promptContext = 'cursos';
+
+    if (subcategoryId && subcategoryName) {
+        cacheKey = `subcat-${subcategoryId}`;
+        promptContext = `a subcategoria "${subcategoryName}"`;
+    } else if (categoryId && categoryName) {
+        cacheKey = `cat-${categoryId}`;
+        promptContext = `a categoria "${categoryName}"`;
+    }
+
+    // 1. Buscar Tags do Sanity
+    try {
+        // Query para buscar todas as tags existentes
+        const query = `*[_type == "courseTag"]{_id, title}`;
+        const rawSanityTags = await sanityClient.fetch(query);
+        
+        sanityTags = rawSanityTags.filter(tag => 
+            tag && typeof tag._id === 'string' && typeof tag.title === 'string' && tag.title.trim() !== ''
+        ).map(tag => ({
+            _id: tag._id,
+            name: tag.title // Mapeia 'title' para 'name'
+        }));
+        
+        console.log(`[Backend] Buscadas ${sanityTags.length} tags válidas do Sanity.`);
+    } catch (error) {
+        console.error('Erro ao buscar tags do Sanity:', error.message);
+    }
+
+    // 2. Buscar Tags da Gemini (com cache)
+    if (!GEMINI_API_KEY) {
+        console.warn("[Backend] GEMINI_API_KEY não configurada. Não será possível gerar tags com Gemini.");
+        geminiErrorFlag = true;
+    } else {
+        const now = Date.now();
+        
+        if (cachedGeminiTags[cacheKey] && (now - geminiTagCacheTimestamps[cacheKey] < GEMINI_TAG_CACHE_LIFETIME_MS)) {
+            console.log(`[Backend] Servindo tags da Gemini do cache para ${promptContext}.`);
+            geminiSuggestedTags = cachedGeminiTags[cacheKey];
+        } else {
+            console.log(`[Backend] Cache de tags Gemini expirado ou não definido para ${promptContext}. Chamando Gemini API...`);
+            try {
+                const geminiPrompt = `Liste 10 a 15 tags relevantes e populares para ${promptContext}. Responda APENAS com uma lista JSON de strings, sem descrições ou textos adicionais, sem markdown. Exemplo para "Desenvolvimento Web": ["HTML", "CSS", "JavaScript", "React", "Node.js", "Frontend", "Backend", "Fullstack"]`;
+
+                const geminiResponse = await axios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+                    { contents: [{ parts: [{ text: geminiPrompt }] }] },
+                    { headers: { 'Content-Type': 'application/json' }, timeout: 20000 }
+                );
+
+                const suggestedNames = parseGeminiResponse(geminiResponse);
+                geminiSuggestedTags = suggestedNames
+                    .filter(name => typeof name === 'string' && name.trim() !== '')
+                    .map(name => ({
+                        _id: `gemini-tag-${name.toLowerCase().replace(/\s/g, '-')}-${cacheKey}`, // ID único para tags Gemini
+                        name: name
+                    }));
+
+                cachedGeminiTags[cacheKey] = geminiSuggestedTags;
+                geminiTagCacheTimestamps[cacheKey] = now;
+                console.log(`[Backend] Geradas e cacheadas ${geminiSuggestedTags.length} tags da Gemini para ${promptContext}.`);
+
+            } catch (geminiError) {
+                console.error(`Erro ao chamar Gemini API para tags de ${promptContext}:`, geminiError.response?.data || geminiError.message);
+                geminiErrorFlag = true;
+
+                if (cachedGeminiTags[cacheKey]) {
+                    console.warn("[Backend] Gemini API call failed, serving stale tag cache if available.");
+                    geminiSuggestedTags = cachedGeminiTags[cacheKey];
+                } else {
+                    console.warn("[Backend] Gemini API call failed and no tag cache available. Gemini tags will be empty.");
+                    geminiSuggestedTags = [];
+                }
+            }
+        }
+    }
+
+    // 3. Combinar, Remover Duplicatas e Ordenar
+    const combinedTagsMap = new Map();
+
+    // Adiciona tags do Sanity (prioridade)
+    sanityTags.forEach(tag => {
+        if (tag && typeof tag.name === 'string' && tag.name.trim() !== '') {
+            const normalizedName = tag.name.toLowerCase();
+            combinedTagsMap.set(normalizedName, tag);
+        }
+    });
+
+    // Adiciona tags sugeridas pela Gemini se não existirem já pelo nome
+    geminiSuggestedTags.forEach(tag => {
+        if (tag && typeof tag.name === 'string' && tag.name.trim() !== '') { 
+            const normalizedName = tag.name.toLowerCase();
+            if (!combinedTagsMap.has(normalizedName)) {
+                combinedTagsMap.set(normalizedName, tag);
+            }
+        }
+    });
+
+    const finalTags = Array.from(combinedTagsMap.values());
+    finalTags.sort((a, b) => a.name.localeCompare(b.name));
+
+    console.log(`[Backend] Total de ${finalTags.length} tags combinadas para ${promptContext} (Sanity + Gemini).`);
+    
+    res.status(200).json({ 
+        tags: finalTags,
+        geminiQuotaExceeded: geminiErrorFlag 
+    });
+};
+
+// NOVO: Função para criar uma nova tag no Sanity
+export const createTag = async (req, res) => {
+    const { title } = req.body;
+
+    if (!title || typeof title !== 'string' || title.trim() === '') {
+        return res.status(400).json({ message: 'O título da tag é obrigatório e deve ser uma string não vazia.' });
+    }
+
+    try {
+        const existingTag = await sanityClient.fetch(`*[_type == "courseTag" && title == $title][0]`, { title });
+        if (existingTag) {
+            return res.status(409).json({ message: 'Esta tag já existe.' });
+        }
+    } catch (error) {
+        console.error('Erro ao verificar tag existente no Sanity:', error.message);
+    }
+
+    const slugValue = title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+
+    const newTagDoc = {
+        _type: 'courseTag',
+        title: title.trim(),
+        slug: {
+            _type: 'slug',
+            current: slugValue
+        }
+    };
+
+    try {
+        const createdDoc = await sanityClient.create(newTagDoc);
+        console.log(`[Backend] Tag "${createdDoc.title}" criada no Sanity com ID: ${createdDoc._id}, Slug: ${createdDoc.slug.current}`);
+        
+        // Invalida todos os caches de tags, pois uma nova tag pode ser relevante para qualquer contexto
+        cachedGeminiTags = {}; 
+        geminiTagCacheTimestamps = {};
+
+        res.status(201).json({ _id: createdDoc._id, name: createdDoc.title });
+
+    } catch (error) {
+        console.error('Erro ao criar tag no Sanity:', error.message);
+        res.status(500).json({ message: 'Erro ao criar tag no Sanity.', error: error.message });
     }
 };

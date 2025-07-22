@@ -26,7 +26,13 @@ function AdminAddSubCategoryModal({ open, onClose, isAuthenticated, userToken, o
         }
     }, [open, parentCategory]);
 
+    // Condição para habilitar/desabilitar o botão "Criar"
+    // Ele será desabilitado se estiver adicionando OU se o título (sem espaços) tiver menos de 3 caracteres
+    const isCreateButtonDisabled = addingSubcategory || newSubcategoryTitle.trim().length < 3;
+
     const handleCreateSubcategory = async () => {
+        // A validação de campo vazio (newSubcategoryTitle.trim() === '') já está coberta
+        // pela condição isCreateButtonDisabled (pois 0 < 3), mas mantemos o onShowAlert explícito.
         if (!newSubcategoryTitle.trim()) {
             onShowAlert('O título da subcategoria não pode ser vazio.', 'warning');
             return;
@@ -87,13 +93,21 @@ function AdminAddSubCategoryModal({ open, onClose, isAuthenticated, userToken, o
                     value={newSubcategoryTitle}
                     onChange={(e) => setNewSubcategoryTitle(e.target.value)}
                     disabled={addingSubcategory}
+                    // Adiciona helperText e error para feedback visual ao usuário
+                    helperText={
+                        newSubcategoryTitle.trim().length > 0 && newSubcategoryTitle.trim().length < 3
+                            ? "Mínimo de 3 caracteres"
+                            : ""
+                    }
+                    error={newSubcategoryTitle.trim().length > 0 && newSubcategoryTitle.trim().length < 3}
                 />
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose} disabled={addingSubcategory}>
                     Cancelar
                 </Button>
-                <Button onClick={handleCreateSubcategory} disabled={addingSubcategory}>
+                {/* O botão "Criar" agora usa a nova condição de desabilitação */}
+                <Button onClick={handleCreateSubcategory} disabled={isCreateButtonDisabled}>
                     {addingSubcategory ? <CircularProgress size={24} /> : 'Criar'}
                 </Button>
             </DialogActions>

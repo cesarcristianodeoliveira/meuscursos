@@ -10,11 +10,14 @@ import jwt from 'jsonwebtoken';
 import { register, login } from './controllers/authController.js';
 
 // --- Importa funções do dataController ---
+// Agora importamos getTopCategories, createCategory, getSubcategories, createSubcategory, getTags e createTag
 import {
     getTopCategories, 
     createCategory,
     getSubcategories,
-    createSubcategory
+    createSubcategory,
+    getTags, // NOVO: Importa a função getTags
+    createTag // NOVO: Importa a função createTag
 } from './controllers/dataController.js';
 
 const app = express();
@@ -24,6 +27,7 @@ const PORT = process.env.PORT || 3001;
 const allowedOrigins = [
     'https://meuscursos.netlify.app',
     'http://localhost:3000',
+    // Adicione outras origens se necessário
 ];
 
 app.use(cors({
@@ -84,17 +88,26 @@ app.get('/', (req, res) => {
 app.post('/api/auth/register', register); 
 app.post('/api/auth/login', login);
 
+// --- ROTAS PARA CRIAÇÃO DE CURSOS (PROTEGIDAS) ---
+
 // Rota para buscar as categorias (protegida)
 app.get('/api/courses/create/top-categories', protect, getTopCategories); 
 
 // Rota para criar uma nova categoria (protegida por adminProtect)
 app.post('/api/categories', protect, adminProtect, createCategory); 
 
-// NOVO: Rota para buscar subcategorias (protegida)
+// Rota para buscar subcategorias (protegida)
 app.get('/api/courses/create/subcategories', protect, getSubcategories);
 
-// NOVO: Rota para criar uma nova subcategoria (protegida por adminProtect)
+// Rota para criar uma nova subcategoria (protegida por adminProtect)
 app.post('/api/subcategories', protect, adminProtect, createSubcategory);
+
+// NOVO: Rota para buscar tags (protegida)
+app.get('/api/courses/create/tags', protect, getTags);
+
+// NOVO: Rota para criar uma nova tag (protegida por adminProtect)
+app.post('/api/tags', protect, adminProtect, createTag);
+
 
 // --- Inicia o Servidor ---
 app.listen(PORT, () => {
@@ -108,4 +121,6 @@ app.listen(PORT, () => {
     console.log(`POST /api/categories (protegida por admin)`);
     console.log(`GET /api/courses/create/subcategories?categoryId=[id]&categoryName=[name] (protegida)`);
     console.log(`POST /api/subcategories (protegida por admin)`);
+    console.log(`GET /api/courses/create/tags?categoryId=[id]&categoryName=[name]&subcategoryId=[id]&subcategoryName=[name] (protegida)`); // Adicionado ao log
+    console.log(`POST /api/tags (protegida por admin)`); // Adicionado ao log
 });

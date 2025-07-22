@@ -1,12 +1,12 @@
-// schemas/courseTag.js
+// D:\meuscursos\sanity\schemas\courseTag.js
 export default {
   name: 'courseTag',
   title: 'Course Tag',
   type: 'document',
   fields: [
     {
-      name: 'name',
-      title: 'Tag Name',
+      name: 'title', // RENOMEADO de 'name' para 'title' para consistência
+      title: 'Tag Title', // Título do campo no Studio
       type: 'string',
       description: 'The display name of the course tag (e.g., "JavaScript", "SEO", "Cloud Computing").',
       validation: Rule => Rule.required().min(2).max(50)
@@ -16,7 +16,7 @@ export default {
       title: 'Tag Slug',
       type: 'slug',
       options: {
-        source: 'name',
+        source: 'title', // ATUALIZADO para usar 'title' como fonte
         maxLength: 96,
       },
       description: 'A unique, URL-friendly identifier for the course tag.',
@@ -44,18 +44,21 @@ export default {
   ],
   preview: {
     select: {
-      title: 'name',
-      categories: 'categories',
-      subtitle: 'description',
+      title: 'title', // ATUALIZADO para usar 'title'
+      description: 'description', // Seleciona a descrição
+      categories: 'categories', // Seleciona as referências de categoria
     },
     prepare(selection) {
-      const { title, categories, subtitle } = selection;
-      // Para mostrar nomes de categorias na preview, você precisaria de um `deep query`
-      // ou ter os nomes disponíveis. Por enquanto, mostrar IDs é ok para depuração.
-      const categoryRefs = categories ? categories.map(cat => cat._ref).join(', ') : 'No categories';
+      const { title, description, categories } = selection;
+      const categoryCount = categories ? categories.length : 0;
+      
+      // Simplifica o subtítulo para ser mais conciso na lista do Sanity Studio
+      let subtitleText = description ? `${description.substring(0, 40)}${description.length > 40 ? '...' : ''}` : 'No description';
+      subtitleText += ` (${categoryCount} categories)`;
+
       return {
         title: title || 'New Course Tag',
-        subtitle: subtitle ? `${subtitle.substring(0, 50)}... (Categories: ${categoryRefs})` : `No description (Categories: ${categoryRefs})`,
+        subtitle: subtitleText,
       };
     },
   },
