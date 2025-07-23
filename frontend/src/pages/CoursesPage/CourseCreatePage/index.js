@@ -329,7 +329,7 @@ function CourseCreatePage() {
                 userToken={userToken}
                 onTagCreated={handleAdminTagCreated}
                 onShowAlert={handleShowAlert}
-                selectedCategory={selectedCategory} {/* NOVO: Passa a categoria selecionada para o modal de tags */}
+                selectedCategory={selectedCategory}
             />
         </Container>
     );
