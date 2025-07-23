@@ -29,7 +29,7 @@ const allowedOrigins = [
     process.env.FRONTEND_URL, // Permite que a variável de ambiente seja usada
     'http://localhost:3000', // Para desenvolvimento local
     'https://meuscursos.netlify.app', // Se você estiver usando Netlify para o frontend
-    'https://meuscursos.onrender.com', // NOVO: Adicionado explicitamente a URL do seu frontend no Render
+    'https://meuscursos.onrender.com', // Adicionado explicitamente a URL do seu frontend no Render
     // Adicione outras origens se necessário, por exemplo, se o seu backend estiver em um subdomínio diferente no Render
     // Ex: 'https://seubackend.onrender.com' se o frontend estiver em 'https://seubackend.onrender.com'
 ].filter(Boolean); // Remove entradas nulas/vazias se FRONTEND_URL não estiver definida
@@ -101,13 +101,13 @@ app.get('/api/courses/create/top-categories', protect, getTopCategories);
 // Rota para criar uma nova categoria (protegida por adminProtect)
 app.post('/api/categories', protect, adminProtect, createCategory); 
 
-// Rota para buscar subcategorias
+// Rota para buscar subcategorias (protegida)
 app.get('/api/subcategories', protect, getSubcategories);
 
 // Rota para criar uma nova subcategoria (protegida por adminProtect)
 app.post('/api/subcategories', protect, adminProtect, createSubcategory);
 
-// Rota para buscar tags
+// Rota para buscar tags (protegida)
 app.get('/api/tags', protect, getTags);
 
 // Rota para criar uma nova tag (protegida por adminProtect)

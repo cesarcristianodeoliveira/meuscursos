@@ -60,7 +60,6 @@ function CourseCreatePage() {
     // Estados para os modais de criação
     const [openAddCategoryModal, setOpenAddCategoryModal] = useState(false);
     const [openAddSubCategoryModal, setOpenAddSubCategoryModal] = useState(false);
-    // REMOVIDO: const [parentCategoryForSubModal, setParentCategoryForSubModal] = useState(null); 
     const [openAddTagModal, setOpenAddTagModal] = useState(false); 
 
     // Função para exibir o Alert (Snackbar)
@@ -212,7 +211,7 @@ function CourseCreatePage() {
 
 
     // --- Funções para o Modal de Criação de Subcategoria ---
-    const handleOpenAddSubCategoryModal = useCallback((parentCat) => {
+    const handleOpenAddSubCategoryModal = useCallback(() => { // Removido parentCat do param
         setOpenAddSubCategoryModal(true);
     }, []);
 
@@ -279,6 +278,7 @@ function CourseCreatePage() {
                         isAdmin={isAdmin}
                         onOpenAddSubCategoryModal={handleOpenAddSubCategoryModal}
                         onShowAlert={handleShowAlert}
+                        userToken={userToken} // Passa o token para o componente filho
                     />
                 );
             case 2:
@@ -291,6 +291,7 @@ function CourseCreatePage() {
                         isAdmin={isAdmin}
                         onOpenAddTagModal={handleOpenAddTagModal}
                         onShowAlert={handleShowAlert}
+                        userToken={userToken} // Passa o token para o componente filho
                         minTags={MIN_TAGS_REQUIRED} 
                         maxTags={MAX_TAGS_ALLOWED} 
                     />
@@ -361,6 +362,7 @@ function CourseCreatePage() {
                 onTagCreated={handleAdminTagCreated}
                 onShowAlert={handleShowAlert}
                 selectedCategory={selectedCategory} 
+                selectedSubcategory={selectedSubcategory} // Passa a subcategoria selecionada
             />
         </Container>
     );

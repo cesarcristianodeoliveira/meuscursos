@@ -518,7 +518,7 @@ export const getTags = async (req, res) => {
         } else {
             console.log(`[Backend] Cache de tags Gemini expirado ou não definido para ${promptContext}. Chamando Gemini API...`);
             try {
-                const geminiPrompt = `Liste 10 a 15 tags relevantes e populares para ${promptContext}. Responda APENAS com uma lista JSON de strings, sem descrições ou textos adicionais, sem markdown. Exemplo para "Desenvolvimento Web": ["HTML", "CSS", "JavaScript", "React", "Node.js", "Frontend", "Backend", "Fullstack"]`;
+                const geminiPrompt = `Liste 10 a 15 tags relevantes e populares para ${promptContext}. Responda APENAS com uma lista JSON de strings, sem descrições ou textos adicionais, sem markdown. Exemplo para "Desenvolvimento Web": ["HTML", "CSS", "JavaScript", "React", "Node.js", "C#", "Python", "Frontend", "Backend", "Fullstack", "Banco de Dados", "APIs", "Cloud", "DevOps", "Mobile"]`;
 
                 const geminiResponse = await axios.post(
                     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
@@ -592,74 +592,78 @@ export const createTag = async (req, res) => {
     if (!title || typeof title !== 'string' || title.trim() === '') {
         return res.status(400).json({ message: 'O título da tag é obrigatório e deve ser uma string não vazia.' });
     }
-    if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
-        return res.status(400).json({ message: 'Pelo menos um ID de categoria deve ser fornecido para associar a tag.' });
+    // categoryIds e categoryNames são opcionais para tags, mas se fornecidos, devem ser arrays válidos
+    if (categoryIds && !Array.isArray(categoryIds)) {
+        return res.status(400).json({ message: 'categoryIds deve ser um array de strings.' });
     }
-    if (categoryIds.some(id => typeof id !== 'string' || id.trim() === '')) {
-        return res.status(400).json({ message: 'Todos os IDs de categoria fornecidos devem ser strings não vazias.' });
+    if (categoryNames && !Array.isArray(categoryNames)) {
+        return res.status(400).json({ message: 'categoryNames deve ser um array de strings.' });
     }
-    if (!Array.isArray(categoryNames) || categoryNames.length !== categoryIds.length) {
-        return res.status(400).json({ message: 'Os nomes das categorias devem ser fornecidos e corresponder aos IDs.' });
+    if (categoryIds && categoryNames && categoryIds.length !== categoryNames.length) {
+        return res.status(400).json({ message: 'Os arrays categoryIds e categoryNames devem ter o mesmo tamanho.' });
     }
 
     const finalCategoryReferences = [];
     const finalCategoryNames = [];
 
     // Processa cada categoryId para garantir que a categoria existe no Sanity
-    for (let i = 0; i < categoryIds.length; i++) {
-        let currentCategoryId = categoryIds[i];
-        let currentCategoryName = categoryNames[i];
+    if (categoryIds && categoryIds.length > 0) {
+        for (let i = 0; i < categoryIds.length; i++) {
+            let currentCategoryId = categoryIds[i];
+            let currentCategoryName = categoryNames[i] || ''; // Fallback para nome vazio
 
-        if (currentCategoryId.startsWith('gemini-')) {
-            try {
-                // Tenta buscar a categoria pelo título (nome) no Sanity
-                const existingSanityCategory = await sanityClient.fetch(
-                    `*[_type == "courseCategory" && title == $title][0]`, 
-                    { title: currentCategoryName }
-                );
-
-                if (existingSanityCategory) {
-                    finalCategoryReferences.push({ _type: 'reference', _ref: existingSanityCategory._id });
-                    finalCategoryNames.push(existingSanityCategory.title);
-                    console.log(`[Backend] Categoria Gemini "${currentCategoryName}" (para tag) já existe no Sanity com ID: ${existingSanityCategory._id}. Usando existente.`);
-                } else {
-                    // Se não existe, cria a categoria no Sanity
-                    const categorySlug = generateSlug(currentCategoryName); // Usa o novo gerador de slug
-                    const newCategoryDoc = {
-                        _type: 'courseCategory',
-                        title: currentCategoryName.trim(),
-                        slug: {
-                            _type: 'slug',
-                            current: categorySlug
-                        }
-                    };
-                    const createdCategory = await sanityClient.create(newCategoryDoc);
-                    finalCategoryReferences.push({ _type: 'reference', _ref: createdCategory._id });
-                    finalCategoryNames.push(createdCategory.title);
-                    console.log(`[Backend] Categoria Gemini "${currentCategoryName}" (para tag) criada no Sanity com ID: ${createdCategory._id}.`);
-                    
-                    // Invalida o cache de categorias para que a nova seja incluída
-                    cachedGeminiCategories = null;
-                    geminiCategoryCacheTimestamp = 0;
-                }
-            } catch (error) {
-                console.error(`Erro ao verificar/criar categoria pai para tag no Sanity (${currentCategoryName}):`, error.message);
-                return res.status(500).json({ message: `Erro interno ao processar a categoria "${currentCategoryName}" para a tag.`, error: error.message });
+            if (!currentCategoryId || typeof currentCategoryId !== 'string' || currentCategoryId.trim() === '') {
+                console.warn(`[Backend] ID de categoria inválido encontrado para tag: ${currentCategoryId}`);
+                continue; // Pula IDs inválidos
             }
-        } else {
-            // Se não é um ID Gemini, assume que é um ID Sanity real e apenas adiciona a referência
-            try {
-                const existingCat = await sanityClient.fetch(`*[_id == $id][0]{title}`, { id: currentCategoryId });
-                if (existingCat) {
-                    finalCategoryReferences.push({ _type: 'reference', _ref: currentCategoryId });
-                    finalCategoryNames.push(existingCat.title);
-                } else {
-                    console.warn(`[Backend] Categoria com ID "${currentCategoryId}" não encontrada no Sanity ao criar tag.`);
-                    return res.status(400).json({ message: `Categoria com ID "${currentCategoryId}" não encontrada.` });
+
+            if (currentCategoryId.startsWith('gemini-')) {
+                try {
+                    // Tenta buscar a categoria pelo título (nome) no Sanity
+                    const existingSanityCategory = await sanityClient.fetch(
+                        `*[_type == "courseCategory" && title == $title][0]`, 
+                        { title: currentCategoryName }
+                    );
+
+                    if (existingSanityCategory) {
+                        finalCategoryReferences.push({ _type: 'reference', _ref: existingSanityCategory._id });
+                        finalCategoryNames.push(existingSanityCategory.title);
+                        console.log(`[Backend] Categoria Gemini "${currentCategoryName}" (para tag) já existe no Sanity com ID: ${existingSanityCategory._id}. Usando existente.`);
+                    } else {
+                        // Se não existe, cria a categoria no Sanity
+                        const categorySlug = generateSlug(currentCategoryName); 
+                        const newCategoryDoc = {
+                            _type: 'courseCategory',
+                            title: currentCategoryName.trim(),
+                            slug: {
+                                _type: 'slug',
+                                current: categorySlug
+                            }
+                        };
+                        const createdCategory = await sanityClient.create(newCategoryDoc);
+                        finalCategoryReferences.push({ _type: 'reference', _ref: createdCategory._id });
+                        finalCategoryNames.push(createdCategory.title);
+                        console.log(`[Backend] Categoria Gemini "${currentCategoryName}" (para tag) criada no Sanity com ID: ${createdCategory._id}.`);
+                        
+                        cachedGeminiCategories = null;
+                        geminiCategoryCacheTimestamp = 0;
+                    }
+                } catch (error) {
+                    console.error(`Erro ao verificar/criar categoria pai para tag no Sanity (${currentCategoryName}):`, error.message);
+                    // Não retorna erro fatal aqui, apenas loga e continua para outras categorias se houver
                 }
-            } catch (error) {
-                console.error(`Erro ao buscar categoria por ID para tag (${currentCategoryId}):`, error.message);
-                return res.status(500).json({ message: `Erro interno ao verificar a categoria "${currentCategoryId}" para a tag.`, error: error.message });
+            } else {
+                try {
+                    const existingCat = await sanityClient.fetch(`*[_id == $id][0]{title}`, { id: currentCategoryId });
+                    if (existingCat) {
+                        finalCategoryReferences.push({ _type: 'reference', _ref: currentCategoryId });
+                        finalCategoryNames.push(existingCat.title);
+                    } else {
+                        console.warn(`[Backend] Categoria com ID "${currentCategoryId}" não encontrada no Sanity ao criar tag. Ignorando esta referência.`);
+                    }
+                } catch (error) {
+                    console.error(`Erro ao buscar categoria por ID para tag (${currentCategoryId}):`, error.message);
+                }
             }
         }
     }
@@ -673,7 +677,7 @@ export const createTag = async (req, res) => {
         console.error('Erro ao verificar tag existente no Sanity:', error.message);
     }
 
-    const slugValue = generateSlug(title); // Usa o novo gerador de slug
+    const slugValue = generateSlug(title); 
 
     const newTagDoc = {
         _type: 'courseTag',
@@ -682,7 +686,8 @@ export const createTag = async (req, res) => {
             _type: 'slug',
             current: slugValue
         },
-        categories: finalCategoryReferences // Usa as referências finais
+        // Adiciona referências de categoria apenas se houver alguma válida
+        ...(finalCategoryReferences.length > 0 && { categories: finalCategoryReferences }) 
     };
 
     try {
@@ -695,8 +700,8 @@ export const createTag = async (req, res) => {
         res.status(201).json({ 
             _id: createdDoc._id, 
             name: createdDoc.title,
-            categoryIds: finalCategoryReferences.map(ref => ref._ref), // Retorna os IDs finais
-            categoryNames: finalCategoryNames // Retorna os nomes finais
+            categoryIds: finalCategoryReferences.map(ref => ref._ref), 
+            categoryNames: finalCategoryNames 
         });
 
     } catch (error) {
@@ -735,23 +740,23 @@ export const getPixabayImages = async (req, res) => {
                 key: PIXABAY_API_KEY,
                 q: searchQuery,
                 image_type: 'photo',
-                orientation: 'horizontal', // Ou 'vertical', 'all'
+                orientation: 'horizontal', 
                 per_page: perPage,
-                min_width: 600, // Imagens de boa qualidade
+                min_width: 600, 
                 min_height: 400,
                 safesearch: true,
-                lang: 'pt' // Preferência por conteúdo em português
+                lang: 'pt' 
             },
-            timeout: 15000 // Timeout de 15 segundos
+            timeout: 15000 
         });
 
         const images = response.data.hits.map(hit => ({
             id: hit.id,
-            webformatURL: hit.webformatURL, // URL da imagem para exibição
-            largeImageURL: hit.largeImageURL, // URL da imagem em alta resolução (para uso futuro)
+            webformatURL: hit.webformatURL, 
+            largeImageURL: hit.largeImageURL, 
             tags: hit.tags,
             user: hit.user,
-            pageURL: hit.pageURL // Link para a página da imagem no Pixabay
+            pageURL: hit.pageURL 
         }));
 
         // Armazena no cache
