@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { register, login } from './controllers/authController.js';
 
 // --- Importa funções do dataController ---
-// Agora importamos getTopCategories, createCategory, getSubcategories, createSubcategory, getTags, createTag, getPixabayImages e createCourse
+// Agora importamos getTopCategories, createCategory, getSubcategories, createSubcategory, getTags, createTag e getPixabayImages
 import {
     getTopCategories, 
     createCategory,
@@ -18,8 +18,7 @@ import {
     createSubcategory,
     getTags, 
     createTag,
-    getPixabayImages,
-    createCourse // Importa a nova função createCourse
+    getPixabayImages 
 } from './controllers/dataController.js';
 
 const app = express();
@@ -30,9 +29,8 @@ const allowedOrigins = [
     process.env.FRONTEND_URL, // Permite que a variável de ambiente seja usada
     'http://localhost:3000', // Para desenvolvimento local
     'https://meuscursos.netlify.app', // Se você estiver usando Netlify para o frontend
-    'https://meuscursos.onrender.com', // Adicionado explicitamente a URL do seu frontend no Render
+    'https://meuscursos.onrender.com', // NOVO: Adicionado explicitamente a URL do seu frontend no Render
     // Adicione outras origens se necessário, por exemplo, se o seu backend estiver em um subdomínio diferente no Render
-    // Ex: 'https://seubackend.onrender.com' se o frontend estiver em 'https://seubackend.onrender.com'
 ].filter(Boolean); // Remove entradas nulas/vazias se FRONTEND_URL não estiver definida
 
 app.use(cors({
@@ -102,13 +100,13 @@ app.get('/api/courses/create/top-categories', protect, getTopCategories);
 // Rota para criar uma nova categoria (protegida por adminProtect)
 app.post('/api/categories', protect, adminProtect, createCategory); 
 
-// Rota para buscar subcategorias (protegida)
+// Rota para buscar subcategorias
 app.get('/api/subcategories', protect, getSubcategories);
 
 // Rota para criar uma nova subcategoria (protegida por adminProtect)
 app.post('/api/subcategories', protect, adminProtect, createSubcategory);
 
-// Rota para buscar tags (protegida)
+// Rota para buscar tags
 app.get('/api/tags', protect, getTags);
 
 // Rota para criar uma nova tag (protegida por adminProtect)
@@ -116,9 +114,6 @@ app.post('/api/tags', protect, adminProtect, createTag);
 
 // Rota para buscar imagens do Pixabay (protegida)
 app.get('/api/pixabay-images', protect, getPixabayImages);
-
-// NOVO: Rota para criar um novo curso (protegida por adminProtect)
-app.post('/api/courses', protect, adminProtect, createCourse);
 
 
 // Tratamento de erros para JWT (se o token for inválido, etc.)
@@ -143,6 +138,5 @@ app.listen(PORT, () => {
     console.log(`POST /api/subcategories (protegida por admin)`);
     console.log(`GET /api/tags?categoryId=[id]&categoryName=[name]&subcategoryId=[id]&subcategoryName=[name] (protegida)`); 
     console.log(`POST /api/tags (protegida por admin)`);
-    console.log(`GET /api/pixabay-images?query=[termo] (protegida)`); 
-    console.log(`POST /api/courses (protegida por admin)`);
+    console.log(`GET /api/pixabay-images?searchQuery=[termo] (protegida)`); 
 });
