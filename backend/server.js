@@ -18,7 +18,7 @@ import {
     createSubcategory,
     getTags, 
     createTag,
-    getPixabayImages // NOVO: Importa a função para buscar imagens do Pixabay
+    getPixabayImages 
 } from './controllers/dataController.js';
 
 const app = express();
@@ -26,16 +26,21 @@ const PORT = process.env.PORT || 3001;
 
 // --- Configuração CORS para Produção ---
 const allowedOrigins = [
-    process.env.FRONTEND_URL || 'http://localhost:3000', // Sua URL do Netlify ou localhost para desenvolvimento
-    // Adicione outras origens se necessário
-];
+    process.env.FRONTEND_URL, // Permite que a variável de ambiente seja usada
+    'http://localhost:3000', // Para desenvolvimento local
+    'https://meuscursos.netlify.app', // Se você estiver usando Netlify para o frontend
+    'https://meuscursos.onrender.com', // NOVO: Adicionado explicitamente a URL do seu frontend no Render
+    // Adicione outras origens se necessário, por exemplo, se o seu backend estiver em um subdomínio diferente no Render
+    // Ex: 'https://seubackend.onrender.com' se o frontend estiver em 'https://seubackend.onrender.com'
+].filter(Boolean); // Remove entradas nulas/vazias se FRONTEND_URL não estiver definida
 
 app.use(cors({
     origin: function (origin, callback) {
         // Permite requisições sem 'origin' (ex: mobile apps, curl)
         if (!origin) return callback(null, true);
         if (allowedOrigins.indexOf(origin) === -1) {
-            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+            console.error(msg); // Loga a origem que está sendo bloqueada
             return callback(new Error(msg), false);
         }
         return callback(null, true);
@@ -96,19 +101,19 @@ app.get('/api/courses/create/top-categories', protect, getTopCategories);
 // Rota para criar uma nova categoria (protegida por adminProtect)
 app.post('/api/categories', protect, adminProtect, createCategory); 
 
-// CORRIGIDO: Rota para buscar subcategorias (agora sem o prefixo /courses/create/)
+// Rota para buscar subcategorias
 app.get('/api/subcategories', protect, getSubcategories);
 
 // Rota para criar uma nova subcategoria (protegida por adminProtect)
 app.post('/api/subcategories', protect, adminProtect, createSubcategory);
 
-// CORRIGIDO: Rota para buscar tags (agora sem o prefixo /courses/create/)
+// Rota para buscar tags
 app.get('/api/tags', protect, getTags);
 
 // Rota para criar uma nova tag (protegida por adminProtect)
 app.post('/api/tags', protect, adminProtect, createTag);
 
-// NOVO: Rota para buscar imagens do Pixabay (protegida)
+// Rota para buscar imagens do Pixabay (protegida)
 app.get('/api/pixabay-images', protect, getPixabayImages);
 
 
@@ -130,9 +135,9 @@ app.listen(PORT, () => {
     console.log(`POST /api/auth/login`);
     console.log(`GET /api/courses/create/top-categories (protegida)`); 
     console.log(`POST /api/categories (protegida por admin)`);
-    console.log(`GET /api/subcategories?categoryId=[id]&categoryName=[name] (protegida)`); // Log atualizado
+    console.log(`GET /api/subcategories?categoryId=[id]&categoryName=[name] (protegida)`); 
     console.log(`POST /api/subcategories (protegida por admin)`);
-    console.log(`GET /api/tags?categoryId=[id]&categoryName=[name]&subcategoryId=[id]&subcategoryName=[name] (protegida)`); // Log atualizado
+    console.log(`GET /api/tags?categoryId=[id]&categoryName=[name]&subcategoryId=[id]&subcategoryName=[name] (protegida)`); 
     console.log(`POST /api/tags (protegida por admin)`);
-    console.log(`GET /api/pixabay-images?searchQuery=[termo] (protegida)`); // Log adicionado
+    console.log(`GET /api/pixabay-images?searchQuery=[termo] (protegida)`); 
 });
