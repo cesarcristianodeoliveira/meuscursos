@@ -269,6 +269,8 @@ function CourseCreatePage() {
                         selectedCategory={selectedCategory}
                         selectedSubcategory={selectedSubcategory}
                         selectedTags={selectedTags}
+                        onGoBack={handleGoBack} // Permite voltar do passo de revisão
+                        // onCreateCourse={handleCreateCourse} // Adicionar esta prop quando a função de criação for implementada
                     />
                 );
             default:
@@ -327,6 +329,7 @@ function CourseCreatePage() {
                 userToken={userToken}
                 onTagCreated={handleAdminTagCreated}
                 onShowAlert={handleShowAlert}
+                selectedCategory={selectedCategory} {/* NOVO: Passa a categoria selecionada para o modal de tags */}
             />
         </Container>
     );

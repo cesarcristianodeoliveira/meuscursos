@@ -9,7 +9,7 @@ export default {
       title: 'Tag Title', // Título do campo no Studio
       type: 'string',
       description: 'The display name of the course tag (e.g., "JavaScript", "SEO", "Cloud Computing").',
-      validation: Rule => Rule.required().min(2).max(50)
+      validation: Rule => Rule.required().min(3).max(50) // ATUALIZADO: min(3) para consistência
     },
     {
       name: 'slug',

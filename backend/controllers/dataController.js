@@ -7,6 +7,10 @@ import { createClient } from '@sanity/client'; // Importa o cliente Sanity
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = 'gemini-1.5-flash';
 
+// --- Configurações da Pixabay API ---
+const PIXABAY_API_KEY = process.env.PIXABAY_API_KEY;
+const PIXABAY_BASE_URL = 'https://pixabay.com/api/';
+
 // --- Variáveis para Cache da Gemini Categories, Subcategories e Tags ---
 let cachedGeminiCategories = null;
 const GEMINI_CATEGORY_CACHE_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 horas em milissegundos
@@ -16,10 +20,15 @@ let cachedGeminiSubcategories = {}; // Objeto para armazenar cache por categoryI
 const GEMINI_SUBCATEGORY_CACHE_LIFETIME_MS = 12 * 60 * 60 * 1000; // 12 horas
 let geminiSubcategoryCacheTimestamps = {}; // Objeto para armazenar timestamps por categoryId
 
-// NOVO: Cache para tags (pode ser mais granular por subcategoria/categoria)
+// Cache para tags (pode ser mais granular por subcategoria/categoria)
 let cachedGeminiTags = {}; // Objeto para armazenar cache por subcategoryId ou categoryId
 const GEMINI_TAG_CACHE_LIFETIME_MS = 6 * 60 * 60 * 1000; // 6 horas
 let geminiTagCacheTimestamps = {}; // Objeto para armazenar timestamps por cacheKey
+
+// Cache para Imagens Pixabay
+let cachedPixabayImages = {}; // Objeto para armazenar cache por termo de busca
+const PIXABAY_IMAGE_CACHE_LIFETIME_MS = 2 * 60 * 60 * 1000; // 2 horas
+let pixabayImageCacheTimestamps = {}; // Objeto para armazenar timestamps por termo de busca
 
 // --- Configurações do Sanity Client ---
 const sanityClient = createClient({
@@ -317,7 +326,7 @@ export const getSubcategories = async (req, res) => {
     });
 };
 
-// NOVO: Função para criar uma nova subcategoria no Sanity
+// Função para criar uma nova subcategoria no Sanity
 export const createSubcategory = async (req, res) => {
     const { title, parentCategoryId } = req.body;
 
@@ -349,7 +358,7 @@ export const createSubcategory = async (req, res) => {
         },
         parentCategory: {
             _type: 'reference',
-            _ref: parentCategoryId
+            _ref: parentCategoryId // A referência está sendo criada aqui
         }
     };
 
@@ -378,7 +387,7 @@ export const createSubcategory = async (req, res) => {
     }
 };
 
-// NOVO: Função para buscar tags com base na categoria ou subcategoria
+// Função para buscar tags com base na categoria ou subcategoria
 export const getTags = async (req, res) => {
     const { categoryId, categoryName, subcategoryId, subcategoryName } = req.query;
 
@@ -496,15 +505,25 @@ export const getTags = async (req, res) => {
     });
 };
 
-// NOVO: Função para criar uma nova tag no Sanity
+// Função para criar uma nova tag no Sanity
 export const createTag = async (req, res) => {
-    const { title } = req.body;
+    // NOVO: Agora espera 'title' E 'categoryIds' (array de IDs de categoria)
+    const { title, categoryIds } = req.body; 
 
     if (!title || typeof title !== 'string' || title.trim() === '') {
         return res.status(400).json({ message: 'O título da tag é obrigatório e deve ser uma string não vazia.' });
     }
+    // Validação para categoryIds
+    if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
+        return res.status(400).json({ message: 'Pelo menos um ID de categoria deve ser fornecido para associar a tag.' });
+    }
+    // Opcional: Validar se cada categoryId é uma string válida
+    if (categoryIds.some(id => typeof id !== 'string' || id.trim() === '')) {
+        return res.status(400).json({ message: 'Todos os IDs de categoria fornecidos devem ser strings não vazias.' });
+    }
 
     try {
+        // Verifica se a tag já existe pelo título
         const existingTag = await sanityClient.fetch(`*[_type == "courseTag" && title == $title][0]`, { title });
         if (existingTag) {
             return res.status(409).json({ message: 'Esta tag já existe.' });
@@ -515,23 +534,31 @@ export const createTag = async (req, res) => {
 
     const slugValue = title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
 
+    // NOVO: Mapeia os categoryIds para o formato de referência do Sanity
+    const categoryReferences = categoryIds.map(id => ({
+        _type: 'reference',
+        _ref: id
+    }));
+
     const newTagDoc = {
         _type: 'courseTag',
         title: title.trim(),
         slug: {
             _type: 'slug',
             current: slugValue
-        }
+        },
+        categories: categoryReferences // NOVO: Adiciona as referências de categoria
     };
 
     try {
         const createdDoc = await sanityClient.create(newTagDoc);
-        console.log(`[Backend] Tag "${createdDoc.title}" criada no Sanity com ID: ${createdDoc._id}, Slug: ${createdDoc.slug.current}`);
+        console.log(`[Backend] Tag "${createdDoc.title}" criada no Sanity com ID: ${createdDoc._id}, Slug: ${createdDoc.slug.current}, Categorias Associadas: ${categoryIds.join(', ')}`);
         
         // Invalida todos os caches de tags, pois uma nova tag pode ser relevante para qualquer contexto
         cachedGeminiTags = {}; 
         geminiTagCacheTimestamps = {};
 
+        // Retorna a tag criada no formato que o frontend espera (_id, name)
         res.status(201).json({ _id: createdDoc._id, name: createdDoc.title });
 
     } catch (error) {

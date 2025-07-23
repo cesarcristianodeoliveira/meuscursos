@@ -1,4 +1,4 @@
-// schemas/courseSubCategory.js
+// D:\meuscursos\sanity\schemas\courseSubCategory.js
 export default {
   name: 'courseSubCategory',
   title: 'Course Subcategory',
@@ -9,7 +9,7 @@ export default {
       title: 'Subcategory Title',
       type: 'string',
       description: 'The main title of the course subcategory (e.g., "Web Development", "Data Science").',
-      // validation: Rule => Rule.required().min(3).max(80)
+      validation: Rule => Rule.required().min(3).max(80) // Reabilitado e adicionado min/max para consistência
     },
     {
       name: 'slug',
@@ -17,9 +17,10 @@ export default {
       type: 'slug',
       options: {
         source: 'title',
-        // maxLength: 96,
+        maxLength: 96,
       },
-      description: 'A unique, URL-friendly identifier for the course subcategory.'
+      description: 'A unique, URL-friendly identifier for the course subcategory.',
+      validation: Rule => Rule.required().unique() // Adicionado required e unique
     },
     {
       name: 'description',
@@ -32,7 +33,7 @@ export default {
       title: 'Parent Category',
       type: 'reference',
       to: [{ type: 'courseCategory' }], // Aponta para o schema 'courseCategory'
-      // validation: Rule => Rule.required(), // Uma subcategoria deve ter uma categoria pai
+      validation: Rule => Rule.required(), // IMPORTANTE: Reabilitado - Uma subcategoria DEVE ter uma categoria pai
       description: 'The main category this subcategory belongs to.'
     }
   ],

@@ -9,12 +9,14 @@ import {
     TextField,
     Button,
     CircularProgress,
+    Typography // Importado para exibir o nome da categoria
 } from '@mui/material';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
-function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCreated, onShowAlert }) {
+// Adicionada a prop 'selectedCategory'
+function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCreated, onShowAlert, selectedCategory }) {
     const [newTagTitle, setNewTagTitle] = useState('');
     const [addingTag, setAddingTag] = useState(false);
 
@@ -26,6 +28,7 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
     }, [open]);
 
     // Condição para habilitar/desabilitar o botão "Criar"
+    // Ele será desabilitado se estiver adicionando OU se o título (sem espaços) tiver menos de 3 caracteres
     const isCreateButtonDisabled = addingTag || newTagTitle.trim().length < 3;
 
     const handleCreateTag = async () => {
@@ -37,11 +40,20 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
             onShowAlert('Você precisa estar logado para criar uma tag.', 'error');
             return;
         }
+        // NOVO: Validação para garantir que uma categoria foi selecionada
+        if (!selectedCategory || !selectedCategory._id) {
+            onShowAlert('Nenhuma categoria principal selecionada para associar a tag.', 'error');
+            return;
+        }
 
         setAddingTag(true);
         try {
             const response = await axios.post(`${API_BASE_URL}/api/tags`, 
-                { title: newTagTitle.trim() },
+                { 
+                    title: newTagTitle.trim(),
+                    // NOVO: Envia o ID da categoria selecionada como um array de categoryIds
+                    categoryIds: [selectedCategory._id] 
+                },
                 { 
                     headers: { 
                         Authorization: `Bearer ${userToken}`,
@@ -68,6 +80,10 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
         <Dialog open={open} onClose={onClose}>
             <DialogTitle>Criar Nova Tag</DialogTitle>
             <DialogContent>
+                {/* NOVO: Exibe a categoria à qual a tag será associada */}
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                    Para a categoria: <strong>{selectedCategory ? selectedCategory.name : 'Nenhuma selecionada'}</strong>
+                </Typography>
                 <TextField
                     autoFocus
                     margin="dense"
