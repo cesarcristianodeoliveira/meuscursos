@@ -31,8 +31,6 @@ function AdminAddSubCategoryModal({ open, onClose, isAuthenticated, userToken, o
     const isCreateButtonDisabled = addingSubcategory || newSubcategoryTitle.trim().length < 3;
 
     const handleCreateSubcategory = async () => {
-        // A validação de campo vazio (newSubcategoryTitle.trim() === '') já está coberta
-        // pela condição isCreateButtonDisabled (pois 0 < 3), mas mantemos o onShowAlert explícito.
         if (!newSubcategoryTitle.trim()) {
             onShowAlert('O título da subcategoria não pode ser vazio.', 'warning');
             return;
@@ -41,7 +39,8 @@ function AdminAddSubCategoryModal({ open, onClose, isAuthenticated, userToken, o
             onShowAlert('Você precisa estar logado para criar uma subcategoria.', 'error');
             return;
         }
-        if (!parentCategory || !parentCategory._id || !parentCategory.name) { // NOVO: Verifica se parentCategory.name existe
+        // Validação para garantir que uma categoria principal válida foi selecionada
+        if (!parentCategory || !parentCategory._id || !parentCategory.name) { 
             onShowAlert('Nenhuma categoria principal válida selecionada para adicionar a subcategoria.', 'error');
             return;
         }
@@ -51,8 +50,8 @@ function AdminAddSubCategoryModal({ open, onClose, isAuthenticated, userToken, o
             const response = await axios.post(`${API_BASE_URL}/api/subcategories`, 
                 { 
                     title: newSubcategoryTitle.trim(),
-                    parentCategoryId: parentCategory._id, // Envia o ID da categoria pai
-                    parentCategoryName: parentCategory.name // NOVO: Envia o nome da categoria pai
+                    parentCategoryId: parentCategory._id, 
+                    parentCategoryName: parentCategory.name // Garante que o nome da categoria pai é enviado
                 },
                 { 
                     headers: { 
@@ -61,11 +60,11 @@ function AdminAddSubCategoryModal({ open, onClose, isAuthenticated, userToken, o
                     } 
                 }
             );
-            const createdSubcategory = response.data; // Assumindo que o backend retorna a subcategoria criada
+            const createdSubcategory = response.data; 
 
             onShowAlert(`Subcategoria "${createdSubcategory.name}" criada com sucesso para "${createdSubcategory.parentCategoryName}"!`, 'success');
-            onSubcategoryCreated(createdSubcategory); // Notifica o pai com a subcategoria criada
-            onClose(); // Fecha o modal
+            onSubcategoryCreated(createdSubcategory); 
+            onClose(); 
 
         } catch (error) {
             console.error('Erro ao criar subcategoria:', error.response?.data || error.message);
@@ -94,7 +93,6 @@ function AdminAddSubCategoryModal({ open, onClose, isAuthenticated, userToken, o
                     value={newSubcategoryTitle}
                     onChange={(e) => setNewSubcategoryTitle(e.target.value)}
                     disabled={addingSubcategory}
-                    // Adiciona helperText e error para feedback visual ao usuário
                     helperText={
                         newSubcategoryTitle.trim().length > 0 && newSubcategoryTitle.trim().length < 3
                             ? "Mínimo de 3 caracteres"
@@ -107,7 +105,6 @@ function AdminAddSubCategoryModal({ open, onClose, isAuthenticated, userToken, o
                 <Button onClick={onClose} disabled={addingSubcategory}>
                     Cancelar
                 </Button>
-                {/* O botão "Criar" agora usa a nova condição de desabilitação */}
                 <Button onClick={handleCreateSubcategory} disabled={isCreateButtonDisabled}>
                     {addingSubcategory ? <CircularProgress size={24} /> : 'Criar'}
                 </Button>

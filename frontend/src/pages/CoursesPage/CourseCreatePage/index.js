@@ -9,7 +9,7 @@ import {
     Step,
     StepLabel,
     Alert,
-    Button, // Mantido para o botão de admin no passo 0
+    Button, 
     Snackbar,
 } from '@mui/material';
 
@@ -17,11 +17,11 @@ import {
 import {
     SelectCategoryStep, 
     SelectSubCategoryStep,
-    SelectTagsStep, // Componente para selecionar tags
+    SelectTagsStep, 
     ReviewAndCreateStep,
     AdminAddCategoryModal,
     AdminAddSubCategoryModal,
-    AdminAddTagModal // Componente do modal de adição de tag
+    AdminAddTagModal 
 } from './components'; 
 
 import axios from 'axios';
@@ -47,7 +47,7 @@ function CourseCreatePage() {
     const [categories, setCategories] = useState([]);
     const [loadingCategories, setLoadingCategories] = useState(false);
     const [errorCategories, setErrorCategories] = useState(null);
-    const [creatingCategoryOnSelect, setCreatingCategoryOnSelect] = useState(false); // Estado para carregamento ao criar categoria ao selecionar
+    const [creatingCategoryOnSelect, setCreatingCategoryOnSelect] = useState(false); 
 
     // Estado para controlar a exibição do Alert (Snackbar)
     const [alertInfo, setAlertInfo] = useState({ message: null, severity: null });
@@ -60,7 +60,7 @@ function CourseCreatePage() {
     // Estados para os modais de criação
     const [openAddCategoryModal, setOpenAddCategoryModal] = useState(false);
     const [openAddSubCategoryModal, setOpenAddSubCategoryModal] = useState(false);
-    const [parentCategoryForSubModal, setParentCategoryForSubModal] = useState(null);
+    // REMOVIDO: const [parentCategoryForSubModal, setParentCategoryForSubModal] = useState(null); 
     const [openAddTagModal, setOpenAddTagModal] = useState(false); 
 
     // Função para exibir o Alert (Snackbar)
@@ -157,7 +157,7 @@ function CourseCreatePage() {
                 const errorMessage = error.response?.data?.message || 'Erro ao criar categoria. Tente novamente.';
                 handleShowAlert(errorMessage, 'error');
                 setCreatingCategoryOnSelect(false); 
-                return; // Não avança se a criação falhar
+                return; 
             } finally {
                 setCreatingCategoryOnSelect(false);
             }
@@ -171,8 +171,6 @@ function CourseCreatePage() {
         setSelectedSubcategory(null); 
         setSelectedTags([]); 
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
-        handleShowAlert(`Avançando para Subcategorias.`, 'info');
-
     }, [handleShowAlert, userToken, fetchCategories]);
 
 
@@ -209,25 +207,21 @@ function CourseCreatePage() {
     // Callback quando uma categoria é criada no modal do admin
     const handleAdminCategoryCreated = useCallback(async (newCategory) => {
         await fetchCategories(); 
-        handleCategorySelectAndAdvance(newCategory); // Usa a mesma lógica de seleção e avanço
+        handleCategorySelectAndAdvance(newCategory); 
     }, [fetchCategories, handleCategorySelectAndAdvance]);
 
 
     // --- Funções para o Modal de Criação de Subcategoria ---
     const handleOpenAddSubCategoryModal = useCallback((parentCat) => {
-        setParentCategoryForSubModal(parentCat);
         setOpenAddSubCategoryModal(true);
     }, []);
 
     const handleCloseAddSubCategoryModal = () => {
         setOpenAddSubCategoryModal(false);
-        setParentCategoryForSubModal(null); 
     };
 
     // Callback quando uma subcategoria é criada no modal do admin
     const handleAdminSubcategoryCreated = useCallback((newSubcategory) => {
-        // Não precisamos recarregar subcategorias aqui, pois o SelectSubCategoryStep já faz isso
-        // quando selectedCategory muda, ou quando o modal é fechado e reaberto.
         setSelectedSubcategory(newSubcategory); 
         handleSubcategorySelectAndAdvance(newSubcategory); 
     }, [handleSubcategorySelectAndAdvance]);
@@ -245,8 +239,6 @@ function CourseCreatePage() {
     // Callback quando uma tag é criada no modal do admin
     const handleAdminTagCreated = useCallback((newTag) => {
         handleShowAlert(`Tag "${newTag.name}" criada com sucesso!`, 'success');
-        // Não precisamos recarregar tags aqui, pois o SelectTagsStep já faz isso
-        // quando selectedCategory/selectedSubcategory muda, ou quando o modal é fechado e reaberto.
     }, [handleShowAlert]);
 
 
@@ -310,7 +302,6 @@ function CourseCreatePage() {
                         selectedSubcategory={selectedSubcategory}
                         selectedTags={selectedTags}
                         onGoBack={handleGoBack} 
-                        // onCreateCourse={handleCreateCourse} 
                     />
                 );
             default:
@@ -359,7 +350,7 @@ function CourseCreatePage() {
                 userToken={userToken}
                 onSubcategoryCreated={handleAdminSubcategoryCreated}
                 onShowAlert={handleShowAlert}
-                parentCategory={parentCategoryForSubModal} 
+                parentCategory={selectedCategory} 
             />
 
             <AdminAddTagModal
