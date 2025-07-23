@@ -10,7 +10,8 @@ import {
     StepLabel,
     Alert,
     Button,
-    Snackbar // Mantido para exibir alertas
+    Snackbar,
+    // CircularProgress // REMOVIDO: 'CircularProgress' não é usado diretamente neste componente.
 } from '@mui/material';
 
 // Importa os componentes de cada passo
@@ -47,6 +48,7 @@ function CourseCreatePage() {
     const [categories, setCategories] = useState([]);
     const [loadingCategories, setLoadingCategories] = useState(false);
     const [errorCategories, setErrorCategories] = useState(null);
+    const [creatingCategoryOnSelect, setCreatingCategoryOnSelect] = useState(false); // NOVO: Estado para carregamento ao criar categoria ao selecionar
 
     // Estado para controlar a exibição do Alert (Snackbar)
     const [alertInfo, setAlertInfo] = useState({ message: null, severity: null });
@@ -130,14 +132,51 @@ function CourseCreatePage() {
 
     // --- Funções de Navegação e Seleção ---
 
-    // Função para selecionar categoria e avançar
-    const handleCategorySelectAndAdvance = useCallback((category) => {
-        setSelectedCategory(category);
+    // NOVO: Função para selecionar categoria e avançar (com criação automática)
+    const handleCategorySelectAndAdvance = useCallback(async (category) => {
+        // Se a categoria selecionada é uma sugestão da Gemini (ID começa com 'gemini-')
+        if (category._id.startsWith('gemini-')) {
+            setCreatingCategoryOnSelect(true);
+            try {
+                const response = await axios.post(`${API_BASE_URL}/api/categories`, 
+                    { title: category.name.trim() },
+                    { 
+                        headers: { 
+                            Authorization: `Bearer ${userToken}`,
+                            'Content-Type': 'application/json'
+                        } 
+                    }
+                );
+                const createdCategory = response.data; // Backend retorna o _id real do Sanity
+                
+                // Atualiza a categoria selecionada para usar o ID real do Sanity
+                setSelectedCategory(createdCategory); 
+                handleShowAlert(`Categoria "${createdCategory.name}" criada e selecionada com sucesso!`, 'success');
+                await fetchCategories(); // Recarrega as categorias para incluir a recém-criada do Sanity
+
+            } catch (error) {
+                console.error('Erro ao criar categoria ao selecionar:', error.response?.data || error.message);
+                const errorMessage = error.response?.data?.message || 'Erro ao criar categoria. Tente novamente.';
+                handleShowAlert(errorMessage, 'error');
+                setCreatingCategoryOnSelect(false); // Reseta o estado de carregamento
+                return; // Não avança se a criação falhar
+            } finally {
+                setCreatingCategoryOnSelect(false);
+            }
+        } else {
+            // Se não for uma categoria Gemini, apenas seleciona
+            setSelectedCategory(category);
+            handleShowAlert(`Categoria "${category.name}" selecionada.`, 'info');
+        }
+
+        // Avança para o próximo passo após a seleção/criação
         setSelectedSubcategory(null); // Reseta a subcategoria ao mudar a categoria principal
         setSelectedTags([]); // Reseta as tags ao mudar a categoria principal
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
-        handleShowAlert(`Categoria "${category.name}" selecionada. Avançando para Subcategorias.`, 'info');
-    }, [handleShowAlert]);
+        handleShowAlert(`Avançando para Subcategorias.`, 'info');
+
+    }, [handleShowAlert, userToken, fetchCategories]);
+
 
     // Função para selecionar subcategoria e avançar
     const handleSubcategorySelectAndAdvance = useCallback((subCategory) => {
@@ -172,7 +211,7 @@ function CourseCreatePage() {
     // Callback quando uma categoria é criada no modal do admin
     const handleAdminCategoryCreated = useCallback(async (newCategory) => {
         await fetchCategories(); 
-        handleCategorySelectAndAdvance(newCategory);
+        handleCategorySelectAndAdvance(newCategory); // Usa a mesma lógica de seleção e avanço
     }, [fetchCategories, handleCategorySelectAndAdvance]);
 
 
@@ -219,7 +258,7 @@ function CourseCreatePage() {
                             categories={categories}
                             selectedCategory={selectedCategory}
                             onCategorySelectAndAdvance={handleCategorySelectAndAdvance} 
-                            loading={loadingCategories}
+                            loading={loadingCategories || creatingCategoryOnSelect} // NOVO: Inclui estado de criação
                             error={errorCategories}
                         />
                         {isAdmin && (
@@ -228,6 +267,7 @@ function CourseCreatePage() {
                                     variant="outlined"
                                     color="primary"
                                     onClick={handleOpenAddCategoryModal}
+                                    disabled={creatingCategoryOnSelect} // Desabilita enquanto cria ao selecionar
                                 >
                                     Criar Nova Categoria (Admin)
                                 </Button>
