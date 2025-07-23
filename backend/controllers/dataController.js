@@ -656,6 +656,7 @@ export const createTag = async (req, res) => {
                         };
                         // Se for subcategoria e tiver um parentCategory, precisamos adicioná-lo
                         // A categoria pai para a subcategoria Gemini deve ser um ID Sanity real
+                        // Esta informação deve vir do frontend no req.body se for uma subcategoria Gemini que está sendo criada.
                         if (docType === 'courseSubCategory' && req.body.parentCategoryForSubcategoryGemini) {
                             const parentCatRefId = req.body.parentCategoryForSubcategoryGemini._id;
                             if (parentCatRefId && typeof parentCatRefId === 'string') {
