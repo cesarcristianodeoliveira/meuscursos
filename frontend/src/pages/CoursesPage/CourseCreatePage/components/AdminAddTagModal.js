@@ -40,9 +40,9 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
             onShowAlert('Você precisa estar logado para criar uma tag.', 'error');
             return;
         }
-        // NOVO: Validação para garantir que uma categoria foi selecionada
-        if (!selectedCategory || !selectedCategory._id) {
-            onShowAlert('Nenhuma categoria principal selecionada para associar a tag.', 'error');
+        // Validação para garantir que uma categoria foi selecionada e tem ID/Nome
+        if (!selectedCategory || !selectedCategory._id || !selectedCategory.name) {
+            onShowAlert('Nenhuma categoria principal válida selecionada para associar a tag.', 'error');
             return;
         }
 
@@ -51,8 +51,10 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
             const response = await axios.post(`${API_BASE_URL}/api/tags`, 
                 { 
                     title: newTagTitle.trim(),
-                    // NOVO: Envia o ID da categoria selecionada como um array de categoryIds
-                    categoryIds: [selectedCategory._id] 
+                    // Envia o ID da categoria selecionada como um array de categoryIds
+                    categoryIds: [selectedCategory._id],
+                    // Envia o nome da categoria selecionada como um array de categoryNames
+                    categoryNames: [selectedCategory.name] 
                 },
                 { 
                     headers: { 
@@ -80,7 +82,7 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
         <Dialog open={open} onClose={onClose}>
             <DialogTitle>Criar Nova Tag</DialogTitle>
             <DialogContent>
-                {/* NOVO: Exibe a categoria à qual a tag será associada */}
+                {/* Exibe a categoria à qual a tag será associada */}
                 <Typography variant="body1" sx={{ mb: 2 }}>
                     Para a categoria: <strong>{selectedCategory ? selectedCategory.name : 'Nenhuma selecionada'}</strong>
                 </Typography>

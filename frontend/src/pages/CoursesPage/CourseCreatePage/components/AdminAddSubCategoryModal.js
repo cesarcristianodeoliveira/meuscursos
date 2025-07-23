@@ -41,8 +41,8 @@ function AdminAddSubCategoryModal({ open, onClose, isAuthenticated, userToken, o
             onShowAlert('Você precisa estar logado para criar uma subcategoria.', 'error');
             return;
         }
-        if (!parentCategory || !parentCategory._id) {
-            onShowAlert('Nenhuma categoria principal selecionada para adicionar a subcategoria.', 'error');
+        if (!parentCategory || !parentCategory._id || !parentCategory.name) { // NOVO: Verifica se parentCategory.name existe
+            onShowAlert('Nenhuma categoria principal válida selecionada para adicionar a subcategoria.', 'error');
             return;
         }
 
@@ -51,7 +51,8 @@ function AdminAddSubCategoryModal({ open, onClose, isAuthenticated, userToken, o
             const response = await axios.post(`${API_BASE_URL}/api/subcategories`, 
                 { 
                     title: newSubcategoryTitle.trim(),
-                    parentCategoryId: parentCategory._id // Envia o ID da categoria pai
+                    parentCategoryId: parentCategory._id, // Envia o ID da categoria pai
+                    parentCategoryName: parentCategory.name // NOVO: Envia o nome da categoria pai
                 },
                 { 
                     headers: { 
