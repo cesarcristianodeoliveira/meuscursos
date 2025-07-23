@@ -9,7 +9,7 @@ export default {
       title: 'Subcategory Title',
       type: 'string',
       description: 'The main title of the course subcategory (e.g., "Web Development", "Data Science").',
-      validation: Rule => Rule.required().min(3).max(80) // Reabilitado e adicionado min/max para consistência
+      validation: Rule => Rule.required().min(3).max(80) 
     },
     {
       name: 'slug',
@@ -18,9 +18,11 @@ export default {
       options: {
         source: 'title',
         maxLength: 96,
+        // CORREÇÃO AQUI: isUnique deve ser uma função que chama context.defaultIsUnique
+        isUnique: (value, context) => context.defaultIsUnique(value, context), 
       },
       description: 'A unique, URL-friendly identifier for the course subcategory.',
-      validation: Rule => Rule.required().unique() // Adicionado required e unique
+      validation: Rule => Rule.required() // Removido .unique() daqui
     },
     {
       name: 'description',
@@ -29,18 +31,18 @@ export default {
       description: 'A brief description of what courses this subcategory includes.',
     },
     {
-      name: 'parentCategory', // Campo de referência para a categoria "pai"
+      name: 'parentCategory', 
       title: 'Parent Category',
       type: 'reference',
-      to: [{ type: 'courseCategory' }], // Aponta para o schema 'courseCategory'
-      validation: Rule => Rule.required(), // IMPORTANTE: Reabilitado - Uma subcategoria DEVE ter uma categoria pai
+      to: [{ type: 'courseCategory' }], 
+      validation: Rule => Rule.required(), 
       description: 'The main category this subcategory belongs to.'
     }
   ],
   preview: {
     select: {
       title: 'title',
-      parentCategoryTitle: 'parentCategory.title', // Mostra o título da categoria pai
+      parentCategoryTitle: 'parentCategory.title', 
       subtitle: 'description',
     },
     prepare(selection) {
