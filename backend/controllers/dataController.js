@@ -59,6 +59,17 @@ const parseGeminiResponse = (response) => {
     }
 };
 
+// NOVO: Função para gerar slugs de forma mais robusta (lidando com acentos)
+const generateSlug = (title) => {
+    return title
+        .normalize("NFD") // Normaliza para decompor caracteres acentuados
+        .replace(/[\u0300-\u036f]/g, "") // Remove os diacríticos (acentos)
+        .toLowerCase() // Converte para minúsculas
+        .trim() // Remove espaços em branco do início/fim
+        .replace(/\s+/g, '-') // Substitui espaços por hífens
+        .replace(/[^\w-]+/g, ''); // Remove todos os caracteres não-palavra e não-hífens
+};
+
 // --- Funções para Categorias (Combinando Sanity e Gemini) ---
 export const getTopCategories = async (req, res) => {
     let sanityCategories = [];
@@ -107,7 +118,7 @@ export const getTopCategories = async (req, res) => {
                 geminiSuggestedCategories = suggestedNames
                     .filter(name => typeof name === 'string' && name.trim() !== '')
                     .map(name => ({
-                        _id: `gemini-${name.toLowerCase().replace(/\s/g, '-')}`,
+                        _id: `gemini-${generateSlug(name)}`, // Usa o novo gerador de slug para o ID Gemini
                         name: name
                     }));
 
@@ -181,8 +192,8 @@ export const createCategory = async (req, res) => {
         // Continua mesmo com erro na verificação para não bloquear a criação
     }
 
-    // Geração do slug a partir do título
-    const slugValue = title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+    // Geração do slug a partir do título usando a nova função
+    const slugValue = generateSlug(title);
 
     const newCategoryDoc = {
         _type: 'courseCategory',
@@ -268,7 +279,7 @@ export const getSubcategories = async (req, res) => {
                 geminiSuggestedSubcategories = suggestedNames
                     .filter(name => typeof name === 'string' && name.trim() !== '')
                     .map(name => ({
-                        _id: `gemini-sub-${name.toLowerCase().replace(/\s/g, '-')}-${categoryId}`, // ID único para subcategorias Gemini
+                        _id: `gemini-sub-${generateSlug(name)}-${categoryId}`, // Usa o novo gerador de slug
                         name: name,
                         parentCategoryId: categoryId,
                         parentCategoryName: categoryName
@@ -327,7 +338,7 @@ export const getSubcategories = async (req, res) => {
 
 // Função para criar uma nova subcategoria no Sanity
 export const createSubcategory = async (req, res) => {
-    const { title, parentCategoryId, parentCategoryName } = req.body; // NOVO: Recebe parentCategoryName
+    const { title, parentCategoryId, parentCategoryName } = req.body; 
 
     if (!title || typeof title !== 'string' || title.trim() === '') {
         return res.status(400).json({ message: 'O título da subcategoria é obrigatório e deve ser uma string não vazia.' });
@@ -335,13 +346,18 @@ export const createSubcategory = async (req, res) => {
     if (!parentCategoryId || typeof parentCategoryId !== 'string' || parentCategoryId.trim() === '') {
         return res.status(400).json({ message: 'O ID da categoria pai é obrigatório para criar uma subcategoria.' });
     }
+    // NOVO: parentCategoryName é obrigatório para o fluxo de criação automática
+    if (!parentCategoryName || typeof parentCategoryName !== 'string' || parentCategoryName.trim() === '') {
+        return res.status(400).json({ message: 'O nome da categoria pai é obrigatório para criar uma subcategoria.' });
+    }
+
 
     let finalParentCategoryId = parentCategoryId;
-    let finalParentCategoryName = parentCategoryName || 'Desconhecida';
+    let finalParentCategoryName = parentCategoryName; // Já temos o nome, usamos ele.
 
     // VERIFICAÇÃO E CRIAÇÃO DA CATEGORIA PAI SE NECESSÁRIO
-    // Se o parentCategoryId for um ID gerado pela Gemini (começa com 'gemini-'),
-    // e não for um ID válido do Sanity, tenta criar a categoria.
+    // Esta lógica só deve ser executada se o parentCategoryId for um ID gerado pela Gemini
+    // e *não* um ID real do Sanity que já foi persistido.
     if (parentCategoryId.startsWith('gemini-')) {
         try {
             // Tenta buscar a categoria pelo título (nome) no Sanity
@@ -356,7 +372,7 @@ export const createSubcategory = async (req, res) => {
                 console.log(`[Backend] Categoria Gemini "${parentCategoryName}" já existe no Sanity com ID: ${finalParentCategoryId}. Usando existente.`);
             } else {
                 // Se não existe, cria a categoria no Sanity
-                const categorySlug = parentCategoryName.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+                const categorySlug = generateSlug(parentCategoryName); // Usa o novo gerador de slug
                 const newCategoryDoc = {
                     _type: 'courseCategory',
                     title: parentCategoryName.trim(),
@@ -379,11 +395,20 @@ export const createSubcategory = async (req, res) => {
             return res.status(500).json({ message: 'Erro interno ao processar a categoria pai.', error: error.message });
         }
     } else {
-        // Se não é um ID Gemini, assume que é um ID Sanity real e tenta buscar o nome
+        // Se não é um ID Gemini, assume que é um ID Sanity real.
+        // Já temos o parentCategoryName do frontend, então não precisamos buscar novamente,
+        // a menos que queiramos validar que o ID realmente corresponde ao nome.
+        // Por simplicidade, vamos confiar no nome vindo do frontend se o ID for Sanity.
+        // Se a validação for crítica, uma busca aqui seria necessária.
         try {
             const parentCat = await sanityClient.fetch(`*[_id == $parentCategoryId][0]{title}`, { parentCategoryId });
             if (parentCat) {
-                finalParentCategoryName = parentCat.title;
+                // Se o nome vindo do frontend e o nome do Sanity forem diferentes,
+                // podemos logar um aviso ou usar o nome do Sanity.
+                if (parentCat.title !== finalParentCategoryName) {
+                    console.warn(`[Backend] Nome da categoria pai (${finalParentCategoryName}) difere do Sanity (${parentCat.title}) para ID ${parentCategoryId}. Usando nome do Sanity.`);
+                    finalParentCategoryName = parentCat.title;
+                }
             } else {
                 console.warn(`[Backend] Categoria pai com ID "${parentCategoryId}" não encontrada no Sanity.`);
                 return res.status(400).json({ message: `Categoria pai com ID "${parentCategoryId}" não encontrada.` });
@@ -405,7 +430,7 @@ export const createSubcategory = async (req, res) => {
         // Continua mesmo com erro na verificação para não bloquear a criação
     }
 
-    const slugValue = title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+    const slugValue = generateSlug(title); // Usa o novo gerador de slug
 
     const newSubcategoryDoc = {
         _type: 'courseSubCategory',
@@ -505,7 +530,7 @@ export const getTags = async (req, res) => {
                 geminiSuggestedTags = suggestedNames
                     .filter(name => typeof name === 'string' && name.trim() !== '')
                     .map(name => ({
-                        _id: `gemini-tag-${name.toLowerCase().replace(/\s/g, '-')}-${cacheKey}`, // ID único para tags Gemini
+                        _id: `gemini-tag-${generateSlug(name)}-${cacheKey}`, // Usa o novo gerador de slug
                         name: name
                     }));
 
@@ -562,7 +587,7 @@ export const getTags = async (req, res) => {
 
 // Função para criar uma nova tag no Sanity
 export const createTag = async (req, res) => {
-    const { title, categoryIds, categoryNames } = req.body; // NOVO: Recebe categoryNames
+    const { title, categoryIds, categoryNames } = req.body; 
 
     if (!title || typeof title !== 'string' || title.trim() === '') {
         return res.status(400).json({ message: 'O título da tag é obrigatório e deve ser uma string não vazia.' });
@@ -573,7 +598,6 @@ export const createTag = async (req, res) => {
     if (categoryIds.some(id => typeof id !== 'string' || id.trim() === '')) {
         return res.status(400).json({ message: 'Todos os IDs de categoria fornecidos devem ser strings não vazias.' });
     }
-    // NOVO: Validação para categoryNames
     if (!Array.isArray(categoryNames) || categoryNames.length !== categoryIds.length) {
         return res.status(400).json({ message: 'Os nomes das categorias devem ser fornecidos e corresponder aos IDs.' });
     }
@@ -581,7 +605,7 @@ export const createTag = async (req, res) => {
     const finalCategoryReferences = [];
     const finalCategoryNames = [];
 
-    // NOVO: Processa cada categoryId para garantir que a categoria existe no Sanity
+    // Processa cada categoryId para garantir que a categoria existe no Sanity
     for (let i = 0; i < categoryIds.length; i++) {
         let currentCategoryId = categoryIds[i];
         let currentCategoryName = categoryNames[i];
@@ -600,7 +624,7 @@ export const createTag = async (req, res) => {
                     console.log(`[Backend] Categoria Gemini "${currentCategoryName}" (para tag) já existe no Sanity com ID: ${existingSanityCategory._id}. Usando existente.`);
                 } else {
                     // Se não existe, cria a categoria no Sanity
-                    const categorySlug = currentCategoryName.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+                    const categorySlug = generateSlug(currentCategoryName); // Usa o novo gerador de slug
                     const newCategoryDoc = {
                         _type: 'courseCategory',
                         title: currentCategoryName.trim(),
@@ -649,7 +673,7 @@ export const createTag = async (req, res) => {
         console.error('Erro ao verificar tag existente no Sanity:', error.message);
     }
 
-    const slugValue = title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+    const slugValue = generateSlug(title); // Usa o novo gerador de slug
 
     const newTagDoc = {
         _type: 'courseTag',
