@@ -603,71 +603,7 @@ export const createTag = async (req, res) => {
         return res.status(400).json({ message: 'Os arrays categoryIds e categoryNames devem ter o mesmo tamanho.' });
     }
 
-    const finalCategoryReferences = [];
-    const finalCategoryNames = [];
-
-    // Processa cada categoryId para garantir que a categoria existe no Sanity
-    if (categoryIds && categoryIds.length > 0) {
-        for (let i = 0; i < categoryIds.length; i++) {
-            let currentCategoryId = categoryIds[i];
-            let currentCategoryName = categoryNames[i] || ''; // Fallback para nome vazio
-
-            if (!currentCategoryId || typeof currentCategoryId !== 'string' || currentCategoryId.trim() === '') {
-                console.warn(`[Backend] ID de categoria inválido encontrado para tag: ${currentCategoryId}`);
-                continue; // Pula IDs inválidos
-            }
-
-            if (currentCategoryId.startsWith('gemini-')) {
-                try {
-                    // Tenta buscar a categoria pelo título (nome) no Sanity
-                    const existingSanityCategory = await sanityClient.fetch(
-                        `*[_type == "courseCategory" && title == $title][0]`, 
-                        { title: currentCategoryName }
-                    );
-
-                    if (existingSanityCategory) {
-                        finalCategoryReferences.push({ _type: 'reference', _ref: existingSanityCategory._id });
-                        finalCategoryNames.push(existingSanityCategory.title);
-                        console.log(`[Backend] Categoria Gemini "${currentCategoryName}" (para tag) já existe no Sanity com ID: ${existingSanityCategory._id}. Usando existente.`);
-                    } else {
-                        // Se não existe, cria a categoria no Sanity
-                        const categorySlug = generateSlug(currentCategoryName); 
-                        const newCategoryDoc = {
-                            _type: 'courseCategory',
-                            title: currentCategoryName.trim(),
-                            slug: {
-                                _type: 'slug',
-                                current: categorySlug
-                            }
-                        };
-                        const createdCategory = await sanityClient.create(newCategoryDoc);
-                        finalCategoryReferences.push({ _type: 'reference', _ref: createdCategory._id });
-                        finalCategoryNames.push(createdCategory.title);
-                        console.log(`[Backend] Categoria Gemini "${currentCategoryName}" (para tag) criada no Sanity com ID: ${createdCategory._id}.`);
-                        
-                        cachedGeminiCategories = null;
-                        geminiCategoryCacheTimestamp = 0;
-                    }
-                } catch (error) {
-                    console.error(`Erro ao verificar/criar categoria pai para tag no Sanity (${currentCategoryName}):`, error.message);
-                    // Não retorna erro fatal aqui, apenas loga e continua para outras categorias se houver
-                }
-            } else {
-                try {
-                    const existingCat = await sanityClient.fetch(`*[_id == $id][0]{title}`, { id: currentCategoryId });
-                    if (existingCat) {
-                        finalCategoryReferences.push({ _type: 'reference', _ref: currentCategoryId });
-                        finalCategoryNames.push(existingCat.title);
-                    } else {
-                        console.warn(`[Backend] Categoria com ID "${currentCategoryId}" não encontrada no Sanity ao criar tag. Ignorando esta referência.`);
-                    }
-                } catch (error) {
-                    console.error(`Erro ao buscar categoria por ID para tag (${currentCategoryId}):`, error.message);
-                }
-            }
-        }
-    }
-
+    // Opcional: Verificar se a tag já existe
     try {
         const existingTag = await sanityClient.fetch(`*[_type == "courseTag" && title == $title][0]`, { title });
         if (existingTag) {
@@ -679,6 +615,85 @@ export const createTag = async (req, res) => {
 
     const slugValue = generateSlug(title); 
 
+    const finalCategoryReferences = [];
+    // Processa cada categoryId para garantir que a categoria existe no Sanity
+    if (categoryIds && categoryIds.length > 0) {
+        for (let i = 0; i < categoryIds.length; i++) {
+            let currentCategoryId = categoryIds[i];
+            let currentCategoryName = categoryNames[i] || ''; // Fallback para nome vazio
+
+            if (!currentCategoryId || typeof currentCategoryId !== 'string' || currentCategoryId.trim() === '') {
+                console.warn(`[Backend] ID de categoria inválido encontrado para tag: ${currentCategoryId}`);
+                continue; // Pula IDs inválidos
+            }
+
+            // Se o ID for Gemini, tenta encontrar ou criar a categoria/subcategoria no Sanity
+            if (currentCategoryId.startsWith('gemini-')) {
+                try {
+                    let docType = 'courseCategory'; 
+                    if (currentCategoryId.includes('sub-')) {
+                        docType = 'courseSubCategory';
+                    }
+
+                    const existingSanityDoc = await sanityClient.fetch(
+                        `*[_type == $docType && title == $title][0]`, 
+                        { docType, title: currentCategoryName }
+                    );
+
+                    if (existingSanityDoc) {
+                        // CORREÇÃO AQUI: Adiciona _key ao objeto de referência
+                        finalCategoryReferences.push({ _type: 'reference', _ref: existingSanityDoc._id, _key: existingSanityDoc._id }); 
+                        console.log(`[Backend] ${docType} Gemini "${currentCategoryName}" (para tag) já existe no Sanity com ID: ${existingSanityDoc._id}. Usando existente.`);
+                    } else {
+                        const docSlug = generateSlug(currentCategoryName); 
+                        const newDoc = {
+                            _type: docType,
+                            title: currentCategoryName.trim(),
+                            slug: {
+                                _type: 'slug',
+                                current: docSlug
+                            }
+                        };
+                        // Se for subcategoria e tiver um parentCategory, precisamos adicioná-lo
+                        // A categoria pai para a subcategoria Gemini deve ser um ID Sanity real
+                        if (docType === 'courseSubCategory' && req.body.parentCategoryForSubcategoryGemini) {
+                            const parentCatRefId = req.body.parentCategoryForSubcategoryGemini._id;
+                            if (parentCatRefId && typeof parentCatRefId === 'string') {
+                                newDoc.parentCategory = {
+                                    _type: 'reference',
+                                    _ref: parentCatRefId
+                                };
+                            } else {
+                                console.warn(`[Backend] Subcategoria Gemini "${currentCategoryName}" não tem categoria pai válida para referência.`);
+                            }
+                        }
+
+                        const createdDoc = await sanityClient.create(newDoc);
+                        // CORREÇÃO AQUI: Adiciona _key ao objeto de referência
+                        finalCategoryReferences.push({ _type: 'reference', _ref: createdDoc._id, _key: createdDoc._id }); 
+                        console.log(`[Backend] ${docType} Gemini "${currentCategoryName}" criada no Sanity com ID: ${createdDoc._id}.`);
+                        
+                        // Invalida o cache relevante
+                        if (docType === 'courseCategory') {
+                            cachedGeminiCategories = null;
+                            geminiCategoryCacheTimestamp = 0;
+                        } else if (docType === 'courseSubCategory' && req.body.parentCategoryForSubcategoryGemini) {
+                            delete cachedGeminiSubcategories[req.body.parentCategoryForSubcategoryGemini._id];
+                            delete geminiSubcategoryCacheTimestamps[req.body.parentCategoryForSubcategoryGemini._id];
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Erro ao verificar/criar ${docType} Gemini para tag:`, error.message);
+                    // Não falha a criação da tag, apenas ignora esta referência
+                }
+            } else {
+                // Se o ID não for Gemini, assume que é um ID Sanity real
+                // CORREÇÃO AQUI: Adiciona _key ao objeto de referência
+                finalCategoryReferences.push({ _type: 'reference', _ref: currentCategoryId, _key: currentCategoryId }); 
+            }
+        }
+    }
+
     const newTagDoc = {
         _type: 'courseTag',
         title: title.trim(),
@@ -686,22 +701,23 @@ export const createTag = async (req, res) => {
             _type: 'slug',
             current: slugValue
         },
-        // Adiciona referências de categoria apenas se houver alguma válida
-        ...(finalCategoryReferences.length > 0 && { categories: finalCategoryReferences }) 
+        categories: finalCategoryReferences // Associa as categorias/subcategorias
     };
 
     try {
         const createdDoc = await sanityClient.create(newTagDoc);
-        console.log(`[Backend] Tag "${createdDoc.title}" criada no Sanity com ID: ${createdDoc._id}, Slug: ${createdDoc.slug.current}, Categorias Associadas (Finais): ${finalCategoryNames.join(', ')}`);
+        console.log(`[Backend] Tag "${createdDoc.title}" criada no Sanity com ID: ${createdDoc._id}, Slug: ${createdDoc.slug.current}`);
         
+        // Invalida o cache de tags para todas as combinações relevantes
+        // (Poderia ser mais granular, mas para simplificar, limpa tudo)
         cachedGeminiTags = {}; 
         geminiTagCacheTimestamps = {};
 
         res.status(201).json({ 
             _id: createdDoc._id, 
             name: createdDoc.title,
-            categoryIds: finalCategoryReferences.map(ref => ref._ref), 
-            categoryNames: finalCategoryNames 
+            // Retorna as categorias associadas para o frontend se necessário
+            associatedCategories: createdDoc.categories
         });
 
     } catch (error) {
@@ -710,69 +726,103 @@ export const createTag = async (req, res) => {
     }
 };
 
-// Função para buscar imagens do Pixabay
+// --- Funções para Imagens (Pixabay) ---
 export const getPixabayImages = async (req, res) => {
-    const { searchQuery } = req.query; // Termo de busca
-    const perPage = 12; // Número de imagens a retornar
+    const { query } = req.query;
 
-    if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
-        return res.status(400).json({ message: 'O termo de busca é obrigatório para buscar imagens.' });
+    if (!query) {
+        return res.status(400).json({ message: 'O termo de busca (query) é obrigatório para buscar imagens.' });
     }
+
     if (!PIXABAY_API_KEY) {
-        console.warn("[Backend] PIXABAY_API_KEY não configurada. Não será possível buscar imagens do Pixabay.");
-        return res.status(503).json({ message: 'Serviço de imagens indisponível (API Key não configurada).' });
+        console.warn("[Backend] PIXABAY_API_KEY não configurada. Não será possível buscar imagens com Pixabay.");
+        return res.status(503).json({ message: 'Serviço de imagens indisponível: Chave de API Pixabay não configurada.' });
     }
 
-    const cacheKey = searchQuery.toLowerCase().replace(/\s+/g, '_');
     const now = Date.now();
+    const cacheKey = query.toLowerCase();
 
-    // Tenta servir do cache primeiro
     if (cachedPixabayImages[cacheKey] && (now - pixabayImageCacheTimestamps[cacheKey] < PIXABAY_IMAGE_CACHE_LIFETIME_MS)) {
-        console.log(`[Backend] Servindo imagens do Pixabay do cache para "${searchQuery}".`);
+        console.log(`[Backend] Servindo imagens da Pixabay do cache para "${query}".`);
         return res.status(200).json({ images: cachedPixabayImages[cacheKey] });
     }
-
-    console.log(`[Backend] Cache de imagens Pixabay expirado ou não definido para "${searchQuery}". Chamando Pixabay API...`);
 
     try {
         const response = await axios.get(PIXABAY_BASE_URL, {
             params: {
                 key: PIXABAY_API_KEY,
-                q: searchQuery,
+                q: query,
                 image_type: 'photo',
-                orientation: 'horizontal', 
-                per_page: perPage,
-                min_width: 600, 
-                min_height: 400,
+                per_page: 20, // Limita o número de resultados
                 safesearch: true,
-                lang: 'pt' 
+                lang: 'pt' // Busca em português
             },
-            timeout: 15000 
+            timeout: 10000 // 10 segundos de timeout
         });
 
         const images = response.data.hits.map(hit => ({
             id: hit.id,
-            webformatURL: hit.webformatURL, 
-            largeImageURL: hit.largeImageURL, 
+            webformatURL: hit.webformatURL,
+            largeImageURL: hit.largeImageURL,
             tags: hit.tags,
-            user: hit.user,
-            pageURL: hit.pageURL 
+            user: hit.user
         }));
 
-        // Armazena no cache
         cachedPixabayImages[cacheKey] = images;
         pixabayImageCacheTimestamps[cacheKey] = now;
-        console.log(`[Backend] Buscadas e cacheadas ${images.length} imagens do Pixabay para "${searchQuery}".`);
+        console.log(`[Backend] Buscadas e cacheadas ${images.length} imagens da Pixabay para "${query}".`);
 
         res.status(200).json({ images });
 
     } catch (error) {
-        console.error(`Erro ao buscar imagens do Pixabay para "${searchQuery}":`, error.response?.data || error.message);
-        // Se houver erro, tenta servir do cache antigo se disponível
-        if (cachedPixabayImages[cacheKey]) {
-            console.warn("[Backend] Pixabay API call failed, serving stale image cache if available.");
-            return res.status(200).json({ images: cachedPixabayImages[cacheKey], error: 'Erro ao buscar novas imagens, servindo do cache.' });
-        }
-        res.status(500).json({ message: 'Erro ao buscar imagens do Pixabay.', error: error.message });
+        console.error('Erro ao buscar imagens da Pixabay:', error.response?.data || error.message);
+        res.status(500).json({ message: 'Erro ao buscar imagens da Pixabay.', error: error.message });
+    }
+};
+
+// --- Funções para Cursos (Placeholder) ---
+// Adicione aqui as funções para criar, ler, atualizar e deletar cursos
+// Exemplo:
+export const createCourse = async (req, res) => {
+    const { title, description, categoryId, subcategoryId, tagIds, imageUrl } = req.body;
+
+    if (!title || !description || !categoryId || !subcategoryId || !tagIds || tagIds.length === 0) {
+        return res.status(400).json({ message: 'Todos os campos obrigatórios para o curso devem ser preenchidos.' });
+    }
+
+    // Geração do slug para o curso
+    const courseSlug = generateSlug(title);
+
+    // Cria referências para categorias, subcategorias e tags
+    const categoryRef = { _type: 'reference', _ref: categoryId };
+    const subcategoryRef = { _type: 'reference', _ref: subcategoryId };
+    const tagsRefs = tagIds.map(id => ({ _type: 'reference', _ref: id }));
+
+    const newCourseDoc = {
+        _type: 'course',
+        title: title.trim(),
+        slug: {
+            _type: 'slug',
+            current: courseSlug
+        },
+        description: description.trim(),
+        category: categoryRef,
+        subcategory: subcategoryRef,
+        tags: tagsRefs,
+        imageUrl: imageUrl || null, // URL da imagem da Pixabay, se fornecida
+        author: { // Exemplo de como associar o autor (usuário logado)
+            _type: 'reference',
+            _ref: req.user.id // ID do usuário logado via JWT
+        },
+        publishedAt: new Date().toISOString()
+    };
+
+    try {
+        const createdDoc = await sanityClient.create(newCourseDoc);
+        console.log(`[Backend] Curso "${createdDoc.title}" criado no Sanity com ID: ${createdDoc._id}`);
+        res.status(201).json({ message: 'Curso criado com sucesso!', course: createdDoc });
+    } catch (error) {
+        console.error('Erro ao criar curso no Sanity:', error.message);
+        res.status(500).json({ message: 'Erro ao criar curso no Sanity.', error: error.message });
     }
 };

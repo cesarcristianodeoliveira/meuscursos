@@ -211,7 +211,7 @@ function CourseCreatePage() {
 
 
     // --- Funções para o Modal de Criação de Subcategoria ---
-    const handleOpenAddSubCategoryModal = useCallback(() => { // Removido parentCat do param
+    const handleOpenAddSubCategoryModal = useCallback(() => { 
         setOpenAddSubCategoryModal(true);
     }, []);
 
@@ -278,7 +278,7 @@ function CourseCreatePage() {
                         isAdmin={isAdmin}
                         onOpenAddSubCategoryModal={handleOpenAddSubCategoryModal}
                         onShowAlert={handleShowAlert}
-                        userToken={userToken} // Passa o token para o componente filho
+                        userToken={userToken} 
                     />
                 );
             case 2:
@@ -291,7 +291,7 @@ function CourseCreatePage() {
                         isAdmin={isAdmin}
                         onOpenAddTagModal={handleOpenAddTagModal}
                         onShowAlert={handleShowAlert}
-                        userToken={userToken} // Passa o token para o componente filho
+                        userToken={userToken} 
                         minTags={MIN_TAGS_REQUIRED} 
                         maxTags={MAX_TAGS_ALLOWED} 
                     />
@@ -362,7 +362,7 @@ function CourseCreatePage() {
                 onTagCreated={handleAdminTagCreated}
                 onShowAlert={handleShowAlert}
                 selectedCategory={selectedCategory} 
-                selectedSubcategory={selectedSubcategory} // Passa a subcategoria selecionada
+                selectedSubcategory={selectedSubcategory} 
             />
         </Container>
     );

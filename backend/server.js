@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { register, login } from './controllers/authController.js';
 
 // --- Importa funções do dataController ---
-// Agora importamos getTopCategories, createCategory, getSubcategories, createSubcategory, getTags, createTag e getPixabayImages
+// Agora importamos getTopCategories, createCategory, getSubcategories, createSubcategory, getTags, createTag, getPixabayImages e createCourse
 import {
     getTopCategories, 
     createCategory,
@@ -18,7 +18,8 @@ import {
     createSubcategory,
     getTags, 
     createTag,
-    getPixabayImages 
+    getPixabayImages,
+    createCourse // Importa a nova função createCourse
 } from './controllers/dataController.js';
 
 const app = express();
@@ -116,6 +117,9 @@ app.post('/api/tags', protect, adminProtect, createTag);
 // Rota para buscar imagens do Pixabay (protegida)
 app.get('/api/pixabay-images', protect, getPixabayImages);
 
+// NOVO: Rota para criar um novo curso (protegida por adminProtect)
+app.post('/api/courses', protect, adminProtect, createCourse);
+
 
 // Tratamento de erros para JWT (se o token for inválido, etc.)
 app.use((err, req, res, next) => {
@@ -139,5 +143,6 @@ app.listen(PORT, () => {
     console.log(`POST /api/subcategories (protegida por admin)`);
     console.log(`GET /api/tags?categoryId=[id]&categoryName=[name]&subcategoryId=[id]&subcategoryName=[name] (protegida)`); 
     console.log(`POST /api/tags (protegida por admin)`);
-    console.log(`GET /api/pixabay-images?searchQuery=[termo] (protegida)`); 
+    console.log(`GET /api/pixabay-images?query=[termo] (protegida)`); 
+    console.log(`POST /api/courses (protegida por admin)`);
 });

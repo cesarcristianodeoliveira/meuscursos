@@ -9,14 +9,15 @@ import {
     TextField,
     Button,
     CircularProgress,
-    Typography // Importado para exibir o nome da categoria
+    Typography,
+    Box,
+    Chip
 } from '@mui/material';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
-// Adicionada a prop 'selectedCategory'
-function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCreated, onShowAlert, selectedCategory }) {
+function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCreated, onShowAlert, selectedCategory, selectedSubcategory }) {
     const [newTagTitle, setNewTagTitle] = useState('');
     const [addingTag, setAddingTag] = useState(false);
 
@@ -28,8 +29,7 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
     }, [open]);
 
     // Condição para habilitar/desabilitar o botão "Criar"
-    // Ele será desabilitado se estiver adicionando OU se o título (sem espaços) tiver menos de 3 caracteres
-    const isCreateButtonDisabled = addingTag || newTagTitle.trim().length < 3;
+    const isCreateButtonDisabled = addingTag || newTagTitle.trim().length < 2; // Tags podem ser mais curtas
 
     const handleCreateTag = async () => {
         if (!newTagTitle.trim()) {
@@ -40,21 +40,30 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
             onShowAlert('Você precisa estar logado para criar uma tag.', 'error');
             return;
         }
-        // Validação para garantir que uma categoria foi selecionada e tem ID/Nome
-        if (!selectedCategory || !selectedCategory._id || !selectedCategory.name) {
-            onShowAlert('Nenhuma categoria principal válida selecionada para associar a tag.', 'error');
-            return;
-        }
 
         setAddingTag(true);
         try {
+            const categoryIds = [];
+            const categoryNames = [];
+
+            // Adiciona a subcategoria se existir e for válida
+            if (selectedSubcategory && selectedSubcategory._id && selectedSubcategory.name) {
+                categoryIds.push(selectedSubcategory._id);
+                categoryNames.push(selectedSubcategory.name);
+            }
+            // Adiciona a categoria principal se existir, for válida E não for a mesma da subcategoria
+            // Isso evita adicionar a categoria pai duas vezes se a subcategoria já a referencia
+            const isParentCategoryAlreadyAdded = selectedSubcategory && selectedSubcategory.parentCategoryId === selectedCategory._id;
+            if (selectedCategory && selectedCategory._id && selectedCategory.name && !isParentCategoryAlreadyAdded) {
+                categoryIds.push(selectedCategory._id);
+                categoryNames.push(selectedCategory.name);
+            }
+
             const response = await axios.post(`${API_BASE_URL}/api/tags`, 
                 { 
                     title: newTagTitle.trim(),
-                    // Envia o ID da categoria selecionada como um array de categoryIds
-                    categoryIds: [selectedCategory._id],
-                    // Envia o nome da categoria selecionada como um array de categoryNames
-                    categoryNames: [selectedCategory.name] 
+                    categoryIds: categoryIds, // Envia os IDs das categorias/subcategorias associadas
+                    categoryNames: categoryNames // Envia os nomes para ajudar na lógica do backend
                 },
                 { 
                     headers: { 
@@ -63,14 +72,15 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
                     } 
                 }
             );
-            const createdTag = response.data; // Assumindo que o backend retorna a tag criada
+            const createdTag = response.data; 
 
             onShowAlert(`Tag "${createdTag.name}" criada com sucesso!`, 'success');
-            onTagCreated(createdTag); // Notifica o pai com a tag criada
-            onClose(); // Fecha o modal
+            onTagCreated(createdTag); 
+            onClose(); 
 
         } catch (error) {
             console.error('Erro ao criar tag:', error.response?.data || error.message);
+            // Captura a mensagem de erro do backend (ex: "Esta tag já existe.")
             const errorMessage = error.response?.data?.message || 'Erro ao criar tag. Tente novamente.';
             onShowAlert(errorMessage, 'error');
         } finally {
@@ -82,10 +92,22 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
         <Dialog open={open} onClose={onClose}>
             <DialogTitle>Criar Nova Tag</DialogTitle>
             <DialogContent>
-                {/* Exibe a categoria à qual a tag será associada */}
-                <Typography variant="body1" sx={{ mb: 2 }}>
-                    Para a categoria: <strong>{selectedCategory ? selectedCategory.name : 'Nenhuma selecionada'}</strong>
-                </Typography>
+                <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="textSecondary">
+                        Associar à:
+                    </Typography>
+                    {selectedCategory && (
+                        <Chip label={`Categoria: ${selectedCategory.name}`} size="small" color="primary" sx={{ mr: 1, mb: 1 }} />
+                    )}
+                    {selectedSubcategory && (
+                        <Chip label={`Subcategoria: ${selectedSubcategory.name}`} size="small" color="secondary" sx={{ mr: 1, mb: 1 }} />
+                    )}
+                    {!selectedCategory && !selectedSubcategory && (
+                        <Typography variant="body2" color="textSecondary">
+                            Nenhuma categoria/subcategoria selecionada para associação.
+                        </Typography>
+                    )}
+                </Box>
                 <TextField
                     autoFocus
                     margin="dense"
@@ -97,8 +119,12 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
                     value={newTagTitle}
                     onChange={(e) => setNewTagTitle(e.target.value)}
                     disabled={addingTag}
-                    helperText={newTagTitle.trim().length < 3 && newTagTitle.trim().length > 0 ? "Mínimo de 3 caracteres" : ""}
-                    error={newTagTitle.trim().length < 3 && newTagTitle.trim().length > 0}
+                    helperText={
+                        newTagTitle.trim().length > 0 && newTagTitle.trim().length < 2
+                            ? "Mínimo de 2 caracteres"
+                            : ""
+                    }
+                    error={newTagTitle.trim().length > 0 && newTagTitle.trim().length < 2}
                 />
             </DialogContent>
             <DialogActions>

@@ -4,42 +4,49 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box,
     Typography,
-    // List, // Não é realmente usado para chips, removido para clareza
-    Chip, // Para exibir as tags
+    Chip, 
     CircularProgress,
     Alert,
     Button,
-    Stack // Para organizar os chips
+    Stack, // Para organizar os chips
+    Grid, // Para organizar os chips em um grid
 } from '@mui/material';
 import axios from 'axios';
-import { useAuth } from '../../../../contexts/AuthContext'; // Ajuste o caminho se necessário
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 function SelectTagsStep({ 
     selectedCategory, 
     selectedSubcategory, 
-    onTagsSelectAndAdvance, // Callback para selecionar tags e avançar
-    onGoBack, // Callback para voltar ao passo anterior
-    isAdmin, // Prop para verificar se é admin
-    onOpenAddTagModal, // Callback para abrir o modal de adicionar tag
-    onShowAlert, // Função para exibir alertas
-    minTags, // Prop para o mínimo de tags
-    maxTags // Prop para o máximo de tags
+    onTagsSelectAndAdvance, 
+    onGoBack, 
+    isAdmin, 
+    onOpenAddTagModal, 
+    onShowAlert, 
+    minTags, 
+    maxTags,
+    userToken // Recebe o token do pai
 }) {
     const [availableTags, setAvailableTags] = useState([]);
     const [loadingTags, setLoadingTags] = useState(false);
     const [errorTags, setErrorTags] = useState(null);
-    const [selectedTags, setSelectedTags] = useState([]); // Array de tags selecionadas
-
-    const { isAuthenticated, userToken } = useAuth();
+    const [selectedLocalTags, setSelectedLocalTags] = useState([]); // Array de tags selecionadas
+    const [creatingTagOnSelect, setCreatingTagOnSelect] = useState(false); // Estado para carregamento ao criar tag ao selecionar
 
     // Função para buscar tags do backend
     const fetchTags = useCallback(async () => {
-        if (!isAuthenticated) {
-            setErrorTags("Você precisa estar logado para criar um curso.");
+        if (!userToken) {
+            setErrorTags("Usuário não autenticado. Não é possível buscar tags.");
             setAvailableTags([]);
+            onShowAlert("Você precisa estar logado para buscar tags.", "warning");
             return;
+        }
+        // Se não houver categoria nem subcategoria selecionada, ainda tenta buscar tags gerais
+        // mas pode exibir uma mensagem mais específica no UI.
+        if (!selectedCategory && !selectedSubcategory) {
+             // Não retornamos aqui para permitir a busca de tags gerais, se o backend suportar.
+             // Apenas logamos um aviso ou definimos um erro se a lógica do backend exigir contexto.
+             console.warn("[Frontend] Nenhuma categoria ou subcategoria selecionada para tags. Buscando tags gerais.");
         }
 
         setLoadingTags(true);
@@ -55,9 +62,9 @@ function SelectTagsStep({
                 params.categoryId = selectedCategory._id;
                 params.categoryName = selectedCategory.name;
             }
-            // Se nem categoria nem subcategoria, o backend deve retornar tags gerais
-
-            const response = await axios.get(`${API_BASE_URL}/api/courses/create/tags`, {
+            
+            // CORREÇÃO AQUI: A rota agora é /api/tags, não /api/courses/create/tags
+            const response = await axios.get(`${API_BASE_URL}/api/tags`, {
                 params: params,
                 headers: {
                     Authorization: `Bearer ${userToken}`
@@ -88,42 +95,94 @@ function SelectTagsStep({
         } finally {
             setLoadingTags(false);
         }
-    }, [isAuthenticated, selectedCategory, selectedSubcategory, userToken, onShowAlert]);
+    }, [userToken, selectedCategory, selectedSubcategory, onShowAlert]);
 
     // Efeito para carregar as tags quando a categoria ou subcategoria selecionada muda
     useEffect(() => {
-        if (isAuthenticated) {
+        if (userToken) { // Só busca se houver token
             fetchTags();
         } else {
             setAvailableTags([]);
-            setSelectedTags([]);
+            setSelectedLocalTags([]);
             setErrorTags(null);
         }
-    }, [isAuthenticated, selectedCategory, selectedSubcategory, fetchTags]);
+    }, [userToken, selectedCategory, selectedSubcategory, fetchTags]);
 
     // Handler para alternar a seleção de uma tag
-    const handleTagClick = useCallback((tag) => {
-        setSelectedTags((prevSelectedTags) => {
-            const isSelected = prevSelectedTags.some(t => t._id === tag._id);
+    const handleTagClick = useCallback(async (tag) => {
+        let finalTag = tag;
 
+        // Se a tag selecionada é uma sugestão da Gemini (ID começa com 'gemini-')
+        if (tag._id.startsWith('gemini-')) {
+            setCreatingTagOnSelect(true);
+            try {
+                // Prepara os IDs e nomes das categorias/subcategorias para associação
+                const categoryIds = [];
+                const categoryNames = [];
+
+                // Adiciona a subcategoria se existir e for válida
+                if (selectedSubcategory && selectedSubcategory._id && selectedSubcategory.name) {
+                    categoryIds.push(selectedSubcategory._id);
+                    categoryNames.push(selectedSubcategory.name);
+                }
+                // Adiciona a categoria principal se existir, for válida E não for a mesma da subcategoria
+                // Isso evita adicionar a categoria pai duas vezes se a subcategoria já a referencia
+                const isParentCategoryAlreadyAdded = selectedSubcategory && selectedSubcategory.parentCategoryId === selectedCategory._id;
+                if (selectedCategory && selectedCategory._id && selectedCategory.name && !isParentCategoryAlreadyAdded) {
+                    categoryIds.push(selectedCategory._id);
+                    categoryNames.push(selectedCategory.name);
+                }
+
+                const response = await axios.post(`${API_BASE_URL}/api/tags`, // Rota correta para criar tags
+                    {
+                        title: tag.name.trim(),
+                        categoryIds: categoryIds, // Envia os IDs das categorias/subcategorias associadas
+                        categoryNames: categoryNames // Envia os nomes para ajudar na lógica do backend
+                    },
+                    {
+                        headers: {
+                            Authorization: `Bearer ${userToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                finalTag = response.data; // Backend retorna o _id real do Sanity
+
+                onShowAlert(`Tag "${finalTag.name}" criada e selecionada com sucesso!`, 'success');
+                await fetchTags(); // Recarrega as tags para incluir a recém-criada do Sanity
+
+            } catch (error) {
+                console.error('Erro ao criar tag ao selecionar:', error.response?.data || error.message);
+                const errorMessage = error.response?.data?.message || 'Erro ao criar tag. Tente novamente.';
+                onShowAlert(errorMessage, 'error');
+                setCreatingTagOnSelect(false);
+                return; // Não prossegue se a criação falhar
+            } finally {
+                setCreatingTagOnSelect(false);
+            }
+        }
+
+        // Lógica de seleção/desseleção local
+        setSelectedLocalTags((prevSelectedTags) => {
+            const isSelected = prevSelectedTags.some((t) => t._id === finalTag._id);
             if (isSelected) {
-                // Remove a tag se já estiver selecionada
-                return prevSelectedTags.filter(t => t._id !== tag._id);
+                // Desseleciona se já estiver selecionada
+                return prevSelectedTags.filter((t) => t._id !== finalTag._id);
             } else {
-                // Adiciona a tag se não estiver selecionada e não exceder o limite
-                if (prevSelectedTags.length < maxTags) { // Usa maxTags da prop
-                    return [...prevSelectedTags, tag];
+                // Seleciona se não estiver selecionada e o limite não foi atingido
+                if (prevSelectedTags.length < maxTags) {
+                    return [...prevSelectedTags, finalTag];
                 } else {
-                    onShowAlert(`Você pode selecionar no máximo ${maxTags} tags.`, 'warning'); // Usa maxTags da prop
-                    return prevSelectedTags; // Não adiciona se exceder o limite
+                    onShowAlert(`Você pode selecionar no máximo ${maxTags} tags.`, 'info');
+                    return prevSelectedTags;
                 }
             }
         });
-    }, [onShowAlert, maxTags]); // Adiciona maxTags às dependências
+    }, [selectedCategory, selectedSubcategory, onShowAlert, fetchTags, maxTags, userToken]); 
 
     // Handler para remover uma tag usando o 'onDelete' do Chip
     const handleDeleteTag = useCallback((tagToDelete) => {
-        setSelectedTags((prevSelectedTags) => 
+        setSelectedLocalTags((prevSelectedTags) => 
             prevSelectedTags.filter(tag => tag._id !== tagToDelete._id)
         );
     }, []);
@@ -134,18 +193,20 @@ function SelectTagsStep({
     };
 
     // Handler para o botão "Adicionar Nova Tag (Admin)"
-    const handleOpenAddTagModalClick = () => {
-        onOpenAddTagModal(); // Abre o modal sem passar categoria/subcategoria (tags são globais)
-    };
+    const handleOpenAddTagModalClick = useCallback(() => {
+        onOpenAddTagModal(); // Abre o modal
+    }, [onOpenAddTagModal]);
 
     // Handler para o botão "Próximo"
     const handleNextClick = () => {
-        if (selectedTags.length < minTags) { // Usa minTags da prop
+        if (selectedLocalTags.length < minTags) { // Usa minTags da prop
             onShowAlert(`Por favor, selecione no mínimo ${minTags} tag(s).`, 'warning'); // Usa minTags da prop
             return;
         }
-        onTagsSelectAndAdvance(selectedTags); // Chama o callback para avançar no Stepper
+        onTagsSelectAndAdvance(selectedLocalTags); // Chama o callback para avançar no Stepper
     };
+
+    const isNextButtonDisabled = selectedLocalTags.length < minTags || selectedLocalTags.length > maxTags || creatingTagOnSelect;
 
     return (
         <Box sx={{ width: '100%', bgcolor: 'background.paper', borderRadius: '8px', overflow: 'hidden' }}>
@@ -161,79 +222,86 @@ function SelectTagsStep({
                 )}
             </Typography>
 
-            {loadingTags ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '150px' }}>
-                    <CircularProgress />
-                </Box>
-            ) : errorTags ? (
-                <Alert severity="error" sx={{ m: 2 }}>{errorTags}</Alert>
-            ) : (
-                <>
-                    {/* Tags Selecionadas */}
-                    <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0' }}>
-                        <Typography variant="subtitle1" gutterBottom>
-                            Tags Selecionadas ({selectedTags.length}/{maxTags}):
+            {/* Exibe chips das tags selecionadas */}
+            <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0' }}>
+                <Typography variant="subtitle1" gutterBottom>
+                    Tags Selecionadas ({selectedLocalTags.length}/{maxTags}):
+                </Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    {selectedLocalTags.length === 0 ? (
+                        <Typography variant="body2" color="textSecondary">
+                            Nenhuma tag selecionada.
                         </Typography>
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                            {selectedTags.length === 0 ? (
-                                <Typography variant="body2" color="textSecondary">
-                                    Nenhuma tag selecionada.
-                                </Typography>
-                            ) : (
-                                selectedTags.map((tag) => (
-                                    <Chip
-                                        key={tag._id}
-                                        label={tag.name}
-                                        variant="filled"
-                                        color="primary"
-                                        onDelete={() => handleDeleteTag(tag)}
-                                        sx={{ m: 0.5 }}
-                                    />
-                                ))
-                            )}
-                        </Stack>
-                    </Box>
+                    ) : (
+                        selectedLocalTags.map((tag) => (
+                            <Chip
+                                key={tag._id}
+                                label={tag.name}
+                                variant="filled"
+                                color="primary"
+                                onDelete={() => handleDeleteTag(tag)}
+                                sx={{ m: 0.5 }}
+                            />
+                        ))
+                    )}
+                </Stack>
+            </Box>
 
-                    {/* Tags Disponíveis */}
-                    <Box sx={{ p: 2 }}>
-                        <Typography variant="subtitle1" gutterBottom>
-                            Tags Disponíveis:
-                        </Typography>
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                            {availableTags.length === 0 ? (
-                                <Typography variant="body2" color="textSecondary">
+            {/* Exibe tags disponíveis para seleção */}
+            <Box sx={{ p: 2 }}>
+                <Typography variant="subtitle1" gutterBottom>
+                    Tags Disponíveis:
+                </Typography>
+                {(loadingTags || creatingTagOnSelect) ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+                        <CircularProgress />
+                    </Box>
+                ) : errorTags ? (
+                    <Alert severity="error">{errorTags}</Alert>
+                ) : (
+                    <Grid container spacing={1}> {/* Usando Grid para melhor layout */}
+                        {availableTags.length === 0 ? (
+                            <Grid item xs={12}>
+                                <Typography variant="body2" color="textSecondary" sx={{ textAlign: 'center', my: 4 }}>
                                     Nenhuma tag disponível para sugestão.
+                                    {!selectedCategory && !selectedSubcategory && (
+                                        <Box component="span" sx={{ display: 'block', mt: 1 }}>
+                                            Selecione uma categoria ou subcategoria para ver as tags sugeridas.
+                                        </Box>
+                                    )}
                                 </Typography>
-                            ) : (
-                                availableTags.map((tag) => {
-                                    const isSelected = selectedTags.some(t => t._id === tag._id);
-                                    return (
+                            </Grid>
+                        ) : (
+                            availableTags.map((tag) => {
+                                const isSelected = selectedLocalTags.some(t => t._id === tag._id);
+                                return (
+                                    <Grid item key={tag._id}>
                                         <Chip
-                                            key={tag._id}
                                             label={tag.name}
                                             variant={isSelected ? "filled" : "outlined"}
                                             color={isSelected ? "primary" : "default"}
                                             onClick={() => handleTagClick(tag)}
                                             sx={{ m: 0.5, cursor: 'pointer' }}
                                         />
-                                    );
-                                })
-                            )}
-                        </Stack>
-                    </Box>
+                                    </Grid>
+                                );
+                            })
+                        )}
+                    </Grid>
+                )}
+            </Box>
 
-                    {isAdmin && (
-                        <Box sx={{ mt: 2, textAlign: 'center', p: 2 }}>
-                            <Button
-                                variant="outlined"
-                                color="secondary"
-                                onClick={handleOpenAddTagModalClick}
-                            >
-                                Adicionar Nova Tag (Admin)
-                            </Button>
-                        </Box>
-                    )}
-                </>
+            {isAdmin && (
+                <Box sx={{ mt: 2, textAlign: 'center', p: 2 }}>
+                    <Button
+                        variant="outlined"
+                        color="primary"
+                        onClick={handleOpenAddTagModalClick}
+                        disabled={creatingTagOnSelect}
+                    >
+                        Criar Nova Tag (Admin)
+                    </Button>
+                </Box>
             )}
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, p: 2 }}>
@@ -243,7 +311,7 @@ function SelectTagsStep({
                 <Button 
                     variant="contained" 
                     onClick={handleNextClick}
-                    disabled={selectedTags.length < minTags || selectedTags.length > maxTags} // Usa minTags e maxTags da prop
+                    disabled={isNextButtonDisabled}
                 >
                     Próximo
                 </Button>
