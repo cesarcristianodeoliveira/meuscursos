@@ -9,9 +9,8 @@ import {
     Step,
     StepLabel,
     Alert,
-    Button,
+    Button, // Mantido para o botão de admin no passo 0
     Snackbar,
-    // CircularProgress // REMOVIDO: 'CircularProgress' não é usado diretamente neste componente.
 } from '@mui/material';
 
 // Importa os componentes de cada passo
@@ -42,13 +41,13 @@ function CourseCreatePage() {
     const [activeStep, setActiveStep] = useState(0);
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [selectedSubcategory, setSelectedSubcategory] = useState(null);
-    const [selectedTags, setSelectedTags] = useState([]); // Este estado é usado para armazenar as tags selecionadas e será passado para o ReviewAndCreateStep
+    const [selectedTags, setSelectedTags] = useState([]); 
 
     // Estados para categorias
     const [categories, setCategories] = useState([]);
     const [loadingCategories, setLoadingCategories] = useState(false);
     const [errorCategories, setErrorCategories] = useState(null);
-    const [creatingCategoryOnSelect, setCreatingCategoryOnSelect] = useState(false); // NOVO: Estado para carregamento ao criar categoria ao selecionar
+    const [creatingCategoryOnSelect, setCreatingCategoryOnSelect] = useState(false); // Estado para carregamento ao criar categoria ao selecionar
 
     // Estado para controlar a exibição do Alert (Snackbar)
     const [alertInfo, setAlertInfo] = useState({ message: null, severity: null });
@@ -67,8 +66,8 @@ function CourseCreatePage() {
     // Função para exibir o Alert (Snackbar)
     const handleShowAlert = useCallback((message, severity) => {
         setAlertInfo({ message, severity });
-        setSnackbarOpen(true); // Abre o Snackbar
-        setTimeout(() => setSnackbarOpen(false), 6000); // Fecha após 6 segundos
+        setSnackbarOpen(true); 
+        setTimeout(() => setSnackbarOpen(false), 6000); 
     }, []);
 
     // Função para fechar o Snackbar
@@ -96,7 +95,6 @@ function CourseCreatePage() {
                 }
             });
             
-            // A resposta agora é um objeto com 'categories' e 'geminiQuotaExceeded'
             setCategories(Array.isArray(response.data.categories) ? response.data.categories : []); 
             
             if (response.data.geminiQuotaExceeded) {
@@ -132,7 +130,7 @@ function CourseCreatePage() {
 
     // --- Funções de Navegação e Seleção ---
 
-    // NOVO: Função para selecionar categoria e avançar (com criação automática)
+    // Função para selecionar categoria e avançar (com criação automática)
     const handleCategorySelectAndAdvance = useCallback(async (category) => {
         // Se a categoria selecionada é uma sugestão da Gemini (ID começa com 'gemini-')
         if (category._id.startsWith('gemini-')) {
@@ -158,7 +156,7 @@ function CourseCreatePage() {
                 console.error('Erro ao criar categoria ao selecionar:', error.response?.data || error.message);
                 const errorMessage = error.response?.data?.message || 'Erro ao criar categoria. Tente novamente.';
                 handleShowAlert(errorMessage, 'error');
-                setCreatingCategoryOnSelect(false); // Reseta o estado de carregamento
+                setCreatingCategoryOnSelect(false); 
                 return; // Não avança se a criação falhar
             } finally {
                 setCreatingCategoryOnSelect(false);
@@ -170,8 +168,8 @@ function CourseCreatePage() {
         }
 
         // Avança para o próximo passo após a seleção/criação
-        setSelectedSubcategory(null); // Reseta a subcategoria ao mudar a categoria principal
-        setSelectedTags([]); // Reseta as tags ao mudar a categoria principal
+        setSelectedSubcategory(null); 
+        setSelectedTags([]); 
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
         handleShowAlert(`Avançando para Subcategorias.`, 'info');
 
@@ -181,15 +179,15 @@ function CourseCreatePage() {
     // Função para selecionar subcategoria e avançar
     const handleSubcategorySelectAndAdvance = useCallback((subCategory) => {
         setSelectedSubcategory(subCategory);
-        setSelectedTags([]); // Reseta as tags ao mudar a subcategoria
-        setActiveStep((prevActiveStep) => prevActiveStep + 1); // Avança para o próximo passo (tags)
+        setSelectedTags([]); 
+        setActiveStep((prevActiveStep) => prevActiveStep + 1); 
         handleShowAlert(`Subcategoria "${subCategory.name}" selecionada. Avançando para Tags.`, 'info');
     }, [handleShowAlert]);
 
     // Função para selecionar tags e avançar
     const handleTagsSelectAndAdvance = useCallback((tags) => {
         setSelectedTags(tags);
-        setActiveStep((prevActiveStep) => prevActiveStep + 1); // Avança para o próximo passo (revisão)
+        setActiveStep((prevActiveStep) => prevActiveStep + 1); 
         handleShowAlert(`Tags selecionadas (${tags.length}). Avançando para Revisão.`, 'info');
     }, [handleShowAlert]);
 
@@ -223,11 +221,13 @@ function CourseCreatePage() {
 
     const handleCloseAddSubCategoryModal = () => {
         setOpenAddSubCategoryModal(false);
-        setParentCategoryForSubModal(null); // Limpa a categoria pai ao fechar
+        setParentCategoryForSubModal(null); 
     };
 
     // Callback quando uma subcategoria é criada no modal do admin
     const handleAdminSubcategoryCreated = useCallback((newSubcategory) => {
+        // Não precisamos recarregar subcategorias aqui, pois o SelectSubCategoryStep já faz isso
+        // quando selectedCategory muda, ou quando o modal é fechado e reaberto.
         setSelectedSubcategory(newSubcategory); 
         handleSubcategorySelectAndAdvance(newSubcategory); 
     }, [handleSubcategorySelectAndAdvance]);
@@ -245,6 +245,8 @@ function CourseCreatePage() {
     // Callback quando uma tag é criada no modal do admin
     const handleAdminTagCreated = useCallback((newTag) => {
         handleShowAlert(`Tag "${newTag.name}" criada com sucesso!`, 'success');
+        // Não precisamos recarregar tags aqui, pois o SelectTagsStep já faz isso
+        // quando selectedCategory/selectedSubcategory muda, ou quando o modal é fechado e reaberto.
     }, [handleShowAlert]);
 
 
@@ -258,7 +260,7 @@ function CourseCreatePage() {
                             categories={categories}
                             selectedCategory={selectedCategory}
                             onCategorySelectAndAdvance={handleCategorySelectAndAdvance} 
-                            loading={loadingCategories || creatingCategoryOnSelect} // NOVO: Inclui estado de criação
+                            loading={loadingCategories || creatingCategoryOnSelect} 
                             error={errorCategories}
                         />
                         {isAdmin && (
@@ -267,7 +269,7 @@ function CourseCreatePage() {
                                     variant="outlined"
                                     color="primary"
                                     onClick={handleOpenAddCategoryModal}
-                                    disabled={creatingCategoryOnSelect} // Desabilita enquanto cria ao selecionar
+                                    disabled={creatingCategoryOnSelect} 
                                 >
                                     Criar Nova Categoria (Admin)
                                 </Button>
@@ -288,7 +290,6 @@ function CourseCreatePage() {
                     />
                 );
             case 2:
-                // Renderiza SelectTagsStep com props
                 return (
                     <SelectTagsStep 
                         selectedCategory={selectedCategory}
@@ -298,19 +299,18 @@ function CourseCreatePage() {
                         isAdmin={isAdmin}
                         onOpenAddTagModal={handleOpenAddTagModal}
                         onShowAlert={handleShowAlert}
-                        minTags={MIN_TAGS_REQUIRED} // Passa a constante para o componente
-                        maxTags={MAX_TAGS_ALLOWED} // Passa a constante para o componente
+                        minTags={MIN_TAGS_REQUIRED} 
+                        maxTags={MAX_TAGS_ALLOWED} 
                     />
                 );
             case 3:
-                // AGORA PASSAMOS AS PROPS PARA O ReviewAndCreateStep
                 return (
                     <ReviewAndCreateStep 
                         selectedCategory={selectedCategory}
                         selectedSubcategory={selectedSubcategory}
                         selectedTags={selectedTags}
-                        onGoBack={handleGoBack} // Permite voltar do passo de revisão
-                        // onCreateCourse={handleCreateCourse} // Adicionar esta prop quando a função de criação for implementada
+                        onGoBack={handleGoBack} 
+                        // onCreateCourse={handleCreateCourse} 
                     />
                 );
             default:
@@ -369,7 +369,7 @@ function CourseCreatePage() {
                 userToken={userToken}
                 onTagCreated={handleAdminTagCreated}
                 onShowAlert={handleShowAlert}
-                selectedCategory={selectedCategory}
+                selectedCategory={selectedCategory} 
             />
         </Container>
     );
