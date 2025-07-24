@@ -9,17 +9,11 @@ import jwt from 'jsonwebtoken';
 // Importa as funções de registro e login do controlador de autenticação
 import { register, login } from './controllers/authController.js';
 
-// --- Importa funções do dataController ---
-// Agora importamos getTopCategories, createCategory, getSubcategories, createSubcategory, getTags, createTag e getPixabayImages
-import {
-    getTopCategories, 
-    createCategory,
-    getSubcategories, 
-    createSubcategory,
-    getTags, 
-    createTag,
-    getPixabayImages 
-} from './controllers/dataController.js';
+// --- Importa funções dos NOVOS controladores ---
+import { getTopCategories, createCategory } from './controllers/categoryController.js';
+import { getSubcategories, createSubcategory } from './controllers/subcategoryController.js';
+import { getTags, createTag } from './controllers/tagsController.js';
+import { getPixabayImages } from './controllers/pixabayController.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001; 
@@ -29,7 +23,7 @@ const allowedOrigins = [
     process.env.FRONTEND_URL, // Permite que a variável de ambiente seja usada
     'http://localhost:3000', // Para desenvolvimento local
     'https://meuscursos.netlify.app', // Se você estiver usando Netlify para o frontend
-    'https://meuscursos.onrender.com', // NOVO: Adicionado explicitamente a URL do seu frontend no Render
+    'https://meuscursos.onrender.com', // Adicionado explicitamente a URL do seu frontend no Render
     // Adicione outras origens se necessário, por exemplo, se o seu backend estiver em um subdomínio diferente no Render
 ].filter(Boolean); // Remove entradas nulas/vazias se FRONTEND_URL não estiver definida
 
@@ -82,7 +76,6 @@ const adminProtect = (req, res, next) => {
     next();
 };
 
-
 // --- Rotas da API ---
 app.get('/', (req, res) => {
     res.send('Servidor do backend "Meus Cursos" está rodando! 🙌');
@@ -94,27 +87,20 @@ app.post('/api/auth/login', login);
 
 // --- ROTAS PARA CRIAÇÃO DE CURSOS (PROTEGIDAS) ---
 
-// Rota para buscar as categorias (protegida)
+// Rotas de Categorias
 app.get('/api/courses/create/top-categories', protect, getTopCategories); 
-
-// Rota para criar uma nova categoria (protegida por adminProtect)
 app.post('/api/categories', protect, adminProtect, createCategory); 
 
-// Rota para buscar subcategorias
+// Rotas de Subcategorias
 app.get('/api/subcategories', protect, getSubcategories);
-
-// Rota para criar uma nova subcategoria (protegida por adminProtect)
 app.post('/api/subcategories', protect, adminProtect, createSubcategory);
 
-// Rota para buscar tags
+// Rotas de Tags
 app.get('/api/tags', protect, getTags);
-
-// Rota para criar uma nova tag (protegida por adminProtect)
 app.post('/api/tags', protect, adminProtect, createTag);
 
-// Rota para buscar imagens do Pixabay (protegida)
+// Rotas de Imagens (Pixabay)
 app.get('/api/pixabay-images', protect, getPixabayImages);
-
 
 // Tratamento de erros para JWT (se o token for inválido, etc.)
 app.use((err, req, res, next) => {

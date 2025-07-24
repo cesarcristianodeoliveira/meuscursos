@@ -1,6 +1,6 @@
 // D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\components\SelectTagsStep.js
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'; // Importa forwardRef e useImperativeHandle
 import {
     Box,
     Typography,
@@ -8,14 +8,15 @@ import {
     CircularProgress,
     Alert,
     Button,
-    Stack, // Para organizar os chips
-    Grid, // Para organizar os chips em um grid
+    Stack, 
+    Grid, 
 } from '@mui/material';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
-function SelectTagsStep({ 
+// Envolve o componente com forwardRef
+const SelectTagsStep = forwardRef(({ 
     selectedCategory, 
     selectedSubcategory, 
     onTagsSelectAndAdvance, 
@@ -25,13 +26,13 @@ function SelectTagsStep({
     onShowAlert, 
     minTags, 
     maxTags,
-    userToken // Recebe o token do pai
-}) {
+    userToken 
+}, ref) => { // Recebe 'ref' como segundo argumento
     const [availableTags, setAvailableTags] = useState([]);
     const [loadingTags, setLoadingTags] = useState(false);
     const [errorTags, setErrorTags] = useState(null);
-    const [selectedLocalTags, setSelectedLocalTags] = useState([]); // Array de tags selecionadas
-    const [creatingTagOnSelect, setCreatingTagOnSelect] = useState(false); // Estado para carregamento ao criar tag ao selecionar
+    const [selectedLocalTags, setSelectedLocalTags] = useState([]); 
+    const [creatingTagOnSelect, setCreatingTagOnSelect] = useState(false); 
 
     // Função para buscar tags do backend
     const fetchTags = useCallback(async () => {
@@ -41,29 +42,19 @@ function SelectTagsStep({
             onShowAlert("Você precisa estar logado para buscar tags.", "warning");
             return;
         }
-        // Se não houver categoria nem subcategoria selecionada, ainda tenta buscar tags gerais
-        // mas pode exibir uma mensagem mais específica no UI.
-        if (!selectedCategory && !selectedSubcategory) {
-             // Não retornamos aqui para permitir a busca de tags gerais, se o backend suportar.
-             // Apenas logamos um aviso ou definimos um erro se a lógica do backend exigir contexto.
-             console.warn("[Frontend] Nenhuma categoria ou subcategoria selecionada para tags. Buscando tags gerais.");
-        }
-
+        
         setLoadingTags(true);
         setErrorTags(null);
         try {
             const params = {};
-            // Prioriza a subcategoria para sugestões de tags
             if (selectedSubcategory && selectedSubcategory._id) {
                 params.subcategoryId = selectedSubcategory._id;
                 params.subcategoryName = selectedSubcategory.name;
             } else if (selectedCategory && selectedCategory._id) {
-                // Se não houver subcategoria, usa a categoria principal
                 params.categoryId = selectedCategory._id;
                 params.categoryName = selectedCategory.name;
             }
             
-            // CORREÇÃO AQUI: A rota agora é /api/tags, não /api/courses/create/tags
             const response = await axios.get(`${API_BASE_URL}/api/tags`, {
                 params: params,
                 headers: {
@@ -97,9 +88,14 @@ function SelectTagsStep({
         }
     }, [userToken, selectedCategory, selectedSubcategory, onShowAlert]);
 
+    // Expõe a função fetchTags para o componente pai via ref
+    useImperativeHandle(ref, () => ({
+        fetchTags: fetchTags
+    }));
+
     // Efeito para carregar as tags quando a categoria ou subcategoria selecionada muda
     useEffect(() => {
-        if (userToken) { // Só busca se houver token
+        if (userToken) { 
             fetchTags();
         } else {
             setAvailableTags([]);
@@ -116,28 +112,31 @@ function SelectTagsStep({
         if (tag._id.startsWith('gemini-')) {
             setCreatingTagOnSelect(true);
             try {
-                // Prepara os IDs e nomes das categorias/subcategorias para associação
                 const categoryIds = [];
                 const categoryNames = [];
 
-                // Adiciona a subcategoria se existir e for válida
                 if (selectedSubcategory && selectedSubcategory._id && selectedSubcategory.name) {
                     categoryIds.push(selectedSubcategory._id);
                     categoryNames.push(selectedSubcategory.name);
                 }
-                // Adiciona a categoria principal se existir, for válida E não for a mesma da subcategoria
-                // Isso evita adicionar a categoria pai duas vezes se a subcategoria já a referencia
                 const isParentCategoryAlreadyAdded = selectedSubcategory && selectedSubcategory.parentCategoryId === selectedCategory._id;
                 if (selectedCategory && selectedCategory._id && selectedCategory.name && !isParentCategoryAlreadyAdded) {
                     categoryIds.push(selectedCategory._id);
                     categoryNames.push(selectedCategory.name);
                 }
 
-                const response = await axios.post(`${API_BASE_URL}/api/tags`, // Rota correta para criar tags
+                // Passa o objeto da categoria pai real para o backend se a subcategoria for Gemini
+                let parentCategoryForSubcategoryGemini = null;
+                if (selectedSubcategory && selectedSubcategory._id.startsWith('gemini-') && selectedCategory) {
+                    parentCategoryForSubcategoryGemini = selectedCategory;
+                }
+
+                const response = await axios.post(`${API_BASE_URL}/api/tags`, 
                     {
                         title: tag.name.trim(),
-                        categoryIds: categoryIds, // Envia os IDs das categorias/subcategorias associadas
-                        categoryNames: categoryNames // Envia os nomes para ajudar na lógica do backend
+                        categoryIds: categoryIds, 
+                        categoryNames: categoryNames,
+                        parentCategoryForSubcategoryGemini: parentCategoryForSubcategoryGemini 
                     },
                     {
                         headers: {
@@ -146,7 +145,7 @@ function SelectTagsStep({
                         }
                     }
                 );
-                finalTag = response.data; // Backend retorna o _id real do Sanity
+                finalTag = response.data; 
 
                 onShowAlert(`Tag "${finalTag.name}" criada e selecionada com sucesso!`, 'success');
                 await fetchTags(); // Recarrega as tags para incluir a recém-criada do Sanity
@@ -156,20 +155,17 @@ function SelectTagsStep({
                 const errorMessage = error.response?.data?.message || 'Erro ao criar tag. Tente novamente.';
                 onShowAlert(errorMessage, 'error');
                 setCreatingTagOnSelect(false);
-                return; // Não prossegue se a criação falhar
+                return; 
             } finally {
                 setCreatingTagOnSelect(false);
             }
         }
 
-        // Lógica de seleção/desseleção local
         setSelectedLocalTags((prevSelectedTags) => {
             const isSelected = prevSelectedTags.some((t) => t._id === finalTag._id);
             if (isSelected) {
-                // Desseleciona se já estiver selecionada
                 return prevSelectedTags.filter((t) => t._id !== finalTag._id);
             } else {
-                // Seleciona se não estiver selecionada e o limite não foi atingido
                 if (prevSelectedTags.length < maxTags) {
                     return [...prevSelectedTags, finalTag];
                 } else {
@@ -189,21 +185,21 @@ function SelectTagsStep({
 
     // Handler para o botão "Voltar"
     const handleGoBackClick = () => {
-        onGoBack(); // Chama o callback para voltar ao passo anterior
+        onGoBack(); 
     };
 
     // Handler para o botão "Adicionar Nova Tag (Admin)"
     const handleOpenAddTagModalClick = useCallback(() => {
-        onOpenAddTagModal(); // Abre o modal
+        onOpenAddTagModal(); 
     }, [onOpenAddTagModal]);
 
     // Handler para o botão "Próximo"
     const handleNextClick = () => {
-        if (selectedLocalTags.length < minTags) { // Usa minTags da prop
-            onShowAlert(`Por favor, selecione no mínimo ${minTags} tag(s).`, 'warning'); // Usa minTags da prop
+        if (selectedLocalTags.length < minTags) { 
+            onShowAlert(`Por favor, selecione no mínimo ${minTags} tag(s).`, 'warning'); 
             return;
         }
-        onTagsSelectAndAdvance(selectedLocalTags); // Chama o callback para avançar no Stepper
+        onTagsSelectAndAdvance(selectedLocalTags); 
     };
 
     const isNextButtonDisabled = selectedLocalTags.length < minTags || selectedLocalTags.length > maxTags || creatingTagOnSelect;
@@ -222,7 +218,7 @@ function SelectTagsStep({
                 )}
             </Typography>
 
-            {/* Exibe chips das tags selecionadas */}
+            {/* Tags Selecionadas */}
             <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0' }}>
                 <Typography variant="subtitle1" gutterBottom>
                     Tags Selecionadas ({selectedLocalTags.length}/{maxTags}):
@@ -247,7 +243,7 @@ function SelectTagsStep({
                 </Stack>
             </Box>
 
-            {/* Exibe tags disponíveis para seleção */}
+            {/* Tags Disponíveis */}
             <Box sx={{ p: 2 }}>
                 <Typography variant="subtitle1" gutterBottom>
                     Tags Disponíveis:
@@ -259,7 +255,7 @@ function SelectTagsStep({
                 ) : errorTags ? (
                     <Alert severity="error">{errorTags}</Alert>
                 ) : (
-                    <Grid container spacing={1}> {/* Usando Grid para melhor layout */}
+                    <Grid container spacing={1}> 
                         {availableTags.length === 0 ? (
                             <Grid item xs={12}>
                                 <Typography variant="body2" color="textSecondary" sx={{ textAlign: 'center', my: 4 }}>
@@ -318,6 +314,6 @@ function SelectTagsStep({
             </Box>
         </Box>
     );
-}
+}); // Fecha o forwardRef
 
 export default SelectTagsStep;

@@ -17,7 +17,17 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
-function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCreated, onShowAlert, selectedCategory, selectedSubcategory }) {
+function AdminAddTagModal({ 
+    open, 
+    onClose, 
+    isAuthenticated, 
+    userToken, 
+    onTagCreated, 
+    onShowAlert, 
+    selectedCategory, 
+    selectedSubcategory,
+    onTagsListUpdated // NOVO PROP: Callback para notificar que a lista de tags precisa ser atualizada
+}) {
     const [newTagTitle, setNewTagTitle] = useState('');
     const [addingTag, setAddingTag] = useState(false);
 
@@ -59,11 +69,23 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
                 categoryNames.push(selectedCategory.name);
             }
 
+            // Para o caso de uma subcategoria Gemini estar sendo criada junto com a tag,
+            // precisamos passar o objeto da categoria pai real para o backend.
+            // O frontend já envia selectedCategory e selectedSubcategory.
+            // O backend (tagsController.js) terá que inferir qual é o parentCategoryForSubcategoryGemini
+            // a partir de selectedCategory se selectedSubcategory for Gemini.
+            let parentCategoryForSubcategoryGemini = null;
+            if (selectedSubcategory && selectedSubcategory._id.startsWith('gemini-') && selectedCategory) {
+                 parentCategoryForSubcategoryGemini = selectedCategory;
+            }
+
+
             const response = await axios.post(`${API_BASE_URL}/api/tags`, 
                 { 
                     title: newTagTitle.trim(),
                     categoryIds: categoryIds, // Envia os IDs das categorias/subcategorias associadas
-                    categoryNames: categoryNames // Envia os nomes para ajudar na lógica do backend
+                    categoryNames: categoryNames, // Envia os nomes para ajudar na lógica do backend
+                    parentCategoryForSubcategoryGemini: parentCategoryForSubcategoryGemini // Envia a categoria pai se subcat for Gemini
                 },
                 { 
                     headers: { 
@@ -75,7 +97,13 @@ function AdminAddTagModal({ open, onClose, isAuthenticated, userToken, onTagCrea
             const createdTag = response.data; 
 
             onShowAlert(`Tag "${createdTag.name}" criada com sucesso!`, 'success');
-            onTagCreated(createdTag); 
+            onTagCreated(createdTag); // Notifica o componente pai (CourseCreatePage)
+            
+            // NOVO: Notifica o SelectTagsStep para recarregar as tags
+            if (onTagsListUpdated) {
+                onTagsListUpdated(); 
+            }
+
             onClose(); 
 
         } catch (error) {

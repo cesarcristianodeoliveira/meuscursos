@@ -1,6 +1,6 @@
 // D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\index.js
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react'; // Adicionado useRef
 import {
     Container,
     Typography,
@@ -61,6 +61,10 @@ function CourseCreatePage() {
     const [openAddCategoryModal, setOpenAddCategoryModal] = useState(false);
     const [openAddSubCategoryModal, setOpenAddSubCategoryModal] = useState(false);
     const [openAddTagModal, setOpenAddTagModal] = useState(false); 
+
+    // Ref para a função fetchTags do SelectTagsStep
+    // Isso nos permite chamar fetchTags do SelectTagsStep a partir do CourseCreatePage
+    const selectTagsStepRef = useRef();
 
     // Função para exibir o Alert (Snackbar)
     const handleShowAlert = useCallback((message, severity) => {
@@ -238,7 +242,16 @@ function CourseCreatePage() {
     // Callback quando uma tag é criada no modal do admin
     const handleAdminTagCreated = useCallback((newTag) => {
         handleShowAlert(`Tag "${newTag.name}" criada com sucesso!`, 'success');
+        // Não precisamos recarregar as tags aqui, pois o SelectTagsStep fará isso
+        // através do onTagsListUpdated que passaremos para o AdminAddTagModal.
     }, [handleShowAlert]);
+
+    // NOVO: Função para ser passada ao AdminAddTagModal para disparar o refresh de tags
+    const handleTagsListUpdated = useCallback(() => {
+        if (selectTagsStepRef.current && typeof selectTagsStepRef.current.fetchTags === 'function') {
+            selectTagsStepRef.current.fetchTags();
+        }
+    }, []);
 
 
     // Renderiza o conteúdo de cada passo do Stepper
@@ -283,6 +296,7 @@ function CourseCreatePage() {
                 );
             case 2:
                 return (
+                    // Passa a ref e o callback de atualização para o SelectTagsStep
                     <SelectTagsStep 
                         selectedCategory={selectedCategory}
                         selectedSubcategory={selectedSubcategory}
@@ -293,7 +307,9 @@ function CourseCreatePage() {
                         onShowAlert={handleShowAlert}
                         userToken={userToken} 
                         minTags={MIN_TAGS_REQUIRED} 
-                        maxTags={MAX_TAGS_ALLOWED} 
+                        maxTags={MAX_TAGS_ALLOWED}
+                        // NOVO: Passa a ref para o componente filho
+                        ref={selectTagsStepRef} 
                     />
                 );
             case 3:
@@ -363,6 +379,7 @@ function CourseCreatePage() {
                 onShowAlert={handleShowAlert}
                 selectedCategory={selectedCategory} 
                 selectedSubcategory={selectedSubcategory} 
+                onTagsListUpdated={handleTagsListUpdated} // NOVO: Passa o callback de atualização
             />
         </Container>
     );
