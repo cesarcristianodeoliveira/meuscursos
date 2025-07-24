@@ -18,11 +18,12 @@ import {
     SelectCategoryStep, 
     SelectSubCategoryStep,
     SelectTagsStep, 
-    SelectImageStep, // NOVO: Importa o componente de seleção de imagem
+    SelectImageStep,
     ReviewAndCreateStep,
     AdminAddCategoryModal,
     AdminAddSubCategoryModal,
-    AdminAddTagModal 
+    AdminAddTagModal,
+    AdminClearSanityDataModal 
 } from './components'; 
 
 import axios from 'axios';
@@ -31,7 +32,6 @@ import { useAuth } from '../../../contexts/AuthContext';
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 // Define os passos do Stepper.
-// NOVO: Adicionado o passo de seleção de imagem
 const steps = ['Selecione a Categoria', 'Selecione a Subcategoria', 'Selecione as Tags', 'Selecione a Imagem', 'Revisar e Criar']; 
 
 // Definimos o limite de tags para SEO
@@ -44,7 +44,7 @@ function CourseCreatePage() {
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [selectedSubcategory, setSelectedSubcategory] = useState(null);
     const [selectedTags, setSelectedTags] = useState([]); 
-    const [selectedImage, setSelectedImage] = useState(null); // NOVO: Estado para a imagem selecionada
+    const [selectedImage, setSelectedImage] = useState(null);
 
     // Estados para categorias
     const [categories, setCategories] = useState([]);
@@ -64,6 +64,10 @@ function CourseCreatePage() {
     const [openAddCategoryModal, setOpenAddCategoryModal] = useState(false);
     const [openAddSubCategoryModal, setOpenAddSubCategoryModal] = useState(false);
     const [openAddTagModal, setOpenAddTagModal] = useState(false); 
+
+    // NOVO: Estados para o modal de limpeza de dados do Sanity.io
+    const [openConfirmClearSanityModal, setOpenConfirmClearSanityModal] = useState(false);
+    const [clearingSanityData, setClearingSanityData] = useState(false);
 
     // Ref para a função fetchTags do SelectTagsStep
     const selectTagsStepRef = useRef();
@@ -175,7 +179,7 @@ function CourseCreatePage() {
         // Avança para o próximo passo após a seleção/criação
         setSelectedSubcategory(null); 
         setSelectedTags([]); 
-        setSelectedImage(null); // NOVO: Limpa a imagem selecionada
+        setSelectedImage(null);
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
     }, [handleShowAlert, userToken, fetchCategories]);
 
@@ -184,7 +188,7 @@ function CourseCreatePage() {
     const handleSubcategorySelectAndAdvance = useCallback((subCategory) => {
         setSelectedSubcategory(subCategory);
         setSelectedTags([]); 
-        setSelectedImage(null); // NOVO: Limpa a imagem selecionada
+        setSelectedImage(null);
         setActiveStep((prevActiveStep) => prevActiveStep + 1); 
         handleShowAlert(`Subcategoria "${subCategory.name}" selecionada. Avançando para Tags.`, 'info');
     }, [handleShowAlert]);
@@ -192,12 +196,12 @@ function CourseCreatePage() {
     // Função para selecionar tags e avançar
     const handleTagsSelectAndAdvance = useCallback((tags) => {
         setSelectedTags(tags);
-        setSelectedImage(null); // NOVO: Limpa a imagem selecionada
+        setSelectedImage(null);
         setActiveStep((prevActiveStep) => prevActiveStep + 1); 
-        handleShowAlert(`Tags selecionadas (${tags.length}). Avançando para Imagem.`, 'info'); // Mensagem atualizada
+        handleShowAlert(`Tags selecionadas (${tags.length}). Avançando para Imagem.`, 'info');
     }, [handleShowAlert]);
 
-    // NOVO: Função para selecionar imagem e avançar
+    // Função para selecionar imagem e avançar
     const handleImageSelectAndAdvance = useCallback((image) => {
         setSelectedImage(image);
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
@@ -266,6 +270,42 @@ function CourseCreatePage() {
         }
     }, []);
 
+    // --- Funções para Limpar Dados do Sanity.io (Admin) ---
+    const handleOpenClearSanityModal = useCallback(() => {
+        setOpenConfirmClearSanityModal(true);
+    }, []);
+
+    const handleCloseClearSanityModal = useCallback(() => {
+        setOpenConfirmClearSanityModal(false);
+    }, []);
+
+    const handleConfirmClearSanityData = useCallback(async () => {
+        setClearingSanityData(true);
+        try {
+            const response = await axios.post(`${API_BASE_URL}/api/admin/clear-sanity-data`, {}, {
+                headers: {
+                    Authorization: `Bearer ${userToken}`
+                }
+            });
+            handleShowAlert(response.data.message || 'Dados do Sanity.io limpos com sucesso!', 'success');
+            // Resetar o estado do formulário após a limpeza completa
+            setSelectedCategory(null);
+            setSelectedSubcategory(null);
+            setSelectedTags([]);
+            setSelectedImage(null);
+            setActiveStep(0);
+            // Recarregar as categorias (e consequentemente subcategorias/tags)
+            await fetchCategories();
+        } catch (error) {
+            console.error('Erro ao limpar dados do Sanity.io:', error.response?.data || error.message);
+            const errorMessage = error.response?.data?.message || 'Erro ao limpar dados do Sanity.io. Verifique o console para detalhes.';
+            handleShowAlert(errorMessage, 'error');
+        } finally {
+            setClearingSanityData(false);
+            handleCloseClearSanityModal();
+        }
+    }, [userToken, handleShowAlert, handleCloseClearSanityModal, fetchCategories]);
+
 
     // Renderiza o conteúdo de cada passo do Stepper
     const getStepContent = (step) => {
@@ -320,29 +360,30 @@ function CourseCreatePage() {
                         userToken={userToken} 
                         minTags={MIN_TAGS_REQUIRED} 
                         maxTags={MAX_TAGS_ALLOWED}
+                        selectedTags={selectedTags}
                         ref={selectTagsStepRef} 
                     />
                 );
-            case 3: // NOVO: Selecionar Imagem
+            case 3: // Selecionar Imagem
                 return (
                     <SelectImageStep
                         selectedCategory={selectedCategory}
                         selectedSubcategory={selectedSubcategory}
                         selectedTags={selectedTags}
-                        selectedImage={selectedImage} // Passa a imagem selecionada para o componente
+                        selectedImage={selectedImage}
                         onImageSelectAndAdvance={handleImageSelectAndAdvance}
                         onGoBack={handleGoBack}
                         onShowAlert={handleShowAlert}
                         userToken={userToken}
                     />
                 );
-            case 4: // Revisar e Criar (Índice ajustado)
+            case 4: // Revisar e Criar
                 return (
                     <ReviewAndCreateStep 
                         selectedCategory={selectedCategory}
                         selectedSubcategory={selectedSubcategory}
                         selectedTags={selectedTags}
-                        selectedImage={selectedImage} // Passa a imagem para revisão
+                        selectedImage={selectedImage}
                         onGoBack={handleGoBack} 
                     />
                 );
@@ -368,6 +409,21 @@ function CourseCreatePage() {
             <Box sx={{ p: 3, border: '1px solid #e0e0e0', borderRadius: '8px', minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 {getStepContent(activeStep)}
             </Box>
+
+            {/* Botão de Limpeza de Dados do Sanity.io para Admin */}
+            {isAdmin && (
+                <Box sx={{ mt: 4, textAlign: 'center' }}>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={handleOpenClearSanityModal}
+                        disabled={clearingSanityData}
+                        sx={{ px: 4, py: 1.5 }}
+                    >
+                        {clearingSanityData ? 'Limpando Sanity.io...' : 'Limpar Todos os Dados do Sanity.io (Admin)'}
+                    </Button>
+                </Box>
+            )}
 
             {/* Snackbar para exibir alertas */}
             <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>
@@ -405,6 +461,15 @@ function CourseCreatePage() {
                 selectedCategory={selectedCategory} 
                 selectedSubcategory={selectedSubcategory} 
                 onTagsListUpdated={handleTagsListUpdated} 
+            />
+
+            {/* NOVO: Modal de Confirmação para Limpeza de Dados do Sanity.io */}
+            <AdminClearSanityDataModal
+                open={openConfirmClearSanityModal}
+                onClose={handleCloseClearSanityModal}
+                onConfirm={handleConfirmClearSanityData}
+                clearingData={clearingSanityData}
+                onShowAlert={handleShowAlert} // Passa a função de alerta para o modal
             />
         </Container>
     );

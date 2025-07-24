@@ -14,6 +14,9 @@ import { getTopCategories, createCategory } from './controllers/categoryControll
 import { getSubcategories, createSubcategory } from './controllers/subcategoryController.js';
 import { getTags, createTag } from './controllers/tagsController.js';
 import { getPixabayImages } from './controllers/pixabayController.js';
+// NOVO: Importa a função de limpeza de dados do adminController
+import { clearSanityData } from './controllers/adminController.js';
+
 
 const app = express();
 const PORT = process.env.PORT || 3001; 
@@ -102,6 +105,10 @@ app.post('/api/tags', protect, adminProtect, createTag);
 // Rotas de Imagens (Pixabay)
 app.get('/api/pixabay-images', protect, getPixabayImages);
 
+// NOVO: Rota de Administração para limpar dados do Sanity.io
+app.post('/api/admin/clear-sanity-data', protect, adminProtect, clearSanityData);
+
+
 // Tratamento de erros para JWT (se o token for inválido, etc.)
 app.use((err, req, res, next) => {
     if (err.name === 'UnauthorizedError') {
@@ -125,4 +132,5 @@ app.listen(PORT, () => {
     console.log(`GET /api/tags?categoryId=[id]&categoryName=[name]&subcategoryId=[id]&subcategoryName=[name] (protegida)`); 
     console.log(`POST /api/tags (protegida por admin)`);
     console.log(`GET /api/pixabay-images?searchQuery=[termo] (protegida)`); 
+    console.log(`POST /api/admin/clear-sanity-data (protegida por admin - CUIDADO: Limpa dados!)`); // NOVO LOG
 });

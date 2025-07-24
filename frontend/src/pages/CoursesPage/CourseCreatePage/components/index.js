@@ -6,3 +6,5 @@ export { default as ReviewAndCreateStep } from './ReviewAndCreateStep'
 export { default as AdminAddCategoryModal } from './AdminAddCategoryModal'
 export { default as AdminAddSubCategoryModal } from './AdminAddSubCategoryModal'
 export { default as AdminAddTagModal } from './AdminAddTagModal'
+export { default as AdminClearSanityDataModal } from './AdminClearSanityDataModal'
+

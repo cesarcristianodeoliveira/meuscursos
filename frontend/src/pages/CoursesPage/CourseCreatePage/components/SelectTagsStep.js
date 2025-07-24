@@ -26,13 +26,23 @@ const SelectTagsStep = forwardRef(({
     onShowAlert, 
     minTags, 
     maxTags,
-    userToken 
+    userToken,
+    selectedTags: initialSelectedTags // Renomeia a prop para evitar conflito com o estado local
 }, ref) => { // Recebe 'ref' como segundo argumento
     const [availableTags, setAvailableTags] = useState([]);
     const [loadingTags, setLoadingTags] = useState(false);
     const [errorTags, setErrorTags] = useState(null);
-    const [selectedLocalTags, setSelectedLocalTags] = useState([]); 
+    const [selectedLocalTags, setSelectedLocalTags] = useState(initialSelectedTags || []); // Inicializa com as tags passadas
     const [creatingTagOnSelect, setCreatingTagOnSelect] = useState(false); 
+
+    // Efeito para sincronizar selectedLocalTags com initialSelectedTags quando a prop muda
+    useEffect(() => {
+        // Só atualiza se a prop for diferente do estado atual para evitar loops
+        // E se a prop não for nula/indefinida
+        if (initialSelectedTags && JSON.stringify(initialSelectedTags) !== JSON.stringify(selectedLocalTags)) {
+            setSelectedLocalTags(initialSelectedTags);
+        }
+    }, [initialSelectedTags, selectedLocalTags]); // Depende da prop initialSelectedTags e do estado local
 
     // Função para buscar tags do backend
     const fetchTags = useCallback(async () => {
@@ -99,7 +109,7 @@ const SelectTagsStep = forwardRef(({
             fetchTags();
         } else {
             setAvailableTags([]);
-            setSelectedLocalTags([]);
+            setSelectedLocalTags([]); // Limpa as tags locais se não houver usuário autenticado
             setErrorTags(null);
         }
     }, [userToken, selectedCategory, selectedSubcategory, fetchTags]);
@@ -161,20 +171,32 @@ const SelectTagsStep = forwardRef(({
             }
         }
 
+        // Lógica de seleção/desseleção
         setSelectedLocalTags((prevSelectedTags) => {
             const isSelected = prevSelectedTags.some((t) => t._id === finalTag._id);
+            let newSelectedTags;
             if (isSelected) {
-                return prevSelectedTags.filter((t) => t._id !== finalTag._id);
+                newSelectedTags = prevSelectedTags.filter((t) => t._id !== finalTag._id);
             } else {
                 if (prevSelectedTags.length < maxTags) {
-                    return [...prevSelectedTags, finalTag];
+                    newSelectedTags = [...prevSelectedTags, finalTag];
                 } else {
                     onShowAlert(`Você pode selecionar no máximo ${maxTags} tags.`, 'info');
-                    return prevSelectedTags;
+                    return prevSelectedTags; // Não altera o estado se o limite for atingido
                 }
             }
+            return newSelectedTags;
         });
     }, [selectedCategory, selectedSubcategory, onShowAlert, fetchTags, maxTags, userToken]); 
+
+    // Efeito para auto-avançar quando o máximo de tags é selecionado
+    useEffect(() => {
+        // Verifica se não está no processo de criação de tag e se o número de tags selecionadas atingiu o máximo
+        if (selectedLocalTags.length === maxTags && !creatingTagOnSelect) {
+            onTagsSelectAndAdvance(selectedLocalTags);
+        }
+    }, [selectedLocalTags, maxTags, onTagsSelectAndAdvance, creatingTagOnSelect]);
+
 
     // Handler para remover uma tag usando o 'onDelete' do Chip
     const handleDeleteTag = useCallback((tagToDelete) => {
