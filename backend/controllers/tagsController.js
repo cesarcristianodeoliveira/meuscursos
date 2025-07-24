@@ -22,19 +22,31 @@ export const getTags = async (req, res) => {
     let cacheKey = 'general_tags'; // Fallback para tags gerais
     let promptContext = 'cursos';
 
+    // Construir a query do Sanity para filtrar tags
+    let sanityQuery = `*[_type == "courseTag"]`;
+    let sanityQueryParams = {};
+
     if (subcategoryId && subcategoryName) {
         cacheKey = `subcat-${subcategoryId}`;
         promptContext = `a subcategoria "${subcategoryName}"`;
+        // Filtra tags que referenciam esta subcategoria
+        sanityQuery += ` && $subcategoryId in categories[]._ref`;
+        sanityQueryParams.subcategoryId = subcategoryId;
     } else if (categoryId && categoryName) {
         cacheKey = `cat-${categoryId}`;
         promptContext = `a categoria "${categoryName}"`;
+        // Filtra tags que referenciam esta categoria
+        sanityQuery += ` && $categoryId in categories[]._ref`;
+        sanityQueryParams.categoryId = categoryId;
     }
+    // Se nenhum ID for fornecido, a query permanece ampla, buscando todas as tags.
+    // Isso pode ser útil para um estado inicial ou para tags "globais".
 
-    // 1. Buscar Tags do Sanity
+    sanityQuery += `{_id, title}`; // Seleciona os campos necessários
+
+    // 1. Buscar Tags do Sanity (AGORA FILTRADAS)
     try {
-        // Query para buscar todas as tags existentes
-        const query = `*[_type == "courseTag"]{_id, title}`;
-        const rawSanityTags = await sanityClient.fetch(query);
+        const rawSanityTags = await sanityClient.fetch(sanityQuery, sanityQueryParams);
         
         sanityTags = rawSanityTags.filter(tag => 
             tag && typeof tag._id === 'string' && typeof tag.title === 'string' && tag.title.trim() !== ''
@@ -43,7 +55,7 @@ export const getTags = async (req, res) => {
             name: tag.title // Mapeia 'title' para 'name'
         }));
         
-        console.log(`[Backend] Buscadas ${sanityTags.length} tags válidas do Sanity.`);
+        console.log(`[Backend] Buscadas ${sanityTags.length} tags válidas do Sanity para ${promptContext}.`);
     } catch (error) {
         console.error('Erro ao buscar tags do Sanity:', error.message);
     }
