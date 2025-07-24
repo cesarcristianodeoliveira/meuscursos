@@ -23,11 +23,11 @@ import {
     AdminAddCategoryModal,
     AdminAddSubCategoryModal,
     AdminAddTagModal,
-    AdminClearSanityDataModal 
+    AdminClearSanityDataModal
 } from './components'; 
 
 import axios from 'axios';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext'; // Importando useAuth
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
@@ -56,8 +56,8 @@ function CourseCreatePage() {
     const [alertInfo, setAlertInfo] = useState({ message: null, severity: null });
     const [snackbarOpen, setSnackbarOpen] = useState(false);
 
-    // Obtém o estado de autenticação e o token do contexto, incluindo isAdmin
-    const { isAuthenticated, userToken, user } = useAuth(); 
+    // Obtém o estado de autenticação, o token e a função de logout do contexto
+    const { isAuthenticated, userToken, user, logout } = useAuth(); // Desestruturando logout
     const isAdmin = user?.isAdmin || false;
 
     // Estados para os modais de criação
@@ -65,7 +65,7 @@ function CourseCreatePage() {
     const [openAddSubCategoryModal, setOpenAddSubCategoryModal] = useState(false);
     const [openAddTagModal, setOpenAddTagModal] = useState(false); 
 
-    // NOVO: Estados para o modal de limpeza de dados do Sanity.io
+    // Estados para o modal de limpeza de dados do Sanity.io
     const [openConfirmClearSanityModal, setOpenConfirmClearSanityModal] = useState(false);
     const [clearingSanityData, setClearingSanityData] = useState(false);
 
@@ -288,14 +288,22 @@ function CourseCreatePage() {
                 }
             });
             handleShowAlert(response.data.message || 'Dados do Sanity.io limpos com sucesso!', 'success');
+            
             // Resetar o estado do formulário após a limpeza completa
             setSelectedCategory(null);
             setSelectedSubcategory(null);
             setSelectedTags([]);
             setSelectedImage(null);
             setActiveStep(0);
+            
             // Recarregar as categorias (e consequentemente subcategorias/tags)
             await fetchCategories();
+
+            // NOVO: Deslogar o usuário após um pequeno delay para a mensagem ser vista
+            setTimeout(() => {
+                logout(); // Chama a função de logout do AuthContext
+            }, 2000); // Delay de 2 segundos (ajuste conforme necessário)
+
         } catch (error) {
             console.error('Erro ao limpar dados do Sanity.io:', error.response?.data || error.message);
             const errorMessage = error.response?.data?.message || 'Erro ao limpar dados do Sanity.io. Verifique o console para detalhes.';
@@ -304,7 +312,7 @@ function CourseCreatePage() {
             setClearingSanityData(false);
             handleCloseClearSanityModal();
         }
-    }, [userToken, handleShowAlert, handleCloseClearSanityModal, fetchCategories]);
+    }, [userToken, handleShowAlert, handleCloseClearSanityModal, fetchCategories, logout]); // Adicionado logout nas dependências
 
 
     // Renderiza o conteúdo de cada passo do Stepper
@@ -463,13 +471,13 @@ function CourseCreatePage() {
                 onTagsListUpdated={handleTagsListUpdated} 
             />
 
-            {/* NOVO: Modal de Confirmação para Limpeza de Dados do Sanity.io */}
+            {/* Modal de Confirmação para Limpeza de Dados do Sanity.io */}
             <AdminClearSanityDataModal
                 open={openConfirmClearSanityModal}
                 onClose={handleCloseClearSanityModal}
                 onConfirm={handleConfirmClearSanityData}
                 clearingData={clearingSanityData}
-                onShowAlert={handleShowAlert} // Passa a função de alerta para o modal
+                onShowAlert={handleShowAlert}
             />
         </Container>
     );
