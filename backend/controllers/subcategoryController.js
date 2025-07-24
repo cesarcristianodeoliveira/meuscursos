@@ -68,7 +68,8 @@ export const getSubcategories = async (req, res) => {
                 geminiSuggestedSubcategories = suggestedNames
                     .filter(name => typeof name === 'string' && name.trim() !== '')
                     .map(name => ({
-                        _id: `gemini-sub-${generateSlug(name)}-${categoryId}`, // Usa o novo gerador de slug
+                        // Gera um ID Gemini que inclui o slug da categoria pai para unicidade
+                        _id: `gemini-sub-${generateSlug(categoryName, name)}-${categoryId}`, 
                         name: name,
                         parentCategoryId: categoryId,
                         parentCategoryName: categoryName
@@ -135,21 +136,17 @@ export const createSubcategory = async (req, res) => {
     if (!parentCategoryId || typeof parentCategoryId !== 'string' || parentCategoryId.trim() === '') {
         return res.status(400).json({ message: 'O ID da categoria pai é obrigatório para criar uma subcategoria.' });
     }
-    // parentCategoryName é obrigatório para o fluxo de criação automática
     if (!parentCategoryName || typeof parentCategoryName !== 'string' || parentCategoryName.trim() === '') {
         return res.status(400).json({ message: 'O nome da categoria pai é obrigatório para criar uma subcategoria.' });
     }
 
-
     let finalParentCategoryId = parentCategoryId;
     let finalParentCategoryName = parentCategoryName;
+    let parentCategorySlug = null; // NOVO: Para armazenar o slug da categoria pai
 
     // VERIFICAÇÃO E CRIAÇÃO DA CATEGORIA PAI SE NECESSÁRIO
-    // Esta lógica só deve ser executada se o parentCategoryId for um ID gerado pela Gemini
-    // e *não* um ID real do Sanity que já foi persistido.
     if (parentCategoryId.startsWith('gemini-')) {
         try {
-            // Tenta buscar a categoria pelo título (nome) no Sanity
             const existingSanityCategory = await sanityClient.fetch(
                 `*[_type == "courseCategory" && title == $title][0]`, 
                 { title: parentCategoryName }
@@ -158,10 +155,10 @@ export const createSubcategory = async (req, res) => {
             if (existingSanityCategory) {
                 finalParentCategoryId = existingSanityCategory._id;
                 finalParentCategoryName = existingSanityCategory.title;
+                parentCategorySlug = existingSanityCategory.slug.current; // Obtém o slug existente
                 console.log(`[Backend] Categoria Gemini "${parentCategoryName}" já existe no Sanity com ID: ${finalParentCategoryId}. Usando existente.`);
             } else {
-                // Se não existe, cria a categoria no Sanity
-                const categorySlug = generateSlug(parentCategoryName); // Usa o novo gerador de slug
+                const categorySlug = generateSlug(parentCategoryName); 
                 const newCategoryDoc = {
                     _type: 'courseCategory',
                     title: parentCategoryName.trim(),
@@ -173,32 +170,32 @@ export const createSubcategory = async (req, res) => {
                 const createdCategory = await sanityClient.create(newCategoryDoc);
                 finalParentCategoryId = createdCategory._id;
                 finalParentCategoryName = createdCategory.title;
+                parentCategorySlug = createdCategory.slug.current; // Obtém o slug da categoria recém-criada
                 console.log(`[Backend] Categoria Gemini "${parentCategoryName}" criada no Sanity com ID: ${finalParentCategoryId}.`);
                 
-                // Invalida o cache de categorias para que a nova seja incluída
-                // (Isso é importante para o categoryController)
-                // Note: cachedGeminiCategories e geminiCategoryCacheTimestamp não estão neste arquivo.
-                // Isso será tratado no categoryController, mas é um ponto a considerar para a refatoração.
+                // Invalida o cache de categorias
+                // (Isso será tratado no categoryController, mas é um ponto a considerar para a refatoração.)
             }
         } catch (error) {
             console.error('Erro ao verificar/criar categoria pai no Sanity para subcategoria:', error.message);
             return res.status(500).json({ message: 'Erro interno ao processar a categoria pai para subcategoria.', error: error.message });
         }
     } else {
-        // Se não é um ID Gemini, assume que é um ID Sanity real.
+        // Se não é um ID Gemini, assume que é um ID Sanity real. Busca o slug.
         try {
-            const parentCat = await sanityClient.fetch(`*[_id == $parentCategoryId][0]{title}`, { parentCategoryId });
+            const parentCat = await sanityClient.fetch(`*[_id == $parentCategoryId][0]{title, slug}`, { parentCategoryId });
             if (parentCat) {
                 if (parentCat.title !== finalParentCategoryName) {
                     console.warn(`[Backend] Nome da categoria pai (${finalParentCategoryName}) difere do Sanity (${parentCat.title}) para ID ${parentCategoryId}. Usando nome do Sanity.`);
                     finalParentCategoryName = parentCat.title;
                 }
+                parentCategorySlug = parentCat.slug.current; // Obtém o slug da categoria existente
             } else {
                 console.warn(`[Backend] Categoria pai com ID "${parentCategoryId}" não encontrada no Sanity.`);
                 return res.status(400).json({ message: `Categoria pai com ID "${parentCategoryId}" não encontrada.` });
             }
         } catch (error) {
-            console.error('Erro ao buscar nome da categoria pai no Sanity para subcategoria:', error.message);
+            console.error('Erro ao buscar nome/slug da categoria pai no Sanity para subcategoria:', error.message);
             return res.status(500).json({ message: 'Erro interno ao verificar a categoria pai para subcategoria.', error: error.message });
         }
     }
@@ -213,7 +210,8 @@ export const createSubcategory = async (req, res) => {
         console.error('Erro ao verificar subcategoria existente no Sanity:', error.message);
     }
 
-    const slugValue = generateSlug(title); // Usa o novo gerador de slug
+    // NOVO: Geração do slug hierárquico
+    const slugValue = generateSlug(parentCategorySlug, title); 
 
     const newSubcategoryDoc = {
         _type: 'courseSubCategory',

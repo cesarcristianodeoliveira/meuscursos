@@ -85,7 +85,8 @@ export const getTags = async (req, res) => {
                 geminiSuggestedTags = suggestedNames
                     .filter(name => typeof name === 'string' && name.trim() !== '')
                     .map(name => ({
-                        _id: `gemini-tag-${generateSlug(name)}-${cacheKey}`, // Usa o novo gerador de slug
+                        // Gera um ID Gemini que inclui o slug da categoria/subcategoria para unicidade
+                        _id: `gemini-tag-${generateSlug(promptContext.replace(/^(a|o|para)\s/, '').replace(/"/g, ''), name)}`, 
                         name: name
                     }));
 
@@ -147,7 +148,6 @@ export const createTag = async (req, res) => {
     if (!title || typeof title !== 'string' || title.trim() === '') {
         return res.status(400).json({ message: 'O título da tag é obrigatório e deve ser uma string não vazia.' });
     }
-    // categoryIds e categoryNames são opcionais para tags, mas se fornecidos, devem ser arrays válidos
     if (categoryIds && !Array.isArray(categoryIds)) {
         return res.status(400).json({ message: 'categoryIds deve ser um array de strings.' });
     }
@@ -168,79 +168,129 @@ export const createTag = async (req, res) => {
         console.error('Erro ao verificar tag existente no Sanity:', error.message);
     }
 
-    const slugValue = generateSlug(title); 
+    let baseSlugParts = []; // Partes para formar o slug hierárquico da tag
+
+    // Tenta encontrar a categoria/subcategoria mais específica para o slug
+    let primaryCategorySlug = null;
+    let primarySubcategorySlug = null;
+
+    if (categoryIds && categoryIds.length > 0) {
+        // Prioriza a subcategoria para o slug, se houver
+        const subcategoryRef = categoryIds.find(id => id.includes('sub-') || id.startsWith('gemini-sub-'));
+        if (subcategoryRef) {
+            try {
+                const subcategoryDoc = await sanityClient.fetch(
+                    `*[_id == $id || (slug.current == $slug && _type == "courseSubCategory")][0]{title, slug, parentCategory->{slug}}`, 
+                    { id: subcategoryRef, slug: generateSlug(categoryNames[categoryIds.indexOf(subcategoryRef)]) }
+                );
+                if (subcategoryDoc && subcategoryDoc.slug && subcategoryDoc.parentCategory && subcategoryDoc.parentCategory.slug) {
+                    primaryCategorySlug = subcategoryDoc.parentCategory.slug.current;
+                    primarySubcategorySlug = subcategoryDoc.slug.current;
+                    baseSlugParts.push(primaryCategorySlug, primarySubcategorySlug);
+                }
+            } catch (error) {
+                console.warn(`Erro ao buscar slug da subcategoria para tag: ${error.message}`);
+            }
+        }
+
+        // Se não encontrou subcategoria ou seu slug, tenta a categoria principal
+        if (!primaryCategorySlug) {
+            const categoryRef = categoryIds.find(id => !id.includes('sub-') || id.startsWith('gemini-'));
+            if (categoryRef) {
+                try {
+                    const categoryDoc = await sanityClient.fetch(
+                        `*[_id == $id || (slug.current == $slug && _type == "courseCategory")][0]{title, slug}`, 
+                        { id: categoryRef, slug: generateSlug(categoryNames[categoryIds.indexOf(categoryRef)]) }
+                    );
+                    if (categoryDoc && categoryDoc.slug) {
+                        primaryCategorySlug = categoryDoc.slug.current;
+                        baseSlugParts.push(primaryCategorySlug);
+                    }
+                } catch (error) {
+                    console.warn(`Erro ao buscar slug da categoria para tag: ${error.message}`);
+                }
+            }
+        }
+    }
+
+    // Adiciona o título da tag como a última parte do slug
+    baseSlugParts.push(title);
+    const slugValue = generateSlug(...baseSlugParts); 
 
     const finalCategoryReferences = [];
-    // Processa cada categoryId para garantir que a categoria existe no Sanity
     if (categoryIds && categoryIds.length > 0) {
         for (let i = 0; i < categoryIds.length; i++) {
             let currentCategoryId = categoryIds[i];
-            let currentCategoryName = categoryNames[i] || ''; // Fallback para nome vazio
+            let currentCategoryName = categoryNames[i] || ''; 
 
             if (!currentCategoryId || typeof currentCategoryId !== 'string' || currentCategoryId.trim() === '') {
                 console.warn(`[Backend] ID de categoria inválido encontrado para tag: ${currentCategoryId}`);
-                continue; // Pula IDs inválidos
+                continue; 
             }
 
-            // Se o ID for Gemini, tenta encontrar ou criar a categoria/subcategoria no Sanity
             if (currentCategoryId.startsWith('gemini-')) {
                 try {
                     let docType = 'courseCategory'; 
+                    let querySlug = generateSlug(currentCategoryName); // Slug para buscar/criar
+                    let parentRefForSubcat = null;
+
                     if (currentCategoryId.includes('sub-')) {
                         docType = 'courseSubCategory';
+                        // Se for uma subcategoria Gemini, precisamos do ID real da categoria pai
+                        // para criar a referência corretamente no Sanity.
+                        // O frontend envia `parentCategoryForSubcategoryGemini` no `req.body` para isso.
+                        if (req.body.parentCategoryForSubcategoryGemini && req.body.parentCategoryForSubcategoryGemini._id) {
+                            parentRefForSubcat = {
+                                _type: 'reference',
+                                _ref: req.body.parentCategoryForSubcategoryGemini._id
+                            };
+                            // O slug da subcategoria Gemini também deve incluir o slug da categoria pai
+                            const parentCatSlugForSubcat = await sanityClient.fetch(
+                                `*[_id == $id][0].slug.current`, 
+                                { id: req.body.parentCategoryForSubcategoryGemini._id }
+                            );
+                            querySlug = generateSlug(parentCatSlugForSubcat, currentCategoryName);
+                        }
                     }
 
                     const existingSanityDoc = await sanityClient.fetch(
-                        `*[_type == $docType && title == $title][0]`, 
-                        { docType, title: currentCategoryName }
+                        `*[_type == $docType && slug.current == $querySlug][0]`, // Busca pelo slug agora
+                        { docType, querySlug }
                     );
 
                     if (existingSanityDoc) {
-                        // Adiciona _key ao objeto de referência
                         finalCategoryReferences.push({ _type: 'reference', _ref: existingSanityDoc._id, _key: existingSanityDoc._id }); 
                         console.log(`[Backend] ${docType} Gemini "${currentCategoryName}" (para tag) já existe no Sanity com ID: ${existingSanityDoc._id}. Usando existente.`);
                     } else {
-                        const docSlug = generateSlug(currentCategoryName); 
                         const newDoc = {
                             _type: docType,
                             title: currentCategoryName.trim(),
                             slug: {
                                 _type: 'slug',
-                                current: docSlug
+                                current: querySlug // Usa o slug hierárquico
                             }
                         };
-                        // Se for subcategoria e tiver um parentCategory, precisamos adicioná-lo
-                        // A categoria pai para a subcategoria Gemini deve ser um ID Sanity real
-                        // Esta informação deve vir do frontend no req.body se for uma subcategoria Gemini que está sendo criada.
-                        if (docType === 'courseSubCategory' && req.body.parentCategoryForSubcategoryGemini) {
-                            const parentCatRefId = req.body.parentCategoryForSubcategoryGemini._id;
-                            if (parentCatRefId && typeof parentCatRefId === 'string') {
-                                newDoc.parentCategory = {
-                                    _type: 'reference',
-                                    _ref: parentCatRefId
-                                };
-                            } else {
-                                console.warn(`[Backend] Subcategoria Gemini "${currentCategoryName}" não tem categoria pai válida para referência.`);
-                            }
+                        if (parentRefForSubcat) {
+                            newDoc.parentCategory = parentRefForSubcat;
                         }
 
                         const createdDoc = await sanityClient.create(newDoc);
-                        // Adiciona _key ao objeto de referência
                         finalCategoryReferences.push({ _type: 'reference', _ref: createdDoc._id, _key: createdDoc._id }); 
                         console.log(`[Backend] ${docType} Gemini "${currentCategoryName}" criada no Sanity com ID: ${createdDoc._id}.`);
                         
                         // Invalida o cache relevante
-                        // (Isso é importante para os respectivos controladores)
-                        // Note: cachedGeminiCategories e cachedGeminiSubcategories não estão neste arquivo.
-                        // Isso será tratado nos respectivos controladores, mas é um ponto a considerar para a refatoração.
+                        if (docType === 'courseCategory') {
+                            // cachedGeminiCategories = null; // Comentado pois está em categoryController
+                            // geminiCategoryCacheTimestamp = 0;
+                        } else if (docType === 'courseSubCategory' && req.body.parentCategoryForSubcategoryGemini) {
+                            // delete cachedGeminiSubcategories[req.body.parentCategoryForSubcategoryGemini._id]; // Comentado pois está em subcategoryController
+                            // delete geminiSubcategoryCacheTimestamps[req.body.parentCategoryForSubcategoryGemini._id];
+                        }
                     }
                 } catch (error) {
                     console.error(`Erro ao verificar/criar ${docType} Gemini para tag:`, error.message);
-                    // Não falha a criação da tag, apenas ignora esta referência
                 }
             } else {
-                // Se o ID não for Gemini, assume que é um ID Sanity real
-                // Adiciona _key ao objeto de referência
                 finalCategoryReferences.push({ _type: 'reference', _ref: currentCategoryId, _key: currentCategoryId }); 
             }
         }
@@ -253,7 +303,7 @@ export const createTag = async (req, res) => {
             _type: 'slug',
             current: slugValue
         },
-        categories: finalCategoryReferences // Associa as categorias/subcategorias
+        categories: finalCategoryReferences 
     };
 
     try {
@@ -267,7 +317,6 @@ export const createTag = async (req, res) => {
         res.status(201).json({ 
             _id: createdDoc._id, 
             name: createdDoc.title,
-            // Retorna as categorias associadas para o frontend se necessário
             associatedCategories: createdDoc.categories
         });
 
