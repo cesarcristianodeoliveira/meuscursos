@@ -1,6 +1,6 @@
 // D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\index.js
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'; // Adicionado useRef
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Container,
     Typography,
@@ -18,6 +18,7 @@ import {
     SelectCategoryStep, 
     SelectSubCategoryStep,
     SelectTagsStep, 
+    SelectImageStep, // NOVO: Importa o componente de seleção de imagem
     ReviewAndCreateStep,
     AdminAddCategoryModal,
     AdminAddSubCategoryModal,
@@ -30,7 +31,8 @@ import { useAuth } from '../../../contexts/AuthContext';
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 // Define os passos do Stepper.
-const steps = ['Selecione a Categoria', 'Selecione a Subcategoria', 'Selecione as Tags', 'Revisar e Criar']; 
+// NOVO: Adicionado o passo de seleção de imagem
+const steps = ['Selecione a Categoria', 'Selecione a Subcategoria', 'Selecione as Tags', 'Selecione a Imagem', 'Revisar e Criar']; 
 
 // Definimos o limite de tags para SEO
 const MIN_TAGS_REQUIRED = 1;
@@ -42,6 +44,7 @@ function CourseCreatePage() {
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [selectedSubcategory, setSelectedSubcategory] = useState(null);
     const [selectedTags, setSelectedTags] = useState([]); 
+    const [selectedImage, setSelectedImage] = useState(null); // NOVO: Estado para a imagem selecionada
 
     // Estados para categorias
     const [categories, setCategories] = useState([]);
@@ -63,7 +66,6 @@ function CourseCreatePage() {
     const [openAddTagModal, setOpenAddTagModal] = useState(false); 
 
     // Ref para a função fetchTags do SelectTagsStep
-    // Isso nos permite chamar fetchTags do SelectTagsStep a partir do CourseCreatePage
     const selectTagsStepRef = useRef();
 
     // Função para exibir o Alert (Snackbar)
@@ -173,6 +175,7 @@ function CourseCreatePage() {
         // Avança para o próximo passo após a seleção/criação
         setSelectedSubcategory(null); 
         setSelectedTags([]); 
+        setSelectedImage(null); // NOVO: Limpa a imagem selecionada
         setActiveStep((prevActiveStep) => prevActiveStep + 1);
     }, [handleShowAlert, userToken, fetchCategories]);
 
@@ -181,6 +184,7 @@ function CourseCreatePage() {
     const handleSubcategorySelectAndAdvance = useCallback((subCategory) => {
         setSelectedSubcategory(subCategory);
         setSelectedTags([]); 
+        setSelectedImage(null); // NOVO: Limpa a imagem selecionada
         setActiveStep((prevActiveStep) => prevActiveStep + 1); 
         handleShowAlert(`Subcategoria "${subCategory.name}" selecionada. Avançando para Tags.`, 'info');
     }, [handleShowAlert]);
@@ -188,9 +192,18 @@ function CourseCreatePage() {
     // Função para selecionar tags e avançar
     const handleTagsSelectAndAdvance = useCallback((tags) => {
         setSelectedTags(tags);
+        setSelectedImage(null); // NOVO: Limpa a imagem selecionada
         setActiveStep((prevActiveStep) => prevActiveStep + 1); 
-        handleShowAlert(`Tags selecionadas (${tags.length}). Avançando para Revisão.`, 'info');
+        handleShowAlert(`Tags selecionadas (${tags.length}). Avançando para Imagem.`, 'info'); // Mensagem atualizada
     }, [handleShowAlert]);
+
+    // NOVO: Função para selecionar imagem e avançar
+    const handleImageSelectAndAdvance = useCallback((image) => {
+        setSelectedImage(image);
+        setActiveStep((prevActiveStep) => prevActiveStep + 1);
+        handleShowAlert(`Imagem selecionada. Avançando para Revisão.`, 'info');
+    }, [handleShowAlert]);
+
 
     // Função para voltar ao passo anterior
     const handleGoBack = useCallback(() => {
@@ -246,7 +259,7 @@ function CourseCreatePage() {
         // através do onTagsListUpdated que passaremos para o AdminAddTagModal.
     }, [handleShowAlert]);
 
-    // NOVO: Função para ser passada ao AdminAddTagModal para disparar o refresh de tags
+    // Função para ser passada ao AdminAddTagModal para disparar o refresh de tags
     const handleTagsListUpdated = useCallback(() => {
         if (selectTagsStepRef.current && typeof selectTagsStepRef.current.fetchTags === 'function') {
             selectTagsStepRef.current.fetchTags();
@@ -257,7 +270,7 @@ function CourseCreatePage() {
     // Renderiza o conteúdo de cada passo do Stepper
     const getStepContent = (step) => {
         switch (step) {
-            case 0:
+            case 0: // Selecionar Categoria
                 return (
                     <>
                         <SelectCategoryStep
@@ -281,7 +294,7 @@ function CourseCreatePage() {
                         )}
                     </>
                 );
-            case 1:
+            case 1: // Selecionar Subcategoria
                 return (
                     <SelectSubCategoryStep 
                         selectedCategory={selectedCategory}
@@ -294,9 +307,8 @@ function CourseCreatePage() {
                         userToken={userToken} 
                     />
                 );
-            case 2:
+            case 2: // Selecionar Tags
                 return (
-                    // Passa a ref e o callback de atualização para o SelectTagsStep
                     <SelectTagsStep 
                         selectedCategory={selectedCategory}
                         selectedSubcategory={selectedSubcategory}
@@ -308,16 +320,29 @@ function CourseCreatePage() {
                         userToken={userToken} 
                         minTags={MIN_TAGS_REQUIRED} 
                         maxTags={MAX_TAGS_ALLOWED}
-                        // NOVO: Passa a ref para o componente filho
                         ref={selectTagsStepRef} 
                     />
                 );
-            case 3:
+            case 3: // NOVO: Selecionar Imagem
+                return (
+                    <SelectImageStep
+                        selectedCategory={selectedCategory}
+                        selectedSubcategory={selectedSubcategory}
+                        selectedTags={selectedTags}
+                        selectedImage={selectedImage} // Passa a imagem selecionada para o componente
+                        onImageSelectAndAdvance={handleImageSelectAndAdvance}
+                        onGoBack={handleGoBack}
+                        onShowAlert={handleShowAlert}
+                        userToken={userToken}
+                    />
+                );
+            case 4: // Revisar e Criar (Índice ajustado)
                 return (
                     <ReviewAndCreateStep 
                         selectedCategory={selectedCategory}
                         selectedSubcategory={selectedSubcategory}
                         selectedTags={selectedTags}
+                        selectedImage={selectedImage} // Passa a imagem para revisão
                         onGoBack={handleGoBack} 
                     />
                 );
@@ -329,7 +354,7 @@ function CourseCreatePage() {
     return (
         <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
             <Typography variant="h4" component="h1" gutterBottom align="center">
-                Criar Novo Curso (v0.1 - Foco em Categorias, Subcategorias e Tags)
+                Criar Novo Curso (v0.1 - Foco em Categorias, Subcategorias, Tags e Imagem)
             </Typography>
 
             <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
@@ -379,7 +404,7 @@ function CourseCreatePage() {
                 onShowAlert={handleShowAlert}
                 selectedCategory={selectedCategory} 
                 selectedSubcategory={selectedSubcategory} 
-                onTagsListUpdated={handleTagsListUpdated} // NOVO: Passa o callback de atualização
+                onTagsListUpdated={handleTagsListUpdated} 
             />
         </Container>
     );

@@ -4,88 +4,98 @@ import React from 'react';
 import {
     Box,
     Typography,
-    Paper, // Para agrupar a revisão
-    Chip, // Para exibir as tags
-    Stack, // Para organizar os chips
     Button,
-    Alert
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
+    Divider,
+    Paper,
+    Card,
+    CardMedia,
+    CardContent
 } from '@mui/material';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CategoryIcon from '@mui/icons-material/Category';
+import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight';
+import TagIcon from '@mui/icons-material/LocalOffer';
+import ImageIcon from '@mui/icons-material/Image';
 
-function ReviewAndCreateStep({ 
-    selectedCategory, 
-    selectedSubcategory, 
-    selectedTags, 
-    onGoBack, // Callback para voltar ao passo anterior
-    onCreateCourse // Callback futuro para criar o curso
-}) {
+
+function ReviewAndCreateStep({ selectedCategory, selectedSubcategory, selectedTags, selectedImage, onGoBack }) {
     return (
         <Box sx={{ width: '100%', bgcolor: 'background.paper', borderRadius: '8px', overflow: 'hidden' }}>
             <Typography variant="h6" gutterBottom sx={{ p: 2, pb: 0 }}>
-                Passo 4: Revisar e Criar Curso
+                Passo Final: Revisar e Criar Curso
             </Typography>
             <Typography variant="body2" color="textSecondary" sx={{ px: 2, pb: 2 }}>
-                Revise as informações selecionadas antes de criar o curso.
+                Por favor, revise os detalhes do seu curso antes de finalizar.
             </Typography>
 
-            <Paper elevation={1} sx={{ p: 3, m: 2, border: '1px solid #e0e0e0', borderRadius: '8px' }}>
-                <Typography variant="subtitle1" gutterBottom>
-                    Resumo do Curso:
+            <Paper elevation={0} sx={{ mx: 2, mb: 3, p: 2, border: '1px solid #e0e0e0', borderRadius: '8px' }}>
+                <Typography variant="subtitle1" gutterBottom sx={{ mb: 1 }}>
+                    Detalhes Selecionados:
                 </Typography>
-
-                <Box sx={{ mb: 2 }}>
-                    <Typography variant="body1">
-                        <strong>Categoria Principal:</strong>{' '}
-                        {selectedCategory ? selectedCategory.name : <span style={{ color: 'red' }}>Nenhuma selecionada</span>}
-                    </Typography>
-                </Box>
-
-                <Box sx={{ mb: 2 }}>
-                    <Typography variant="body1">
-                        <strong>Subcategoria:</strong>{' '}
-                        {selectedSubcategory ? selectedSubcategory.name : <span style={{ color: 'red' }}>Nenhuma selecionada</span>}
-                    </Typography>
-                </Box>
-
-                <Box sx={{ mb: 2 }}>
-                    <Typography variant="body1" gutterBottom>
-                        <strong>Tags Selecionadas:</strong>
-                    </Typography>
-                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                        {selectedTags && selectedTags.length > 0 ? (
-                            selectedTags.map((tag) => (
-                                <Chip
-                                    key={tag._id}
-                                    label={tag.name}
-                                    variant="outlined"
-                                    color="info"
-                                    sx={{ m: 0.5 }}
-                                />
-                            ))
-                        ) : (
-                            <Typography variant="body2" color="textSecondary">
-                                Nenhuma tag selecionada.
-                            </Typography>
-                        )}
-                    </Stack>
-                </Box>
-
-                {/* Adicione mais campos de revisão aqui conforme o curso for evoluindo */}
-                <Alert severity="info" sx={{ mt: 3 }}>
-                    Esta é uma versão inicial. Mais detalhes do curso (título, descrição, instrutor, etc.) serão adicionados em futuras atualizações.
-                </Alert>
+                <List dense>
+                    <ListItem>
+                        <ListItemIcon>
+                            <CategoryIcon color="primary" />
+                        </ListItemIcon>
+                        <ListItemText primary="Categoria" secondary={selectedCategory?.name || 'N/A'} />
+                    </ListItem>
+                    <Divider component="li" />
+                    <ListItem>
+                        <ListItemIcon>
+                            <SubdirectoryArrowRightIcon color="secondary" />
+                        </ListItemIcon>
+                        <ListItemText primary="Subcategoria" secondary={selectedSubcategory?.name || 'N/A'} />
+                    </ListItem>
+                    <Divider component="li" />
+                    <ListItem>
+                        <ListItemIcon>
+                            <TagIcon color="info" />
+                        </ListItemIcon>
+                        <ListItemText 
+                            primary="Tags" 
+                            secondary={selectedTags.length > 0 ? selectedTags.map(tag => tag.name).join(', ') : 'N/A'} 
+                        />
+                    </ListItem>
+                    <Divider component="li" />
+                    <ListItem>
+                        <ListItemIcon>
+                            <ImageIcon color="success" />
+                        </ListItemIcon>
+                        <ListItemText primary="Imagem do Curso" />
+                    </ListItem>
+                    {selectedImage ? (
+                        <Card sx={{ maxWidth: 345, mx: 'auto', mt: 1, mb: 2 }}>
+                            <CardMedia
+                                component="img"
+                                height="140"
+                                image={selectedImage.webformatURL} // Exibe a imagem selecionada
+                                alt={selectedImage.tags}
+                                sx={{ objectFit: 'cover' }}
+                            />
+                            <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+                                <Typography variant="caption" color="text.secondary" noWrap>
+                                    Por: {selectedImage.user}
+                                </Typography>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <Typography variant="body2" color="textSecondary" sx={{ ml: 7, mb: 1 }}>
+                            Nenhuma imagem selecionada.
+                        </Typography>
+                    )}
+                </List>
             </Paper>
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, p: 2 }}>
                 <Button variant="outlined" onClick={onGoBack}>
-                    Voltar para Tags
+                    Voltar para Imagem
                 </Button>
-                <Button 
-                    variant="contained" 
-                    color="primary"
-                    onClick={onCreateCourse} // Chama a função de criação (futura)
-                    disabled // Desabilitado por enquanto, pois a lógica de criação ainda não está implementada
-                >
-                    Criar Curso (Em Breve)
+                <Button variant="contained" color="success" startIcon={<CheckCircleOutlineIcon />}>
+                    Criar Curso
                 </Button>
             </Box>
         </Box>
