@@ -18,11 +18,10 @@ export default {
       options: {
         source: 'title', 
         maxLength: 96,
-        // CORREÇÃO AQUI: isUnique deve ser uma função que chama context.defaultIsUnique
         isUnique: (value, context) => context.defaultIsUnique(value, context),
       },
       description: 'A unique, URL-friendly identifier for the course tag.',
-      validation: Rule => Rule.required() // Removido .unique() daqui
+      validation: Rule => Rule.required() 
     },
     {
       name: 'description',
@@ -37,11 +36,13 @@ export default {
       of: [
         {
           type: 'reference',
-          to: [{ type: 'courseCategory' }],
+          // CORREÇÃO AQUI: Agora aceita referências para ambos os tipos
+          to: [{ type: 'courseCategory' }, { type: 'courseSubCategory' }], 
         },
       ],
-      description: 'The categories this tag is primarily associated with.',
-      validation: Rule => Rule.required().min(1).error('Every tag must be associated with at least one category.'),
+      // Atualizado a mensagem de validação para refletir que pode ser categoria OU subcategoria
+      description: 'The categories and/or subcategories this tag is primarily associated with.',
+      validation: Rule => Rule.required().min(1).error('Every tag must be associated with at least one category or subcategory.'),
     },
   ],
   preview: {
@@ -55,7 +56,8 @@ export default {
       const categoryCount = categories ? categories.length : 0;
       
       let subtitleText = description ? `${description.substring(0, 40)}${description.length > 40 ? '...' : ''}` : 'No description';
-      subtitleText += ` (${categoryCount} categories)`;
+      // Alterado para ser mais genérico, já que agora associa subcategorias também
+      subtitleText += ` (${categoryCount} associations)`; 
 
       return {
         title: title || 'New Course Tag',
