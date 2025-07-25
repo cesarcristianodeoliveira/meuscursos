@@ -25,12 +25,13 @@ function SelectCategoryStep({ categories, selectedCategory, onCategorySelectAndA
                 </Box>
             ) : (
                 <>
-                    {/* Exibe erros de rede/servidor */}
+                    {/* Exibe erros de rede/servidor (se houver) */}
                     {error && (
                         <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>
                     )}
 
-                    {/* NOVO: Exibe o aviso de cota da Gemini API */}
+                    {/* NOVO: Exibe o aviso de cota da Gemini API, independentemente de haver categorias ou outros erros.
+                        A severidade é 'warning' pois é um aviso sobre a funcionalidade de sugestão. */}
                     {geminiQuotaExceeded && (
                         <Alert severity="warning" sx={{ m: 2 }}>
                             Cota da Gemini API excedida. As categorias sugeridas podem não estar completas.
@@ -65,9 +66,10 @@ function SelectCategoryStep({ categories, selectedCategory, onCategorySelectAndA
                             ))}
                         </List>
                     ) : (
-                        // Exibe mensagem se não houver categorias E não houver um erro de rede/servidor
-                        // E se não for apenas o aviso da Gemini (que significa que a lista está realmente vazia do Sanity)
-                        !error && !geminiQuotaExceeded && (
+                        // Exibe mensagem se não houver categorias do Sanity E não houver um erro de rede/servidor.
+                        // A condição `!geminiQuotaExceeded` FOI REMOVIDA daqui, permitindo que esta mensagem
+                        // apareça mesmo se a cota da Gemini estiver excedida.
+                        !error && ( 
                             <Typography variant="body2" color="textSecondary" sx={{ p: 2 }}>
                                 Nenhuma categoria disponível no Sanity.io. Por favor, crie uma.
                             </Typography>
