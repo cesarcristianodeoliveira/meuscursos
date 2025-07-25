@@ -11,57 +11,101 @@ export const clearSanityData = async (req, res) => {
         // Esta é a parte crucial para resolver dependências e circularidades.
         // A ordem aqui é: "quem referencia" (pai lógico) antes de "quem é referenciado" (filho lógico).
 
-        // Definir os tipos de documentos e os campos de referência que eles podem conter.
-        // Isso nos permite iterar e limpar de forma mais genérica.
+        // Mapeamento dos tipos de documentos e os campos de REFERÊNCIA que eles contêm.
+        // Estes nomes de campo SÃO BASEADOS EXATAMENTE NOS SEUS SCHEMAS FORNECIDOS.
         const typesToNullify = {
-            // Documentos que referenciam 'course'
-            'lesson': ['course'], // Campo 'course' em 'lesson' referencia 'course'
-            'courseRating': ['course'], // Campo 'course' em 'courseRating' referencia 'course'
-            'member': ['courses', 'course'], // 'member' pode ter um array 'courses' ou um campo único 'course' que referencia 'course'
-
-            // Documentos que referenciam 'courseCategory', 'courseSubCategory', 'courseTag', 'lesson', 'member', 'courseRating'
-            'course': ['category', 'subcategory', 'tags', 'lessons', 'members', 'ratings']
+            'member': { // Member referencia Course, Lesson, Group, Badge, Certificate, Message
+                singleRefs: [], // Não há referências únicas diretas a outros documentos que precisam ser nullificadas aqui
+                arrayRefs: ['createdCourses', 'enrolledCourses', 'favoriteCourses', 'createdGroups', 'joinedGroups', 'badgesEarned', 'certificatesAwarded', 'messages']
+            },
+            'lesson': { // Lesson referencia Course
+                singleRefs: ['course'],
+                arrayRefs: []
+            },
+            'courseRating': { // CourseRating referencia Member, Course
+                singleRefs: ['member', 'course'],
+                arrayRefs: []
+            },
+            'course': { // Course referencia Category, SubCategory, CourseTag, Member (creator), Lesson
+                singleRefs: ['category', 'subCategory', 'creator'],
+                arrayRefs: ['courseTags', 'lessons']
+            },
+            'courseTag': { // CourseTag referencia Category, SubCategory
+                singleRefs: [],
+                arrayRefs: ['categories']
+            },
+            'courseSubCategory': { // CourseSubCategory referencia CourseCategory
+                singleRefs: ['parentCategory'],
+                arrayRefs: []
+            },
+            // courseCategory não referencia outros documentos que precisam de nullificação
         };
 
-        for (const docType in typesToNullify) {
-            const referenceFields = typesToNullify[docType];
-            console.log(`[Sanity Clear] Limpando referências de "${docType}" para os tipos relacionados...`);
-            
-            // Buscar todos os documentos deste tipo
-            const documentsToPatch = await sanityClient.fetch(`*[_type == "${docType}"]._id`);
+        // Ordem de nullificação para quebrar as circularidades e dependências
+        // Começamos pelos documentos que contêm referências para os mais "profundos" ou circulares.
+        const nullificationOrder = [
+            'member',
+            'lesson',
+            'courseRating',
+            'course',
+            'courseTag',
+            'courseSubCategory'
+        ];
 
-            if (documentsToPatch.length > 0) {
+        for (const docType of nullificationOrder) {
+            const config = typesToNullify[docType];
+            if (!config) continue; // Pula se o tipo não estiver configurado para nullificação
+
+            console.log(`\n[Sanity Clear] --- Processando nullificação para o tipo: "${docType}" ---`);
+            
+            // Buscar todos os IDs dos documentos deste tipo
+            const documentsToPatchIds = await sanityClient.fetch(`*[_type == "${docType}"]._id`);
+            console.log(`[Sanity Clear] Encontrados ${documentsToPatchIds.length} documentos do tipo "${docType}" para inspecionar e nullificar.`);
+
+            if (documentsToPatchIds.length > 0) {
                 const patches = [];
-                documentsToPatch.forEach(id => {
+                for (const id of documentsToPatchIds) {
+                    const currentDoc = await sanityClient.fetch(`*[_id == "${id}"][0]{${[...config.singleRefs, ...config.arrayRefs].join(',')}}`);
+                    
                     const patch = {
                         patch: {
                             id: id,
-                            unset: [], // Para campos de referência única
-                            set: {}    // Para arrays de referências
+                            unset: [], 
+                            set: {}    
                         }
                     };
+                    let hasChanges = false;
 
-                    referenceFields.forEach(field => {
-                        // Assumindo que campos como 'tags', 'lessons', 'members', 'ratings' são arrays
-                        if (['tags', 'lessons', 'members', 'ratings'].includes(field)) {
-                            patch.patch.set[field] = []; // Esvazia o array de referências
-                        } else {
-                            // Assumindo que campos como 'course', 'category', 'subcategory' são referências únicas
-                            patch.patch.unset.push(field); // Remove o campo de referência
+                    // Lidar com referências únicas
+                    config.singleRefs.forEach(field => {
+                        if (currentDoc && currentDoc[field] && currentDoc[field]._ref) {
+                            patch.patch.unset.push(field);
+                            hasChanges = true;
+                            console.log(`[Sanity Clear - Patch] Doc ${id} (${docType}) - Removendo referência única: ${field}`);
                         }
                     });
-                    // Remove 'unset' ou 'set' se estiverem vazios para evitar erros de patch
-                    if (patch.patch.unset.length === 0) delete patch.patch.unset;
-                    if (Object.keys(patch.patch.set).length === 0) delete patch.patch.set;
 
-                    if (patch.patch.unset || patch.patch.set) {
+                    // Lidar com arrays de referências
+                    config.arrayRefs.forEach(field => {
+                        if (currentDoc && Array.isArray(currentDoc[field]) && currentDoc[field].length > 0) {
+                            patch.patch.set[field] = []; // Esvazia o array
+                            hasChanges = true;
+                            console.log(`[Sanity Clear - Patch] Doc ${id} (${docType}) - Esvaziando array de referência: ${field}`);
+                        }
+                    });
+
+                    // Adiciona o patch apenas se houver mudanças a serem feitas
+                    if (hasChanges) {
+                        if (patch.patch.unset.length === 0) delete patch.patch.unset;
+                        if (Object.keys(patch.patch.set).length === 0) delete patch.patch.set;
                         patches.push(patch);
                     }
-                });
+                }
 
                 if (patches.length > 0) {
+                    console.log(`[Sanity Clear] Aplicando ${patches.length} patches para o tipo "${docType}"...`);
                     await sanityClient.mutate(patches);
-                    console.log(`[Sanity Clear] ${patches.length} documentos do tipo "${docType}" tiveram suas referências limpas.`);
+                    console.log(`[Sanity Clear] Sucesso ao aplicar patches para o tipo "${docType}".`);
                 } else {
                     console.log(`[Sanity Clear] Nenhum patch necessário para documentos do tipo "${docType}".`);
                 }
@@ -71,28 +115,24 @@ export const clearSanityData = async (req, res) => {
         }
 
         // Adicionar um pequeno delay para garantir que as mutações de patch sejam propagadas
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Aumentado para 2 segundos
-        console.log('[Sanity Clear] Delay de 2 segundos concluído após nullificação de referências.');
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Aumentado para 5 segundos
+        console.log('[Sanity Clear] Delay de 5 segundos concluído após nullificação de referências.');
 
         // --- PASSO 2: Deletar Documentos ---
         // Agora que as referências foram (tentativamente) removidas, podemos deletar os documentos.
-        // A ordem é importante para garantir que não haja novas referências criadas ou esquecidas.
         // A ordem deve ir dos documentos que agora não são mais referenciados para os mais "raiz".
         const deletionOrder = [
-            'lesson',            // Agora que 'course' não os referencia mais
-            'courseRating',      // Agora que 'course' não os referencia mais
-            'member',            // Agora que 'course' não os referencia mais (e vice-versa)
-            'course',            // Agora que seus filhos e os que o referenciavam foram tratados
-            'courseTag',         // Agora que 'course' não os referencia mais
-            'courseSubCategory', // Agora que 'course' não os referencia mais
-            'courseCategory',    // Agora que 'course' e 'courseSubCategory' não os referenciam mais
-            
-            // Outros tipos de documentos que você quer limpar e que não têm dependências
-            // cíclicas ou complexas com os tipos acima.
-            'badge',
-            'certificate',
-            'group',
-            'message',
+            'courseRating',      // Não referencia mais course/member
+            'lesson',            // Não referencia mais course
+            'badge',             // Não referenciado por nada aqui
+            'certificate',       // Não referenciado por nada aqui
+            'group',             // Não referenciado por nada aqui
+            'message',           // Não referenciado por nada aqui
+            'member',            // Não referencia mais course/group/badge/certificate/message
+            'course',            // Não referencia mais lesson/courseTag/courseSubCategory/courseCategory/member
+            'courseTag',         // Não referencia mais courseCategory/courseSubCategory
+            'courseSubCategory', // Não referencia mais courseCategory
+            'courseCategory',    // Não referenciado por nada aqui
         ];
 
         let totalDeletedCount = 0;
