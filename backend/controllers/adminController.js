@@ -6,27 +6,34 @@ import sanityClient from '../utils/sanityClient.js';
 export const clearSanityData = async (req, res) => {
     try {
         // Define a ordem de exclusão para respeitar as referências do Sanity.io.
-        // Ordem: Documentos que contêm referências (os "pais" lógicos) devem ser deletados ANTES
-        // dos documentos que são referenciados (os "filhos" lógicos).
+        // A regra é: Deletar o documento que CONTÉM A REFERÊNCIA (o "pai" lógico) ANTES
+        // de tentar deletar o documento que É REFERENCIADO (o "filho" lógico).
         //
-        // Com base no erro "lesson cannot be deleted as there are references to it from course",
-        // significa que 'course' referencia 'lesson'. Portanto, 'course' deve ser deletado antes de 'lesson'.
+        // Baseado nos seus logs e schemas, a ordem mais provável é:
         const deletionOrder = [
-            'courseRating',      // Se 'courseRating' referencia 'course', deve ser deletado primeiro.
-            'course',            // 'course' referencia 'lesson'. DELETAR 'course' ANTES de 'lesson'.
-            'lesson',            // 'lesson' é referenciado por 'course'. DELETAR 'lesson' DEPOIS de 'course'.
-            'courseTag',         // 'courseTag' referencia 'courseCategory', 'courseSubCategory'.
-                                 // Deve ser deletado antes de 'courseSubCategory' e 'courseCategory'.
-            'courseSubCategory', // 'courseSubCategory' referencia 'courseCategory'.
-                                 // Deve ser deletado antes de 'courseCategory'.
-            'courseCategory',    // 'courseCategory' não referencia outros tipos de conteúdo listados aqui.
+            // 1. Deletar documentos que REFERENCIAM 'course'
+            // (Se 'courseRating' referencia 'course')
+            'courseRating',      
+            // 'lesson' referencia 'course', então 'lesson' deve ser deletado antes de 'course'.
+            'lesson',            
+            // 'member' referencia 'course', então 'member' deve ser deletado antes de 'course'.
+            'member',            
 
-            // Outros tipos de documentos que você quer limpar e que não têm dependências
-            // cíclicas ou complexas com os tipos acima.
+            // 2. Agora, deletar 'course' (que era referenciado pelos tipos acima)
+            'course',            
+
+            // 3. Deletar documentos que ERAM REFERENCIADOS por 'course' (e agora estão "órfãos")
+            // 'course' referencia 'courseTag', então 'courseTag' pode ser deletado depois de 'course'.
+            'courseTag',         
+            // 'course' referencia 'courseSubCategory', então 'courseSubCategory' pode ser deletado depois de 'course'.
+            'courseSubCategory', 
+            // 'course' referencia 'courseCategory', então 'courseCategory' pode ser deletado depois de 'courseSubCategory'.
+            'courseCategory',    
+
+            // 4. Outros documentos independentes que não têm referências complexas com os tipos acima.
             'badge',
             'certificate',
             'group',
-            'member',
             'message',
         ];
 
@@ -78,7 +85,8 @@ export const clearSanityData = async (req, res) => {
                 // Captura erros específicos para este tipo de documento
                 console.error(`[Sanity Clear] Erro inesperado ao tentar deletar documentos do tipo ${docType}:`, error.message);
                 failedDeletions.push({ type: docType, error: error.message });
-                // Não lança o erro aqui para permitir que outros tipos sejam processados.
+                // Não lança o erro aqui para permitir que outros tipos sejam processados,
+                // mas a resposta final indicará as falhas.
             }
         }
 
