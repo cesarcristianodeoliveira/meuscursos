@@ -4,40 +4,48 @@ import {
     Box,
     Typography,
     List,
-    ListItemButton, // Alterado de ListItem para ListItemButton
+    ListItemButton,
     ListItemText,
     CircularProgress,
     Alert,
 } from '@mui/material';
 
 // onCategorySelectAndAdvance é a única função de clique
-function SelectCategoryStep({ categories, selectedCategory, onCategorySelectAndAdvance, loading, error }) {
+// Adicionada a prop 'geminiQuotaExceeded'
+function SelectCategoryStep({ categories, selectedCategory, onCategorySelectAndAdvance, loading, error, geminiQuotaExceeded }) {
     return (
         <Box sx={{ width: '100%', bgcolor: 'background.paper', borderRadius: '8px', overflow: 'hidden' }}>
             <Typography variant="h6" gutterBottom sx={{ p: 2, pb: 0 }}>
                 Selecione a Categoria Principal do Curso
             </Typography>
+
             {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '150px' }}>
                     <CircularProgress />
                 </Box>
-            ) : error ? (
-                <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>
             ) : (
                 <>
-                    <List component="nav" aria-label="main course categories">
-                        {categories.length === 0 ? (
-                            <Typography variant="body2" color="textSecondary" sx={{ p: 2 }}>
-                                Nenhuma categoria disponível. Verifique o backend ou sua conexão.
-                            </Typography>
-                        ) : (
-                            categories.map((category) => (
+                    {/* Exibe erros de rede/servidor */}
+                    {error && (
+                        <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>
+                    )}
+
+                    {/* NOVO: Exibe o aviso de cota da Gemini API */}
+                    {geminiQuotaExceeded && (
+                        <Alert severity="warning" sx={{ m: 2 }}>
+                            Cota da Gemini API excedida. As categorias sugeridas podem não estar completas.
+                        </Alert>
+                    )}
+
+                    {/* Renderiza as categorias se existirem */}
+                    {categories.length > 0 ? (
+                        <List component="nav" aria-label="main course categories">
+                            {categories.map((category) => (
                                 <ListItemButton
                                     key={category._id}
                                     selected={selectedCategory && selectedCategory._id === category._id}
                                     onClick={() => onCategorySelectAndAdvance(category)} 
                                     sx={{
-                                        // Estilo baseado no exemplo, mas mantendo a seleção visível
                                         '&.Mui-selected': {
                                             backgroundColor: 'primary.main', // Cor de destaque para selecionado
                                             color: 'white', // Texto branco para contraste
@@ -54,9 +62,17 @@ function SelectCategoryStep({ categories, selectedCategory, onCategorySelectAndA
                                 >
                                     <ListItemText primary={category.name} />
                                 </ListItemButton>
-                            ))
-                        )}
-                    </List>
+                            ))}
+                        </List>
+                    ) : (
+                        // Exibe mensagem se não houver categorias E não houver um erro de rede/servidor
+                        // E se não for apenas o aviso da Gemini (que significa que a lista está realmente vazia do Sanity)
+                        !error && !geminiQuotaExceeded && (
+                            <Typography variant="body2" color="textSecondary" sx={{ p: 2 }}>
+                                Nenhuma categoria disponível no Sanity.io. Por favor, crie uma.
+                            </Typography>
+                        )
+                    )}
                 </>
             )}
         </Box>
