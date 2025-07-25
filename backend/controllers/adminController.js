@@ -6,19 +6,18 @@ import sanityClient from '../utils/sanityClient.js';
 export const clearSanityData = async (req, res) => {
     try {
         // Define a ordem de exclusão para respeitar as referências do Sanity.io.
-        // Documentos que são referenciados por outros devem ser deletados ANTES dos que os referenciam.
-        // Ordem: Deletar documentos que referenciam primeiro, depois os que são referenciados.
-        // Ex: Se 'curso' referencia 'aula', delete 'curso' primeiro, depois 'aula'.
+        // Documentos que contêm referências (os "pais" lógicos) devem ser deletados ANTES
+        // dos documentos que são referenciados (os "filhos" lógicos).
         const deletionOrder = [
-            'courseRating',      // Se referencia 'course', deve ser deletado antes de 'course'.
-            'course',            // Referencia 'lesson', 'courseCategory', 'courseSubCategory', 'courseTag'.
-                                 // Deve ser deletado antes de 'lesson'.
-            'lesson',            // É referenciado por 'course'. Pode ser deletado depois de 'course'.
-            'courseTag',         // Referencia 'courseCategory', 'courseSubCategory'.
+            'courseRating',      // Se 'courseRating' referencia 'course', deve ser deletado primeiro.
+            'lesson',            // 'lesson' referencia 'course', então 'lesson' deve ser deletado antes de 'course'.
+            'course',            // 'course' referencia 'courseCategory', 'courseSubCategory', 'courseTag'.
+                                 // Pode ser deletado depois de 'lesson' e 'courseRating', mas antes de seus próprios "filhos".
+            'courseTag',         // 'courseTag' referencia 'courseCategory', 'courseSubCategory'.
                                  // Deve ser deletado antes de 'courseSubCategory' e 'courseCategory'.
-            'courseSubCategory', // Referencia 'courseCategory'.
+            'courseSubCategory', // 'courseSubCategory' referencia 'courseCategory'.
                                  // Deve ser deletado antes de 'courseCategory'.
-            'courseCategory',    // Não referencia outros tipos de conteúdo listados aqui.
+            'courseCategory',    // 'courseCategory' não referencia outros tipos de conteúdo listados aqui.
 
             // Outros tipos de documentos que você quer limpar e que não têm dependências
             // cíclicas ou complexas com os tipos acima.
