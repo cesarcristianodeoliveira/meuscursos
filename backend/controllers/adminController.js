@@ -11,96 +11,72 @@ export const clearSanityData = async (req, res) => {
         // Esta é a parte crucial para resolver dependências e circularidades.
         // A ordem aqui é: "quem referencia" (pai lógico) antes de "quem é referenciado" (filho lógico).
 
-        // 1. Limpar referências de 'member' para 'course'
-        // (Baseado no log: "member" cannot be deleted as there are references to it from "course-...")
-        // Isso implica que 'course' tem um campo que referencia 'member'.
-        // No entanto, o log também diz "member" cannot be deleted as there are references to it from "course-...",
-        // o que sugere que 'member' também referencia 'course' (circularidade).
-        // Vamos primeiro limpar as referências que 'member' faz para 'course'.
-        console.log('[Sanity Clear] Limpando referências de "member" para "course"...');
-        const membersWithCourseRefs = await sanityClient.fetch(`*[_type == "member" && defined(courses[]._ref) || defined(course._ref)]._id`); // Ajuste se o campo for diferente de 'courses' ou 'course'
-        if (membersWithCourseRefs.length > 0) {
-            const memberPatches = membersWithCourseRefs.map(id => ({
-                patch: {
-                    id: id,
-                    set: { courses: [] }, // Se 'member' tem um array de referências a cursos
-                    unset: ['course'] // Se 'member' tem uma referência única a um curso
-                }
-            }));
-            await sanityClient.mutate(memberPatches);
-            console.log(`[Sanity Clear] ${membersWithCourseRefs.length} referências de "member" para "course" limpas.`);
-        } else {
-            console.log('[Sanity Clear] Nenhuma referência de "member" para "course" encontrada para limpar.');
-        }
+        // Definir os tipos de documentos e os campos de referência que eles podem conter.
+        // Isso nos permite iterar e limpar de forma mais genérica.
+        const typesToNullify = {
+            // Documentos que referenciam 'course'
+            'lesson': ['course'], // Campo 'course' em 'lesson' referencia 'course'
+            'courseRating': ['course'], // Campo 'course' em 'courseRating' referencia 'course'
+            'member': ['courses', 'course'], // 'member' pode ter um array 'courses' ou um campo único 'course' que referencia 'course'
 
-        // 2. Limpar referências de 'lesson' para 'course'
-        // (Baseado no log: "lesson" cannot be deleted as there are references to it from "course-...")
-        // Isso implica que 'course' tem um campo que referencia 'lesson'.
-        // Mas o log também diz "lesson" cannot be deleted as there are references to it from "course-...",
-        // o que é confuso. Vamos assumir que 'course' referencia 'lesson' e vice-versa pode ser um problema.
-        // Vamos limpar as referências de 'lesson' para 'course' primeiro.
-        console.log('[Sanity Clear] Limpando referências de "lesson" para "course"...');
-        const lessonsWithCourseRefs = await sanityClient.fetch(`*[_type == "lesson" && defined(course._ref)]._id`);
-        if (lessonsWithCourseRefs.length > 0) {
-            const lessonPatches = lessonsWithCourseRefs.map(id => ({
-                patch: {
-                    id: id,
-                    unset: ['course'] // Remove o campo 'course' que referencia o curso
-                }
-            }));
-            await sanityClient.mutate(lessonPatches);
-            console.log(`[Sanity Clear] ${lessonsWithCourseRefs.length} referências de "lesson" para "course" limpas.`);
-        } else {
-            console.log('[Sanity Clear] Nenhuma referência de "lesson" para "course" encontrada para limpar.');
-        }
+            // Documentos que referenciam 'courseCategory', 'courseSubCategory', 'courseTag', 'lesson', 'member', 'courseRating'
+            'course': ['category', 'subcategory', 'tags', 'lessons', 'members', 'ratings']
+        };
 
-        // 3. Limpar referências de 'courseRating' para 'course'
-        console.log('[Sanity Clear] Limpando referências de "courseRating" para "course"...');
-        const courseRatingsWithCourseRefs = await sanityClient.fetch(`*[_type == "courseRating" && defined(course._ref)]._id`);
-        if (courseRatingsWithCourseRefs.length > 0) {
-            const courseRatingPatches = courseRatingsWithCourseRefs.map(id => ({
-                patch: {
-                    id: id,
-                    unset: ['course'] // Remove o campo 'course' que referencia o curso
-                }
-            }));
-            await sanityClient.mutate(courseRatingPatches);
-            console.log(`[Sanity Clear] ${courseRatingsWithCourseRefs.length} referências de "courseRating" para "course" limpas.`);
-        } else {
-            console.log('[Sanity Clear] Nenhuma referência de "courseRating" para "course" encontrada para limpar.');
-        }
+        for (const docType in typesToNullify) {
+            const referenceFields = typesToNullify[docType];
+            console.log(`[Sanity Clear] Limpando referências de "${docType}" para os tipos relacionados...`);
+            
+            // Buscar todos os documentos deste tipo
+            const documentsToPatch = await sanityClient.fetch(`*[_type == "${docType}"]._id`);
 
-        // 4. Limpar TODAS as referências de 'course' para seus "filhos" (lesson, tag, subcategory, category, member)
-        // Isso é crucial porque 'course' parece ser o hub central que referencia muitos outros tipos.
-        console.log('[Sanity Clear] Limpando TODAS as referências de "course" para seus filhos (lessons, tags, subcategory, category, members)...');
-        const coursesWithOutgoingRefs = await sanityClient.fetch(`*[_type == "course" && (defined(category._ref) || defined(subcategory._ref) || defined(tags[]._ref) || defined(lessons[]._ref) || defined(members[]._ref) || defined(ratings[]._ref))]._id`);
-        if (coursesWithOutgoingRefs.length > 0) {
-            const coursePatches = coursesWithOutgoingRefs.map(id => ({
-                patch: {
-                    id: id,
-                    unset: ['category', 'subcategory'], // Campos de referência única
-                    set: { 
-                        tags: [], 
-                        lessons: [], 
-                        members: [], // Se 'course' referencia 'member'
-                        ratings: []  // Se 'course' referencia 'courseRating'
-                    } // Arrays de referências
+            if (documentsToPatch.length > 0) {
+                const patches = [];
+                documentsToPatch.forEach(id => {
+                    const patch = {
+                        patch: {
+                            id: id,
+                            unset: [], // Para campos de referência única
+                            set: {}    // Para arrays de referências
+                        }
+                    };
+
+                    referenceFields.forEach(field => {
+                        // Assumindo que campos como 'tags', 'lessons', 'members', 'ratings' são arrays
+                        if (['tags', 'lessons', 'members', 'ratings'].includes(field)) {
+                            patch.patch.set[field] = []; // Esvazia o array de referências
+                        } else {
+                            // Assumindo que campos como 'course', 'category', 'subcategory' são referências únicas
+                            patch.patch.unset.push(field); // Remove o campo de referência
+                        }
+                    });
+                    // Remove 'unset' ou 'set' se estiverem vazios para evitar erros de patch
+                    if (patch.patch.unset.length === 0) delete patch.patch.unset;
+                    if (Object.keys(patch.patch.set).length === 0) delete patch.patch.set;
+
+                    if (patch.patch.unset || patch.patch.set) {
+                        patches.push(patch);
+                    }
+                });
+
+                if (patches.length > 0) {
+                    await sanityClient.mutate(patches);
+                    console.log(`[Sanity Clear] ${patches.length} documentos do tipo "${docType}" tiveram suas referências limpas.`);
+                } else {
+                    console.log(`[Sanity Clear] Nenhum patch necessário para documentos do tipo "${docType}".`);
                 }
-            }));
-            await sanityClient.mutate(coursePatches);
-            console.log(`[Sanity Clear] ${coursesWithOutgoingRefs.length} referências de "course" para seus filhos limpas.`);
-        } else {
-            console.log('[Sanity Clear] Nenhuma referência de "course" para seus filhos encontrada para limpar.');
+            } else {
+                console.log(`[Sanity Clear] Nenhum documento do tipo "${docType}" encontrado para limpar referências.`);
+            }
         }
 
         // Adicionar um pequeno delay para garantir que as mutações de patch sejam propagadas
-        // Embora Sanity.io seja eventualmente consistente, um pequeno atraso pode ajudar em cenários complexos.
-        await new Promise(resolve => setTimeout(resolve, 1000)); 
-        console.log('[Sanity Clear] Delay de 1 segundo concluído após nullificação de referências.');
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Aumentado para 2 segundos
+        console.log('[Sanity Clear] Delay de 2 segundos concluído após nullificação de referências.');
 
         // --- PASSO 2: Deletar Documentos ---
         // Agora que as referências foram (tentativamente) removidas, podemos deletar os documentos.
-        // A ordem ainda é importante para garantir que não haja novas referências criadas ou esquecidas.
+        // A ordem é importante para garantir que não haja novas referências criadas ou esquecidas.
         // A ordem deve ir dos documentos que agora não são mais referenciados para os mais "raiz".
         const deletionOrder = [
             'lesson',            // Agora que 'course' não os referencia mais
@@ -132,8 +108,7 @@ export const clearSanityData = async (req, res) => {
                     
                     const mutations = idsToDelete.map(id => ({ delete: { id: id } }));
                     const result = await sanityClient.mutate(mutations, {
-                        // Usar skipCrossDatasetReferences aqui é uma camada extra de segurança,
-                        // mas a nullificação é a principal estratégia.
+                        // Usar skipCrossDatasetReferences aqui é uma camada extra de segurança.
                         skipCrossDatasetReferences: true 
                     });
                     
