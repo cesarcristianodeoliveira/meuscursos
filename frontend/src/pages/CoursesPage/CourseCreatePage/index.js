@@ -52,6 +52,9 @@ function CourseCreatePage() {
     const [loadingCategories, setLoadingCategories] = useState(false);
     const [errorCategories, setErrorCategories] = useState(null);
     const [creatingCategoryOnSelect, setCreatingCategoryOnSelect] = useState(false); 
+    
+    // NOVO ESTADO: Para controlar se a busca inicial de categorias já foi tentada
+    const [hasFetchedCategoriesInitially, setHasFetchedCategoriesInitially] = useState(false);
 
     // Estado para controlar a exibição do Alert (Snackbar)
     const [alertInfo, setAlertInfo] = useState({ message: null, severity: null });
@@ -96,11 +99,12 @@ function CourseCreatePage() {
         if (!isAuthenticated) {
             setErrorCategories("Você precisa estar logado para criar um curso.");
             handleShowAlert("Você precisa estar logado para criar um curso.", "warning");
+            setHasFetchedCategoriesInitially(true); // Marca como tentado mesmo sem autenticação
             return;
         }
 
         setLoadingCategories(true);
-        setErrorCategories(null);
+        setErrorCategories(null); // Limpa erros anteriores
         try {
             const response = await axios.get(`${API_BASE_URL}/api/courses/create/top-categories`, {
                 headers: {
@@ -110,13 +114,19 @@ function CourseCreatePage() {
             
             setCategories(Array.isArray(response.data.categories) ? response.data.categories : []); 
             
+            // Lógica aprimorada para definir errorCategories com base na resposta do backend
             if (response.data.geminiQuotaExceeded) {
+                setErrorCategories('Cota da Gemini API excedida. As categorias sugeridas podem não estar completas.');
                 handleShowAlert('Cota da Gemini API excedida. As categorias sugeridas podem não estar completas.', 'warning');
+            } else if (!Array.isArray(response.data.categories) || response.data.categories.length === 0) {
+                // Se não há categorias e a cota não foi excedida, significa que não há categorias no Sanity
+                setErrorCategories('Nenhuma categoria encontrada no Sanity.io. Por favor, crie uma.');
+                handleShowAlert('Nenhuma categoria encontrada no Sanity.io. Por favor, crie uma.', 'info');
             }
 
         } catch (err) {
             console.error('Erro ao buscar categorias:', err);
-            setCategories([]); 
+            setCategories([]); // Garante que as categorias estejam vazias em caso de erro
             if (axios.isAxiosError(err)) {
                 if (err.code === 'ERR_NETWORK') {
                     setErrorCategories('Erro de rede: O servidor backend pode não estar rodando ou está inacessível. Verifique se o backend está iniciado na porta 3001.');
@@ -131,14 +141,21 @@ function CourseCreatePage() {
             }
         } finally {
             setLoadingCategories(false);
+            setHasFetchedCategoriesInitially(true); // Marca que a busca inicial foi tentada
         }
     }, [isAuthenticated, userToken, handleShowAlert]);
 
     useEffect(() => {
-        if (isAuthenticated && categories.length === 0 && !loadingCategories && !errorCategories) {
+        // A busca só ocorrerá se:
+        // 1. O usuário estiver autenticado.
+        // 2. A lista de categorias estiver vazia.
+        // 3. Não estiver carregando categorias no momento.
+        // 4. Não houver um erro *persistente* que já foi identificado (ex: cota excedida, nenhuma categoria encontrada).
+        // 5. A busca inicial ainda não foi tentada.
+        if (isAuthenticated && categories.length === 0 && !loadingCategories && !errorCategories && !hasFetchedCategoriesInitially) {
             fetchCategories();
         }
-    }, [isAuthenticated, categories.length, loadingCategories, errorCategories, fetchCategories]);
+    }, [isAuthenticated, categories.length, loadingCategories, errorCategories, hasFetchedCategoriesInitially, fetchCategories]);
 
 
     // --- Funções de Navegação e Seleção ---
@@ -301,6 +318,8 @@ function CourseCreatePage() {
             setActiveStep(0);
             
             // Recarregar as categorias (e consequentemente subcategorias/tags)
+            // Resetar hasFetchedCategoriesInitially para que fetchCategories seja chamado novamente
+            setHasFetchedCategoriesInitially(false); 
             await fetchCategories();
 
             // NOVO: Deslogar o usuário após um pequeno delay para a mensagem ser vista
@@ -343,8 +362,14 @@ function CourseCreatePage() {
                             selectedCategory={selectedCategory}
                             onCategorySelectAndAdvance={handleCategorySelectAndAdvance} 
                             loading={loadingCategories || creatingCategoryOnSelect} 
-                            error={errorCategories}
+                            error={errorCategories} // Passa o erro específico para o componente filho
                         />
+                        {/* Exibe a mensagem de erro ou ausência de categorias aqui, se necessário */}
+                        {!loadingCategories && hasFetchedCategoriesInitially && categories.length === 0 && errorCategories && (
+                            <Alert severity={errorCategories.includes('Cota') ? 'warning' : 'info'} sx={{ mt: 2 }}>
+                                {errorCategories}
+                            </Alert>
+                        )}
                         {isAdmin && (
                             <Box sx={{ mt: 2, textAlign: 'center' }}>
                                 <Button
