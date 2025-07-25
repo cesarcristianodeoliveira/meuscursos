@@ -12,6 +12,7 @@ import {
     Button, 
     Snackbar,
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom'; // Importar useNavigate
 
 // Importa os componentes de cada passo
 import {
@@ -59,6 +60,9 @@ function CourseCreatePage() {
     // Obtém o estado de autenticação, o token e a função de logout do contexto
     const { isAuthenticated, userToken, user, logout } = useAuth(); // Desestruturando logout
     const isAdmin = user?.isAdmin || false;
+
+    // Hook para navegação programática
+    const navigate = useNavigate();
 
     // Estados para os modais de criação
     const [openAddCategoryModal, setOpenAddCategoryModal] = useState(false);
@@ -287,7 +291,7 @@ function CourseCreatePage() {
                     Authorization: `Bearer ${userToken}`
                 }
             });
-            handleShowAlert(response.data.message || 'Dados do Sanity.io limpos com sucesso!', 'success');
+            handleShowAlert(response.data.message || 'Dados do Sanity.io limpos com sucesso! Você será desconectado.', 'success');
             
             // Resetar o estado do formulário após a limpeza completa
             setSelectedCategory(null);
@@ -300,19 +304,32 @@ function CourseCreatePage() {
             await fetchCategories();
 
             // NOVO: Deslogar o usuário após um pequeno delay para a mensagem ser vista
+            // Aumentado o delay para 3 segundos para garantir que o Snackbar seja visível
             setTimeout(() => {
                 logout(); // Chama a função de logout do AuthContext
-            }, 2000); // Delay de 2 segundos (ajuste conforme necessário)
+                console.log("Logout forçado após limpeza de dados.");
+                // Redirecionar explicitamente para a página de login
+                navigate('/login'); 
+            }, 3000); // Delay de 3 segundos
 
         } catch (error) {
             console.error('Erro ao limpar dados do Sanity.io:', error.response?.data || error.message);
             const errorMessage = error.response?.data?.message || 'Erro ao limpar dados do Sanity.io. Verifique o console para detalhes.';
             handleShowAlert(errorMessage, 'error');
+            
+            // Em caso de erro na limpeza, ainda é uma boa ideia forçar o logout
+            // para evitar problemas de sessão inconsistente, especialmente se o erro
+            // foi devido a dados corrompidos ou inconsistentes no Sanity.
+            setTimeout(() => {
+                logout();
+                console.log("Logout forçado devido a erro na limpeza de dados.");
+                navigate('/login');
+            }, 3000); // Delay de 3 segundos mesmo em caso de erro
         } finally {
             setClearingSanityData(false);
             handleCloseClearSanityModal();
         }
-    }, [userToken, handleShowAlert, handleCloseClearSanityModal, fetchCategories, logout]); // Adicionado logout nas dependências
+    }, [userToken, handleShowAlert, handleCloseClearSanityModal, fetchCategories, logout, navigate]); // Adicionado 'navigate' nas dependências
 
 
     // Renderiza o conteúdo de cada passo do Stepper
