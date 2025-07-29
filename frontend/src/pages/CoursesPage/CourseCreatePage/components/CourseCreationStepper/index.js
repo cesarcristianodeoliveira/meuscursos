@@ -2,38 +2,53 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Stepper,
-  Step,
-  StepLabel,
+  // Removido CircularProgress e IconButton das importações diretas,
+  // pois serão usados dentro dos componentes Button do MobileStepper
   Button,
   Typography,
   Box,
-  CircularProgress,
   Container,
   Paper,
-  IconButton, // Importa IconButton
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import MobileStepper from '@mui/material/MobileStepper';
+import CircularProgress from '@mui/material/CircularProgress'; // Mantido aqui para uso no botão
+import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft'; // Ícone de seta para a esquerda
+import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight'; // Ícone de seta para a direita
+
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
-
-// Importa ícones de seta
-import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 
 // Importa o componente do Step1 com o novo nome
 import Step1AIModelSelection from './components/Step1AIModelSelection';
 // Os próximos passos continuam comentados
 // import Step2ContentStructure from './components/Step2ContentStructure';
-// import Step3AdditionalSettings from './components/Step3AdditionalSettings';
+// import Step3AdditionalSettings from './components/3AdditionalSettings';
 // import Step4ReviewPublish from './components/Step4ReviewPublish';
 
-function getSteps() {
-  // Rótulos dos passos atualizados
-  return ['Modelo de IA', 'Informações Básicas', 'Estrutura do Conteúdo', 'Revisão e Publicação'];
-}
+// Define os rótulos e descrições dos passos para o MobileStepper
+const stepsData = [
+  {
+    label: 'Modelo de IA',
+    description: 'Selecione o modelo de inteligência artificial para gerar o conteúdo do curso.',
+  },
+  {
+    label: 'Informações Básicas',
+    description: 'Defina o título, descrição, categoria e outros dados essenciais do curso.',
+  },
+  {
+    label: 'Estrutura do Conteúdo',
+    description: 'Crie os módulos e aulas que compõem o curso.',
+  },
+  {
+    label: 'Revisão e Publicação',
+    description: 'Revise todos os detalhes e publique seu curso.',
+  },
+];
 
 const CourseCreationStepper = ({ onShowPageAlert }) => {
+  const theme = useTheme();
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState(() => {
     const savedData = localStorage.getItem('courseCreationFormData');
@@ -56,7 +71,7 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
       creator: { _ref: '', _type: 'reference' },
       lessons: [],
       aiGenerationPrompt: '',
-      aiModelUsed: '', // Campo para o modelo de IA selecionado
+      aiModelUsed: '',
       generatedAt: '',
       lastGenerationRevision: '',
       prerequisites: [], 
@@ -79,8 +94,8 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
   });
 
   const [loading, setLoading] = useState(false);
-  const steps = getSteps();
   const navigate = useNavigate();
+  const maxSteps = stepsData.length;
 
   useEffect(() => {
     localStorage.setItem('courseCreationFormData', JSON.stringify(formData));
@@ -97,31 +112,22 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
     switch (step) {
       case 0: 
         return <Step1AIModelSelection formData={formData} updateFormData={updateFormData} onShowAlert={onShowPageAlert} />;
-      // Os outros passos serão implementados em breve
-      // case 1:
-      //   return <Step2ContentStructure formData={formData} updateFormData={updateFormData} onShowAlert={onShowPageAlert} />;
-      // case 2:
-      //   return <Step3AdditionalSettings formData={formData} updateFormData={updateFormData} onShowAlert={onShowPageAlert} />;
-      // case 3:
-      //   return <Step4ReviewPublish formData={formData} onShowAlert={onShowPageAlert} />;
       default:
         return (
             <Box sx={{ p: 3, textAlign: 'center' }}>
                 <Typography variant="h6" color="textSecondary">
                     Este passo ainda não foi implementado.
                 </Typography>
-                {/* O botão "Voltar" já está na navegação principal, então não precisamos dele aqui */}
             </Box>
         );
     }
   }
 
   const handleNext = () => {
-    // TODO: Adicionar validação específica para cada passo aqui se necessário
-    // Por exemplo, para o Step1AIModelSelection:
+    // Validação para o primeiro passo: Modelo de IA deve ser selecionado
     if (activeStep === 0 && !formData.aiModelUsed) {
       onShowPageAlert('Por favor, selecione um modelo de IA para continuar.', 'error');
-      return; // Impede o avanço se não houver modelo selecionado
+      return; 
     }
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
   };
@@ -155,6 +161,8 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
         delete dataToSend.mainImage;
       }
 
+      // A resposta não precisa ser desestruturada se não for usada.
+      // Apenas aguarde a conclusão da requisição.
       await axios.post('/api/courses', dataToSend, {
         headers: {
           'Content-Type': 'application/json',
@@ -180,66 +188,61 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
         <Typography variant="h4" gutterBottom align="center">
           Criar Novo Curso
         </Typography>
-        <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
+        
+        {/* Título do passo atual */}
+        <Paper
+          square
+          elevation={0}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            height: 50,
+            pl: 2,
+            bgcolor: 'background.default',
+            justifyContent: 'center',
+            mb: 2,
+          }}
+        >
+          <Typography variant="h6">{stepsData[activeStep].label}</Typography>
+        </Paper>
 
-        <div>
-          {activeStep === steps.length ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 4 }}>
-              {loading && <CircularProgress sx={{ mb: 2 }} />}
-              <Typography variant="h5" sx={{ mb: 2 }}>
-                Finalizando a criação do curso...
-              </Typography>
-              <Button onClick={() => navigate('/dashboard/my-courses')} variant="contained">
-                Ir para Meus Cursos
-              </Button>
-            </Box>
-          ) : (
-            <Box>
-              {getStepContent(activeStep)}
-              
-              {/* Controles de Navegação com Ícones */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 4 }}>
-                <IconButton
-                  onClick={handleBack}
-                  disabled={activeStep === 0 || loading}
-                  color="primary"
-                  aria-label="Voltar"
-                >
-                  <ArrowBackIosIcon />
-                </IconButton>
-                
-                {/* Rótulo do passo no centro (opcional, já está no Stepper acima) */}
-                {/* <Typography variant="body1" sx={{ mx: 2 }}>
-                  {steps[activeStep]}
-                </Typography> */}
-
-                <Button
-                  variant="contained"
-                  onClick={activeStep === steps.length - 1 ? handleSubmit : handleNext}
-                  disabled={loading || activeStep === steps.length -1 || !formData.aiModelUsed} // Desabilita "Próximo" se não for o último passo e o modelo de IA não estiver selecionado
-                  sx={{ flexGrow: 1, mx: 2 }} // Ocupa espaço entre os botões de navegação
-                >
-                  {loading ? <CircularProgress size={24} /> : (activeStep === steps.length - 1 ? 'Publicar Curso' : 'Próximo')}
-                </Button>
-
-                <IconButton
-                  onClick={handleNext}
-                  disabled={activeStep === steps.length - 1 || loading || !formData.aiModelUsed} // Desabilita se for o último passo ou modelo de IA não selecionado
-                  color="primary"
-                  aria-label="Próximo"
-                >
-                  <ArrowForwardIosIcon />
-                </IconButton>
-              </Box>
-            </Box>
-          )}
-        </div>
+        {/* Conteúdo do passo atual */}
+        <Box sx={{ minHeight: '200px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+          {getStepContent(activeStep)}
+        </Box>
+        
+        {/* MobileStepper para navegação */}
+        <MobileStepper
+          variant="text"
+          steps={maxSteps}
+          position="static"
+          activeStep={activeStep}
+          sx={{ maxWidth: '100%', flexGrow: 1, mt: 4 }}
+          nextButton={
+            <Button
+              size="small"
+              onClick={activeStep === maxSteps - 1 ? handleSubmit : handleNext} // Lógica de submissão no último passo
+              disabled={activeStep === maxSteps - 1 && loading ? true : (activeStep === maxSteps - 1 ? false : (activeStep === 0 && !formData.aiModelUsed))} // Ajuste da lógica de desabilitação
+            >
+              {loading ? <CircularProgress size={24} /> : (activeStep === maxSteps - 1 ? 'Publicar Curso' : 'Próximo')}
+              {theme.direction === 'rtl' ? (
+                <KeyboardArrowLeft />
+              ) : (
+                <KeyboardArrowRight />
+              )}
+            </Button>
+          }
+          backButton={
+            <Button size="small" onClick={handleBack} disabled={activeStep === 0 || loading}>
+              {theme.direction === 'rtl' ? (
+                <KeyboardArrowRight />
+              ) : (
+                <KeyboardArrowLeft />
+              )}
+              Voltar
+            </Button>
+          }
+        />
       </Paper>
     </Container>
   );

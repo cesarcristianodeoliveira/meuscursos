@@ -12,7 +12,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import axios from 'axios';
-import { useAuth } from '../../../../../../contexts/AuthContext'; // Importa useAuth para pegar o token
+import { useAuth } from '../../../../../../contexts/AuthContext';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
@@ -21,12 +21,11 @@ const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert }) => {
   const [loadingAiModels, setLoadingAiModels] = useState(false);
   const [aiModelsError, setAiModelsError] = useState(null);
 
-  const { userToken } = useAuth(); // Obtém o token do contexto de autenticação
+  const { userToken } = useAuth();
 
-  // Efeito para carregar modelos de IA disponíveis do backend
   useEffect(() => {
     const fetchAiModels = async () => {
-      if (!userToken) { // Só tenta buscar se houver um token
+      if (!userToken) {
         setAiModelsError("Você precisa estar logado para carregar modelos de IA.");
         onShowAlert("Você precisa estar logado para carregar modelos de IA.", "warning");
         return;
@@ -37,13 +36,12 @@ const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert }) => {
       try {
         const response = await axios.get(`${API_BASE_URL}/api/ai-models`, {
           headers: {
-            Authorization: `Bearer ${userToken}`, // Usa o token do useAuth
+            Authorization: `Bearer ${userToken}`,
           },
         });
         const fetchedModels = response.data.models;
         setAiModels(fetchedModels);
 
-        // Define o modelo padrão APENAS se nenhum estiver selecionado e houver modelos
         if (!formData.aiModelUsed && fetchedModels.length > 0) {
           const defaultModel = fetchedModels.find(m => m.default) || fetchedModels[0];
           if (defaultModel) {
@@ -73,12 +71,21 @@ const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert }) => {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+    <Box 
+      sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: 3, 
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '200px',
+      }}
+    >
       <Typography variant="h6" gutterBottom>
         Selecione o Modelo de IA
       </Typography>
 
-      <FormControl fullWidth required sx={{ maxWidth: 400 }}> {/* Limita a largura para melhor visual */}
+      <FormControl fullWidth required sx={{ maxWidth: 400 }}>
         <InputLabel id="ai-model-label">Modelo de IA para Geração de Conteúdo</InputLabel>
         <Select
           labelId="ai-model-label"
@@ -87,7 +94,8 @@ const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert }) => {
           value={formData.aiModelUsed || ''}
           label="Modelo de IA para Geração de Conteúdo"
           onChange={handleChange}
-          disabled={loadingAiModels || !userToken} // Desabilita se estiver carregando ou sem token
+          disabled={loadingAiModels || !userToken}
+          sx={{ '& .MuiSelect-select': { py: 1.5, fontSize: '1.1rem' } }} 
         >
           {loadingAiModels ? (
             <MenuItem disabled>
