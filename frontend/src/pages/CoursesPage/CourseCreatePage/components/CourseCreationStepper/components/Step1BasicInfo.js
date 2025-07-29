@@ -15,26 +15,32 @@ import {
   FormControlLabel,
   Checkbox,
 } from '@mui/material';
-import client from '../../../../../../sanity';
-import { slugify } from '../../../../../../utils/slugify';
+// client do Sanity e slugify não são necessários neste arquivo por enquanto, pois o upload de imagem e o slug automático estão comentados.
+// import client from '../../../../../../sanity';
+import { slugify } from '../../../../../../utils/slugify'; // Mantido para o slug, caso o usuário digite um título
 import axios from 'axios';
+import { useAuth } from '../../../../../../contexts/AuthContext'; // Importa useAuth para pegar o token
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
-  const [categories, setCategories] = useState([]);
+  // Categorias e lógica de upload de imagem estão comentadas por enquanto.
+  // const [categories, setCategories] = useState([]);
+  // const [uploadingImage, setUploadingImage] = useState(false);
+  // const [imageUploadError, setImageUploadError] = useState(null);
+
   const [aiModels, setAiModels] = useState([]);
   const [loadingAiModels, setLoadingAiModels] = useState(false);
   const [aiModelsError, setAiModelsError] = useState(null);
 
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [imageUploadError, setImageUploadError] = useState(null);
+  const { userToken } = useAuth(); // Obtém o token do contexto de autenticação
 
-  // Efeito para carregar categorias do Sanity (executa uma vez)
+  // Efeito para carregar categorias do Sanity (COMENTADO POR ENQUANTO)
+  /*
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('token'); // Ou userToken
         const response = await axios.get(`${API_BASE_URL}/api/categories`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -48,46 +54,54 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
     };
 
     fetchCategories();
-  }, [onShowAlert]); // onShowAlert deve ser memoizado no componente pai
+  }, [onShowAlert]);
+  */
 
-  // Efeito para carregar modelos de IA disponíveis do backend (executa uma vez)
+  // Efeito para carregar modelos de IA disponíveis do backend (AGORA SEM LOOP)
   useEffect(() => {
     const fetchAiModels = async () => {
+      if (!userToken) { // Só tenta buscar se houver um token
+        setAiModelsError("Você precisa estar logado para carregar modelos de IA.");
+        onShowAlert("Você precisa estar logado para carregar modelos de IA.", "warning");
+        return;
+      }
+
       setLoadingAiModels(true);
       setAiModelsError(null);
       try {
-        const token = localStorage.getItem('token');
         const response = await axios.get(`${API_BASE_URL}/api/ai-models`, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${userToken}`, // Usa o token do useAuth
           },
         });
-        setAiModels(response.data.models);
+        const fetchedModels = response.data.models;
+        setAiModels(fetchedModels);
+
+        // Define o modelo padrão APENAS se nenhum estiver selecionado e houver modelos
+        if (!formData.aiModelUsed && fetchedModels.length > 0) {
+          const defaultModel = fetchedModels.find(m => m.default) || fetchedModels[0];
+          if (defaultModel) {
+            updateFormData(prevData => ({ ...prevData, aiModelUsed: defaultModel.id }));
+          }
+        }
       } catch (error) {
         console.error("Erro ao buscar modelos de IA:", error);
-        setAiModelsError("Não foi possível carregar os modelos de IA.");
-        onShowAlert("Erro ao carregar modelos de IA. Verifique sua conexão.", "error");
+        // Verifica se o erro é 401 (Não Autorizado)
+        if (axios.isAxiosError(error) && error.response && error.response.status === 401) {
+            setAiModelsError("Sessão expirada ou não autorizada. Faça login novamente.");
+            onShowAlert("Sessão expirada ou não autorizada. Faça login novamente.", "error");
+            // O redirecionamento para login já é tratado no CourseCreatePage/index.js
+        } else {
+            setAiModelsError("Não foi possível carregar os modelos de IA.");
+            onShowAlert("Erro ao carregar modelos de IA. Verifique sua conexão.", "error");
+        }
       } finally {
         setLoadingAiModels(false);
       }
     };
 
     fetchAiModels();
-  }, [onShowAlert]); // onShowAlert deve ser memoizado no componente pai
-
-  // Efeito para definir o modelo de IA padrão (executa quando aiModels ou formData.aiModelUsed muda)
-  useEffect(() => {
-    // Só tenta definir o modelo padrão se:
-    // 1. Os modelos de IA foram carregados (aiModels.length > 0)
-    // 2. Não há um modelo de IA já selecionado no formData
-    if (aiModels.length > 0 && !formData.aiModelUsed) {
-      const defaultModel = aiModels.find(m => m.default) || aiModels[0];
-      if (defaultModel) {
-        updateFormData(prevData => ({ ...prevData, aiModelUsed: defaultModel.id }));
-      }
-    }
-  }, [aiModels, formData.aiModelUsed, updateFormData]); // updateFormData deve ser memoizado no componente pai
-
+  }, [userToken, updateFormData, formData.aiModelUsed, onShowAlert]); // Adicionado userToken e formData.aiModelUsed como dependências para re-executar se o token aparecer ou se o modelo padrão mudar após o carregamento inicial
 
   const handleChange = (e) => {
     const { name, value, checked } = e.target; 
@@ -99,9 +113,10 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
         slug: { _type: 'slug', current: newSlug },
       });
     } else if (name === 'category') {
-      updateFormData({
-        [name]: { _ref: value, _type: 'reference' },
-      });
+      // Lógica de categoria comentada por enquanto
+      // updateFormData({
+      //   [name]: { _ref: value, _type: 'reference' },
+      // });
     } else if (name === 'isPro') {
       updateFormData({ [name]: checked });
     } else {
@@ -109,6 +124,8 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
     }
   };
 
+  // Lida com o upload da imagem de capa (COMENTADO POR ENQUANTO)
+  /*
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -139,6 +156,7 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
       setUploadingImage(false);
     }
   };
+  */
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -155,14 +173,14 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
           value={formData.aiModelUsed || ''}
           label="Modelo de IA para Geração de Conteúdo"
           onChange={handleChange}
-          disabled={loadingAiModels}
+          disabled={loadingAiModels || !userToken} // Desabilita se estiver carregando ou sem token
         >
           {loadingAiModels ? (
             <MenuItem disabled>
               <CircularProgress size={20} sx={{ mr: 1 }} /> Carregando modelos...
             </MenuItem>
           ) : aiModelsError ? (
-            <MenuItem disabled>Erro ao carregar modelos.</MenuItem>
+            <MenuItem disabled>{aiModelsError}</MenuItem>
           ) : (
             aiModels.map((model) => (
               <MenuItem key={model.id} value={model.id}>
@@ -172,6 +190,7 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
           )}
         </Select>
         {aiModelsError && <FormHelperText error>{aiModelsError}</FormHelperText>}
+        {!userToken && <FormHelperText error>Faça login para selecionar um modelo de IA.</FormHelperText>}
       </FormControl>
 
       <TextField
@@ -203,6 +222,8 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
         required
       />
 
+      {/* Campos de Categoria (COMENTADOS POR ENQUANTO) */}
+      {/*
       <FormControl fullWidth required>
         <InputLabel id="category-label">Categoria</InputLabel>
         <Select
@@ -220,6 +241,7 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
           ))}
         </Select>
       </FormControl>
+      */}
 
       <FormControl fullWidth required>
         <InputLabel id="level-label">Nível de Dificuldade</InputLabel>
@@ -286,6 +308,8 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
         label="Conteúdo Pro? (Disponível apenas para membros Pro)"
       />
 
+      {/* Seção de Imagem Principal (COMENTADA POR ENQUANTO) */}
+      {/*
       <Box>
         <Typography variant="subtitle1" gutterBottom>
           Imagem Principal do Curso
@@ -312,6 +336,7 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
           </Typography>
         )}
       </Box>
+      */}
 
       <TextField
         label="Pré-requisitos (separados por vírgula)"
