@@ -9,14 +9,11 @@ import {
   FormControl,
   InputLabel,
   Select,
-  Button,
   FormHelperText,
   CircularProgress,
   FormControlLabel,
   Checkbox,
 } from '@mui/material';
-// client do Sanity e slugify não são necessários neste arquivo por enquanto, pois o upload de imagem e o slug automático estão comentados.
-// import client from '../../../../../../sanity';
 import { slugify } from '../../../../../../utils/slugify'; // Mantido para o slug, caso o usuário digite um título
 import axios from 'axios';
 import { useAuth } from '../../../../../../contexts/AuthContext'; // Importa useAuth para pegar o token
@@ -24,38 +21,12 @@ import { useAuth } from '../../../../../../contexts/AuthContext'; // Importa use
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
-  // Categorias e lógica de upload de imagem estão comentadas por enquanto.
-  // const [categories, setCategories] = useState([]);
-  // const [uploadingImage, setUploadingImage] = useState(false);
-  // const [imageUploadError, setImageUploadError] = useState(null);
 
   const [aiModels, setAiModels] = useState([]);
   const [loadingAiModels, setLoadingAiModels] = useState(false);
   const [aiModelsError, setAiModelsError] = useState(null);
 
   const { userToken } = useAuth(); // Obtém o token do contexto de autenticação
-
-  // Efeito para carregar categorias do Sanity (COMENTADO POR ENQUANTO)
-  /*
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const token = localStorage.getItem('token'); // Ou userToken
-        const response = await axios.get(`${API_BASE_URL}/api/categories`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        setCategories(response.data.categories);
-      } catch (error) {
-        console.error("Erro ao buscar categorias do backend:", error);
-        onShowAlert("Erro ao carregar categorias. Por favor, recarregue a página.", "error");
-      }
-    };
-
-    fetchCategories();
-  }, [onShowAlert]);
-  */
 
   // Efeito para carregar modelos de IA disponíveis do backend (AGORA SEM LOOP)
   useEffect(() => {
