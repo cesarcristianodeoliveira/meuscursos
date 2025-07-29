@@ -1,6 +1,6 @@
 // D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\components\SelectTagsStep.js
 
-import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'; // Importa forwardRef e useImperativeHandle
+import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import {
     Box,
     Typography,
@@ -10,41 +10,55 @@ import {
     Button,
     Stack, 
     Grid, 
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
 } from '@mui/material';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
-// Envolve o componente com forwardRef
 const SelectTagsStep = forwardRef(({ 
     selectedCategory, 
     selectedSubcategory, 
     onTagsSelectAndAdvance, 
     onGoBack, 
     isAdmin, 
-    onOpenAddTagModal, 
     onShowAlert, 
     minTags, 
     maxTags,
     userToken,
-    selectedTags: initialSelectedTags // Renomeia a prop para evitar conflito com o estado local
-}, ref) => { // Recebe 'ref' como segundo argumento
+    selectedTags: initialSelectedTags, // Tags vindas do componente pai
+    onTagsChange // Handler para atualizar o estado de tags no componente pai
+}, ref) => {
+    // availableTags conterá tags do Sanity + sugestões Gemini (já deduplicadas)
     const [availableTags, setAvailableTags] = useState([]);
     const [loadingTags, setLoadingTags] = useState(false);
     const [errorTags, setErrorTags] = useState(null);
-    const [selectedLocalTags, setSelectedLocalTags] = useState(initialSelectedTags || []); // Inicializa com as tags passadas
-    const [creatingTagOnSelect, setCreatingTagOnSelect] = useState(false); 
+    const [geminiQuotaExceededTags, setGeminiQuotaExceededTags] = useState(false);
+    // selectedLocalTags é o estado interno das tags que o usuário selecionou
+    const [selectedLocalTags, setSelectedLocalTags] = useState(initialSelectedTags || []); 
+    const [creatingTagOnSelect, setCreatingTagOnSelect] = useState(false); // Indica que uma tag Gemini está sendo criada
 
-    // Efeito para sincronizar selectedLocalTags com initialSelectedTags quando a prop muda
+    const [openAdminTagModal, setOpenAdminTagModal] = useState(false);
+    const [newAdminTagName, setNewAdminTagName] = useState('');
+    const [adminTagCreationLoading, setAdminTagCreationLoading] = useState(false);
+    const [adminTagCreationError, setAdminTagCreationError] = useState(null);
+
+    // Efeito para sincronizar selectedLocalTags com initialSelectedTags (prop do pai).
+    // Isso garante que, ao navegar para trás e depois para frente, as tags selecionadas persistam.
+    // Usamos JSON.stringify para comparar o conteúdo dos arrays e evitar loops desnecessários.
     useEffect(() => {
-        // Só atualiza se a prop for diferente do estado atual para evitar loops
-        // E se a prop não for nula/indefinida
         if (initialSelectedTags && JSON.stringify(initialSelectedTags) !== JSON.stringify(selectedLocalTags)) {
             setSelectedLocalTags(initialSelectedTags);
         }
-    }, [initialSelectedTags, selectedLocalTags]); // Depende da prop initialSelectedTags e do estado local
+    }, [initialSelectedTags, selectedLocalTags]);
 
-    // Função para buscar tags do backend
+    // Função para buscar tags do backend.
+    // O backend será responsável por combinar tags do Sanity e sugestões da Gemini,
+    // e também por deduplicar as sugestões.
     const fetchTags = useCallback(async () => {
         if (!userToken) {
             setErrorTags("Usuário não autenticado. Não é possível buscar tags.");
@@ -55,8 +69,10 @@ const SelectTagsStep = forwardRef(({
         
         setLoadingTags(true);
         setErrorTags(null);
+        setGeminiQuotaExceededTags(false);
         try {
             const params = {};
+            // Passa a categoria e/ou subcategoria para o backend para que a Gemini possa sugerir tags relevantes
             if (selectedSubcategory && selectedSubcategory._id) {
                 params.subcategoryId = selectedSubcategory._id;
                 params.subcategoryName = selectedSubcategory.name;
@@ -72,15 +88,24 @@ const SelectTagsStep = forwardRef(({
                 }
             });
             
-            setAvailableTags(Array.isArray(response.data.tags) ? response.data.tags : []); 
+            // O backend deve retornar uma lista já combinada e ordenada de tags
+            const fetchedTags = Array.isArray(response.data.tags) ? response.data.tags : [];
+            setAvailableTags(fetchedTags); 
             
+            // Verifica se a cota da Gemini foi excedida, informando ao usuário
             if (response.data.geminiQuotaExceeded) {
+                setGeminiQuotaExceededTags(true);
                 onShowAlert('Cota da Gemini API excedida para tags. As sugestões podem não estar completas.', 'warning');
+            } else if (fetchedTags.length === 0 && !response.data.geminiQuotaExceeded) {
+                // Se não há tags e a Gemini não está excedida, significa que não há tags no Sanity
+                setErrorTags('Nenhuma tag encontrada no Sanity.io. Por favor, crie uma ou selecione uma categoria/subcategoria.');
+                onShowAlert('Nenhuma tag encontrada no Sanity.io. Por favor, crie uma.', 'info');
             }
 
         } catch (err) {
             console.error('Erro ao buscar tags:', err);
             setAvailableTags([]); 
+            setGeminiQuotaExceededTags(false);
             if (axios.isAxiosError(err)) {
                 if (err.code === 'ERR_NETWORK') {
                     setErrorTags('Erro de rede: O servidor backend pode não estar rodando ou está inacessível.');
@@ -98,124 +123,167 @@ const SelectTagsStep = forwardRef(({
         }
     }, [userToken, selectedCategory, selectedSubcategory, onShowAlert]);
 
-    // Expõe a função fetchTags para o componente pai via ref
+    // Permite que o componente pai chame fetchTags via ref
     useImperativeHandle(ref, () => ({
         fetchTags: fetchTags
     }));
 
-    // Efeito para carregar as tags quando a categoria ou subcategoria selecionada muda
+    // Efeito para carregar tags quando o token do usuário ou categoria/subcategoria mudam
     useEffect(() => {
         if (userToken) { 
             fetchTags();
         } else {
             setAvailableTags([]);
-            setSelectedLocalTags([]); // Limpa as tags locais se não houver usuário autenticado
+            setSelectedLocalTags([]); // Limpa as tags selecionadas se o usuário não estiver logado
             setErrorTags(null);
+            setGeminiQuotaExceededTags(false);
         }
     }, [userToken, selectedCategory, selectedSubcategory, fetchTags]);
 
-    // Handler para alternar a seleção de uma tag
+    // Lógica principal para selecionar/desselecionar tags
     const handleTagClick = useCallback(async (tag) => {
-        let finalTag = tag;
+        // Verifica se a tag já está na lista de selecionadas
+        const isCurrentlySelected = selectedLocalTags.some((t) => t._id === tag._id);
 
-        // Se a tag selecionada é uma sugestão da Gemini (ID começa com 'gemini-')
-        if (tag._id.startsWith('gemini-')) {
-            setCreatingTagOnSelect(true);
-            try {
-                const categoryIds = [];
-                const categoryNames = [];
+        if (isCurrentlySelected) {
+            // Se a tag já está selecionada, remove-a (desseleciona)
+            const newSelectedTags = selectedLocalTags.filter((t) => t._id !== tag._id);
+            setSelectedLocalTags(newSelectedTags);
+            onTagsChange(newSelectedTags); // Notifica o componente pai
+        } else {
+            // Se a tag não está selecionada, tenta adicioná-la
+            if (selectedLocalTags.length < maxTags) {
+                let finalTag = tag; // A tag que será adicionada (pode ser a original ou a recém-criada)
 
-                if (selectedSubcategory && selectedSubcategory._id && selectedSubcategory.name) {
-                    categoryIds.push(selectedSubcategory._id);
-                    categoryNames.push(selectedSubcategory.name);
-                }
-                const isParentCategoryAlreadyAdded = selectedSubcategory && selectedSubcategory.parentCategoryId === selectedCategory._id;
-                if (selectedCategory && selectedCategory._id && selectedCategory.name && !isParentCategoryAlreadyAdded) {
-                    categoryIds.push(selectedCategory._id);
-                    categoryNames.push(selectedCategory.name);
-                }
+                // Se a tag é uma sugestão da Gemini (ID começa com 'gemini-'), tenta criá-la no Sanity
+                if (tag._id && tag._id.startsWith('gemini-')) {
+                    setCreatingTagOnSelect(true); // Ativa o estado de carregamento
+                    try {
+                        const categoryIds = [];
+                        const categoryNames = [];
 
-                // Passa o objeto da categoria pai real para o backend se a subcategoria for Gemini
-                let parentCategoryForSubcategoryGemini = null;
-                if (selectedSubcategory && selectedSubcategory._id.startsWith('gemini-') && selectedCategory) {
-                    parentCategoryForSubcategoryGemini = selectedCategory;
-                }
-
-                const response = await axios.post(`${API_BASE_URL}/api/tags`, 
-                    {
-                        title: tag.name.trim(),
-                        categoryIds: categoryIds, 
-                        categoryNames: categoryNames,
-                        parentCategoryForSubcategoryGemini: parentCategoryForSubcategoryGemini 
-                    },
-                    {
-                        headers: {
-                            Authorization: `Bearer ${userToken}`,
-                            'Content-Type': 'application/json'
+                        if (selectedSubcategory && selectedSubcategory._id) {
+                            categoryIds.push(selectedSubcategory._id);
+                            categoryNames.push(selectedSubcategory.name);
                         }
+                        // Verifica se a categoria pai da subcategoria já foi adicionada para evitar duplicidade
+                        const isParentCategoryAlreadyAdded = selectedSubcategory && selectedSubcategory.parentCategoryId === selectedCategory._id;
+                        if (selectedCategory && selectedCategory._id && selectedCategory.name && !isParentCategoryAlreadyAdded) {
+                            categoryIds.push(selectedCategory._id);
+                            categoryNames.push(selectedCategory.name);
+                        }
+
+                        let parentCategoryForSubcategoryGemini = null;
+                        // Se a subcategoria selecionada for uma sugestão Gemini, precisamos passar a categoria pai real
+                        if (selectedSubcategory && selectedSubcategory._id && selectedSubcategory._id.startsWith('gemini-') && selectedCategory) {
+                            parentCategoryForSubcategoryGemini = selectedCategory;
+                        }
+
+                        const response = await axios.post(`${API_BASE_URL}/api/tags`, 
+                            {
+                                title: tag.name.trim(),
+                                categoryIds: categoryIds, 
+                                categoryNames: categoryNames,
+                                parentCategoryForSubcategoryGemini: parentCategoryForSubcategoryGemini 
+                            },
+                            {
+                                headers: {
+                                    Authorization: `Bearer ${userToken}`,
+                                    'Content-Type': 'application/json'
+                                }
+                            }
+                        );
+                        finalTag = response.data; // Atualiza para a tag real do Sanity (pode ser a existente ou a recém-criada)
+                        onShowAlert(`Tag "${finalTag.name}" criada/selecionada com sucesso!`, 'success');
+                        
+                        // CRUCIAL: Recarrega as tags DISPONÍVEIS do backend.
+                        // Isso garante que a tag recém-criada (agora com um ID real do Sanity)
+                        // seja removida da lista de "Tags Disponíveis" corretamente na próxima renderização.
+                        await fetchTags(); 
+
+                    } catch (error) {
+                        console.error('Erro ao criar tag ao selecionar:', error.response?.data || error.message);
+                        const errorMessage = error.response?.data?.message || 'Erro ao criar tag. Tente novamente.';
+                        onShowAlert(errorMessage, 'error');
+                        setCreatingTagOnSelect(false);
+                        return; // Impede a seleção se a criação falhar
+                    } finally {
+                        setCreatingTagOnSelect(false); // Desativa o carregamento
                     }
-                );
-                finalTag = response.data; 
+                }
 
-                onShowAlert(`Tag "${finalTag.name}" criada e selecionada com sucesso!`, 'success');
-                await fetchTags(); // Recarrega as tags para incluir a recém-criada do Sanity
+                // Adiciona a tag (original ou recém-criada) à lista de selecionadas
+                const newSelectedTags = [...selectedLocalTags, finalTag];
+                setSelectedLocalTags(newSelectedTags);
+                onTagsChange(newSelectedTags); // Notifica o componente pai
 
-            } catch (error) {
-                console.error('Erro ao criar tag ao selecionar:', error.response?.data || error.message);
-                const errorMessage = error.response?.data?.message || 'Erro ao criar tag. Tente novamente.';
-                onShowAlert(errorMessage, 'error');
-                setCreatingTagOnSelect(false);
-                return; 
-            } finally {
-                setCreatingTagOnSelect(false);
+            } else {
+                onShowAlert(`Você pode selecionar no máximo ${maxTags} tags.`, 'info');
             }
         }
+    }, [selectedLocalTags, maxTags, onShowAlert, selectedCategory, selectedSubcategory, fetchTags, userToken, onTagsChange]); 
 
-        // Lógica de seleção/desseleção
-        setSelectedLocalTags((prevSelectedTags) => {
-            const isSelected = prevSelectedTags.some((t) => t._id === finalTag._id);
-            let newSelectedTags;
-            if (isSelected) {
-                newSelectedTags = prevSelectedTags.filter((t) => t._id !== finalTag._id);
-            } else {
-                if (prevSelectedTags.length < maxTags) {
-                    newSelectedTags = [...prevSelectedTags, finalTag];
-                } else {
-                    onShowAlert(`Você pode selecionar no máximo ${maxTags} tags.`, 'info');
-                    return prevSelectedTags; // Não altera o estado se o limite for atingido
-                }
-            }
-            return newSelectedTags;
-        });
-    }, [selectedCategory, selectedSubcategory, onShowAlert, fetchTags, maxTags, userToken]); 
-
-    // Efeito para auto-avançar quando o máximo de tags é selecionado
+    // Efeito para avançar automaticamente se o número máximo de tags for atingido
     useEffect(() => {
-        // Verifica se não está no processo de criação de tag e se o número de tags selecionadas atingiu o máximo
         if (selectedLocalTags.length === maxTags && !creatingTagOnSelect) {
             onTagsSelectAndAdvance(selectedLocalTags);
         }
     }, [selectedLocalTags, maxTags, onTagsSelectAndAdvance, creatingTagOnSelect]);
 
-
-    // Handler para remover uma tag usando o 'onDelete' do Chip
+    // Lógica para remover uma tag da lista de selecionadas
     const handleDeleteTag = useCallback((tagToDelete) => {
-        setSelectedLocalTags((prevSelectedTags) => 
-            prevSelectedTags.filter(tag => tag._id !== tagToDelete._id)
-        );
-    }, []);
+        setSelectedLocalTags((prevSelectedTags) => {
+            const newSelectedTags = prevSelectedTags.filter(tag => tag._id !== tagToDelete._id);
+            onTagsChange(newSelectedTags); // Notifica o componente pai
+            return newSelectedTags;
+        });
+    }, [onTagsChange]); 
 
-    // Handler para o botão "Voltar"
     const handleGoBackClick = () => {
         onGoBack(); 
     };
 
-    // Handler para o botão "Adicionar Nova Tag (Admin)"
+    // Abre o modal de criação de tag para admins
     const handleOpenAddTagModalClick = useCallback(() => {
-        onOpenAddTagModal(); 
-    }, [onOpenAddTagModal]);
+        setOpenAdminTagModal(true); 
+    }, []);
 
-    // Handler para o botão "Próximo"
+    const handleCloseAdminTagModal = () => {
+        setOpenAdminTagModal(false);
+        setNewAdminTagName('');
+        setAdminTagCreationError(null);
+    };
+
+    // Lógica para criar uma tag via modal admin
+    const handleCreateAdminTag = async () => {
+        if (!newAdminTagName.trim()) {
+            setAdminTagCreationError('O nome da tag não pode ser vazio.');
+            return;
+        }
+        setAdminTagCreationLoading(true);
+        setAdminTagCreationError(null);
+        try {
+            const response = await axios.post(`${API_BASE_URL}/api/tags`, 
+                { title: newAdminTagName.trim() },
+                {
+                    headers: {
+                        Authorization: `Bearer ${userToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            onShowAlert(`Tag "${response.data.name}" criada com sucesso!`, 'success');
+            await fetchTags(); // Recarrega as tags para incluir a nova tag criada pelo admin
+            handleCloseAdminTagModal();
+        } catch (error) {
+            console.error('Erro ao criar tag via modal admin:', error.response?.data || error.message);
+            setAdminTagCreationError(error.response?.data?.message || 'Erro ao criar tag. Tente novamente.');
+        } finally {
+            setAdminTagCreationLoading(false);
+        }
+    };
+
+    // Lógica para o botão "Próximo"
     const handleNextClick = () => {
         if (selectedLocalTags.length < minTags) { 
             onShowAlert(`Por favor, selecione no mínimo ${minTags} tag(s).`, 'warning'); 
@@ -224,7 +292,14 @@ const SelectTagsStep = forwardRef(({
         onTagsSelectAndAdvance(selectedLocalTags); 
     };
 
+    // Condição para desabilitar o botão "Próximo"
     const isNextButtonDisabled = selectedLocalTags.length < minTags || selectedLocalTags.length > maxTags || creatingTagOnSelect;
+
+    // Filtra as tags disponíveis para NÃO INCLUIR as já selecionadas.
+    // Isso garante que uma tag selecionada não apareça na lista de disponíveis.
+    const filteredAvailableTags = availableTags.filter(
+        (availableTag) => !selectedLocalTags.some((selectedTag) => selectedTag._id === availableTag._id)
+    );
 
     return (
         <Box sx={{ width: '100%', bgcolor: 'background.paper', borderRadius: '8px', overflow: 'hidden' }}>
@@ -253,11 +328,11 @@ const SelectTagsStep = forwardRef(({
                     ) : (
                         selectedLocalTags.map((tag) => (
                             <Chip
-                                key={tag._id}
+                                key={tag._id} // Usa _id como key para estabilidade
                                 label={tag.name}
                                 variant="filled"
                                 color="primary"
-                                onDelete={() => handleDeleteTag(tag)}
+                                onDelete={() => handleDeleteTag(tag)} // Permite remover
                                 sx={{ m: 0.5 }}
                             />
                         ))
@@ -274,38 +349,41 @@ const SelectTagsStep = forwardRef(({
                     <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
                         <CircularProgress />
                     </Box>
-                ) : errorTags ? (
-                    <Alert severity="error">{errorTags}</Alert>
                 ) : (
-                    <Grid container spacing={1}> 
-                        {availableTags.length === 0 ? (
-                            <Grid item xs={12}>
-                                <Typography variant="body2" color="textSecondary" sx={{ textAlign: 'center', my: 4 }}>
-                                    Nenhuma tag disponível para sugestão.
-                                    {!selectedCategory && !selectedSubcategory && (
+                    <>
+                        {errorTags && <Alert severity="error">{errorTags}</Alert>}
+                        {geminiQuotaExceededTags && (
+                            <Alert severity="warning">
+                                Cota da Gemini API excedida para tags. As sugestões podem não estar completas.
+                            </Alert>
+                        )}
+                        <Grid container spacing={1}> 
+                            {filteredAvailableTags.length === 0 && !errorTags && !geminiQuotaExceededTags ? ( 
+                                <Grid item xs={12}>
+                                    <Typography variant="body2" color="textSecondary" sx={{ textAlign: 'center', my: 4 }}>
+                                        Nenhuma tag disponível para sugestão.
                                         <Box component="span" sx={{ display: 'block', mt: 1 }}>
                                             Selecione uma categoria ou subcategoria para ver as tags sugeridas.
                                         </Box>
-                                    )}
-                                </Typography>
-                            </Grid>
-                        ) : (
-                            availableTags.map((tag) => {
-                                const isSelected = selectedLocalTags.some(t => t._id === tag._id);
-                                return (
-                                    <Grid item key={tag._id}>
-                                        <Chip
-                                            label={tag.name}
-                                            variant={isSelected ? "filled" : "outlined"}
-                                            color={isSelected ? "primary" : "default"}
-                                            onClick={() => handleTagClick(tag)}
-                                            sx={{ m: 0.5, cursor: 'pointer' }}
-                                        />
-                                    </Grid>
-                                );
-                            })
-                        )}
-                    </Grid>
+                                    </Typography>
+                                </Grid>
+                            ) : (
+                                filteredAvailableTags.map((tag) => { 
+                                    return ( 
+                                        <Grid item key={tag._id}> {/* Usa _id como key para estabilidade */}
+                                            <Chip
+                                                label={tag.name}
+                                                variant="outlined" // Sempre outline para tags disponíveis
+                                                color="default" // Sempre default para tags disponíveis
+                                                onClick={() => handleTagClick(tag)} // Adiciona ao clicar
+                                                sx={{ m: 0.5, cursor: 'pointer' }}
+                                            />
+                                        </Grid>
+                                    );
+                                })
+                            )}
+                        </Grid>
+                    </>
                 )}
             </Box>
 
@@ -334,8 +412,35 @@ const SelectTagsStep = forwardRef(({
                     Próximo
                 </Button>
             </Box>
+
+            {/* Modal de Criação de Tag (Admin) */}
+            <Dialog open={openAdminTagModal} onClose={handleCloseAdminTagModal}>
+                <DialogTitle>Criar Nova Tag</DialogTitle>
+                <DialogContent>
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        label="Nome da Tag"
+                        type="text"
+                        fullWidth
+                        variant="outlined"
+                        value={newAdminTagName}
+                        onChange={(e) => setNewAdminTagName(e.target.value)}
+                        sx={{ mt: 1 }}
+                    />
+                    {adminTagCreationError && (
+                        <Alert severity="error" sx={{ mt: 2 }}>{adminTagCreationError}</Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseAdminTagModal} disabled={adminTagCreationLoading}>Cancelar</Button>
+                    <Button onClick={handleCreateAdminTag} disabled={adminTagCreationLoading}>
+                        {adminTagCreationLoading ? <CircularProgress size={24} /> : 'Criar'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
-}); // Fecha o forwardRef
+});
 
 export default SelectTagsStep;

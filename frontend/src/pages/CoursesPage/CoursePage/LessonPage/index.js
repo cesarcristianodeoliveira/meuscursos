@@ -16,7 +16,7 @@ import {
   Alert
 } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import client, { urlFor } from '../../../sanity'; // Ajuste o caminho se for diferente
+import client, { urlFor } from '../../../../sanity'; // Ajuste o caminho se for diferente
 
 // Importe para renderizar Portable Text (instale: npm install @sanity/block-content-to-react)
 import BlockContent from '@sanity/block-content-to-react'; 

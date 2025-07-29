@@ -26,19 +26,24 @@ function SelectSubCategoryStep({
 }) {
     const [subcategories, setSubcategories] = useState([]);
     const [loadingSubcategories, setLoadingSubcategories] = useState(false);
-    const [errorSubcategories, setErrorSubcategories] = useState(null);
+    const [errorSubcategories, setErrorSubcategories] = useState(null); // Para erros de rede/servidor ou ausência TOTAL
+    // NOVO ESTADO: Para o aviso de cota da Gemini para subcategorias
+    const [geminiQuotaExceededSubcategories, setGeminiQuotaExceededSubcategories] = useState(false);
     const [creatingSubcategoryOnSelect, setCreatingSubcategoryOnSelect] = useState(false); // Novo estado para carregamento ao criar
 
     // Função para buscar subcategorias do backend
     const fetchSubcategories = useCallback(async () => {
         if (!selectedCategory || !userToken) {
+            // Se não há categoria selecionada ou usuário não autenticado, limpa e define erro
             setSubcategories([]);
             setErrorSubcategories('Nenhuma categoria principal selecionada ou usuário não autenticado.');
+            setGeminiQuotaExceededSubcategories(false); // Garante que o aviso esteja limpo
             return;
         }
 
         setLoadingSubcategories(true);
-        setErrorSubcategories(null);
+        setErrorSubcategories(null); // Limpa erros anteriores
+        setGeminiQuotaExceededSubcategories(false); // Limpa aviso de cota anterior
         try {
             const response = await axios.get(`${API_BASE_URL}/api/subcategories`, { // Rota ajustada
                 params: {
@@ -51,13 +56,24 @@ function SelectSubCategoryStep({
             });
             
             setSubcategories(Array.isArray(response.data.subcategories) ? response.data.subcategories : []); 
+            
+            // Lógica aprimorada para definir o aviso de cota e erros de ausência de subcategorias
             if (response.data.geminiQuotaExceeded) {
+                setGeminiQuotaExceededSubcategories(true); // Define o aviso de cota separadamente
                 onShowAlert('Cota da Gemini API excedida para subcategorias. As sugestões podem não estar completas.', 'warning');
+            } 
+            
+            // Se não houver subcategorias do Sanity E não for um aviso de cota da Gemini
+            // (ou seja, a lista está realmente vazia do Sanity e não há sugestões)
+            if ((!Array.isArray(response.data.subcategories) || response.data.subcategories.length === 0) && !response.data.geminiQuotaExceeded) {
+                setErrorSubcategories('Nenhuma subcategoria encontrada no Sanity.io para esta categoria. Por favor, crie uma.');
+                onShowAlert('Nenhuma subcategoria encontrada no Sanity.io. Por favor, crie uma.', 'info');
             }
 
         } catch (err) {
             console.error('Erro ao buscar subcategorias:', err);
             setSubcategories([]);
+            setGeminiQuotaExceededSubcategories(false); // Limpa o aviso em caso de erro de rede/servidor
             if (axios.isAxiosError(err)) {
                 if (err.code === 'ERR_NETWORK') {
                     setErrorSubcategories('Erro de rede: O servidor backend pode não estar rodando ou está inacessível.');
@@ -144,15 +160,31 @@ function SelectSubCategoryStep({
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '150px' }}>
                     <CircularProgress />
                 </Box>
-            ) : errorSubcategories ? (
-                <Alert severity="error" sx={{ m: 2 }}>{errorSubcategories}</Alert>
             ) : (
                 <>
+                    {/* Exibe erros de rede/servidor ou outros erros críticos (se houver) */}
+                    {errorSubcategories && (
+                        <Alert severity="error" sx={{ m: 2 }}>{errorSubcategories}</Alert>
+                    )}
+
+                    {/* NOVO: Exibe o aviso de cota da Gemini API para subcategorias */}
+                    {geminiQuotaExceededSubcategories && (
+                        <Alert severity="warning" sx={{ m: 2 }}>
+                            Cota da Gemini API excedida. As subcategorias sugeridas podem não estar completas.
+                        </Alert>
+                    )}
+
                     <List component="nav" aria-label="course subcategories">
                         {subcategories.length === 0 ? (
-                            <Typography variant="body2" color="textSecondary" sx={{ p: 2 }}>
-                                Nenhuma subcategoria disponível para esta categoria.
-                            </Typography>
+                            /* Exibe esta mensagem APENAS se não houver subcategorias no Sanity.io
+                               E não houver um erro crítico (como erro de rede/servidor)
+                               E a cota da Gemini API NÃO estiver excedida (pois se estiver, o aviso da Gemini já cobre a falta de sugestões).
+                               Isso significa que o Sanity.io está realmente vazio de subcategorias para esta categoria. */
+                            !errorSubcategories && !geminiQuotaExceededSubcategories && (
+                                <Typography variant="body2" color="textSecondary" sx={{ p: 2 }}>
+                                    Nenhuma subcategoria disponível para esta categoria no Sanity.io.
+                                </Typography>
+                            )
                         ) : (
                             subcategories.map((subCat) => (
                                 <ListItemButton

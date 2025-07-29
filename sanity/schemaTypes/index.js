@@ -4,6 +4,7 @@ import lesson from './lesson'
 import courseCategory from './courseCategory'
 import courseSubCategory from './courseSubCategory'
 import courseTag from './courseTag'
+import courseThumbnail from './courseThumbnail'
 import courseRating from './courseRating'
 import group from './group'
 import badge from './badge'
@@ -17,6 +18,7 @@ export const schemaTypes = [
   courseCategory,
   courseSubCategory,
   courseTag,
+  courseThumbnail,
   courseRating,
   group,
   badge,

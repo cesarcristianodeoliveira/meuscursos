@@ -29,8 +29,8 @@ const xThemeComponents = {
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const CoursesPage = lazy(() => import('./pages/CoursesPage'));
 const CourseCreatePage = lazy(() => import('./pages/CoursesPage/CourseCreatePage')); 
-const CoursePage = lazy(() => import('./pages/CoursePage')); 
-const LessonPage = lazy(() => import('./pages/CoursePage/LessonPage')); 
+const CoursePage = lazy(() => import('./pages/CoursesPage/CoursePage')); 
+const LessonPage = lazy(() => import('./pages/CoursesPage/CoursePage/LessonPage')); 
 const MemberProfilePage = lazy(() => import('./pages/Member/Profile')); 
 const RegisterPage = lazy(() => import('./pages/RegisterPage')); 
 const LoginPage = lazy(() => import('./pages/LoginPage'));

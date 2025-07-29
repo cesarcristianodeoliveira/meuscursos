@@ -1,94 +1,107 @@
 // schemas/course.js
 export default {
   name: 'course',
-  title: 'Course',
+  title: 'Curso',
   type: 'document',
   fields: [
     {
       name: 'title',
-      title: 'Course Title',
+      title: 'Título do Curso',
       type: 'string',
-      description: 'The main title of the course.',
-      // validation: Rule => Rule.required().min(5).max(120), // Exemplo de validação
+      description: 'O título principal do curso.',
+      // validation: Rule => Rule.required().min(5).max(120),
     },
     {
       name: 'slug',
-      title: 'Course Slug',
+      title: 'Slug do Curso',
       type: 'slug',
       options: {
         source: 'title',
-        // maxLength: 96, // Sugestão para um maximo para URLs
+        // maxLength: 96,
       },
-      description: 'A unique, URL-friendly identifier for the course.'
+      description: 'Um identificador único e amigável para URLs do curso.'
     },
     {
       name: 'description',
-      title: 'Short Description',
+      title: 'Descrição Curta',
       type: 'text',
-      // validation: Rule => Rule.required().min(20).max(500), // Exemplo de validação
-      description: 'A brief overview of what the course covers.'
+      // validation: Rule => Rule.required().min(20).max(500),
+      description: 'Uma breve visão geral do que o curso aborda.'
     },
     {
       name: 'mainImage',
-      title: 'Course Main Image',
-      type: 'image',
-      options: {
-        hotspot: true, // Allows selecting focal point for image crops
-      },
-      description: 'A compelling image to represent the course.'
+      title: 'Imagem Principal do Curso',
+      type: 'reference', // ALTERADO PARA REFERÊNCIA
+      to: [{ type: 'courseThumbnail' }], // REFERENCIA AO NOVO SCHEMA
+      description: 'Uma imagem atraente para representar o curso.'
     },
     {
       name: 'video',
-      title: 'Vídeo',
+      title: 'Vídeo de Introdução',
       type: 'file',
       options: {
         accept: 'video/mp4, video/webm, video/ogg',
       },
+      description: 'Um vídeo introdutório para o curso.'
     },
     {
       name: 'category',
-      title: 'Category',
+      title: 'Categoria',
       type: 'reference',
       to: [{ type: 'courseCategory' }],
-      // validation: Rule => Rule.required(), // Manter esta validação é importante, já que é uma referência
-      description: 'The primary category this course belongs to. Selected from predefined categories.'
+      // validation: Rule => Rule.required(),
+      description: 'A categoria principal à qual este curso pertence. Selecionada de categorias predefinidas.'
     },
     {
       name: 'subCategory',
-      title: 'Subcategory',
+      title: 'Subcategoria',
       type: 'reference',
       to: [{ type: 'courseSubCategory' }],
-      // validation: Rule => Rule.required(), // Você pode decidir tornar obrigatório para v0.1 ou depois
-      description: 'The specific subcategory of the course. Selected from predefined subcategories.'
+      // validation: Rule => Rule.required(),
+      description: 'A subcategoria específica do curso. Selecionada de subcategorias predefinidas.'
     },
     {
       name: 'courseTags',
       title: 'Tags',
       type: 'array',
       of: [{ type: 'reference', to: [{ type: 'courseTag' }] }], 
-      description: 'Relevant tags for the course to aid discovery and filtering.'
+      description: 'Tags relevantes para o curso para auxiliar na descoberta e filtragem.'
     },
     {
       name: 'level',
-      title: 'Difficulty Level',
+      title: 'Nível de Dificuldade',
       type: 'string',
       options: {
         list: [
-          { title: 'Beginner', value: 'beginner' },
-          { title: 'Intermediate', value: 'intermediate' },
-          { title: 'Advanced', value: 'advanced' },
+          { title: 'Iniciante', value: 'beginner' },
+          { title: 'Intermediário', value: 'intermediate' },
+          { title: 'Avançado', value: 'advanced' },
         ],
         layout: 'radio',
       },
       initialValue: 'beginner',
       // validation: Rule => Rule.required(), 
-      description: 'The recommended difficulty level for this course.'
+      description: 'O nível de dificuldade recomendado para este curso.'
     },
     {
       name: 'estimatedDuration',
-      title: 'Estimated Duration',
-      type: 'number', // Ex: "2 hours", "30 minutes", "1 day"
-      description: 'The estimated time to complete the course.'
+      title: 'Duração Estimada (em minutos)',
+      type: 'number', 
+      description: 'O tempo estimado para completar o curso (em minutos).'
+    },
+    {
+      name: 'language',
+      title: 'Idioma do Curso',
+      type: 'string',
+      options: {
+        list: [
+          { title: 'Português', value: 'pt' },
+          { title: 'Inglês', value: 'en' },
+        ],
+        layout: 'dropdown',
+      },
+      initialValue: 'pt',
+      description: 'O idioma principal do conteúdo do curso.'
     },
     {
       name: 'status',
@@ -96,43 +109,43 @@ export default {
       type: 'string',
       options: {
         list: [
-          { title: 'Published', value: 'published' },
-          { title: 'Draft', value: 'draft' },
-          { title: 'Pending', value: 'pending' },
-          { title: 'Private', value: 'private' },
-          { title: 'Archived', value: 'archived' },
+          { title: 'Publicado', value: 'published' },
+          { title: 'Rascunho', value: 'draft' },
+          { title: 'Pendente', value: 'pending' },
+          { title: 'Privado', value: 'private' },
+          { title: 'Arquivado', value: 'archived' },
         ],
         layout: 'radio',
       },
-      initialValue: 'published',
-      description: 'Current publication status of the course, similar to WordPress posts.'
+      initialValue: 'draft',
+      description: 'Status atual de publicação do curso.'
     },
     {
       name: 'price',
-      title: 'Price (BRL)',
+      title: 'Preço (BRL)',
       type: 'number',
-      description: 'Price of the course in BRL. Set to 0 for free courses.',
+      description: 'Preço do curso em BRL. Defina como 0 para cursos gratuitos.',
       initialValue: 0,
-      // validation: Rule => Rule.min(0), // Preço não pode ser negativo
+      // validation: Rule => Rule.min(0),
     },
     {
-      name: 'isProContent',
-      title: 'Is Pro Content?',
+      name: 'isPro',
+      title: 'Conteúdo Pro?',
       type: 'boolean',
       initialValue: false,
-      description: 'If true, this course is only available to Pro plan members.'
+      description: 'Se verdadeiro, este curso está disponível apenas para membros do plano Pro.'
     },
     {
       name: 'creator',
-      title: 'Creator',
+      title: 'Criador',
       type: 'reference',
       to: [{ type: 'member' }],
-      // validation: Rule => Rule.required(), // Para garantir que todo curso tenha um criador
-      description: 'The member who initiated the creation of this course (often generated by AI).'
+      // validation: Rule => Rule.required(),
+      description: 'O membro que iniciou a criação deste curso (frequentemente gerado por IA).'
     },
     {
       name: 'lessons',
-      title: 'Lessons',
+      title: 'Aulas',
       type: 'array',
       of: [
         {
@@ -140,25 +153,25 @@ export default {
           to: [{ type: 'lesson' }],
         }
       ],
-      description: 'The sequence of lessons that make up this course.'
+      description: 'A sequência de aulas que compõem este curso.'
     },
     // --- Campos para Rastreamento da Geração via IA ---
     {
       name: 'aiGenerationPrompt',
-      title: 'AI Generation Prompt',
+      title: 'Prompt de Geração por IA',
       type: 'text',
-      description: 'The prompt used to generate this course content via AI. For internal tracking and potential regeneration.',
+      description: 'O prompt usado para gerar o conteúdo deste curso via IA. Para rastreamento interno e potencial regeneração.',
     },
     {
       name: 'aiModelUsed',
-      title: 'AI Model Used',
+      title: 'Modelo de IA Usado',
       type: 'string',
-      description: 'The specific AI model (e.g., gemini-1.5-flash, gpt-4o) used for content generation.',
+      description: 'O modelo de IA específico (ex: gemini-1.5-flash, gpt-4o) usado para a geração de conteúdo.',
       readOnly: true,
     },
     {
       name: 'generatedAt',
-      title: 'Generated At',
+      title: 'Gerado Em',
       type: 'datetime',
       options: {
         dateFormat: 'YYYY-MM-DD',
@@ -166,11 +179,11 @@ export default {
         calendarTodayLabel: 'Today'
       },
       readOnly: true,
-      description: 'Timestamp of when the course content was initially generated by AI.'
+      description: 'Data e hora em que o conteúdo do curso foi gerado inicialmente pela IA.'
     },
     {
       name: 'lastGenerationRevision',
-      title: 'Last Generation Revision',
+      title: 'Última Revisão de Geração',
       type: 'datetime',
       options: {
         dateFormat: 'YYYY-MM-DD',
@@ -178,7 +191,7 @@ export default {
         calendarTodayLabel: 'Today'
       },
       readOnly: true,
-      description: 'Timestamp of the last time the course content was regenerated or revised by AI.'
+      description: 'Data e hora da última vez que o conteúdo do curso foi regenerado ou revisado pela IA.'
     },
   ],
   preview: {
@@ -186,9 +199,8 @@ export default {
       title: 'title',
       categoryTitle: 'category.title',
       subCategoryTitle: 'subCategory.title',
-      // ADICIONE ISTO para que as tags apareçam no preview do Studio, se desejar
       courseTags: 'courseTags',
-      media: 'mainImage',
+      media: 'mainImage.image', // AJUSTADO PARA PEGAR A IMAGEM DA REFERÊNCIA
       status: 'status',
       creatorName: 'creator.name',
     },
@@ -198,15 +210,13 @@ export default {
       if (categoryTitle) subtitleParts.push(categoryTitle);
       if (subCategoryTitle) subtitleParts.push(subCategoryTitle);
       if (courseTags && courseTags.length > 0) {
-        // Você precisaria de um GROQ query para pegar os títulos das tags aqui para o preview
-        // Por simplicidade, podemos mostrar o número de tags ou "Com Tags"
         subtitleParts.push(`Tags: ${courseTags.length}`);
       }
-      if (status) subtitleParts.push(`(${status})`);
-      if (creatorName) subtitleParts.push(`By ${creatorName}`);
+      if (status) subtitleParts.push(`Status: ${status}`);
+      if (creatorName) subtitleParts.push(`Criador: ${creatorName}`);
 
       return {
-        title: title || 'New Course (Title Pending)',
+        title: title || 'Novo Curso (Título Pendente)',
         subtitle: subtitleParts.join(' - '),
         media: media,
       };

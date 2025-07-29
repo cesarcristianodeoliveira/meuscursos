@@ -19,26 +19,29 @@ function SelectCategoryStep({ categories, selectedCategory, onCategorySelectAndA
                 Selecione a Categoria Principal do Curso
             </Typography>
 
+            {/* Condição para exibir o indicador de carregamento */}
             {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '150px' }}>
                     <CircularProgress />
                 </Box>
             ) : (
                 <>
-                    {/* Exibe erros de rede/servidor (se houver) */}
+                    {/* Exibe erros de rede/servidor ou outros erros críticos (se houver) */}
+                    {/* A severidade é 'error' para indicar um problema que impede o funcionamento normal. */}
                     {error && (
                         <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>
                     )}
 
-                    {/* NOVO: Exibe o aviso de cota da Gemini API, independentemente de haver categorias ou outros erros.
-                        A severidade é 'warning' pois é um aviso sobre a funcionalidade de sugestão. */}
+                    {/* Exibe o aviso de cota da Gemini API.
+                        Este aviso é independente da existência de categorias ou de outros erros,
+                        pois informa sobre a funcionalidade de sugestão. */}
                     {geminiQuotaExceeded && (
                         <Alert severity="warning" sx={{ m: 2 }}>
                             Cota da Gemini API excedida. As categorias sugeridas podem não estar completas.
                         </Alert>
                     )}
 
-                    {/* Renderiza as categorias se existirem */}
+                    {/* Renderiza as categorias se a lista não estiver vazia */}
                     {categories.length > 0 ? (
                         <List component="nav" aria-label="main course categories">
                             {categories.map((category) => (
@@ -66,10 +69,11 @@ function SelectCategoryStep({ categories, selectedCategory, onCategorySelectAndA
                             ))}
                         </List>
                     ) : (
-                        // Exibe mensagem se não houver categorias do Sanity E não houver um erro de rede/servidor.
-                        // A condição `!geminiQuotaExceeded` FOI REMOVIDA daqui, permitindo que esta mensagem
-                        // apareça mesmo se a cota da Gemini estiver excedida.
-                        !error && ( 
+                        /* Exibe esta mensagem APENAS se não houver categorias no Sanity.io
+                           E não houver um erro crítico (como erro de rede/servidor)
+                           E a cota da Gemini API NÃO estiver excedida (pois se estiver, o aviso da Gemini já cobre a falta de sugestões).
+                           Isso significa que o Sanity.io está realmente vazio de categorias. */
+                        !error && !geminiQuotaExceeded && ( 
                             <Typography variant="body2" color="textSecondary" sx={{ p: 2 }}>
                                 Nenhuma categoria disponível no Sanity.io. Por favor, crie uma.
                             </Typography>

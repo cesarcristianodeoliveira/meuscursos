@@ -15,7 +15,7 @@ import {
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 
 // IMPORTANTE: Este é o caminho correto para o seu Sanity Client no frontend
-import client from '../../sanity';
+import client from '../../../sanity';
 
 function CoursePage() {
   const { courseSlug } = useParams(); // Pega o slug do curso da URL
