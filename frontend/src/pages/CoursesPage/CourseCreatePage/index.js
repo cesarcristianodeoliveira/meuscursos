@@ -3,7 +3,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Container,
-  Typography,
   Box,
   Alert,
   CircularProgress,
@@ -33,23 +32,17 @@ function CourseCreatePage() {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
-        <Typography variant="h6" sx={{ ml: 2 }}>Verificando autenticação...</Typography>
       </Box>
     );
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom align="center">
-        Criar Novo Curso
-      </Typography>
-
+    <Container maxWidth="md" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
       {pageAlert.message && (
-        <Alert severity={pageAlert.severity} sx={{ mb: 3 }}>
+        <Alert severity={pageAlert.severity}>
           {pageAlert.message}
         </Alert>
       )}
-
       <CourseCreationStepper onShowPageAlert={handleShowPageAlert} />
     </Container>
   );

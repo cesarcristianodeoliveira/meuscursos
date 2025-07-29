@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   MenuItem,
-  Typography,
   Box,
   FormControl,
   InputLabel,
@@ -75,16 +74,12 @@ const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert }) => {
       sx={{ 
         display: 'flex', 
         flexDirection: 'column', 
-        gap: 3, 
+        gap: 2, 
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '200px',
+        width: '100%'
       }}
     >
-      <Typography variant="h6" gutterBottom>
-        Selecione o Modelo de IA
-      </Typography>
-
       <FormControl fullWidth required sx={{ maxWidth: 400 }}>
         <InputLabel id="ai-model-label">Modelo de IA para Geração de Conteúdo</InputLabel>
         <Select
@@ -95,7 +90,7 @@ const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert }) => {
           label="Modelo de IA para Geração de Conteúdo"
           onChange={handleChange}
           disabled={loadingAiModels || !userToken}
-          sx={{ '& .MuiSelect-select': { py: 1.5, fontSize: '1.1rem' } }} 
+          sx={{ '& .MuiSelect-select': { width: '100%', py: 1.5, fontSize: '1.1rem' } }} 
         >
           {loadingAiModels ? (
             <MenuItem disabled>
