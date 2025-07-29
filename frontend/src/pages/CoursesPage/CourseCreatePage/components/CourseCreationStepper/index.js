@@ -9,7 +9,7 @@ import {
   Typography,
   Box,
   CircularProgress,
-  Alert,
+  // Removido: Alert não é usado diretamente neste componente
   Container,
   Paper,
 } from '@mui/material';
@@ -18,6 +18,7 @@ import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 
 import Step1BasicInfo from './components/Step1BasicInfo';
+// Os próximos passos continuam comentados
 // import Step2ContentStructure from './components/Step2ContentStructure';
 // import Step3AdditionalSettings from './components/Step3AdditionalSettings';
 // import Step4ReviewPublish from './components/Step4ReviewPublish';
@@ -52,7 +53,6 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
       aiModelUsed: '',
       generatedAt: '',
       lastGenerationRevision: '',
-      // Inicializa prerequisites como um array vazio para evitar o erro de 'join'
       prerequisites: [], 
     };
 
@@ -138,7 +138,8 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
         delete dataToSend.mainImage;
       }
 
-      const response = await axios.post('/api/courses', dataToSend, {
+      // Alterado para desestruturar 'data' diretamente, evitando o aviso de 'response' não utilizado
+      const { data } = await axios.post('/api/courses', dataToSend, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,

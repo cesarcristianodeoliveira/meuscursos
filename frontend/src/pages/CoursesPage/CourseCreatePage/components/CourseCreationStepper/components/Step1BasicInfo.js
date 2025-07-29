@@ -74,7 +74,8 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
   }, [formData.aiModelUsed, updateFormData, onShowAlert]);
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    // Removido 'type' da desestruturação, pois não é utilizado
+    const { name, value, checked } = e.target; 
 
     if (name === 'title') {
       const newSlug = slugify(value);
@@ -300,7 +301,6 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
       <TextField
         label="Pré-requisitos (separados por vírgula)"
         name="prerequisites"
-        // Correção: Garante que formData.prerequisites seja um array antes de chamar .join()
         value={(formData.prerequisites || []).join(', ')}
         onChange={(e) => updateFormData({ prerequisites: e.target.value.split(',').map(item => item.trim()) })}
         fullWidth
