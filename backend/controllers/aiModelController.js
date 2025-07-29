@@ -9,7 +9,7 @@ export const getAvailableAIModels = (req, res) => { // Removido 'async' e 'async
     const aiModels = [
         {
             id: 'gemini-1.5-flash',
-            name: 'Gemini 1.5 Flash',
+            name: 'Gemini',
             description: 'Modelo rápido e eficiente do Google Gemini.',
             provider: 'Google',
             default: true // Indica que este é o modelo padrão para a v0.1

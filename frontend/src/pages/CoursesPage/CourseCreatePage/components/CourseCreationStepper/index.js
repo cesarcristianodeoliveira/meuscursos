@@ -19,7 +19,7 @@ import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 
 import Step1AIModelSelection from './components/Step1AIModelSelection';
-import Step2BasicInfo from './components/Step2BasicInfo';
+import Step2LevelSelection from './components/Step2LevelSelection'; 
 // import Step3AdditionalSettings from './components/Step3AdditionalSettings';
 // import Step4ReviewPublish from './components/Step4ReviewPublish';
 
@@ -28,6 +28,10 @@ const stepsData = [
   {
     label: 'Selecione o Modelo de IA',
     description: 'Selecione o modelo de inteligência artificial para gerar o conteúdo do curso.',
+  },
+  {
+    label: 'Nível de Dificuldade',
+    description: 'Escolha o nível de dificuldade do curso.',
   },
   {
     label: 'Informações Básicas',
@@ -58,7 +62,7 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
       category: { _ref: '', _type: 'reference' },
       subCategory: { _ref: '', _type: 'reference' },
       courseTags: [],
-      level: 'beginner',
+      level: '',
       estimatedDuration: 0,
       language: 'pt',
       status: 'draft',
@@ -109,11 +113,7 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
       case 0: 
         return <Step1AIModelSelection formData={formData} updateFormData={updateFormData} onShowAlert={onShowPageAlert} />;
       case 1:
-        return <Step2BasicInfo formData={formData} updateFormData={updateFormData} onShowAlert={onShowPageAlert} />;
-      // case 2:
-      //   return <Step3AdditionalSettings formData={formData} updateFormData={updateFormData} onShowAlert={onShowPageAlert} />;
-      // case 3:
-      //   return <Step4ReviewPublish formData={formData} onShowAlert={onShowPageAlert} />;
+        return <Step2LevelSelection formData={formData} updateFormData={updateFormData} onShowAlert={onShowPageAlert} />;
       default:
         return (
             <Box sx={{ p: 3, textAlign: 'center' }}>
@@ -130,6 +130,11 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
       onShowPageAlert('Por favor, selecione um modelo de IA para continuar.', 'error');
       return; 
     }
+    if (activeStep === 1 && !formData.level) {
+      onShowPageAlert('Por favor, selecione o nível de dificuldade do curso para continuar.', 'error');
+      return;
+    }
+
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
   };
 
@@ -184,7 +189,10 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       <Paper elevation={3} sx={{ p: 4, position: 'relative' }}>
-        {/* Título do passo atual */}
+        <Typography variant="h4" gutterBottom align="center">
+          Criar Novo Curso
+        </Typography>
+        
         <Paper
           square
           elevation={0}
@@ -194,21 +202,19 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
             height: 50,
             pl: 2,
             bgcolor: 'background.default',
-            justifyContent: 'center', // Garante que o rótulo do passo esteja centralizado
+            justifyContent: 'center',
             mb: 2,
           }}
         >
           <Typography variant="h6">{stepsData[activeStep].label}</Typography>
         </Paper>
 
-        {/* Conteúdo do passo atual */}
         <Box sx={{ minHeight: '200px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
           {getStepContent(activeStep)}
         </Box>
         
-        {/* MobileStepper para navegação */}
         <MobileStepper
-          variant="text" // Mantém o variant="text" para o rótulo do passo
+          variant="text"
           steps={maxSteps}
           position="static"
           activeStep={activeStep}
@@ -220,7 +226,8 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
               disabled={
                 loading ||
                 (activeStep === maxSteps - 1) ||
-                (activeStep === 0 && !formData.aiModelUsed) // Desabilita se no passo 0 e sem modelo de IA
+                (activeStep === 0 && !formData.aiModelUsed) ||
+                (activeStep === 1 && !formData.level)
               }
             >
               {loading && activeStep === maxSteps - 1 ? <CircularProgress size={24} /> : (activeStep === maxSteps - 1 ? 'Publicar Curso' : 'Próximo')}
@@ -232,7 +239,6 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
             </Button>
           }
           backButton={
-            // Renderiza um Box invisível com a mesma largura do botão "Próximo" para manter a centralização
             <Box sx={{ width: '80px', visibility: activeStep === 0 ? 'hidden' : 'visible' }}>
               <Button size="small" onClick={handleBack} disabled={loading || activeStep === 0}>
                 {theme.direction === 'rtl' ? (
@@ -245,7 +251,6 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
             </Box>
           }
         />
-        {/* Overlay de loading geral */}
         {loading && (
           <Box sx={{ 
             position: 'absolute', 

@@ -41,6 +41,8 @@ const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert }) => {
         const fetchedModels = response.data.models;
         setAiModels(fetchedModels);
 
+        // Define o modelo padrão APENAS se nenhum estiver selecionado NO FORM DATA
+        // E se houver modelos disponíveis.
         if (!formData.aiModelUsed && fetchedModels.length > 0) {
           const defaultModel = fetchedModels.find(m => m.default) || fetchedModels[0];
           if (defaultModel) {
@@ -86,7 +88,8 @@ const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert }) => {
           labelId="ai-model-label"
           id="ai-model-select"
           name="aiModelUsed"
-          value={formData.aiModelUsed || ''}
+          // AQUI ESTÁ A MUDANÇA: Verifica se o valor do formData existe nas opções disponíveis
+          value={aiModels.some(model => model.id === formData.aiModelUsed) ? formData.aiModelUsed : ''}
           label="Modelo de IA para Geração de Conteúdo"
           onChange={handleChange}
           disabled={loadingAiModels || !userToken}

@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Container,
+  Typography,
   Box,
   Alert,
   CircularProgress,
@@ -32,6 +33,7 @@ function CourseCreatePage() {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
+        <Typography variant="h6" sx={{ ml: 2 }}>Verificando autenticação...</Typography>
       </Box>
     );
   }

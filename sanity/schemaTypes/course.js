@@ -31,8 +31,8 @@ export default {
     {
       name: 'mainImage',
       title: 'Imagem Principal do Curso',
-      type: 'reference', // ALTERADO PARA REFERÊNCIA
-      to: [{ type: 'courseThumbnail' }], // REFERENCIA AO NOVO SCHEMA
+      type: 'reference',
+      to: [{ type: 'courseThumbnail' }],
       description: 'Uma imagem atraente para representar o curso.'
     },
     {
