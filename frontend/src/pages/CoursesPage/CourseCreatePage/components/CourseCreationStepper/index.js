@@ -1,6 +1,6 @@
 // D:\meuscursos\frontend\src\pages\CoursesPage\CourseCreatePage\components\CourseCreationStepper\index.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Importe useCallback
 import {
   Stepper,
   Step,
@@ -79,12 +79,16 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
     localStorage.setItem('courseCreationFormData', JSON.stringify(formData));
   }, [formData]);
 
-  const updateFormData = (stepData) => {
+  // Memoize updateFormData para evitar re-criação em cada render
+  const updateFormData = useCallback((stepData) => {
     setFormData((prevData) => ({
       ...prevData,
       ...stepData,
     }));
-  };
+  }, []); // Dependência vazia, pois setFormData é estável
+
+  // onShowPageAlert já deve ser estável se vier de um contexto ou useCallback no App.js
+  // Se não for, você precisaria envolvê-lo aqui também, mas por enquanto, vamos assumir que é.
 
   function getStepContent(step) {
     switch (step) {
@@ -137,7 +141,6 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
         delete dataToSend.mainImage;
       }
 
-      // Removido a desestruturação de 'data' se não for usada, ou use-a
       await axios.post('/api/courses', dataToSend, {
         headers: {
           'Content-Type': 'application/json',

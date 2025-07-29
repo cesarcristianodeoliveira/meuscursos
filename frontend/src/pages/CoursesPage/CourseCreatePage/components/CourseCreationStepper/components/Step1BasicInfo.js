@@ -26,13 +26,11 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
   const [aiModels, setAiModels] = useState([]);
   const [loadingAiModels, setLoadingAiModels] = useState(false);
   const [aiModelsError, setAiModelsError] = useState(null);
-  // NOVO ESTADO: Para controlar se o modelo de IA padrão já foi definido
-  const [hasDefaultAiModelBeenSet, setHasDefaultAiModelBeenSet] = useState(false);
 
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageUploadError, setImageUploadError] = useState(null);
 
-  // Efeito para carregar categorias do Sanity
+  // Efeito para carregar categorias do Sanity (executa uma vez)
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -50,9 +48,9 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
     };
 
     fetchCategories();
-  }, [onShowAlert]);
+  }, [onShowAlert]); // onShowAlert deve ser memoizado no componente pai
 
-  // Efeito para carregar modelos de IA disponíveis do backend
+  // Efeito para carregar modelos de IA disponíveis do backend (executa uma vez)
   useEffect(() => {
     const fetchAiModels = async () => {
       setLoadingAiModels(true);
@@ -64,16 +62,7 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
             Authorization: `Bearer ${token}`,
           },
         });
-        const fetchedModels = response.data.models;
-        setAiModels(fetchedModels);
-
-        // Define o modelo padrão APENAS se nenhum estiver selecionado, houver modelos,
-        // E AINDA NÃO TIVER SIDO DEFINIDO ANTERIORMENTE.
-        if (!hasDefaultAiModelBeenSet && fetchedModels.length > 0) {
-          const defaultModel = fetchedModels.find(m => m.default) || fetchedModels[0];
-          updateFormData(prevData => ({ ...prevData, aiModelUsed: defaultModel.id }));
-          setHasDefaultAiModelBeenSet(true); // Marca que o padrão foi definido
-        }
+        setAiModels(response.data.models);
       } catch (error) {
         console.error("Erro ao buscar modelos de IA:", error);
         setAiModelsError("Não foi possível carregar os modelos de IA.");
@@ -84,7 +73,21 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
     };
 
     fetchAiModels();
-  }, [updateFormData, onShowAlert, hasDefaultAiModelBeenSet]); // 'hasDefaultAiModelBeenSet' é agora uma dependência válida
+  }, [onShowAlert]); // onShowAlert deve ser memoizado no componente pai
+
+  // Efeito para definir o modelo de IA padrão (executa quando aiModels ou formData.aiModelUsed muda)
+  useEffect(() => {
+    // Só tenta definir o modelo padrão se:
+    // 1. Os modelos de IA foram carregados (aiModels.length > 0)
+    // 2. Não há um modelo de IA já selecionado no formData
+    if (aiModels.length > 0 && !formData.aiModelUsed) {
+      const defaultModel = aiModels.find(m => m.default) || aiModels[0];
+      if (defaultModel) {
+        updateFormData(prevData => ({ ...prevData, aiModelUsed: defaultModel.id }));
+      }
+    }
+  }, [aiModels, formData.aiModelUsed, updateFormData]); // updateFormData deve ser memoizado no componente pai
+
 
   const handleChange = (e) => {
     const { name, value, checked } = e.target; 
