@@ -26,18 +26,25 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
   const [aiModels, setAiModels] = useState([]);
   const [loadingAiModels, setLoadingAiModels] = useState(false);
   const [aiModelsError, setAiModelsError] = useState(null);
+  // NOVO ESTADO: Para controlar se o modelo de IA padrão já foi definido
+  const [hasDefaultAiModelBeenSet, setHasDefaultAiModelBeenSet] = useState(false);
 
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageUploadError, setImageUploadError] = useState(null);
 
+  // Efeito para carregar categorias do Sanity
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const query = `*[_type == "courseCategory"]{_id, title}`;
-        const fetchedCategories = await client.fetch(query);
-        setCategories(fetchedCategories);
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${API_BASE_URL}/api/categories`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setCategories(response.data.categories);
       } catch (error) {
-        console.error("Erro ao buscar categorias do Sanity:", error);
+        console.error("Erro ao buscar categorias do backend:", error);
         onShowAlert("Erro ao carregar categorias. Por favor, recarregue a página.", "error");
       }
     };
@@ -45,6 +52,7 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
     fetchCategories();
   }, [onShowAlert]);
 
+  // Efeito para carregar modelos de IA disponíveis do backend
   useEffect(() => {
     const fetchAiModels = async () => {
       setLoadingAiModels(true);
@@ -56,10 +64,15 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
             Authorization: `Bearer ${token}`,
           },
         });
-        setAiModels(response.data.models);
-        if (!formData.aiModelUsed && response.data.models.length > 0) {
-          const defaultModel = response.data.models.find(m => m.default) || response.data.models[0];
-          updateFormData({ aiModelUsed: defaultModel.id });
+        const fetchedModels = response.data.models;
+        setAiModels(fetchedModels);
+
+        // Define o modelo padrão APENAS se nenhum estiver selecionado, houver modelos,
+        // E AINDA NÃO TIVER SIDO DEFINIDO ANTERIORMENTE.
+        if (!hasDefaultAiModelBeenSet && fetchedModels.length > 0) {
+          const defaultModel = fetchedModels.find(m => m.default) || fetchedModels[0];
+          updateFormData(prevData => ({ ...prevData, aiModelUsed: defaultModel.id }));
+          setHasDefaultAiModelBeenSet(true); // Marca que o padrão foi definido
         }
       } catch (error) {
         console.error("Erro ao buscar modelos de IA:", error);
@@ -71,10 +84,9 @@ const Step1BasicInfo = ({ formData, updateFormData, onShowAlert }) => {
     };
 
     fetchAiModels();
-  }, [formData.aiModelUsed, updateFormData, onShowAlert]);
+  }, [updateFormData, onShowAlert, hasDefaultAiModelBeenSet]); // 'hasDefaultAiModelBeenSet' é agora uma dependência válida
 
   const handleChange = (e) => {
-    // Removido 'type' da desestruturação, pois não é utilizado
     const { name, value, checked } = e.target; 
 
     if (name === 'title') {

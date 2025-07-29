@@ -9,7 +9,6 @@ import {
   Typography,
   Box,
   CircularProgress,
-  // Removido: Alert não é usado diretamente neste componente
   Container,
   Paper,
 } from '@mui/material';
@@ -138,8 +137,8 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
         delete dataToSend.mainImage;
       }
 
-      // Alterado para desestruturar 'data' diretamente, evitando o aviso de 'response' não utilizado
-      const { data } = await axios.post('/api/courses', dataToSend, {
+      // Removido a desestruturação de 'data' se não for usada, ou use-a
+      await axios.post('/api/courses', dataToSend, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
