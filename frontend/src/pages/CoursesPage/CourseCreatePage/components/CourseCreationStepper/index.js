@@ -47,7 +47,8 @@ const stepsData = [
   },
 ];
 
-const CourseCreationStepper = ({ onShowPageAlert }) => {
+// Recebe a função para controlar o loading do componente pai
+const CourseCreationStepper = ({ onShowPageAlert, setLoadingProgress }) => { 
   const theme = useTheme();
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState(() => {
@@ -111,7 +112,12 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
   function getStepContent(step) {
     switch (step) {
       case 0: 
-        return <Step1AIModelSelection formData={formData} updateFormData={updateFormData} onShowAlert={onShowPageAlert} />;
+        return <Step1AIModelSelection 
+                 formData={formData} 
+                 updateFormData={updateFormData} 
+                 onShowAlert={onShowPageAlert} 
+                 setLoadingProgress={setLoadingProgress} 
+               />;
       case 1:
         return <Step2LevelSelection formData={formData} updateFormData={updateFormData} onShowAlert={onShowPageAlert} />;
       default:
@@ -187,7 +193,7 @@ const CourseCreationStepper = ({ onShowPageAlert }) => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="md" sx={{ mt: 4, mb: 4, position: 'relative' }}>
       <Paper elevation={3} sx={{ p: 4, position: 'relative' }}>
         <Typography variant="h4" gutterBottom align="center">
           Criar Novo Curso

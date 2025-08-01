@@ -8,17 +8,13 @@ import {
   InputLabel,
   Select,
   FormHelperText,
-  // LinearProgress, // Removido
 } from '@mui/material';
-// import LinearProgress from '@mui/material/LinearProgress'; // Removido
-import CircularProgress from '@mui/material/CircularProgress'; // Mantido para o MenuItem desabilitado
 import axios from 'axios';
 import { useAuth } from '../../../../../../contexts/AuthContext';
 
 const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
-// Recebe setLoadingStepSpecific via props
-const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert, setLoadingStepSpecific }) => {
+const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert, setLoadingProgress }) => {
   const [aiModels, setAiModels] = useState([]);
   const [aiModelsError, setAiModelsError] = useState(null);
 
@@ -32,7 +28,7 @@ const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert, setLoadi
         return;
       }
 
-      setLoadingStepSpecific(true); // Ativa o loading no componente pai
+      setLoadingProgress(true);
       setAiModelsError(null);
       try {
         const response = await axios.get(`${API_BASE_URL}/api/ai-models`, {
@@ -59,32 +55,33 @@ const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert, setLoadi
             onShowAlert("Erro ao carregar modelos de IA. Verifique sua conexão.", "error");
         }
       } finally {
-        setLoadingStepSpecific(false); // Desativa o loading no componente pai
+        setLoadingProgress(false);
       }
     };
 
-    fetchAiModels();
-  }, [userToken, updateFormData, formData.aiModelUsed, onShowAlert, setLoadingStepSpecific]); // Adiciona setLoadingStepSpecific como dependência
+    // A busca só acontece se a lista de modelos estiver vazia.
+    // Isso garante que a API não será chamada novamente ao voltar para este passo.
+    if (aiModels.length === 0) {
+      fetchAiModels();
+    }
+  }, [userToken, updateFormData, formData.aiModelUsed, onShowAlert, setLoadingProgress, aiModels.length]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target; 
+    const { name, value } = e.target;
     updateFormData({ [name]: value });
   };
 
   return (
-    <Box 
-      sx={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: 2, 
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
         alignItems: 'center',
         justifyContent: 'center',
         width: '100%',
-        // position: 'relative', // Não é mais necessário aqui
       }}
     >
-      {/* LinearProgress foi movido para o componente pai (CourseCreationStepper) */}
-
       <FormControl fullWidth required sx={{ maxWidth: 400 }}>
         <InputLabel id="ai-model-label">Modelo de IA para Geração de Conteúdo</InputLabel>
         <Select
@@ -94,16 +91,15 @@ const Step1AIModelSelection = ({ formData, updateFormData, onShowAlert, setLoadi
           value={aiModels.some(model => model.id === formData.aiModelUsed) ? formData.aiModelUsed : ''}
           label="Modelo de IA para Geração de Conteúdo"
           onChange={handleChange}
-          disabled={!userToken} // Desabilita apenas se não houver token, o loading é controlado pelo pai
-          sx={{ '& .MuiSelect-select': { width: '100%', py: 1.5, fontSize: '1.1rem' } }} 
+          disabled={!userToken}
+          sx={{ '& .MuiSelect-select': { width: '100%', py: 1.5, fontSize: '1.1rem' } }}
         >
-          {/* O CircularProgress dentro do MenuItem é para quando a lista de modelos está vazia ou com erro */}
           {aiModelsError ? (
             <MenuItem disabled>{aiModelsError}</MenuItem>
           ) : (
-            aiModels.length === 0 ? ( // Adicionado para exibir "Carregando modelos..." enquanto a lista está vazia
+            aiModels.length === 0 ? (
               <MenuItem disabled>
-                <CircularProgress size={20} sx={{ mr: 1 }} /> Carregando modelos...
+                Carregando modelos...
               </MenuItem>
             ) : (
               aiModels.map((model) => (
