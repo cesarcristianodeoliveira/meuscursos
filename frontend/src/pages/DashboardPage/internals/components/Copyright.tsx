@@ -1,6 +1,7 @@
 import * as React from 'react';
-import Link from '@mui/material/Link';
+import { Link } from 'react-router-dom';
 import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
 
 export default function Copyright(props: any) {
   return (
@@ -16,9 +17,9 @@ export default function Copyright(props: any) {
       ]}
     >
       {'Copyright © '}
-      <Link color="inherit" href="https://mui.com/">
-        Sitemark
-      </Link>{' '}
+      <Button variant='text' color="inherit" LinkComponent={Link} to="/">
+        Meus Cursos
+      </Button>{' '}
       {new Date().getFullYear()}
       {'.'}
     </Typography>

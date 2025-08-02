@@ -54,23 +54,23 @@ export default function AppAppBar() {
           <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', px: 0 }}>
             <Sitemark />
             <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
-              <Button variant="text" color="info" size="small">
-                Features
+              <Button LinkComponent={Link} to='/cursos' variant="text" color="info" size="small">
+                Cursos
               </Button>
-              <Button variant="text" color="info" size="small">
-                Testimonials
+              <Button LinkComponent={Link} to='/membros' variant="text" color="info" size="small">
+                Membros
               </Button>
-              <Button variant="text" color="info" size="small">
-                Highlights
+              <Button LinkComponent={Link} to='/grupos' variant="text" color="info" size="small">
+                Grupos
               </Button>
-              <Button variant="text" color="info" size="small">
-                Pricing
+              <Button LinkComponent={Link} to='/planos' variant="text" color="info" size="small">
+                Planos
               </Button>
-              <Button variant="text" color="info" size="small" sx={{ minWidth: 0 }}>
-                FAQ
-              </Button>
-              <Button variant="text" color="info" size="small" sx={{ minWidth: 0 }}>
+              <Button LinkComponent={Link} to='/blog' variant="text" color="info" size="small" sx={{ minWidth: 0 }}>
                 Blog
+              </Button>
+              <Button LinkComponent={Link} to='/sobre' variant="text" color="info" size="small" sx={{ minWidth: 0 }}>
+                Sobre
               </Button>
             </Box>
           </Box>
@@ -116,21 +116,21 @@ export default function AppAppBar() {
                   </IconButton>
                 </Box>
 
-                <MenuItem>Features</MenuItem>
-                <MenuItem>Testimonials</MenuItem>
-                <MenuItem>Highlights</MenuItem>
-                <MenuItem>Pricing</MenuItem>
-                <MenuItem>FAQ</MenuItem>
+                <MenuItem>Cursos</MenuItem>
+                <MenuItem>Membros</MenuItem>
+                <MenuItem>Grupos</MenuItem>
+                <MenuItem>Planos</MenuItem>
                 <MenuItem>Blog</MenuItem>
+                <MenuItem>Sobre</MenuItem>
                 <Divider sx={{ my: 3 }} />
                 <MenuItem>
                   <Button color="primary" variant="contained" fullWidth>
-                    Sign up
+                    Cadastrar
                   </Button>
                 </MenuItem>
                 <MenuItem>
                   <Button color="primary" variant="outlined" fullWidth>
-                    Sign in
+                    Entrar
                   </Button>
                 </MenuItem>
               </Box>
