@@ -1,0 +1,46 @@
+import express from 'express';
+import axios from 'axios';
+
+const router = express.Router();
+
+router.post('/assinar', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'E-mail é obrigatório.' });
+  }
+
+  const API_KEY = process.env.MAILCHIMP_API_KEY;
+  const LIST_ID = process.env.MAILCHIMP_LIST_ID;
+  const SERVER = process.env.MAILCHIMP_SERVER;
+
+  if (!API_KEY || !LIST_ID || !SERVER) {
+    return res.status(500).json({ message: 'Configuração do Mailchimp ausente no .env.' });
+  }
+
+  const url = `https://${SERVER}.api.mailchimp.com/3.0/lists/${LIST_ID}/members`;
+
+  try {
+    const response = await axios.post(
+      url,
+      {
+        email_address: email,
+        status: 'subscribed',
+      },
+      {
+        headers: {
+          Authorization: `apikey ${API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    return res.status(200).json({ message: 'Inscrição realizada com sucesso!' });
+  } catch (error) {
+    const errorMsg =
+      error?.response?.data?.detail || 'Erro ao se inscrever na lista do Mailchimp.';
+    return res.status(400).json({ message: errorMsg });
+  }
+});
+
+export default router;

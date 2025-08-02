@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
@@ -27,7 +28,7 @@ const StyledBox = styled('div')(({ theme }) => ({
     marginTop: theme.spacing(10),
     height: 700,
   },
-  ...theme.applyStyles('dark', {
+  ...theme.applyStyles?.('dark', {
     boxShadow: '0 0 24px 12px hsla(210, 100%, 25%, 0.2)',
     backgroundImage: `url(${process.env.TEMPLATE_IMAGE_URL || 'https://mui.com'}/static/screenshots/material-ui/getting-started/templates/dashboard-dark.jpg)`,
     outlineColor: 'hsla(220, 20%, 42%, 0.1)',
@@ -36,6 +37,40 @@ const StyledBox = styled('div')(({ theme }) => ({
 }));
 
 export default function Hero() {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState(null); // 'success' | 'error' | null
+  const [message, setMessage] = useState('');
+
+  const handleSubscribe = async () => {
+    if (!email || !email.includes('@')) {
+      setStatus('error');
+      setMessage('Por favor, insira um e-mail válido.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setStatus('success');
+        setMessage(data.message || 'Inscrição realizada com sucesso!');
+        setEmail('');
+      } else {
+        setStatus('error');
+        setMessage(data.message || 'Erro ao tentar se inscrever.');
+      }
+    } catch (err) {
+      setStatus('error');
+      setMessage('Erro na conexão com o servidor.');
+    }
+  };
+
   return (
     <Box
       id="hero"
@@ -44,7 +79,7 @@ export default function Hero() {
         backgroundRepeat: 'no-repeat',
         backgroundImage:
           'radial-gradient(ellipse 80% 50% at 50% -20%, hsl(210, 100%, 90%), transparent)',
-        ...theme.applyStyles('dark', {
+        ...theme.applyStyles?.('dark', {
           backgroundImage:
             'radial-gradient(ellipse 80% 50% at 50% -20%, hsl(210, 100%, 16%), transparent)',
         }),
@@ -80,7 +115,7 @@ export default function Hero() {
               sx={(theme) => ({
                 fontSize: 'inherit',
                 color: 'primary.main',
-                ...theme.applyStyles('dark', {
+                ...theme.applyStyles?.('dark', {
                   color: 'primary.light',
                 }),
               })}
@@ -88,6 +123,7 @@ export default function Hero() {
               Cursos
             </Typography>
           </Typography>
+
           <Typography
             sx={{
               textAlign: 'center',
@@ -95,10 +131,9 @@ export default function Hero() {
               width: { sm: '100%', md: '80%' },
             }}
           >
-            Explore our cutting-edge dashboard, delivering high-quality solutions
-            tailored to your needs. Elevate your experience with top-tier features
-            and services.
+            Explore nossos recursos de aprendizado e receba novidades no seu e-mail!
           </Typography>
+
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
             spacing={1}
@@ -113,33 +148,43 @@ export default function Hero() {
               hiddenLabel
               size="small"
               variant="outlined"
-              aria-label="Enter your email address"
-              placeholder="Your email address"
+              aria-label="Digite seu e-mail"
+              placeholder="Seu e-mail"
               fullWidth
-              slotProps={{
-                htmlInput: {
-                  autoComplete: 'off',
-                  'aria-label': 'Enter your email address',
-                },
-              }}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
             <Button
               variant="contained"
               color="primary"
               size="small"
+              onClick={handleSubscribe}
               sx={{ minWidth: 'fit-content' }}
             >
-              Start now
+              Assinar
             </Button>
           </Stack>
+
+          {status && (
+            <Typography
+              variant="body2"
+              sx={{
+                color: status === 'success' ? 'green' : 'error.main',
+                textAlign: 'center',
+              }}
+            >
+              {message}
+            </Typography>
+          )}
+
           <Typography
             variant="caption"
             color="text.secondary"
             sx={{ textAlign: 'center' }}
           >
-            By clicking &quot;Start now&quot; you agree to our&nbsp;
+            Ao clicar em &quot;Assinar&quot;, você concorda com nossos&nbsp;
             <Link href="#" color="primary">
-              Terms & Conditions
+              Termos e Condições
             </Link>
             .
           </Typography>
