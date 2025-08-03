@@ -46,7 +46,6 @@ export default function Hero() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
 
-  // Efeito para verificar o status da inscrição ao carregar o componente
   useEffect(() => {
     const checkSubscriptionStatus = async () => {
       const storedEmail = localStorage.getItem('subscribedEmail');
@@ -106,8 +105,8 @@ export default function Hero() {
       setIsSubscribed(true);
     } catch (err) {
       console.error('Erro na requisição Axios:', err);
-      // Checa se o erro da API do Mailchimp é sobre um membro já existente
-      if (err.response?.data?.title === 'Member Exists') {
+      // Checa se a mensagem de erro da API do Mailchimp é sobre um membro já existente
+      if (err.response?.data?.message?.includes('is already a list member.')) {
         setStatus('success');
         setMessage('Parece que você já está inscrito(a) em nossa newsletter!');
         localStorage.setItem('subscribedEmail', email);
