@@ -43,18 +43,47 @@ export default function Hero() {
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState(null); // 'success' | 'error' | null
   const [message, setMessage] = useState('');
-  // Novo estado para controlar se o usuário já se inscreveu
   const [isSubscribed, setIsSubscribed] = useState(false);
+  // Novo estado para controlar o loading da checagem inicial
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
 
-  // Efeito para verificar o localStorage na montagem do componente
+  // Efeito para verificar o status da inscrição na montagem do componente
   useEffect(() => {
-    const subscribedEmail = localStorage.getItem('subscribedEmail');
-    if (subscribedEmail) {
-      setEmail(subscribedEmail);
-      setIsSubscribed(true);
-      setMessage('Você já está inscrito(a) em nossa newsletter.');
-    }
-  }, []);
+    const checkSubscriptionStatus = async () => {
+      const storedEmail = localStorage.getItem('subscribedEmail');
+      if (!storedEmail) {
+        setIsCheckingStatus(false);
+        return;
+      }
+      
+      setEmail(storedEmail);
+      setIsCheckingStatus(true);
+      
+      try {
+        const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+        const apiUrl = `${backendUrl}/api/newsletter/subscribe-status?email=${storedEmail}`;
+        const response = await axios.get(apiUrl);
+        
+        if (response.data.isSubscribed) {
+          setIsSubscribed(true);
+          setMessage('Você já está inscrito(a) em nossa newsletter.');
+        } else {
+          // Se o e-mail não estiver mais na lista, remove do localStorage
+          localStorage.removeItem('subscribedEmail');
+          setEmail('');
+          setIsSubscribed(false);
+        }
+      } catch (err) {
+        console.error('Erro ao verificar status de inscrição:', err);
+        setMessage('Ocorreu um erro ao verificar sua inscrição. Por favor, tente novamente.');
+        setStatus('error');
+      } finally {
+        setIsCheckingStatus(false);
+      }
+    };
+
+    checkSubscriptionStatus();
+  }, []); // O array de dependências vazio garante que o efeito rode apenas uma vez na montagem
 
   const handleSubscribe = async () => {
     if (!email || !email.includes('@')) {
@@ -75,7 +104,6 @@ export default function Hero() {
 
       setStatus('success');
       setMessage('Obrigado por assinar! Em breve você receberá as novidades da comunidade.');
-      // Persiste o e-mail no localStorage em caso de sucesso
       localStorage.setItem('subscribedEmail', email);
       setIsSubscribed(true);
     } catch (err) {
@@ -83,13 +111,11 @@ export default function Hero() {
       setStatus('error');
       let errorMsg = err.response?.data?.message || 'Erro ao tentar se inscrever.';
       
-      // Traduz a mensagem de erro específica do Mailchimp
       if (errorMsg.includes('was permanently deleted')) {
         errorMsg = 'Este e-mail foi removido permanentemente da nossa lista. Por favor, assine novamente para se re-adicionar.';
       }
-
+      
       setMessage(errorMsg);
-      // O e-mail não é limpo para que o usuário possa corrigi-lo
     } finally {
       setIsLoading(false);
     }
@@ -107,7 +133,6 @@ export default function Hero() {
       await axios.delete(apiUrl, { data: { email } });
 
       setMessage('Sua assinatura foi cancelada com sucesso.');
-      // Remove o e-mail do localStorage
       localStorage.removeItem('subscribedEmail');
       setEmail('');
       setIsSubscribed(false);
@@ -121,7 +146,12 @@ export default function Hero() {
   };
 
   const renderContent = () => {
-    // Se o usuário já estiver inscrito, mostra a mensagem de sucesso e o botão de desinscrição
+    if (isCheckingStatus) {
+      return (
+        <CircularProgress />
+      );
+    }
+
     if (isSubscribed) {
       return (
         <Stack spacing={2} sx={{ alignItems: 'center', width: { xs: '100%', sm: '70%' } }}>
@@ -157,7 +187,6 @@ export default function Hero() {
       );
     }
 
-    // Se não estiver inscrito, mostra o formulário de inscrição
     return (
       <Stack
         spacing={2}
@@ -216,7 +245,7 @@ export default function Hero() {
             fullWidth
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || isCheckingStatus}
             error={status === 'error'}
             helperText={status === 'error' ? message : ''}
           />
@@ -226,7 +255,7 @@ export default function Hero() {
             size="small"
             onClick={handleSubscribe}
             sx={{ minWidth: 'fit-content' }}
-            disabled={isLoading || !email}
+            disabled={isLoading || isCheckingStatus || !email}
           >
             {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Assinar'}
           </Button>
