@@ -100,21 +100,20 @@ export default function Hero() {
       
       await axios.post(apiUrl, { email });
 
-      // Se a requisição for bem-sucedida
       setStatus('success');
       setMessage('Obrigado por assinar! Em breve você receberá as novidades da comunidade.');
       localStorage.setItem('subscribedEmail', email);
       setIsSubscribed(true);
     } catch (err) {
       console.error('Erro na requisição Axios:', err);
-      // Se o erro for "Member Exists" (membro já inscrito), tratamos como sucesso
+      // Checa se o erro da API do Mailchimp é sobre um membro já existente
       if (err.response?.data?.title === 'Member Exists') {
         setStatus('success');
         setMessage('Parece que você já está inscrito(a) em nossa newsletter!');
         localStorage.setItem('subscribedEmail', email);
         setIsSubscribed(true);
       } else {
-        // Para outros tipos de erro, mostramos a mensagem padrão
+        // Para outros tipos de erro, mostra a mensagem padrão
         setStatus('error');
         let errorMsg = err.response?.data?.message || 'Erro ao tentar se inscrever.';
         
