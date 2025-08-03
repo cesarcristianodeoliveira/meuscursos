@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
 import InputLabel from '@mui/material/InputLabel';
 import Link from '@mui/material/Link';
@@ -10,7 +11,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import visuallyHidden from '@mui/utils/visuallyHidden';
 import { styled } from '@mui/material/styles';
-import axios from 'axios'; // Importa o axios
+import axios from 'axios';
 
 const StyledBox = styled('div')(({ theme }) => ({
   alignSelf: 'center',
@@ -39,33 +40,159 @@ const StyledBox = styled('div')(({ theme }) => ({
 
 export default function Hero() {
   const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState(null); // 'success' | 'error' | null
   const [message, setMessage] = useState('');
 
   const handleSubscribe = async () => {
+    // Validação de e-mail básica antes de enviar
     if (!email || !email.includes('@')) {
-      setStatus('error');
       setMessage('Por favor, insira um e-mail válido.');
+      setStatus('error');
       return;
     }
 
+    setIsLoading(true);
+    setMessage('');
+    setStatus(null);
+
     try {
-      // Constrói a URL completa usando a variável de ambiente
       const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
       const apiUrl = `${backendUrl}/api/newsletter/subscribe`;
       
-      const response = await axios.post(apiUrl, { email });
+      // A variável 'response' não é mais declarada para evitar o aviso do ESLint
+      await axios.post(apiUrl, { email });
 
-      // O Axios retorna o data diretamente no objeto de resposta
       setStatus('success');
-      setMessage(response.data.message || 'Inscrição realizada com sucesso!');
-      setEmail('');
+      // Mensagem de sucesso personalizada
+      setMessage('Obrigado por assinar! Em breve você receberá as novidades da comunidade.');
     } catch (err) {
       console.error('Erro na requisição Axios:', err);
       setStatus('error');
       // Trata o erro e pega a mensagem do backend ou uma mensagem padrão
       setMessage(err.response?.data?.message || 'Erro ao tentar se inscrever.');
+    } finally {
+      setIsLoading(false);
+      // Limpa o email apenas em caso de sucesso para que o usuário possa corrigir o erro
+      if (status === 'success') {
+          setEmail('');
+      }
     }
+  };
+
+  const renderContent = () => {
+    if (status === 'success') {
+      return (
+        <Stack spacing={2} sx={{ alignItems: 'center', width: { xs: '100%', sm: '70%' } }}>
+          <Typography
+            variant="h4"
+            sx={{
+              textAlign: 'center',
+              fontWeight: 'bold',
+              color: 'primary.main',
+            }}
+          >
+            Inscrição Realizada com Sucesso! 🎉
+          </Typography>
+          <Typography
+            sx={{
+              textAlign: 'center',
+              color: 'text.secondary',
+              width: { sm: '100%', md: '80%' },
+            }}
+          >
+            {message}
+          </Typography>
+        </Stack>
+      );
+    }
+
+    return (
+      <Stack
+        spacing={2}
+        useFlexGap
+        sx={{ alignItems: 'center', width: { xs: '100%', sm: '70%' } }}
+      >
+        <Typography
+          variant="h1"
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: 'center',
+            fontSize: 'clamp(3rem, 10vw, 3.5rem)',
+          }}
+        >
+          Comunidade&nbsp;de&nbsp;
+          <Typography
+            component="span"
+            variant="h1"
+            sx={(theme) => ({
+              fontSize: 'inherit',
+              color: 'primary.main',
+              ...theme.applyStyles?.('dark', {
+                color: 'primary.light',
+              }),
+            })}
+          >
+            Cursos
+          </Typography>
+        </Typography>
+        <Typography
+          sx={{
+            textAlign: 'center',
+            color: 'text.secondary',
+            width: { sm: '100%', md: '80%' },
+          }}
+        >
+          Explore nossos recursos de aprendizado e receba novidades no seu e-mail!
+        </Typography>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1}
+          useFlexGap
+          sx={{ pt: 2, width: { xs: '100%', sm: '350px' } }}
+        >
+          <InputLabel htmlFor="email-hero" sx={visuallyHidden}>
+            Email
+          </InputLabel>
+          <TextField
+            id="email-hero"
+            hiddenLabel
+            size="small"
+            variant="outlined"
+            aria-label="Digite seu e-mail"
+            placeholder="Seu e-mail"
+            fullWidth
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={isLoading}
+            error={status === 'error'}
+            helperText={status === 'error' ? message : ''}
+          />
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
+            onClick={handleSubscribe}
+            sx={{ minWidth: 'fit-content' }}
+            disabled={isLoading || !email}
+          >
+            {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Assinar'}
+          </Button>
+        </Stack>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ textAlign: 'center' }}
+        >
+          Ao clicar em &quot;Assinar&quot;, você concorda com nossos&nbsp;
+          <Link href="#" color="primary">
+            Termos e Condições
+          </Link>
+          .
+        </Typography>
+      </Stack>
+    );
   };
 
   return (
@@ -91,101 +218,7 @@ export default function Hero() {
           pb: { xs: 8, sm: 12 },
         }}
       >
-        <Stack
-          spacing={2}
-          useFlexGap
-          sx={{ alignItems: 'center', width: { xs: '100%', sm: '70%' } }}
-        >
-          <Typography
-            variant="h1"
-            sx={{
-              display: 'flex',
-              flexDirection: { xs: 'column', sm: 'row' },
-              alignItems: 'center',
-              fontSize: 'clamp(3rem, 10vw, 3.5rem)',
-            }}
-          >
-            Comunidade&nbsp;de&nbsp;
-            <Typography
-              component="span"
-              variant="h1"
-              sx={(theme) => ({
-                fontSize: 'inherit',
-                color: 'primary.main',
-                ...theme.applyStyles?.('dark', {
-                  color: 'primary.light',
-                }),
-              })}
-            >
-              Cursos
-            </Typography>
-          </Typography>
-
-          <Typography
-            sx={{
-              textAlign: 'center',
-              color: 'text.secondary',
-              width: { sm: '100%', md: '80%' },
-            }}
-          >
-            Explore nossos recursos de aprendizado e receba novidades no seu e-mail!
-          </Typography>
-
-          <Stack
-            direction={{ xs: 'column', sm: 'row' }}
-            spacing={1}
-            useFlexGap
-            sx={{ pt: 2, width: { xs: '100%', sm: '350px' } }}
-          >
-            <InputLabel htmlFor="email-hero" sx={visuallyHidden}>
-              Email
-            </InputLabel>
-            <TextField
-              id="email-hero"
-              hiddenLabel
-              size="small"
-              variant="outlined"
-              aria-label="Digite seu e-mail"
-              placeholder="Seu e-mail"
-              fullWidth
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <Button
-              variant="contained"
-              color="primary"
-              size="small"
-              onClick={handleSubscribe}
-              sx={{ minWidth: 'fit-content' }}
-            >
-              Assinar
-            </Button>
-          </Stack>
-
-          {status && (
-            <Typography
-              variant="body2"
-              sx={{
-                color: status === 'success' ? 'green' : 'error.main',
-                textAlign: 'center',
-              }}
-            >
-              {message}
-            </Typography>
-          )}
-
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ textAlign: 'center' }}
-          >
-            Ao clicar em &quot;Assinar&quot;, você concorda com nossos&nbsp;
-            <Link href="#" color="primary">
-              Termos e Condições
-            </Link>
-            .
-          </Typography>
-        </Stack>
+        {renderContent()}
         <StyledBox id="image" />
       </Container>
     </Box>
