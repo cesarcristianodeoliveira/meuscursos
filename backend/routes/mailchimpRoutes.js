@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const router = express.Router();
 
-router.post('/assinar', async (req, res) => {
+router.post('/subscribe', async (req, res) => {
   const { email } = req.body;
 
   if (!email) {

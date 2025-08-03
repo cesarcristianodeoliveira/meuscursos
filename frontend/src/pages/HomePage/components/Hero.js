@@ -10,6 +10,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import visuallyHidden from '@mui/utils/visuallyHidden';
 import { styled } from '@mui/material/styles';
+import axios from 'axios'; // Importa o axios
 
 const StyledBox = styled('div')(({ theme }) => ({
   alignSelf: 'center',
@@ -49,25 +50,21 @@ export default function Hero() {
     }
 
     try {
-      const response = await fetch('/api/newsletter/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
+      // Constrói a URL completa usando a variável de ambiente
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+      const apiUrl = `${backendUrl}/api/newsletter/subscribe`;
+      
+      const response = await axios.post(apiUrl, { email });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setStatus('success');
-        setMessage(data.message || 'Inscrição realizada com sucesso!');
-        setEmail('');
-      } else {
-        setStatus('error');
-        setMessage(data.message || 'Erro ao tentar se inscrever.');
-      }
+      // O Axios retorna o data diretamente no objeto de resposta
+      setStatus('success');
+      setMessage(response.data.message || 'Inscrição realizada com sucesso!');
+      setEmail('');
     } catch (err) {
+      console.error('Erro na requisição Axios:', err);
       setStatus('error');
-      setMessage('Erro na conexão com o servidor.');
+      // Trata o erro e pega a mensagem do backend ou uma mensagem padrão
+      setMessage(err.response?.data?.message || 'Erro ao tentar se inscrever.');
     }
   };
 

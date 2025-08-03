@@ -85,5 +85,5 @@ app.listen(PORT, () => {
   console.log('GET  /api/ai-models');
   console.log('GET  /api/protected');
   console.log('GET  /api/admin');
-  console.log('POST /api/newsletter/assinar ✅');
+  console.log('POST /api/newsletter/subscribe');
 });
