@@ -44,10 +44,9 @@ export default function Hero() {
   const [status, setStatus] = useState(null); // 'success' | 'error' | null
   const [message, setMessage] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);
-  // Novo estado para controlar o loading da checagem inicial
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
 
-  // Efeito para verificar o status da inscrição na montagem do componente
+  // Efeito para verificar o status da inscrição ao carregar o componente
   useEffect(() => {
     const checkSubscriptionStatus = async () => {
       const storedEmail = localStorage.getItem('subscribedEmail');
@@ -68,7 +67,6 @@ export default function Hero() {
           setIsSubscribed(true);
           setMessage('Você já está inscrito(a) em nossa newsletter.');
         } else {
-          // Se o e-mail não estiver mais na lista, remove do localStorage
           localStorage.removeItem('subscribedEmail');
           setEmail('');
           setIsSubscribed(false);
@@ -83,7 +81,7 @@ export default function Hero() {
     };
 
     checkSubscriptionStatus();
-  }, []); // O array de dependências vazio garante que o efeito rode apenas uma vez na montagem
+  }, []);
 
   const handleSubscribe = async () => {
     if (!email || !email.includes('@')) {
@@ -102,20 +100,29 @@ export default function Hero() {
       
       await axios.post(apiUrl, { email });
 
+      // Se a requisição for bem-sucedida
       setStatus('success');
       setMessage('Obrigado por assinar! Em breve você receberá as novidades da comunidade.');
       localStorage.setItem('subscribedEmail', email);
       setIsSubscribed(true);
     } catch (err) {
       console.error('Erro na requisição Axios:', err);
-      setStatus('error');
-      let errorMsg = err.response?.data?.message || 'Erro ao tentar se inscrever.';
-      
-      if (errorMsg.includes('was permanently deleted')) {
-        errorMsg = 'Este e-mail foi removido permanentemente da nossa lista. Por favor, assine novamente para se re-adicionar.';
+      // Se o erro for "Member Exists" (membro já inscrito), tratamos como sucesso
+      if (err.response?.data?.title === 'Member Exists') {
+        setStatus('success');
+        setMessage('Parece que você já está inscrito(a) em nossa newsletter!');
+        localStorage.setItem('subscribedEmail', email);
+        setIsSubscribed(true);
+      } else {
+        // Para outros tipos de erro, mostramos a mensagem padrão
+        setStatus('error');
+        let errorMsg = err.response?.data?.message || 'Erro ao tentar se inscrever.';
+        
+        if (errorMsg.includes('was permanently deleted')) {
+          errorMsg = 'Este e-mail foi removido permanentemente da nossa lista. Por favor, assine novamente para se re-adicionar.';
+        }
+        setMessage(errorMsg);
       }
-      
-      setMessage(errorMsg);
     } finally {
       setIsLoading(false);
     }
