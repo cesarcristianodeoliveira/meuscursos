@@ -86,4 +86,5 @@ app.listen(PORT, () => {
   console.log('GET  /api/protected');
   console.log('GET  /api/admin');
   console.log('POST /api/newsletter/subscribe');
+  console.log('DELETE /api/newsletter/subscribe');
 });

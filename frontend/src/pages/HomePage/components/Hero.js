@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -43,9 +43,20 @@ export default function Hero() {
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState(null); // 'success' | 'error' | null
   const [message, setMessage] = useState('');
+  // Novo estado para controlar se o usuário já se inscreveu
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
+  // Efeito para verificar o localStorage na montagem do componente
+  useEffect(() => {
+    const subscribedEmail = localStorage.getItem('subscribedEmail');
+    if (subscribedEmail) {
+      setEmail(subscribedEmail);
+      setIsSubscribed(true);
+      setMessage('Você já está inscrito(a) em nossa newsletter.');
+    }
+  }, []);
 
   const handleSubscribe = async () => {
-    // Validação de e-mail básica antes de enviar
     if (!email || !email.includes('@')) {
       setMessage('Por favor, insira um e-mail válido.');
       setStatus('error');
@@ -60,28 +71,58 @@ export default function Hero() {
       const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
       const apiUrl = `${backendUrl}/api/newsletter/subscribe`;
       
-      // A variável 'response' não é mais declarada para evitar o aviso do ESLint
       await axios.post(apiUrl, { email });
 
       setStatus('success');
-      // Mensagem de sucesso personalizada
       setMessage('Obrigado por assinar! Em breve você receberá as novidades da comunidade.');
+      // Persiste o e-mail no localStorage em caso de sucesso
+      localStorage.setItem('subscribedEmail', email);
+      setIsSubscribed(true);
     } catch (err) {
       console.error('Erro na requisição Axios:', err);
       setStatus('error');
-      // Trata o erro e pega a mensagem do backend ou uma mensagem padrão
-      setMessage(err.response?.data?.message || 'Erro ao tentar se inscrever.');
+      let errorMsg = err.response?.data?.message || 'Erro ao tentar se inscrever.';
+      
+      // Traduz a mensagem de erro específica do Mailchimp
+      if (errorMsg.includes('was permanently deleted')) {
+        errorMsg = 'Este e-mail foi removido permanentemente da nossa lista. Por favor, assine novamente para se re-adicionar.';
+      }
+
+      setMessage(errorMsg);
+      // O e-mail não é limpo para que o usuário possa corrigi-lo
     } finally {
       setIsLoading(false);
-      // Limpa o email apenas em caso de sucesso para que o usuário possa corrigir o erro
-      if (status === 'success') {
-          setEmail('');
-      }
+    }
+  };
+
+  const handleUnsubscribe = async () => {
+    setIsLoading(true);
+    setMessage('');
+    setStatus(null);
+
+    try {
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+      const apiUrl = `${backendUrl}/api/newsletter/subscribe`;
+      
+      await axios.delete(apiUrl, { data: { email } });
+
+      setMessage('Sua assinatura foi cancelada com sucesso.');
+      // Remove o e-mail do localStorage
+      localStorage.removeItem('subscribedEmail');
+      setEmail('');
+      setIsSubscribed(false);
+    } catch (err) {
+      console.error('Erro ao cancelar assinatura:', err);
+      setMessage(err.response?.data?.message || 'Erro ao cancelar sua assinatura.');
+      setStatus('error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const renderContent = () => {
-    if (status === 'success') {
+    // Se o usuário já estiver inscrito, mostra a mensagem de sucesso e o botão de desinscrição
+    if (isSubscribed) {
       return (
         <Stack spacing={2} sx={{ alignItems: 'center', width: { xs: '100%', sm: '70%' } }}>
           <Typography
@@ -92,7 +133,7 @@ export default function Hero() {
               color: 'primary.main',
             }}
           >
-            Inscrição Realizada com Sucesso! 🎉
+            Inscrição Realizada! 🎉
           </Typography>
           <Typography
             sx={{
@@ -103,10 +144,20 @@ export default function Hero() {
           >
             {message}
           </Typography>
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={handleUnsubscribe}
+            disabled={isLoading}
+            sx={{ minWidth: 'fit-content' }}
+          >
+            {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Cancelar Assinatura'}
+          </Button>
         </Stack>
       );
     }
 
+    // Se não estiver inscrito, mostra o formulário de inscrição
     return (
       <Stack
         spacing={2}
