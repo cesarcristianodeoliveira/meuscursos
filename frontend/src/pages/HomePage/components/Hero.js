@@ -104,7 +104,6 @@ export default function Hero() {
       localStorage.setItem('subscribedEmail', email);
       setIsSubscribed(true);
     } catch (err) {
-      console.error('Erro na requisição Axios:', err);
       // Checa se a mensagem de erro da API do Mailchimp é sobre um membro já existente
       if (err.response?.data?.message?.includes('is already a list member.')) {
         setStatus('success');
@@ -112,7 +111,8 @@ export default function Hero() {
         localStorage.setItem('subscribedEmail', email);
         setIsSubscribed(true);
       } else {
-        // Para outros tipos de erro, mostra a mensagem padrão
+        // Para outros tipos de erro, mostra a mensagem padrão e loga o erro no console
+        console.error('Erro na requisição Axios:', err);
         setStatus('error');
         let errorMsg = err.response?.data?.message || 'Erro ao tentar se inscrever.';
         
