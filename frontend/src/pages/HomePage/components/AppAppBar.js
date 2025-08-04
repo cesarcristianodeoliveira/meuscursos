@@ -43,7 +43,6 @@ export default function AppAppBar() {
       position="fixed"
       enableColorOnDark
       sx={{
-        boxShadow: 0,
         bgcolor: 'transparent',
         backgroundImage: 'none',
         mt: 'calc(var(--template-frame-height, 0px) + 28px)',
@@ -81,11 +80,11 @@ export default function AppAppBar() {
               alignItems: 'center',
             }}
           >
-            <Button LinkComponent={Link} to='/entrar' color="primary" variant="text" size="small">
-              Entrar
-            </Button>
-            <Button LinkComponent={Link} to='/cadastrar' color="primary" variant="contained" size="small">
+            <Button LinkComponent={Link} to='/cadastrar' color="primary" variant="text" size="small">
               Cadastrar
+            </Button>
+            <Button LinkComponent={Link} to='/entrar' color="primary" variant="contained" size="small">
+              Entrar
             </Button>
             <ColorModeIconDropdown />
           </Box>
