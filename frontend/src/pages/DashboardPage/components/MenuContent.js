@@ -11,7 +11,7 @@ import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 // import HelpRoundedIcon from '@mui/icons-material/HelpRounded';
 
 const mainListItems = [
-  { text: 'Painel', icon: <HomeRoundedIcon /> },
+  { text: 'Início', icon: <HomeRoundedIcon /> },
 ];
 
 // const secondaryListItems = [
