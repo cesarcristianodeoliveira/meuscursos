@@ -163,6 +163,9 @@ export default function RegisterPage() {
     }
   };
 
+  const currentYear = new Date().getFullYear(); // Obtém o ano atual dinamicamente
+  const projectName = "Meus Cursos"; // Nome do projeto
+
   return (
     <SignUpContainer direction="column" justifyContent="center">
       <Card variant="outlined">
@@ -295,6 +298,13 @@ export default function RegisterPage() {
           </Link>
         </Typography>
       </Card>
+      <Typography variant="body2" color="text.secondary" align="center">
+        <Link color="inherit" component={RouterLink} to="/">
+          {projectName}
+        </Link>
+        {' '}©{' '}
+        {currentYear}
+      </Typography>
     </SignUpContainer>
   );
 }
