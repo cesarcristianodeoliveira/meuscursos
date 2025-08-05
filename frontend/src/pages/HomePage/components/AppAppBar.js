@@ -27,7 +27,8 @@ const StyledToolbar = styled(Toolbar)(({ theme }) => ({
   backgroundColor: theme.vars
     ? `rgba(${theme.vars.palette.background.defaultChannel} / 0.4)`
     : alpha(theme.palette.background.default, 0.4),
-  boxShadow: (theme.vars || theme).shadows[1],
+  // Aumentado o nível da sombra para torná-la mais visível
+  boxShadow: (theme.vars || theme).shadows[4], // Alterado de shadows[1] para shadows[4]
   padding: '8px 12px',
 }));
 
@@ -43,6 +44,7 @@ export default function AppAppBar() {
       position="fixed"
       enableColorOnDark
       sx={{
+        boxShadow: 0, // Mantém a AppBar principal sem sombra, focando na StyledToolbar
         bgcolor: 'transparent',
         backgroundImage: 'none',
         mt: 'calc(var(--template-frame-height, 0px) + 28px)',

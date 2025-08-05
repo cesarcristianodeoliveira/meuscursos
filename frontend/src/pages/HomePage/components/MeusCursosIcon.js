@@ -1,7 +1,7 @@
 import * as React from 'react';
 import SvgIcon from '@mui/material/SvgIcon';
 
-export default function SitemarkIcon() {
+export default function MeusCursosIcon() {
   return (
     <SvgIcon sx={{ height: 21, width: 21, mr: 1 }}>
       <svg

@@ -120,7 +120,7 @@ export default function Hero() {
               width: { sm: '100%', md: '80%' },
             }}
           >
-            Meus Cursos é uma Comunidade de Cursos gerados por Inteligência Artificial.<br /> 
+            Meus Cursos é uma Comunidade de Cursos por Inteligência Artificial.<br /> 
             Estude sem limites, ou crie para que mais pessoas aprendam.
           </Typography>
 
@@ -131,7 +131,7 @@ export default function Hero() {
             sx={{ pt: 2, width: { xs: '100%', sm: '256px' } }}
           >
             <Button
-              variant="contained" // Alterado para contained para ser o botão principal
+              variant="text"
               color="primary"
               size="large"
               onClick={handleRegisterClick}
@@ -140,7 +140,7 @@ export default function Hero() {
               Cadastrar
             </Button>
             <Button
-              variant="outlined" // Alterado para outlined para ser o botão secundário
+              variant="contained"
               color="primary"
               size="large"
               onClick={handleLoginClick}
@@ -157,16 +157,16 @@ export default function Hero() {
             useFlexGap
             sx={{ justifyContent: 'center', flexWrap: 'wrap' }}
           >
-            <Link component="button" variant="caption" color="text.secondary" onClick={handleAboutClick} sx={{ cursor: 'pointer' }}>
+            <Link component="button" variant="caption" color="primary" onClick={handleAboutClick} sx={{ cursor: 'pointer' }}>
               Sobre
             </Link>
-            <Link component="button" variant="caption" color="text.secondary" onClick={handleTermsClick} sx={{ cursor: 'pointer' }}>
+            <Link component="button" variant="caption" color="primary" onClick={handleTermsClick} sx={{ cursor: 'pointer' }}>
               Termos
             </Link>
-            <Link component="button" variant="caption" color="text.secondary" onClick={handlePrivacyClick} sx={{ cursor: 'pointer' }}>
+            <Link component="button" variant="caption" color="primary" onClick={handlePrivacyClick} sx={{ cursor: 'pointer' }}>
               Privacidade
             </Link>
-            <Link component="button" variant="caption" color="text.secondary" onClick={handleContactClick} sx={{ cursor: 'pointer' }}>
+            <Link component="button" variant="caption" color="primary" onClick={handleContactClick} sx={{ cursor: 'pointer' }}>
               Contato
             </Link>
           </Stack>

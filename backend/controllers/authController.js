@@ -49,7 +49,7 @@ export const register = async (req, res) => {
 
     // 1. Validação básica das informações de entrada
     if (!name || !email || !password) {
-        return res.status(400).json({ message: 'Por favor, preencha nome, email e senha.' });
+        return res.status(400).json({ message: 'Por favor, preencha nome, e-mail e senha.' });
     }
 
     // --- VALIDAÇÃO DE SENHA: EXATAMENTE 6 DÍGITOS NUMÉRICOS ---
@@ -68,7 +68,7 @@ export const register = async (req, res) => {
 
         if (existingMember) {
             // Se o email já existe, retorna um erro de conflito
-            return res.status(409).json({ message: 'Este email já está cadastrado.' });
+            return res.status(409).json({ message: 'E-mail já está cadastrado.' });
         }
 
         // 3. Hashear (criptografar) a senha antes de salvar
@@ -144,7 +144,7 @@ export const login = async (req, res) => {
 
     // 1. Validação básica das informações de entrada
     if (!email || !password) {
-        return res.status(400).json({ message: 'Por favor, preencha email e senha.' });
+        return res.status(400).json({ message: 'Por favor, preencha e-mail e senha.' });
     }
 
     try {
