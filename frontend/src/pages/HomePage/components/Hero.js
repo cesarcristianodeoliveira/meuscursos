@@ -2,7 +2,7 @@ import * as React from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
-import Link from '@mui/material/Link';
+// import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { styled } from '@mui/material/styles';
@@ -45,21 +45,21 @@ export default function Hero() {
   };
 
   // Funções de navegação para os novos links
-  const handleAboutClick = () => {
-    navigate('/sobre');
-  };
+  // const handleAboutClick = () => {
+  //   navigate('/sobre');
+  // };
 
-  const handleTermsClick = () => {
-    navigate('/termos');
-  };
+  // const handleTermsClick = () => {
+  //   navigate('/termos');
+  // };
 
-  const handlePrivacyClick = () => {
-    navigate('/privacidade');
-  };
+  // const handlePrivacyClick = () => {
+  //   navigate('/privacidade');
+  // };
 
-  const handleContactClick = () => {
-    navigate('/contato');
-  };
+  // const handleContactClick = () => {
+  //   navigate('/contato');
+  // };
 
   return (
     <Box
@@ -151,7 +151,7 @@ export default function Hero() {
           </Stack>
 
           {/* Novos Links Importantes */}
-          <Stack
+          {/* <Stack
             direction="row"
             spacing={2}
             useFlexGap
@@ -169,7 +169,7 @@ export default function Hero() {
             <Link component="button" variant="caption" color="primary" onClick={handleContactClick} sx={{ cursor: 'pointer' }}>
               Contato
             </Link>
-          </Stack>
+          </Stack> */}
         </Stack>
         <StyledBox id="image" />
       </Container>
