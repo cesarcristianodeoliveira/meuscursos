@@ -173,6 +173,11 @@ export default function SignInCard() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             color={passwordError ? 'error' : 'primary'}
+            inputProps={{
+              inputMode: 'numeric',
+              pattern: '[0-9]*',
+              maxLength: 6,
+            }}
           />
         </FormControl>
 
