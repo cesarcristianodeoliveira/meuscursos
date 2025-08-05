@@ -294,7 +294,7 @@ export default function RegisterPage() {
             variant="body2" 
             sx={{ alignSelf: 'center', cursor: 'pointer' }}
           >
-            Faça login aqui.
+            Entrar
           </Link>
         </Typography>
       </Card>

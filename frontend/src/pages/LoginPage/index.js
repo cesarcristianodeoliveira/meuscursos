@@ -1,167 +1,64 @@
 // D:\meuscursos\frontend\src\pages\LoginPage\index.js
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import * as React from 'react';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Link from '@mui/material/Link';
+import { styled } from '@mui/material/styles';
+import { Link as RouterLink } from 'react-router-dom';
 
-// Importa componentes do Material-UI
-import {
-  Container,
-  Box,
-  Typography,
-  TextField,
-  Button,
-  Alert,
-  CircularProgress,
-  Link as MuiLink 
-} from '@mui/material';
+// Importa os componentes criados
+import SignInCard from './components/SignInCard';
+import Content from './components/Content';
 
-// Importa o hook useAuth do seu AuthContext
-import { useAuth } from '../../contexts/AuthContext'; 
+// Styled Container para a página inteira, com o fundo gradiente
+const SignInContainer = styled(Stack)(({ theme }) => ({
+  justifyContent: 'center',
+  minHeight: '100dvh',
+  position: 'relative',
+  '&::before': {
+    content: '""',
+    display: 'block',
+    position: 'absolute',
+    zIndex: -1,
+    inset: 0,
+    backgroundImage:
+      'radial-gradient(ellipse at 50% 50%, hsl(210, 100%, 97%), hsl(0, 0%, 100%))',
+    backgroundRepeat: 'no-repeat',
+    ...theme.applyStyles?.('dark', {
+      backgroundImage:
+        'radial-gradient(at 50% 50%, hsla(210, 100%, 16%, 0.5), hsl(220, 30%, 5%))',
+    }),
+  },
+}));
 
-const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState(null); // Para mensagens de sucesso
-  const [loading, setLoading] = useState(false);
-
-  const navigate = useNavigate();
-  const location = useLocation(); // Hook para acessar o estado da navegação
-  const { login, isAuthenticated } = useAuth(); // Pega a função 'login' e o estado 'isAuthenticated' do seu AuthContext
-
-  // Efeito para exibir mensagens de sucesso que vêm de outras páginas (ex: após registro)
-  useEffect(() => {
-    if (location.state && location.state.message) {
-      setSuccessMessage(location.state.message);
-      // Limpa o estado da localização para que a mensagem não reapareça em recargas de página
-      navigate(location.pathname, { replace: true, state: {} }); 
-    }
-  }, [location, navigate]); // Dependências: location e navigate para evitar warnings
-
-  // Efeito para redirecionar se o usuário já estiver autenticado
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/'); // Redireciona se já estiver logado
-    }
-  }, [isAuthenticated, navigate]); // Dependências: isAuthenticated e navigate
-
-  const handleSubmit = async (e) => {
-    e.preventDefault(); 
-
-    setError(null);         // Limpa erros anteriores
-    setSuccessMessage(null); // Limpa mensagens de sucesso anteriores
-    setLoading(true);       // Ativa o estado de carregamento
-
-    try {
-      // Chama a função 'login' do AuthContext em vez de fazer o fetch diretamente
-      const result = await login(email, password); 
-
-      if (result.success) {
-        setSuccessMessage(result.message || 'Login realizado com sucesso!');
-        // O redirecionamento já será tratado pelo useEffect acima
-        // que observa isAuthenticated, que é atualizado pelo AuthContext.
-        // Não precisamos de setTimeout aqui, o useEffect faz o trabalho.
-      } else {
-        // Exibe a mensagem de erro vinda do AuthContext/backend
-        setError(result.message);
-      }
-    } catch (err) {
-      console.error('Erro ao processar login:', err);
-      // Erro inesperado, talvez problema de rede
-      setError('Ocorreu um erro inesperado. Tente novamente.');
-    } finally {
-      setLoading(false); // Desativa o estado de carregamento
-    }
-  };
+export default function LoginPage() {
+  const currentYear = new Date().getFullYear();
+  const projectName = "Meus Cursos";
 
   return (
-    <Container component="main" maxWidth="xs" sx={{ mt: 8, mb: 4 }}>
-      <Box
+    <SignInContainer direction="column" component="main">
+      <Stack
+        direction={{ xs: 'column-reverse', md: 'row' }} // Conteúdo e formulário lado a lado no desktop, empilhados no mobile
         sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          backgroundColor: 'background.paper',
-          p: 4,
-          borderRadius: 2,
-          boxShadow: 3,
+          justifyContent: 'center',
+          gap: { xs: 6, sm: 12 },
+          p: { xs: 2, sm: 4 }, // Padding responsivo para o Stack interno
+          mx: 'auto', // Centraliza o Stack interno
         }}
       >
-        <Typography component="h1" variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>
-          Entrar na Sua Conta
-        </Typography>
+        <Content /> {/* O lado do conteúdo */}
+        <SignInCard /> {/* O card de login */}
+      </Stack>
 
-        {/* Exibe mensagem de sucesso se houver */}
-        {successMessage && (
-          <Alert severity="success" sx={{ mt: 2, mb: 1 }}>
-            {successMessage}
-          </Alert>
-        )}
-        {/* Exibe mensagem de erro se houver */}
-        {error && (
-          <Alert severity="error" sx={{ mt: 2, mb: 1 }}>
-            {error}
-          </Alert>
-        )}
-
-        <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, width: '100%' }}>
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            id="email"
-            label="Email"
-            name="email"
-            autoComplete="email"
-            autoFocus
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            name="password"
-            label="Senha"
-            type="password"
-            id="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            // Adicionado inputProps para o teclado numérico e limite de caracteres
-            inputProps={{
-              inputMode: 'numeric',
-              pattern: '[0-9]*',
-              maxLength: 6,
-            }}
-          />
-          
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            sx={{ mt: 3, mb: 2, py: 1.5 }}
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={24} color="inherit" /> : 'Entrar'}
-          </Button>
-          <Box sx={{ textAlign: 'center', mt: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              Não tem uma conta?{' '}
-              <MuiLink 
-                component="button" 
-                variant="body2" 
-                onClick={() => navigate('/cadastrar')} // Corrigido para /cadastrar
-                sx={{ cursor: 'pointer' }}
-              >
-                Crie uma aqui.
-              </MuiLink>
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-    </Container>
+      {/* Copyright adicionado abaixo do Stack principal, dentro do SignInContainer */}
+      <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 2, mb: 2 }}>
+        <Link color="inherit" component={RouterLink} to="/">
+          {projectName}
+        </Link>
+        {' '}©{' '}
+        {currentYear}
+      </Typography>
+    </SignInContainer>
   );
-};
-
-export default LoginPage;
+}
