@@ -58,21 +58,6 @@ export default function AppAppBar() {
               <Button LinkComponent={Link} to='/cursos' variant="text" color="info" size="small">
                 Cursos
               </Button>
-              <Button LinkComponent={Link} to='/membros' variant="text" color="info" size="small">
-                Membros
-              </Button>
-              <Button LinkComponent={Link} to='/grupos' variant="text" color="info" size="small">
-                Grupos
-              </Button>
-              <Button LinkComponent={Link} to='/planos' variant="text" color="info" size="small">
-                Planos
-              </Button>
-              <Button LinkComponent={Link} to='/blog' variant="text" color="info" size="small" sx={{ minWidth: 0 }}>
-                Blog
-              </Button>
-              <Button LinkComponent={Link} to='/sobre' variant="text" color="info" size="small" sx={{ minWidth: 0 }}>
-                Sobre
-              </Button>
             </Box>
           </Box>
           <Box
@@ -118,11 +103,6 @@ export default function AppAppBar() {
                 </Box>
 
                 <MenuItem>Cursos</MenuItem>
-                <MenuItem>Membros</MenuItem>
-                <MenuItem>Grupos</MenuItem>
-                <MenuItem>Planos</MenuItem>
-                <MenuItem>Blog</MenuItem>
-                <MenuItem>Sobre</MenuItem>
                 <Divider sx={{ my: 3 }} />
                 <MenuItem>
                   <Button color="primary" variant="contained" fullWidth>
