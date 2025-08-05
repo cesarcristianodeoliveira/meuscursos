@@ -12,27 +12,17 @@ import { useNavigate } from 'react-router-dom';
 import CourseCreationStepper from './components/CourseCreationStepper';
 import { useAuth } from '../../../contexts/AuthContext';
 import { alpha } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
 import Stack from '@mui/material/Stack';
+
+// Componentes do Dashboard (AppNavbar e SideMenu)
 import AppNavbar from '../../DashboardPage/components/AppNavbar';
 import Header from '../../DashboardPage/components/Header';
 import SideMenu from '../../DashboardPage/components/SideMenu';
-import AppTheme from '../../../theme';
-import {
-  chartsCustomizations,
-  dataGridCustomizations,
-  datePickersCustomizations,
-  treeViewCustomizations,
-} from '../../../theme/customizations';
 
-const xThemeComponents = {
-  ...chartsCustomizations,
-  ...dataGridCustomizations,
-  ...datePickersCustomizations,
-  ...treeViewCustomizations,
-};
+// Removidas as importações de AppTheme, CssBaseline e customizations,
+// pois são gerenciadas globalmente no App.js.
 
-export default function CourseCreatePage(props) {
+export default function CourseCreatePage() {
   const [pageAlert, setPageAlert] = useState({ message: null, severity: null });
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -66,65 +56,72 @@ export default function CourseCreatePage(props) {
   }
 
   return (
-    <AppTheme {...props} themeComponents={xThemeComponents}>
-      <CssBaseline enableColorScheme />
-      <Box sx={{ display: 'flex' }}>
-        <SideMenu />
-        <AppNavbar />
-        {/* Main content */}
-        <Box
-          component="main"
-          sx={(theme) => ({
-            flexGrow: 1,
-            backgroundColor: theme.vars
-              ? `rgba(${theme.vars.palette.background.defaultChannel} / 1)`
-              : alpha(theme.palette.background.default, 1),
-            overflow: 'auto',
-          })}
+    // O AppTheme e CssBaseline são aplicados no App.js, então não precisamos deles aqui.
+    <Box sx={{ display: 'flex' }}> {/* Container flexível raiz, como no DashboardPage */}
+      <SideMenu /> {/* SideMenu, provavelmente com position: fixed ou similar */}
+      <AppNavbar /> {/* AppNavbar, provavelmente com position: fixed ou similar */}
+      
+      {/* Main content - Replicando a estrutura do DashboardPage */}
+      <Box
+        component="main"
+        sx={(theme) => ({
+          flexGrow: 1, // Ocupa o espaço restante
+          backgroundColor: theme.vars
+            ? `rgba(${theme.vars.palette.background.defaultChannel} / 1)`
+            : alpha(theme.palette.background.default, 1),
+          overflow: 'auto', // Permite rolagem do conteúdo principal
+          // O padding para compensar AppNavbar e SideMenu é tratado pelo mt do Stack interno
+          // e pelo design dos componentes AppNavbar/SideMenu em si.
+        })}
+      >
+        <Stack
+          spacing={2}
+          sx={{
+            alignItems: 'center', // Centraliza o conteúdo horizontalmente
+            mx: 3, // Margem horizontal
+            pb: 5, // Padding inferior, como no DashboardPage
+            mt: { xs: 8, md: 0 }, // Margem superior para compensar a AppNavbar no mobile
+          }}
         >
-          <Stack
-            spacing={2}
-            sx={{
-              alignItems: 'center',
-              mx: 3,
-            }}
-          >
-            <Header />
+          <Header />
 
-            {/* Container para a barra de progresso, com altura fixa para evitar "salto" */}
+          {/* LinearProgress posicionado dentro do Stack, com sticky para fixar ao rolar */}
+          {loadingProgress && (
             <Box
               sx={{
                 width: '100%',
-                height: loadingProgress ? '4px' : '0px', // Altura do LinearProgress, ajuste se necessário
-                position: 'relative',
+                // A altura do Box é 4px para o LinearProgress.
+                // Não precisa de 'position: relative' aqui se o LinearProgress é sticky ao Stack.
+                // Apenas garante que o espaço seja reservado.
+                height: '4px', 
               }}
             >
-              {loadingProgress && (
-                <LinearProgress
-                  sx={{
-                    position: 'sticky', // Use 'sticky' para fixar ao rolar a página
-                    top: 0, // Ancorado ao topo do contêiner
-                    zIndex: 1500,
-                  }}
-                />
-              )}
+              <LinearProgress
+                sx={{
+                  position: 'sticky', // Fixa ao topo do contêiner pai (Stack) ao rolar
+                  top: 0, // Ancorado ao topo do Stack
+                  zIndex: 1500, // Garante que esteja acima de outros conteúdos
+                }}
+              />
             </Box>
+          )}
 
-            {/* Exibe o alerta se houver uma mensagem */}
-            {pageAlert.message && (
-              <Container maxWidth="md">
-                <Alert severity={pageAlert.severity} onClose={() => setPageAlert({ message: null, severity: null })}>
-                  {pageAlert.message}
-                </Alert>
-              </Container>
-            )}
-            <CourseCreationStepper 
-              onShowPageAlert={handleShowPageAlert}
-              setLoadingProgress={setLoadingProgress} 
-            />
-          </Stack>
-        </Box>
+          {/* Exibe o alerta se houver uma mensagem */}
+          {pageAlert.message && (
+            <Container maxWidth="md">
+              <Alert severity={pageAlert.severity} onClose={() => setPageAlert({ message: null, severity: null })}>
+                {pageAlert.message}
+              </Alert>
+            </Container>
+          )}
+
+          {/* O Stepper de criação de curso, no lugar do MainGrid */}
+          <CourseCreationStepper 
+            onShowPageAlert={handleShowPageAlert}
+            setLoadingProgress={setLoadingProgress} 
+          />
+        </Stack>
       </Box>
-    </AppTheme>
+    </Box>
   );
 }
