@@ -3,13 +3,14 @@ import { styled } from '@mui/material/styles';
 import Avatar from '@mui/material/Avatar';
 import MuiDrawer, { drawerClasses } from '@mui/material/Drawer';
 import Box from '@mui/material/Box';
-import Divider from '@mui/material/Divider';
+// import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import SelectContent from './SelectContent';
+// import SelectContent from './SelectContent';
 import MenuContent from './MenuContent';
-import CardAlert from './CardAlert';
+// import CardAlert from './CardAlert';
 import OptionsMenu from './OptionsMenu';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const drawerWidth = 240;
 
@@ -25,6 +26,11 @@ const Drawer = styled(MuiDrawer)({
 });
 
 export default function SideMenu() {
+
+  const {
+    user
+  } = useAuth()
+
   return (
     <Drawer
       variant="permanent"
@@ -35,7 +41,7 @@ export default function SideMenu() {
         },
       }}
     >
-      <Box
+      {/* <Box
         sx={{
           display: 'flex',
           mt: 'calc(var(--template-frame-height, 0px) + 4px)',
@@ -44,7 +50,7 @@ export default function SideMenu() {
       >
         <SelectContent />
       </Box>
-      <Divider />
+      <Divider /> */}
       <Box
         sx={{
           overflow: 'auto',
@@ -54,7 +60,7 @@ export default function SideMenu() {
         }}
       >
         <MenuContent />
-        <CardAlert />
+        {/* <CardAlert /> */}
       </Box>
       <Stack
         direction="row"
@@ -68,17 +74,26 @@ export default function SideMenu() {
       >
         <Avatar
           sizes="small"
-          alt="Riley Carter"
-          src="/static/images/avatar/7.jpg"
+          alt={user.name}
           sx={{ width: 36, height: 36 }}
         />
         <Box sx={{ mr: 'auto' }}>
           <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: '16px' }}>
-            Riley Carter
+            {user.name}
           </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            riley@email.com
-          </Typography>
+          <Box sx={{ display: 'grid', width: '100%' }}>
+            <Typography 
+              noWrap // Este prop já faz o trabalho!
+              variant="caption" 
+              sx={{ 
+                display: 'block', 
+                width: '100%', 
+                color: 'text.secondary' 
+              }}
+            >
+              {user.email}
+            </Typography>
+          </Box>
         </Box>
         <OptionsMenu />
       </Stack>

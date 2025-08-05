@@ -10,9 +10,15 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
 import MenuButton from './MenuButton';
 import MenuContent from './MenuContent';
-import CardAlert from './CardAlert';
+// import CardAlert from './CardAlert';
+import { useAuth } from '../../../contexts/AuthContext';
 
 function SideMenuMobile({ open, toggleDrawer }) {
+
+  const {
+    user
+  } = useAuth()
+
   return (
     <Drawer
       anchor="right"
@@ -39,12 +45,11 @@ function SideMenuMobile({ open, toggleDrawer }) {
           >
             <Avatar
               sizes="small"
-              alt="Riley Carter"
-              src="/static/images/avatar/7.jpg"
+              alt={user.name}
               sx={{ width: 24, height: 24 }}
             />
             <Typography component="p" variant="h6">
-              Riley Carter
+              {user.name}
             </Typography>
           </Stack>
           <MenuButton showBadge>
@@ -56,10 +61,10 @@ function SideMenuMobile({ open, toggleDrawer }) {
           <MenuContent />
           <Divider />
         </Stack>
-        <CardAlert />
+        {/* <CardAlert /> */}
         <Stack sx={{ p: 2 }}>
           <Button variant="outlined" fullWidth startIcon={<LogoutRoundedIcon />}>
-            Logout
+            Sair
           </Button>
         </Stack>
       </Stack>
