@@ -378,6 +378,7 @@ export default function RegisterPage() {
       >
         <Alert 
           icon={false} 
+          variant='outlined'
           // onClose={handleSnackbarClose} 
           severity={snackbarSeverity} 
           sx={{ width: '100%' }}

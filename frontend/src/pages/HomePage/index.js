@@ -10,7 +10,7 @@ import Hero from './components/Hero';               // Seção principal de dest
 // import Testimonials from './components/Testimonials'; // Depoimentos de usuários (alunos e criadores)
 // import Pricing from './components/Pricing';         // Planos de preços (se aplicável para criadores)
 // import FAQ from './components/FAQ';                 // Perguntas frequentes (para alunos e criadores)
-// import Footer from './components/Footer';           // Rodapé do site
+import Footer from './components/Footer';           // Rodapé do site
 
 // Componente principal da Página Inicial
 export default function HomePage() {
@@ -55,7 +55,7 @@ export default function HomePage() {
         {/* <Divider /> */}
         
         {/* Rodapé da página */}
-        {/* <Footer /> */}
+        <Footer />
       </div>
     </>
   );

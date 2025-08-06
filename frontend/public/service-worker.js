@@ -3,15 +3,8 @@ const urlsToCache = [
   '/', // A raiz do seu site
   '/index.html', // O arquivo HTML principal
   // Adicione aqui outros assets que seu aplicativo precisa para funcionar offline
-  // Por exemplo, seus ícones:
   '/logo192.png',
   '/logo512.png',
-  // Se você tiver um CSS principal ou JS que sempre carrega:
-  // '/static/css/main.css',
-  // '/static/js/bundle.js',
-  // AVISO: Caminhos como '/static/js/bundle.js' são específicos de como o seu build os nomeia.
-  // Você pode precisar verificar as URLs dos seus assets após o build para adicioná-los aqui.
-  // Para começar, apenas os HTML e ícones já são um bom ponto de partida.
 ];
 
 // O evento 'install' é disparado quando o Service Worker é instalado pela primeira vez.
@@ -51,7 +44,6 @@ self.addEventListener('fetch', (event) => {
         return fetch(event.request)
           .then((networkResponse) => {
             // Se a busca na rede for bem-sucedida, clona a resposta e a adiciona ao cache.
-            // Isso é útil para cachear novos recursos dinamicamente.
             if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
               const responseToCache = networkResponse.clone();
               caches.open(CACHE_NAME).then((cache) => {
@@ -63,7 +55,6 @@ self.addEventListener('fetch', (event) => {
           .catch((error) => {
             console.error('[Service Worker] Falha na busca de rede:', error);
             // Aqui você pode adicionar uma página offline fallback se quiser
-            // return caches.match('/offline.html');
           });
       })
   );
@@ -86,6 +77,8 @@ self.addEventListener('activate', (event) => {
         })
       );
     })
+    // Adicionamos o self.skipWaiting() para forçar a ativação imediata
+    .then(() => self.skipWaiting()) 
   );
   // Garante que o Service Worker assume o controle da página imediatamente após a ativação.
   event.waitUntil(self.clients.claim());
