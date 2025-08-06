@@ -1,17 +1,16 @@
 import * as React from 'react';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
+// import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import IconButton from '@mui/material/IconButton';
-import InputLabel from '@mui/material/InputLabel';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
+// import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import TwitterIcon from '@mui/icons-material/X';
-import MeusCursosIcon from './MeusCursosIcon';
+// import MeusCursosIcon from './MeusCursosIcon';
 import Copyright from '../../../components/Copyright'
 
 export default function Footer() {
@@ -26,7 +25,7 @@ export default function Footer() {
         textAlign: { sm: 'center', md: 'left' },
       }}
     >
-      <Box
+      {/* <Box
         sx={{
           display: 'flex',
           flexDirection: { xs: 'column', sm: 'row' },
@@ -50,7 +49,6 @@ export default function Footer() {
             <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
               Subscribe for weekly updates. No spams ever!
             </Typography>
-            <InputLabel htmlFor="email-newsletter">Email</InputLabel>
             <Stack direction="row" spacing={1} useFlexGap>
               <TextField
                 id="email-newsletter"
@@ -92,9 +90,6 @@ export default function Footer() {
             Cursos
           </Link>
           <Link color="text.secondary" variant="body2" href="#">
-            Grupos
-          </Link>
-          <Link color="text.secondary" variant="body2" href="#">
             Membros
           </Link>
         </Box>
@@ -110,6 +105,9 @@ export default function Footer() {
           </Typography>
           <Link color="text.secondary" variant="body2" href="#">
             Sobre
+          </Link>
+          <Link color="text.secondary" variant="body2" href="#">
+            Contato
           </Link>
         </Box>
         <Box
@@ -128,19 +126,17 @@ export default function Footer() {
           <Link color="text.secondary" variant="body2" href="#">
             Privacidade
           </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            Contato
-          </Link>
         </Box>
-      </Box>
+      </Box> */}
       <Box
         sx={{
+          alignItems: 'center',
           display: 'flex',
           justifyContent: 'space-between',
           pt: { xs: 4, sm: 8 },
           width: '100%',
-          borderTop: '1px solid',
-          borderColor: 'divider',
+          // borderTop: '1px solid',
+          // borderColor: 'divider',
         }}
       >
         <div>
