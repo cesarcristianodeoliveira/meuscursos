@@ -175,24 +175,28 @@ export default function RegisterPage() {
       if (result.success) {
         localStorage.setItem('isFirstLogin', 'true'); 
         showSnackbar(result.message || 'Cadastro realizado com sucesso!', 'success');
-        // Mantém loading true para exibir LinearProgress durante o setTimeout
+
+        // CORRIGIDO: Gerencia o loading e a navegação para permitir a transição do LinearProgress
+        // O LinearProgress ficará visível por 6 segundos (Snackbar) + 300ms (fade-out)
         setTimeout(() => {
-          navigate('/', { state: { message: result.message } });
-          // Não precisa setLoading(false) aqui, o componente será desmontado ao navegar.
-        }, 6000); 
+          setLoading(false); // Desativa o loading, o que fará o LinearProgress começar a transição
+          setTimeout(() => {
+            navigate('/', { state: { message: result.message } });
+          }, 300); // Pequeno atraso para a transição do LinearProgress ser visível
+        }, 6000); // Duração do Snackbar
       } else {
         showSnackbar(result.message, 'error');
-        setFieldsDisabled(false); // Reabilita campos em caso de erro
+        setFieldsDisabled(false);
         setLoading(false); // Para o LinearProgress e reabilita o botão em caso de erro
       }
     } catch (err) {
       console.error('Erro ao processar registro:', err);
       showSnackbar('Ocorreu um erro inesperado. Tente novamente.', 'error');
-      setFieldsDisabled(false); // Reabilita campos em caso de erro
+      setFieldsDisabled(false);
       setLoading(false); // Para o LinearProgress e reabilita o botão em caso de erro
     }
     // REMOVIDO: O bloco 'finally' foi removido para controlar o 'loading' manualmente
-    // nos caminhos de sucesso e erro.
+    // nos caminhos de sucesso e erro, permitindo a transição.
   };
 
   const currentYear = new Date().getFullYear(); // Obtém o ano atual dinamicamente
@@ -208,7 +212,9 @@ export default function RegisterPage() {
             top: 0, 
             left: 0, 
             right: 0, 
-            zIndex: 9999 // Garante que fique acima de tudo
+            zIndex: 9999, // Garante que fique acima de tudo
+            transition: 'opacity 0.3s ease-out',
+            opacity: loading ? 1 : 0, // Controla a opacidade com o estado 'loading'
           }} 
         />
       )}
