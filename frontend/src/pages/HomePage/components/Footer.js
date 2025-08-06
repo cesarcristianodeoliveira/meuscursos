@@ -12,19 +12,7 @@ import GitHubIcon from '@mui/icons-material/GitHub';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import TwitterIcon from '@mui/icons-material/X';
 import MeusCursosIcon from './MeusCursosIcon';
-
-function Copyright() {
-  return (
-    <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
-      {'Copyright © '}
-      <Link color="text.secondary" href="/">
-        Meus Cursos
-      </Link>
-      &nbsp;
-      {new Date().getFullYear()}
-    </Typography>
-  );
-}
+import Copyright from '../../../components/Copyright'
 
 export default function Footer() {
   return (
@@ -78,7 +66,6 @@ export default function Footer() {
                     'aria-label': 'Enter your email address',
                   },
                 }}
-                sx={{ width: '250px' }}
               />
               <Button
                 variant="contained"
@@ -99,22 +86,16 @@ export default function Footer() {
           }}
         >
           <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-            Product
+            Comunidade
           </Typography>
           <Link color="text.secondary" variant="body2" href="#">
-            Features
+            Cursos
           </Link>
           <Link color="text.secondary" variant="body2" href="#">
-            Testimonials
+            Grupos
           </Link>
           <Link color="text.secondary" variant="body2" href="#">
-            Highlights
-          </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            Pricing
-          </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            FAQs
+            Membros
           </Link>
         </Box>
         <Box
@@ -125,16 +106,10 @@ export default function Footer() {
           }}
         >
           <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-            Company
+            Empresa
           </Typography>
           <Link color="text.secondary" variant="body2" href="#">
-            About us
-          </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            Careers
-          </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            Press
+            Sobre
           </Link>
         </Box>
         <Box
@@ -148,13 +123,13 @@ export default function Footer() {
             Legal
           </Typography>
           <Link color="text.secondary" variant="body2" href="#">
-            Terms
+            Termos
           </Link>
           <Link color="text.secondary" variant="body2" href="#">
-            Privacy
+            Privacidade
           </Link>
           <Link color="text.secondary" variant="body2" href="#">
-            Contact
+            Contato
           </Link>
         </Box>
       </Box>
@@ -170,15 +145,17 @@ export default function Footer() {
       >
         <div>
           <Link color="text.secondary" variant="body2" href="#">
-            Privacy Policy
+            Privacidade
           </Link>
           <Typography sx={{ display: 'inline', mx: 0.5, opacity: 0.5 }}>
             &nbsp;•&nbsp;
           </Typography>
           <Link color="text.secondary" variant="body2" href="#">
-            Terms of Service
+            Termos
           </Link>
-          <Copyright />
+          <Box sx={{ mt: 1 }}>
+            <Copyright />
+          </Box>
         </div>
         <Stack
           direction="row"

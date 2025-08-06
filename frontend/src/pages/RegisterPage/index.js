@@ -205,7 +205,7 @@ export default function RegisterPage() {
   return (
     <SignUpContainer direction="column" justifyContent="center">
       {/* LinearProgress fixo no topo da tela */}
-      {loading && (
+      {!loading && (
         <LinearProgress 
           sx={{ 
             position: 'fixed', 
@@ -214,7 +214,11 @@ export default function RegisterPage() {
             right: 0, 
             zIndex: 9999, // Garante que fique acima de tudo
             transition: 'opacity 0.3s ease-out',
-            opacity: loading ? 1 : 0, // Controla a opacidade com o estado 'loading'
+            opacity: !loading ? 1 : 0, // Controla a opacidade com o estado 'loading',
+            '&.MuiLinearProgress-root': {
+              borderRadius: '0',
+              height: '2px'
+            }
           }} 
         />
       )}
@@ -378,7 +382,6 @@ export default function RegisterPage() {
       >
         <Alert 
           icon={false} 
-          variant='outlined'
           // onClose={handleSnackbarClose} 
           severity={snackbarSeverity} 
           sx={{ width: '100%' }}
