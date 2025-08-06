@@ -93,25 +93,21 @@ export default function Hero() {
             variant="h1"
             sx={{
               display: 'flex',
-              flexDirection: { xs: 'column', sm: 'row' },
+              flexDirection: 'column',
               alignItems: 'center',
               fontSize: 'clamp(3rem, 10vw, 3.5rem)',
+              fontWeight: 'bold',
+              textAlign: 'center',
+              // Opção 1: Gradiente do claro para o escuro (Meus = claro, Cursos = escuro)
+              backgroundImage: (theme) =>
+                `linear-gradient(90deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.primary.dark} 100%)`,
+              WebkitBackgroundClip: 'text',
+              backgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              textFillColor: 'transparent',
             }}
           >
-            Meus&nbsp;
-            <Typography
-              component="span"
-              variant="h1"
-              sx={(theme) => ({
-                fontSize: 'inherit',
-                color: 'primary.main',
-                ...theme.applyStyles?.('dark', {
-                  color: 'primary.light',
-                }),
-              })}
-            >
-              Cursos
-            </Typography>
+            Meus Cursos
           </Typography>
           <Typography
             sx={{
