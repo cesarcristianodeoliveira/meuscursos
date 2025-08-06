@@ -1,6 +1,5 @@
 // D:\meuscursos\frontend\src\theme\customizations\feedback.js
 
-import { alpha } from '@mui/material/styles';
 // CORRIGIDO: Importe todas as cores necessárias da sua paleta
 import { gray, green, orange, red } from '../themePrimitives/colors'; 
 
@@ -9,13 +8,11 @@ export const feedbackCustomizations = {
   MuiAlert: {
     styleOverrides: {
       root: ({ theme }) => ({
-        borderRadius: 10,
         // REMOVIDO: backgroundColor e color do root.
         // Isso permite que as variantes (standardSuccess, etc.) definam suas próprias cores de fundo e texto.
         // A cor do texto principal do tema será aplicada por padrão, a menos que uma variante a sobrescreva.
         // backgroundColor: orange[100], // Removido
         color: (theme.vars || theme).palette.text.primary, // Mantém a cor do texto padrão
-        border: `1px solid ${alpha(gray[300], 0.5)}`, // Borda padrão para todos os alerts (usando gray)
         // REMOVIDO: Cor do ícone do root, pois cada severidade terá a sua
         // '& .MuiAlert-icon': {
         //   color: orange[500],
@@ -23,7 +20,6 @@ export const feedbackCustomizations = {
         ...theme.applyStyles('dark', {
           // REMOVIDO: backgroundColor e border do root no modo dark
           // backgroundColor: `${alpha(orange[900], 0.5)}`, // Removido
-          border: `1px solid ${alpha(gray[700], 0.5)}`, // Borda padrão para modo dark (usando gray)
         }),
       }),
       // ADICIONADO/CORRIGIDO: Estilos específicos para cada severidade
