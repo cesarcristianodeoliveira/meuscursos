@@ -159,10 +159,10 @@ export default function RegisterPage() {
     e.preventDefault();
 
     setSnackbarOpen(false);
-    
+
     const validationError = validateForm();
     if (validationError) {
-      showSnackbar(validationError, 'warning'); // Mensagens de validação do formulário: severidade 'warning'
+      showSnackbar(validationError, 'warning');
       return;
     }
 
@@ -174,21 +174,25 @@ export default function RegisterPage() {
 
       if (result.success) {
         localStorage.setItem('isFirstLogin', 'true'); 
-        showSnackbar(result.message || 'Cadastro realizado com sucesso!', 'success'); // Mensagem de sucesso do backend: severidade 'success' (verde)
+        showSnackbar(result.message || 'Cadastro realizado com sucesso!', 'success');
+        // Mantém loading true para exibir LinearProgress durante o setTimeout
         setTimeout(() => {
           navigate('/', { state: { message: result.message } });
-        }, 6000);
+          // Não precisa setLoading(false) aqui, o componente será desmontado ao navegar.
+        }, 6000); 
       } else {
-        showSnackbar(result.message, 'error'); // Mensagem de erro do backend: severidade 'error' (vermelho)
+        showSnackbar(result.message, 'error');
         setFieldsDisabled(false); // Reabilita campos em caso de erro
+        setLoading(false); // Para o LinearProgress e reabilita o botão em caso de erro
       }
     } catch (err) {
       console.error('Erro ao processar registro:', err);
-      showSnackbar('Ocorreu um erro inesperado. Tente novamente.', 'error'); // Mensagem de erro inesperado: severidade 'error' (vermelho)
+      showSnackbar('Ocorreu um erro inesperado. Tente novamente.', 'error');
       setFieldsDisabled(false); // Reabilita campos em caso de erro
-    } finally {
-      setLoading(false);
+      setLoading(false); // Para o LinearProgress e reabilita o botão em caso de erro
     }
+    // REMOVIDO: O bloco 'finally' foi removido para controlar o 'loading' manualmente
+    // nos caminhos de sucesso e erro.
   };
 
   const currentYear = new Date().getFullYear(); // Obtém o ano atual dinamicamente
@@ -317,7 +321,7 @@ export default function RegisterPage() {
             type="submit"
             fullWidth
             variant={loading || fieldsDisabled ? 'outlined' : 'contained'}
-            sx={{ py: 1.5 }}
+            sx={{ py: 1.5, transition: 'none' }}
             disabled={loading || fieldsDisabled}
           >
             Cadastrar
