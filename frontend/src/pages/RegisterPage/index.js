@@ -14,6 +14,9 @@ import Stack from '@mui/material/Stack';
 import MuiCard from '@mui/material/Card';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
+import Snackbar from '@mui/material/Snackbar';
+import Grid from '@mui/material/Grid'; // Adicionado: Importação do Grid
+
 import { styled } from '@mui/material/styles';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -71,7 +74,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
-  // Estados para mensagens de erro específicas por campo
+  // Estados para mensagens de erro específicas por campo (usados internamente para validar)
   const [nameError, setNameError] = useState(false);
   const [nameErrorMessage, setNameErrorMessage] = useState('');
   const [emailError, setEmailError] = useState(false);
@@ -81,83 +84,116 @@ export default function RegisterPage() {
   const [confirmPasswordError, setConfirmPasswordError] = useState(false);
   const [confirmPasswordErrorMessage, setConfirmPasswordErrorMessage] = useState('');
 
-  const [generalError, setGeneralError] = useState(null); // Para erros gerais da API
+  // Estados para Snackbar
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('info'); // 'success', 'error', 'warning', 'info'
+
   const [loading, setLoading] = useState(false);
+  const [fieldsDisabled, setFieldsDisabled] = useState(false); // Novo estado para desabilitar campos
 
   const navigate = useNavigate();
   const { register } = useAuth();
 
+  // Função para abrir o Snackbar
+  const showSnackbar = (message, severity) => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+
+  // Função para fechar o Snackbar
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbarOpen(false);
+  };
+
   // Função de validação para todos os campos
+  // Retorna a primeira mensagem de erro encontrada ou null se tudo for válido
   const validateForm = () => {
-    let isValid = true;
+    // Limpa todos os erros de campo antes de revalidar
+    setNameError(false); setNameErrorMessage('');
+    setEmailError(false); setEmailErrorMessage('');
+    setPasswordError(false); setPasswordErrorMessage('');
+    setConfirmPasswordError(false); setConfirmPasswordErrorMessage('');
 
     // Validação do Nome
     if (!name.trim()) {
       setNameError(true);
-      setNameErrorMessage('Por favor, insira seu nome completo.');
-      isValid = false;
-    } else {
-      setNameError(false);
-      setNameErrorMessage('');
+      return 'Por favor, insira seu nome completo.';
+    }
+    if (name.trim().length < 3) {
+      setNameError(true);
+      return 'O nome deve ter no mínimo 3 caracteres.';
+    }
+    if (name.trim().length > 80) {
+      setNameError(true);
+      return 'O nome deve ter no máximo 80 caracteres.';
     }
 
     // Validação do Email
     if (!email || !/\S+@\S+\.\S+/.test(email)) {
       setEmailError(true);
-      setEmailErrorMessage('Por favor, insira um e-mail válido.');
-      isValid = false;
-    } else {
-      setEmailError(false);
-      setEmailErrorMessage('');
+      return 'Por favor, insira um e-mail válido.';
     }
 
-    // Validação da Senha (exatamente 6 dígitos numéricos)
+    // Validação da Senha (exatamente 6 números)
     const passwordRegex = /^\d{6}$/;
     if (!passwordRegex.test(password)) {
       setPasswordError(true);
-      setPasswordErrorMessage('A senha deve conter exatamente 6 dígitos numéricos.');
-      isValid = false;
-    } else {
-      setPasswordError(false);
-      setPasswordErrorMessage('');
+      return 'A senha deve conter 6 números.';
     }
 
     // Validação da Confirmação de Senha
     if (password !== confirmPassword) {
       setConfirmPasswordError(true);
-      setConfirmPasswordErrorMessage('As senhas não coincidem!');
-      isValid = false;
-    } else {
-      setConfirmPasswordError(false);
-      setConfirmPasswordErrorMessage('');
+      return 'As senhas não coincidem!';
     }
 
-    return isValid;
+    return null; // Retorna null se não houver erros
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    setGeneralError(null); // Limpa erros gerais
+    // Limpa Snackbar antes de nova tentativa
+    setSnackbarOpen(false);
     
-    // Executa a validação do formulário antes de enviar
-    if (!validateForm()) {
+    // Executa a validação do formulário
+    const validationError = validateForm();
+    if (validationError) {
+      // Se houver um erro de validação, exibe com severidade 'warning'
+      showSnackbar(validationError, 'warning'); 
       return;
     }
 
     setLoading(true);
+    setFieldsDisabled(true); // Desabilita campos ao iniciar o processo
 
     try {
       const result = await register(name, email, password); 
 
       if (result.success) {
-        navigate('/entrar', { state: { message: result.message } });
+        // Marca o primeiro login para ser verificado na LoginPage
+        localStorage.setItem('isFirstLogin', 'true'); 
+        // Se sucesso, exibe com severidade 'success'
+        showSnackbar(result.message || 'Cadastro realizado com sucesso!', 'success');
+        // Mantém campos desabilitados e navega após o Snackbar se fechar
+        setTimeout(() => {
+          navigate('/entrar', { state: { message: result.message } });
+        }, 6000); // autoHideDuration do Snackbar
       } else {
-        setGeneralError(result.message);
+        // Se erro da API, exibe com severidade 'error'
+        showSnackbar(result.message, 'error');
+        setFieldsDisabled(false); // Reabilita campos em caso de erro
       }
     } catch (err) {
       console.error('Erro ao processar registro:', err);
-      setGeneralError('Ocorreu um erro inesperado. Tente novamente.');
+      // Se erro inesperado, exibe com severidade 'error'
+      showSnackbar('Ocorreu um erro inesperado. Tente novamente.', 'error');
+      setFieldsDisabled(false); // Reabilita campos em caso de erro
     } finally {
       setLoading(false);
     }
@@ -170,6 +206,7 @@ export default function RegisterPage() {
     <SignUpContainer direction="column" justifyContent="center">
       <Card variant="outlined">
         <Typography
+          align='center'
           component="h1"
           variant="h4"
           sx={{ width: '100%', fontSize: 'clamp(2rem, 10vw, 2.15rem)' }}
@@ -183,10 +220,8 @@ export default function RegisterPage() {
           sx={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 2 }}
         >
           {/* Campo Nome Completo */}
-          <FormControl>
+          <FormControl fullWidth>
             <TextField
-              error={nameError}
-              helperText={nameErrorMessage}
               id="name"
               type="text"
               name="name"
@@ -197,14 +232,13 @@ export default function RegisterPage() {
               variant="outlined"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              disabled={fieldsDisabled}
             />
           </FormControl>
 
           {/* Campo Email */}
-          <FormControl>
+          <FormControl fullWidth>
             <TextField
-              error={emailError}
-              helperText={emailErrorMessage}
               id="email"
               type="email"
               name="email"
@@ -215,96 +249,130 @@ export default function RegisterPage() {
               variant="outlined"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={fieldsDisabled}
             />
           </FormControl>
 
-          {/* Campo Senha */}
-          <FormControl>
-            <TextField
-              error={passwordError}
-              helperText={passwordErrorMessage}
-              name="password"
-              placeholder="Senha"
-              type="password"
-              id="password"
-              autoComplete="new-password"
-              required
-              fullWidth
-              variant="outlined"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              inputProps={{
-                inputMode: 'numeric',
-                pattern: '[0-9]*',
-                maxLength: 6,
-              }}
-            />
-          </FormControl>
-
-          {/* Campo Confirmar Senha */}
-          <FormControl>
-            <TextField
-              error={confirmPasswordError}
-              helperText={confirmPasswordErrorMessage}
-              name="confirmPassword"
-              placeholder="Confirmar Senha"
-              type="password"
-              id="confirmPassword"
-              autoComplete="new-password"
-              required
-              fullWidth
-              variant="outlined"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              inputProps={{
-                inputMode: 'numeric',
-                pattern: '[0-9]*',
-                maxLength: 6,
-              }}
-            />
-          </FormControl>
-
-          {/* Exibe o erro geral da API ou do formulário */}
-          {generalError && (
-            <Alert severity="error" icon={false} sx={{ textAlign: 'center', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {generalError}
-            </Alert>
-          )}
+          {/* Senha e Confirmar Senha usando Grid */}
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6 }}> {/* CORRIGIDO: Usando 'item' e 'xs', 'sm' */}
+              <FormControl fullWidth>
+                {/* REMOVIDO: FormLabel para Senha, conforme sua solicitação */}
+                <TextField
+                  name="password"
+                  placeholder="Senha"
+                  type="password"
+                  id="password"
+                  autoComplete="new-password"
+                  required
+                  fullWidth
+                  variant="outlined"
+                  value={password}
+                  // Adicionado: Filtra para aceitar apenas números
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, ''); // Remove tudo que não for dígito
+                    setPassword(value);
+                  }}
+                  inputProps={{
+                    inputMode: 'numeric',
+                    pattern: '[0-9]*',
+                    maxLength: 6,
+                  }}
+                  disabled={fieldsDisabled}
+                />
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}> {/* CORRIGIDO: Usando 'item' e 'xs', 'sm' */}
+              <FormControl fullWidth>
+                {/* REMOVIDO: FormLabel para Confirmar Senha, conforme sua solicitação */}
+                <TextField
+                  name="confirmPassword"
+                  placeholder="Confirmar Senha"
+                  type="password"
+                  id="confirmPassword"
+                  autoComplete="new-password"
+                  required
+                  fullWidth
+                  variant="outlined"
+                  value={confirmPassword}
+                  // Adicionado: Filtra para aceitar apenas números
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, ''); // Remove tudo que não for dígito
+                    setConfirmPassword(value);
+                  }}
+                  inputProps={{
+                    inputMode: 'numeric',
+                    pattern: '[0-9]*',
+                    maxLength: 6,
+                  }}
+                  disabled={fieldsDisabled}
+                />
+              </FormControl>
+            </Grid>
+          </Grid>
 
           <Button
             type="submit"
             fullWidth
-            variant="contained"
+            variant={loading ? 'outlined' : 'contained'} // Muda a variante do botão
             sx={{ py: 1.5 }}
-            disabled={loading}
+            disabled={loading || fieldsDisabled} // Desabilita o botão
           >
             {loading ? <CircularProgress size={24} color="inherit" /> : 'Cadastrar'}
           </Button>
-          
         </Box>
 
         <Divider>ou</Divider> {/* Divisor "ou" */}
 
-        {/* Botões de Login Social */}
-        <Typography sx={{ textAlign: 'center' }}>
-          Já tem uma conta?{' '}
-          <Link 
-            component={RouterLink}
-            to="/entrar"
-            variant="body2" 
-            sx={{ alignSelf: 'center', cursor: 'pointer' }}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* Botão "Entrar" com LinkComponent */}
+          <Button
+            fullWidth
+            variant="outlined"
+            LinkComponent={RouterLink}
+            to='/entrar'
+            disabled={fieldsDisabled}
           >
             Entrar
-          </Link>
+          </Button>
+        </Box>
+        {/* Copyright movido para DENTRO do Card, conforme sua última instrução */}
+        <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 2 }}>
+          <Link color="inherit" component={RouterLink} to="/">
+            {projectName}
+          </Link>{' '}©{' '}
+          {currentYear}
         </Typography>
+
+        <Box sx={{ display: 'none' }}>
+          {nameError}
+          {nameErrorMessage}
+          {emailError}
+          {emailErrorMessage}
+          {passwordError}
+          {passwordErrorMessage}
+          {confirmPasswordError}
+          {confirmPasswordErrorMessage}
+        </Box>
+
       </Card>
-      <Typography variant="body2" color="text.secondary" align="center">
-        <Link color="inherit" component={RouterLink} to="/">
-          {projectName}
-        </Link>
-        {' '}©{' '}
-        {currentYear}
-      </Typography>
+      
+      {/* Snackbar para exibir mensagens de alerta/erro/sucesso */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000} // 6 segundos
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Alert 
+          icon={false} 
+          // onClose={handleSnackbarClose} 
+          severity={snackbarSeverity} 
+          sx={{ width: '100%' }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </SignUpContainer>
   );
 }

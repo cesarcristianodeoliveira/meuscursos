@@ -78,8 +78,8 @@ export default {
       type: 'string',
       options: {
         list: [
-          { title: 'Free', value: 'Grátis' },
-          { title: 'Pro', value: 'Pro' },
+          { title: 'Grátis', value: 'free' },
+          { title: 'Pro', value: 'pro' },
         ],
         layout: 'radio',
       },
