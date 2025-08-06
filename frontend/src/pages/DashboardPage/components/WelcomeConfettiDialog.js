@@ -8,7 +8,7 @@
     import DialogContentText from '@mui/material/DialogContentText';
     import DialogActions from '@mui/material/DialogActions';
     import Button from '@mui/material/Button';
-    import useWindowSize from '../../../hooks/useWindowSize'; // Ajustado o caminho para o hook
+    import useWindowSize from '../hooks/useWindowSize'; // Ajustado o caminho para o hook
 
     /**
      * Componente WelcomeConfettiDialog
