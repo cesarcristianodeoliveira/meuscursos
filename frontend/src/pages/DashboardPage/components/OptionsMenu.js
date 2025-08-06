@@ -26,6 +26,7 @@ export default function OptionsMenu() {
     setAnchorEl(null);
   };
   const {
+    user,
     logout
   } = useAuth()
   return (
@@ -57,7 +58,8 @@ export default function OptionsMenu() {
           },
         }}
       >
-        <MenuItem onClick={handleClose}>Perfil</MenuItem>
+        <MenuItem onClick={handleClose}>{user.name}</MenuItem>
+        <Divider />
         <MenuItem onClick={handleClose}>Meus Cursos</MenuItem>
         <Divider />
         <MenuItem onClick={handleClose}>Configurações</MenuItem>

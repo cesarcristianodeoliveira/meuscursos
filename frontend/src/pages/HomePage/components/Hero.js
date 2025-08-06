@@ -120,8 +120,8 @@ export default function Hero() {
               width: { sm: '100%', md: '80%' },
             }}
           >
-            Meus Cursos é uma Comunidade de Cursos por Inteligência Artificial.<br /> 
-            Estude sem limites, ou crie para que mais pessoas aprendam.
+            Comunidade de Cursos por Inteligência Artificial.<br /> 
+            Estude, ou crie para que mais pessoas aprendam.
           </Typography>
 
           <Stack

@@ -11,6 +11,7 @@ import MenuContent from './MenuContent';
 // import CardAlert from './CardAlert';
 import OptionsMenu from './OptionsMenu';
 import { useAuth } from '../../../contexts/AuthContext';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
 const drawerWidth = 240;
 
@@ -76,22 +77,23 @@ export default function SideMenu() {
           sizes="small"
           alt={user.name}
           sx={{ width: 36, height: 36 }}
-        />
+        >
+          {user.name.charAt(0).toUpperCase()}
+        </Avatar>
         <Box sx={{ mr: 'auto' }}>
           <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: '16px' }}>
-            {user.name}
+            {user.name.split(" ")[0]}
           </Typography>
-          <Box sx={{ display: 'grid', width: '100%' }}>
+          <Box sx={{ alignItems: 'center', display: 'flex', width: '100%' }}>
+            <AutoAwesomeIcon sx={{ fontSize: '0.75rem', mr: .25, color: 'text.secondary' }} /> 
             <Typography 
-              noWrap // Este prop já faz o trabalho!
               variant="caption" 
               sx={{ 
-                display: 'block', 
                 width: '100%', 
                 color: 'text.secondary' 
               }}
             >
-              {user.email}
+              {user.credits} - {user.plan}
             </Typography>
           </Box>
         </Box>
