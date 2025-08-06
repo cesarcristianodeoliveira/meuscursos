@@ -32,6 +32,16 @@ export default function SideMenu() {
     user
   } = useAuth()
 
+  const planOptions = [
+    { title: 'Grátis', value: 'free' },
+    { title: 'Pro', value: 'pro' },
+  ];
+
+  const getPlanTitle = (planValue) => {
+    const option = planOptions.find(option => option.value === planValue);
+    return option ? option.title : 'Plano Desconhecido'; // Retorna o título ou um fallback
+  };
+
   return (
     <Drawer
       variant="permanent"
@@ -93,7 +103,7 @@ export default function SideMenu() {
                 color: 'text.secondary' 
               }}
             >
-              {user.credits} - {user.plan}
+              {user.credits} - {getPlanTitle(user.plan)}
             </Typography>
           </Box>
         </Box>

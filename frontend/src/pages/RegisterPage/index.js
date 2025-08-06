@@ -12,7 +12,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import MuiCard from '@mui/material/Card';
-import CircularProgress from '@mui/material/CircularProgress';
+import LinearProgress from '@mui/material/LinearProgress';
 import Alert from '@mui/material/Alert';
 import Snackbar from '@mui/material/Snackbar';
 import Grid from '@mui/material/Grid'; // Adicionado: Importação do Grid
@@ -122,7 +122,7 @@ export default function RegisterPage() {
     // Validação do Nome
     if (!name.trim()) {
       setNameError(true);
-      return 'Por favor, insira seu nome completo.';
+      return 'Por favor, insira seu nome.';
     }
     if (name.trim().length < 3) {
       setNameError(true);
@@ -158,14 +158,11 @@ export default function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Limpa Snackbar antes de nova tentativa
     setSnackbarOpen(false);
     
-    // Executa a validação do formulário
     const validationError = validateForm();
     if (validationError) {
-      // Se houver um erro de validação, exibe com severidade 'warning'
-      showSnackbar(validationError, 'warning'); 
+      showSnackbar(validationError, 'warning'); // Mensagens de validação do formulário: severidade 'warning'
       return;
     }
 
@@ -176,23 +173,18 @@ export default function RegisterPage() {
       const result = await register(name, email, password); 
 
       if (result.success) {
-        // Marca o primeiro login para ser verificado na LoginPage
         localStorage.setItem('isFirstLogin', 'true'); 
-        // Se sucesso, exibe com severidade 'success'
-        showSnackbar(result.message || 'Cadastro realizado com sucesso!', 'success');
-        // Mantém campos desabilitados e navega após o Snackbar se fechar
+        showSnackbar(result.message || 'Cadastro realizado com sucesso!', 'success'); // Mensagem de sucesso do backend: severidade 'success' (verde)
         setTimeout(() => {
-          navigate('/entrar', { state: { message: result.message } });
-        }, 6000); // autoHideDuration do Snackbar
+          navigate('/', { state: { message: result.message } });
+        }, 6000);
       } else {
-        // Se erro da API, exibe com severidade 'error'
-        showSnackbar(result.message, 'error');
+        showSnackbar(result.message, 'error'); // Mensagem de erro do backend: severidade 'error' (vermelho)
         setFieldsDisabled(false); // Reabilita campos em caso de erro
       }
     } catch (err) {
       console.error('Erro ao processar registro:', err);
-      // Se erro inesperado, exibe com severidade 'error'
-      showSnackbar('Ocorreu um erro inesperado. Tente novamente.', 'error');
+      showSnackbar('Ocorreu um erro inesperado. Tente novamente.', 'error'); // Mensagem de erro inesperado: severidade 'error' (vermelho)
       setFieldsDisabled(false); // Reabilita campos em caso de erro
     } finally {
       setLoading(false);
@@ -204,6 +196,18 @@ export default function RegisterPage() {
 
   return (
     <SignUpContainer direction="column" justifyContent="center">
+      {/* LinearProgress fixo no topo da tela */}
+      {loading && (
+        <LinearProgress 
+          sx={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            zIndex: 9999 // Garante que fique acima de tudo
+          }} 
+        />
+      )}
       <Card variant="outlined">
         <Typography
           align='center'
@@ -255,7 +259,7 @@ export default function RegisterPage() {
 
           {/* Senha e Confirmar Senha usando Grid */}
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}> {/* CORRIGIDO: Usando 'item' e 'xs', 'sm' */}
+            <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth>
                 {/* REMOVIDO: FormLabel para Senha, conforme sua solicitação */}
                 <TextField
@@ -282,9 +286,8 @@ export default function RegisterPage() {
                 />
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}> {/* CORRIGIDO: Usando 'item' e 'xs', 'sm' */}
+            <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth>
-                {/* REMOVIDO: FormLabel para Confirmar Senha, conforme sua solicitação */}
                 <TextField
                   name="confirmPassword"
                   placeholder="Confirmar Senha"
@@ -295,9 +298,8 @@ export default function RegisterPage() {
                   fullWidth
                   variant="outlined"
                   value={confirmPassword}
-                  // Adicionado: Filtra para aceitar apenas números
                   onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, ''); // Remove tudo que não for dígito
+                    const value = e.target.value.replace(/\D/g, '');
                     setConfirmPassword(value);
                   }}
                   inputProps={{
@@ -314,11 +316,11 @@ export default function RegisterPage() {
           <Button
             type="submit"
             fullWidth
-            variant={loading ? 'outlined' : 'contained'} // Muda a variante do botão
+            variant={loading || fieldsDisabled ? 'outlined' : 'contained'}
             sx={{ py: 1.5 }}
-            disabled={loading || fieldsDisabled} // Desabilita o botão
+            disabled={loading || fieldsDisabled}
           >
-            {loading ? <CircularProgress size={24} color="inherit" /> : 'Cadastrar'}
+            Cadastrar
           </Button>
         </Box>
 
