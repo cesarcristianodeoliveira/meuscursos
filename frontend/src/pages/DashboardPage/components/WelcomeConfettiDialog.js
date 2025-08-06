@@ -67,7 +67,7 @@
             </DialogTitle>
             <DialogContent>
               <DialogContentText id="welcome-dialog-description">
-                É um prazer ter você conosco! Explore a comunidade e comece a aprender ou criar.
+                É um prazer ter você conosco!<br /> Explore a comunidade e comece a aprender ou criar.
               </DialogContentText>
             </DialogContent>
             <DialogActions>
