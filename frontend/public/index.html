@@ -44,15 +44,13 @@
       document.documentElement.setAttribute('data-mui-color-scheme', colorScheme);
       document.documentElement.style.colorScheme = colorScheme; 
 
-      // --- DEFINIÇÕES DE CORES DO SEU TEMA MATERIAL-UI ---
-      // IMPORTANTE: Essas cores devem ser as mesmas definidas em src/theme/themePrimitives/colorSchemes.js
-      // As cores 'brand' e 'gray' são as paletas base que você definiu.
+      // --- DEFINIÇÕES DE CORES DO SEU TEMA MATERIAL-UI (para o loader inicial) ---
       const brand = {
         50: 'hsl(210, 100%, 95%)',
         100: 'hsl(210, 100%, 92%)',
         200: 'hsl(210, 100%, 80%)',
         300: 'hsl(210, 100%, 65%)',
-        400: 'hsl(210, 98%, 48%)', // Cor principal (main) para primary
+        400: 'hsl(210, 98%, 48%)',
         500: 'hsl(210, 98%, 42%)',
         600: 'hsl(210, 98%, 55%)',
         700: 'hsl(210, 100%, 35%)',
@@ -70,16 +68,16 @@
         600: 'hsl(220, 20%, 35%)',
         700: 'hsl(220, 20%, 25%)',
         800: 'hsl(220, 30%, 6%)',
-        900: 'hsl(220, 35%, 3%)', // Fundo padrão para dark mode
+        900: 'hsl(220, 35%, 3%)',
       };
       // --- FIM DAS DEFINIÇÕES DE CORES ---
 
       // Define as cores do loader inicial com base no esquema de cores do seu tema
-      const loaderBgLight = 'hsl(0, 0%, 99%)'; // palette.background.default light
-      const loaderBgDark = gray[900];          // palette.background.default dark
+      const loaderBgLight = 'hsl(0, 0%, 99%)';
+      const loaderBgDark = gray[900];          
       
-      const spinnerColorLight = brand[400]; // palette.primary.main light
-      const spinnerColorDark = brand[400];  // palette.primary.main dark (ou brand[300] se preferir mais claro)
+      const spinnerColorLight = brand[400];
+      const spinnerColorDark = brand[400];  
       
       const spinnerBorderColorLight = 'rgba(0, 0, 0, 0.1)'; 
       const spinnerBorderColorDark = 'rgba(255, 255, 255, 0.2)'; 
@@ -101,6 +99,12 @@
     </script>
 
     <style>
+      /* ADICIONADO: Definição da variável CSS global --template-frame-height */
+      /* Este valor pode ser ajustado se você tiver um cabeçalho fixo com altura específica */
+      :root {
+        --template-frame-height: 0px; 
+      }
+
       #initial-loader {
         position: fixed;
         top: 0;
@@ -134,7 +138,7 @@
     <noscript>Você precisa ativar o JavaScript para executar este aplicativo.</noscript>
     
     <div id="initial-loader">
-      <!-- <div class="spinner"></div> -->
+      <div class="spinner"></div>
     </div>
 
     <div id="root"></div>

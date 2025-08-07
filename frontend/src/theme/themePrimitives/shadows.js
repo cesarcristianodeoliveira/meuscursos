@@ -1,15 +1,9 @@
 // D:\meuscursos\frontend\src\theme\themePrimitives\shadows.js
-
-import { createTheme } from '@mui/material/styles'; // Importe createTheme para defaultTheme
-
+import { createTheme } from '@mui/material/styles';
 const defaultTheme = createTheme();
-
-// customShadows não é mais necessário aqui, pois a lógica de alternar sombras
-// com base no modo escuro/claro será lidada pelo getDesignTokens
-// e as sombras são referenciadas como variáveis CSS no createTheme.
-
 export const shadows = [
-  'none', // defaultTheme.shadows[0]
-  'var(--template-palette-baseShadow)', // O primeiro sombra será uma variável CSS
-  ...defaultTheme.shadows.slice(2), // O restante das sombras padrão do MUI
+  'none',
+  // 'var(--template-palette-baseShadow)',
+  'hsla(220, 30%, 5%, 0.07) 0px 4px 16px 0px, hsla(220, 25%, 10%, 0.07) 0px 8px 16px -5px',
+  ...defaultTheme.shadows.slice(2),
 ];

@@ -1,7 +1,7 @@
 // D:\meuscursos\frontend\src\theme\themePrimitives\colorSchemes.js
 
 import { alpha } from '@mui/material/styles';
-import { brand, gray, green, orange, red } from './colors'; // Importe suas cores base
+import { brand, gray, green, orange, red } from './colors'; // Importa as cores base
 
 export const colorSchemes = {
   light: {
@@ -50,8 +50,9 @@ export const colorSchemes = {
         hover: alpha(gray[200], 0.2),
         selected: `${alpha(gray[200], 0.3)}`,
       },
-      // Note: baseShadow não vai aqui, ele é parte da propriedade 'shadows' no createTheme
-      // e é tratado por getDesignTokens.
+      // Esta baseShadow será convertida em --template-palette-baseShadow
+      baseShadow:
+        'hsla(220, 30%, 5%, 0.07) 0px 4px 16px 0px, hsla(220, 25%, 10%, 0.07) 0px 8px 16px -5px',
     },
   },
   dark: {
@@ -99,7 +100,9 @@ export const colorSchemes = {
         hover: alpha(gray[600], 0.2),
         selected: alpha(gray[600], 0.3),
       },
-      // Note: baseShadow não vai aqui
+      // Esta baseShadow será convertida em --template-palette-baseShadow
+      baseShadow:
+        'hsla(220, 30%, 5%, 0.7) 0px 4px 16px 0px, hsla(220, 25%, 10%, 0.8) 0px 8px 16px -5px',
     },
   },
 };

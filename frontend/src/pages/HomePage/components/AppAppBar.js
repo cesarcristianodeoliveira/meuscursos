@@ -29,8 +29,7 @@ const StyledToolbar = styled(Toolbar)(({ theme }) => ({
   backgroundColor: theme.vars
     ? `rgba(${theme.vars.palette.background.defaultChannel} / 0.4)`
     : alpha(theme.palette.background.default, 0.4),
-  boxShadow: (theme.vars || theme).shadows[1],
-  // boxShadow: 'hsla(220, 30%, 5%, 0.07) 0px 4px 16px 0px,hsla(220, 25%, 10%, 0.07) 0px 8px 16px -5px',
+  boxShadow: (theme.vars || theme).shadows[1], // Esta linha está correta e usará a sombra definida em shadows.js
   padding: '8px 12px',
 }));
 
