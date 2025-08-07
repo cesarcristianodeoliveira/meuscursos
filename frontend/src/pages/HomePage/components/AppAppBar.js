@@ -1,3 +1,5 @@
+// D:\meuscursos\frontend\src\pages\HomePage\components\AppAppBar.js
+
 import * as React from 'react';
 import { styled, alpha } from '@mui/material/styles';
 import Box from '@mui/material/Box';
@@ -27,8 +29,8 @@ const StyledToolbar = styled(Toolbar)(({ theme }) => ({
   backgroundColor: theme.vars
     ? `rgba(${theme.vars.palette.background.defaultChannel} / 0.4)`
     : alpha(theme.palette.background.default, 0.4),
-  // Aumentado o nível da sombra para torná-la mais visível
-  boxShadow: (theme.vars || theme).shadows[1], // Alterado de shadows[1] para shadows[4]
+  boxShadow: (theme.vars || theme).shadows[1],
+  // boxShadow: 'hsla(220, 30%, 5%, 0.07) 0px 4px 16px 0px,hsla(220, 25%, 10%, 0.07) 0px 8px 16px -5px',
   padding: '8px 12px',
 }));
 
@@ -44,7 +46,7 @@ export default function AppAppBar() {
       position="fixed"
       enableColorOnDark
       sx={{
-        boxShadow: 0, // Mantém a AppBar principal sem sombra, focando na StyledToolbar
+        boxShadow: 0,
         bgcolor: 'transparent',
         backgroundImage: 'none',
         mt: 'calc(var(--template-frame-height, 0px) + 28px)',
@@ -67,7 +69,7 @@ export default function AppAppBar() {
               alignItems: 'center',
             }}
           >
-            <Button LinkComponent={Link} to='/cadastrar' color="primary" variant="text" size="small">
+            <Button LinkComponent={Link} to='/cadastrar' color="primary" variant="outlined" size="small">
               Cadastrar
             </Button>
             <Button LinkComponent={Link} to='/entrar' color="primary" variant="contained" size="small">
@@ -105,12 +107,12 @@ export default function AppAppBar() {
                 <MenuItem>Cursos</MenuItem>
                 <Divider sx={{ my: 3 }} />
                 <MenuItem>
-                  <Button color="primary" variant="contained" fullWidth>
+                  <Button LinkComponent={Link} to='/cadastrar' color="primary" variant="contained" fullWidth>
                     Cadastrar
                   </Button>
                 </MenuItem>
                 <MenuItem>
-                  <Button color="primary" variant="outlined" fullWidth>
+                  <Button LinkComponent={Link} to='/entrar' color="primary" variant="outlined" fullWidth>
                     Entrar
                   </Button>
                 </MenuItem>

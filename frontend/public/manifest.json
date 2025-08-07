@@ -1,7 +1,7 @@
 {
   "name": "Meus Cursos",
   "short_name": "Meus Cursos",
-  "description": "Cursos por Inteligência Artificial",
+  "description": "Comunidade de Cursos",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FCFCFC",

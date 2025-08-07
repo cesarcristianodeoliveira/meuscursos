@@ -10,9 +10,16 @@ import SignInCard from './components/SignInCard';
 
 // Styled Container para a página inteira, com o fundo gradiente
 const SignInContainer = styled(Stack)(({ theme }) => ({
-  justifyContent: 'center',
-  minHeight: '100dvh',
+  minHeight: '100vh',
+  padding: theme.spacing(2),
+  [theme.breakpoints.up('sm')]: {
+    padding: theme.spacing(4),
+  },
   position: 'relative',
+  overflow: 'auto',
+  justifyContent: 'center', 
+  
+  // Fundo gradiente similar ao modelo oficial
   '&::before': {
     content: '""',
     display: 'block',
@@ -33,18 +40,8 @@ export default function LoginPage() {
 
   return (
     <SignInContainer direction="column" component="main">
-      <Stack
-        direction={{ xs: 'column-reverse', md: 'row' }} // Conteúdo e formulário lado a lado no desktop, empilhados no mobile
-        sx={{
-          justifyContent: 'center',
-          gap: { xs: 6, sm: 12 },
-          p: { xs: 2, sm: 4 }, // Padding responsivo para o Stack interno
-          mx: 'auto', // Centraliza o Stack interno
-        }}
-      >
-        {/* <Content /> */}
-        <SignInCard />
-      </Stack>
+      {/* <Content /> */}
+      <SignInCard />
     </SignInContainer>
   );
 }

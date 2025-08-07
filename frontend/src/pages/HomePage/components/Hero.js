@@ -127,7 +127,7 @@ export default function Hero() {
             sx={{ pt: 2, width: { xs: '100%', sm: '256px' } }}
           >
             <Button
-              variant="text"
+              variant="outlined"
               color="primary"
               size="large"
               onClick={handleRegisterClick}
