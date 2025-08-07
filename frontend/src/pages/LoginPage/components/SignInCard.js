@@ -123,9 +123,13 @@ export default function SignInCard() {
     }
   };
 
+  const currentYear = new Date().getFullYear();
+  const projectName = "Meus Cursos";
+
   return (
     <Card variant="outlined">
       <Typography
+        align='center'
         component="h1"
         variant="h4"
         sx={{ width: '100%', fontSize: 'clamp(2rem, 10vw, 2.15rem)' }}
@@ -199,19 +203,24 @@ export default function SignInCard() {
         </Button>
       </Box>
       <Divider>ou</Divider>
-      <Typography sx={{ textAlign: 'center' }}>
-          Não tem uma conta?{' '}
-          <span>
-            <Link
-              component={RouterLink}
-              to="/cadastrar"
-              variant="body2"
-              sx={{ alignSelf: 'center', cursor: 'pointer' }}
-            >
-              Cadastrar
-            </Link>
-          </span>
-        </Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {/* Botão "Cadastrar" com LinkComponent */}
+        <Button
+          fullWidth
+          variant="outlined"
+          LinkComponent={RouterLink}
+          to='/cadastrar'
+        >
+          Cadastrar
+        </Button>
+      </Box>
+      {/* Copyright movido para DENTRO do Card, conforme sua última instrução */}
+      <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 2 }}>
+        <Link color="inherit" component={RouterLink} to="/">
+          {projectName}
+        </Link>{' '}©{' '}
+        {currentYear}
+      </Typography>
     </Card>
   );
 }

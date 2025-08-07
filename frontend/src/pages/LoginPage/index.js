@@ -2,14 +2,11 @@
 
 import * as React from 'react';
 import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import Link from '@mui/material/Link';
 import { styled } from '@mui/material/styles';
-import { Link as RouterLink } from 'react-router-dom';
 
 // Importa os componentes criados
 import SignInCard from './components/SignInCard';
-import Content from './components/Content';
+// import Content from './components/Content';
 
 // Styled Container para a página inteira, com o fundo gradiente
 const SignInContainer = styled(Stack)(({ theme }) => ({
@@ -33,8 +30,6 @@ const SignInContainer = styled(Stack)(({ theme }) => ({
 }));
 
 export default function LoginPage() {
-  const currentYear = new Date().getFullYear();
-  const projectName = "Meus Cursos";
 
   return (
     <SignInContainer direction="column" component="main">
@@ -47,18 +42,9 @@ export default function LoginPage() {
           mx: 'auto', // Centraliza o Stack interno
         }}
       >
-        <Content /> {/* O lado do conteúdo */}
-        <SignInCard /> {/* O card de login */}
+        {/* <Content /> */}
+        <SignInCard />
       </Stack>
-
-      {/* Copyright adicionado abaixo do Stack principal, dentro do SignInContainer */}
-      <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 2, mb: 2 }}>
-        <Link color="inherit" component={RouterLink} to="/">
-          {projectName}
-        </Link>
-        {' '}©{' '}
-        {currentYear}
-      </Typography>
     </SignInContainer>
   );
 }
