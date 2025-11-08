@@ -1,6 +1,5 @@
-import { createClient } from '@sanity/client';
-import dotenv from 'dotenv';
-dotenv.config();
+const { createClient } = require('@sanity/client');
+require('dotenv').config();
 
 const client = createClient({
   projectId: process.env.SANITY_PROJECT_ID,
@@ -10,4 +9,4 @@ const client = createClient({
   useCdn: false,
 });
 
-export default client;
+module.exports = client;

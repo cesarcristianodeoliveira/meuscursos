@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const client = require('../config/sanityClient')
+const client = require('../config/sanityClient.js')
 
 // --- 🔹 /all (categorias, subcategorias, tags e cursos resumidos) ---
 router.get('/all', async (req, res) => {
