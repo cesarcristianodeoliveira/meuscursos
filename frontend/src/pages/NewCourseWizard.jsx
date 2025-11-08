@@ -147,7 +147,7 @@ function NewCourseWizard() {
             ))}
           </List>
         ) : (
-          <Typography sx={{ mt: 2 }}>
+          <Typography sx={{ mt: 2, px: [1] }}>
             {loading ? 'Carregando categorias...' : 'Nenhuma categoria disponível.'}
           </Typography>
         )
