@@ -147,14 +147,14 @@ function NewCourseWizard() {
             ))}
           </List>
         ) : (
-          <Typography sx={{ mt: 2, px: [1] }}>
-            {loading ? 'Carregando categorias...' : 'Nenhuma categoria disponível.'}
+          <Typography color='textSecondary' variant='caption' sx={{ mt: 2, px: [1] }}>
+            {loading ? 'Carregando categorias...' : 'Nenhuma categoria disponível'}
           </Typography>
         )
 
       case 2:
         return !filteredSubs.length ? (
-          <Typography sx={{ mt: 2 }}>Nenhuma subcategoria disponível.</Typography>
+          <Typography color='textSecondary' variant='caption' sx={{ mt: 2, px: [1] }}>Nenhuma subcategoria disponível</Typography>
         ) : (
           <List sx={{ width: '100%' }}>
             {filteredSubs.map(sub => (
@@ -275,7 +275,7 @@ function NewCourseWizard() {
             Criar Novo Curso
           </Typography>
           <Typography variant="body1">
-            Siga o passo a passo para configurar seu curso.
+            Siga o passo a passo para configurar seu curso
           </Typography>
         </Box>
         
