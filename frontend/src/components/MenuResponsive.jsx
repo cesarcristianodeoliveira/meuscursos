@@ -78,42 +78,44 @@ const MenuResponsive = () => {
 
   return (
     <>
-<Tabs
-  value={value}
-  onChange={handleChange}
-  aria-label="menu de navegação principal"
-  role="navigation"
-  indicatorColor="transparent"
-  sx={{
-    ml: 1,
-    display: { xs: 'none', md: 'flex' },
-    minHeight: 48,
-  }}
->
-  {routes.map((route) => (
-    <LinkTab
-      key={route.path}
-      label={route.label}
-      href={route.path}
-      value={route.path}
+    <Tabs
+      value={value}
+      onChange={handleChange}
+      aria-label="menu de navegação principal"
+      role="navigation"
+      // indicatorColor="transparent"
       sx={{
-        textTransform: 'none',
-        fontWeight: 500,
-        minHeight: 48,
-        color: 'text.secondary',
-        transition: 'none',
-        '&.Mui-selected': {
-          color: 'primary.main',
-          backgroundColor: (theme) =>
-            theme.palette.action.selected,
-        },
-        '&:hover': {
-          backgroundColor: (theme) => theme.palette.action.hover,
-        },
+        display: { xs: 'none', md: 'flex' },
+        minHeight: 40,
+        // '& .MuiTabs-indicator': {
+        //   display: 'none'
+        // }
       }}
-    />
-  ))}
-</Tabs>
+    >
+      {routes.map((route) => (
+        <LinkTab
+          key={route.path}
+          label={route.label}
+          href={route.path}
+          value={route.path}
+          sx={{
+            textTransform: 'none',
+            fontWeight: 500,
+            minHeight: 40,
+            color: 'text.secondary',
+            transition: 'none',
+            '&.Mui-selected': {
+              color: 'primary.main',
+              backgroundColor: (theme) =>
+                theme.palette.action.selected,
+            },
+            '&:hover': {
+              backgroundColor: (theme) => theme.palette.action.hover,
+            },
+          }}
+        />
+      ))}
+    </Tabs>
 
     </>
   )

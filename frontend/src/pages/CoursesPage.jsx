@@ -54,7 +54,7 @@ const CoursesPage = () => {
     >
       <Toolbar sx={{ px: [0], minHeight: '56px!important' }} />
       <Typography component="h2" variant="h6" sx={{ my: 1.5, lineHeight: 1 }}>
-        Visão geral
+        Cursos
       </Typography>
       <Grid
         container

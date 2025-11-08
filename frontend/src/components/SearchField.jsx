@@ -15,6 +15,7 @@ const SearchField = () => {
     },
     marginLeft: 0,
     width: '100%',
+    height: '100%',
     [theme.breakpoints.up('md')]: {
       display: 'flex',
       marginLeft: theme.spacing(1),
@@ -42,9 +43,6 @@ const SearchField = () => {
       transition: theme.transitions.create('width'),
       [theme.breakpoints.up('md')]: {
         width: '12ch',
-        '&:focus': {
-          width: '20ch',
-        },
       },
     },
   }));

@@ -375,10 +375,11 @@ const Sidebar = () => {
                     >
                         <RocketLaunchIcon color='primary' />
                     </Typography>
+                    <SearchField />
+                    <Box flexGrow={1} />
                     <MenuResponsive />
                     <Box flexGrow={1} />
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <SearchField />
                         <IconButton
                             color='inherit'
                             LinkComponent={Link}

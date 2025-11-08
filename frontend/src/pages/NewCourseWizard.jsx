@@ -147,14 +147,14 @@ function NewCourseWizard() {
             ))}
           </List>
         ) : (
-          <Typography color='textSecondary' variant='caption' sx={{ mt: 2, px: [1] }}>
+          <Typography color='textSecondary' fontSize='small' sx={{ mt: 2, px: [1] }}>
             {loading ? 'Carregando categorias...' : 'Nenhuma categoria disponível'}
           </Typography>
         )
 
       case 2:
         return !filteredSubs.length ? (
-          <Typography color='textSecondary' variant='caption' sx={{ mt: 2, px: [1] }}>Nenhuma subcategoria disponível</Typography>
+          <Typography color='textSecondary' fontSize='small' sx={{ mt: 2, px: [1] }}>Nenhuma subcategoria disponível</Typography>
         ) : (
           <List sx={{ width: '100%' }}>
             {filteredSubs.map(sub => (
