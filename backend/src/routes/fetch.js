@@ -6,9 +6,9 @@ const client = require('../config/sanityClient.js')
 router.get('/all', async (req, res) => {
   try {
     const [categories, subcategories, tags, courses] = await Promise.all([
-      client.fetch(`*[_type == "category"]{_id, title} | order(title asc)`),
-      client.fetch(`*[_type == "subcategory"]{_id, title, category->{_id, title}} | order(title asc)`),
-      client.fetch(`*[_type == "tag"]{_id, title, subcategory->{_id, title}} | order(title asc)`),
+      client.fetch(`*[_type == "category"]{_id, title, icon, "slug": slug.current} | order(title asc)`),
+      client.fetch(`*[_type == "subcategory"]{_id, title, icon, "slug": slug.current, category->{_id, title}} | order(title asc)`),
+      client.fetch(`*[_type == "tag"]{_id, title, "slug": slug.current, subcategory->{_id, title}} | order(title asc)`),
       client.fetch(`*[_type == "course"]{
         _id,
         title,
@@ -16,12 +16,12 @@ router.get('/all', async (req, res) => {
         description,
         level,
         duration,
-        category->{_id, title},
-        subcategory->{_id, title},
+        category->{_id, title, icon},
+        subcategory->{_id, title, icon},
         tags[]->{_id, title},
         status,
         provider
-      } | order(_createdAt desc)`),
+      } | order(_createdAt asc)`),
     ])
 
     res.json({ categories, subcategories, tags, courses })
@@ -34,7 +34,7 @@ router.get('/all', async (req, res) => {
 // --- 🔹 Categorias ---
 router.get('/categories', async (_, res) => {
   try {
-    const data = await client.fetch(`*[_type == "category"]{_id, title} | order(title asc)`)
+    const data = await client.fetch(`*[_type == "category"]{_id, title, "slug": slug.current, icon} | order(title asc)`)
     res.json(data)
   } catch (err) {
     console.error('❌ Erro /categories', err)
@@ -47,8 +47,8 @@ router.get('/subcategories', async (req, res) => {
   try {
     const { categoryId } = req.query
     const query = categoryId
-      ? `*[_type == "subcategory" && references($categoryId)]{_id, title, category->{_id, title}} | order(title asc)`
-      : `*[_type == "subcategory"]{_id, title, category->{_id, title}} | order(title asc)`
+      ? `*[_type == "subcategory" && references($categoryId)]{_id, title, "slug": slug.current, icon, category->{_id, title}} | order(title asc)`
+      : `*[_type == "subcategory"]{_id, title, category->{_id, title, "slug": slug.current, icon}} | order(title asc)`
     const data = await client.fetch(query, { categoryId })
     res.json(data)
   } catch (err) {
@@ -62,8 +62,8 @@ router.get('/tags', async (req, res) => {
   try {
     const { subcategoryId } = req.query
     const query = subcategoryId
-      ? `*[_type == "tag" && references($subcategoryId)]{_id, title, subcategory->{_id, title}} | order(title asc)`
-      : `*[_type == "tag"]{_id, title, subcategory->{_id, title}} | order(title asc)`
+      ? `*[_type == "tag" && references($subcategoryId)]{_id, title, "slug": slug.current, subcategory->{_id, title}} | order(title asc)`
+      : `*[_type == "tag"]{_id, title, subcategory->{_id, title, "slug": slug.current}} | order(title asc)`
     const data = await client.fetch(query, { subcategoryId })
     res.json(data)
   } catch (err) {
