@@ -11,6 +11,7 @@ import CoursesPage from './pages/CoursesPage'
 import CoursePage from './pages/CoursePage'
 import NewCourseWizard from './pages/NewCourseWizard'
 import GeneratingCourse from './pages/GeneratingCourse'
+import SearchPage from './pages/SearchPage'
 
 const App = () => {
   return (
@@ -23,6 +24,7 @@ const App = () => {
             <Box component="main" sx={{ flexGrow: 1 }}>
               <Routes>
                 <Route path="/" element={<Welcome />} />
+                <Route path="/pesquisar" element={<SearchPage />} />
                 <Route path="/cursos" element={<CoursesPage />} />
                 <Route path="/curso/:slug" element={<CoursePage />} />
                 <Route path="/criar" element={<NewCourseWizard />} />

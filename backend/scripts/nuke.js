@@ -22,14 +22,11 @@ function question(query) {
 
 async function nuke() {
   try {
-    console.log('💥 FORMATADOR NUCLEAR DO SANITY');
     console.log('═'.repeat(50));
 
     // Importa o client
     const clientModule = await import('../src/config/sanityClient.js');
     const client = clientModule.default;
-
-    console.log('📡 Conectado ao projeto:', process.env.SANITY_PROJECT_ID);
 
     // SEUS SCHEMAS - lista fixa dos seus tipos
     const YOUR_SCHEMAS = ['course', 'video', 'thumbnail', 'category', 'subcategory', 'tag'];
@@ -60,22 +57,22 @@ async function nuke() {
     console.log('Isso vai DELETAR PERMANENTEMENTE TODOS os documentos!');
     console.log('Todos os cursos, categorias, tags, vídeos... TUDO!');
     
-    const confirm1 = await question('\n🔴 Digite "FORMATAR" para continuar: ');
-    if (confirm1.trim().toUpperCase() !== 'FORMATAR') {
+    const confirm1 = await question('\n🔴 Digite "SIM" para continuar: ');
+    if (confirm1.trim().toUpperCase() !== 'SIM') {
       console.log('❌ Cancelado pelo usuário');
       rl.close();
       return;
     }
 
-    const confirm2 = await question('🔴 Digite "ZERAR-TUDO" para confirmar: ');
-    if (confirm2.trim().toUpperCase() !== 'ZERAR-TUDO') {
+    const confirm2 = await question('🔴 Digite "FORMATAR" para confirmar: ');
+    if (confirm2.trim().toUpperCase() !== 'FORMATAR') {
       console.log('❌ Cancelado - confirmação final não fornecida');
       rl.close();
       return;
     }
 
     // EXECUÇÃO DA LIMPEZA TOTAL
-    console.log('\n💥 INICIANDO FORMATAÇÃO...');
+    console.log('\n💥 INICIANDO...');
     console.log('═'.repeat(50));
 
     let deletedCount = 0;

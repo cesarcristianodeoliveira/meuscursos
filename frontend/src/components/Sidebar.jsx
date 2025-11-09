@@ -280,7 +280,7 @@ const Sidebar = () => {
                     {/* Conteúdo Colapsável */}
                     <Collapse in={openCourses} timeout="auto" unmountOnExit>
                         {loading ? (
-                            <Box sx={{ alignItems: 'center', display: 'flex', justifyContent: 'center', px: 1, py: 2 }}>
+                            <Box sx={{ alignItems: 'center', display: 'flex', p: 1 }}>
                                 <CircularProgress size={20} />
                             </Box>
                         ) : (
@@ -307,16 +307,16 @@ const Sidebar = () => {
                                     })
                                 ) : (
                                     <ListItem disablePadding>
-                                        <ListItemButton>
-                                            <ListItemText 
-                                                primary="Nenhum curso no momento" 
-                                                primaryTypographyProps={{ 
-                                                    noWrap: true,
-                                                    // NOVO: Adicionado fontSize para consistência
-                                                    fontSize: '0.875rem',
-                                                }} 
-                                            />
-                                        </ListItemButton>
+                                        <ListItemText 
+                                            primary="Nenhum curso no momento" 
+                                            primaryTypographyProps={{ 
+                                                color: 'textSecondary',
+                                                noWrap: true,
+                                                // NOVO: Adicionado fontSize para consistência
+                                                fontSize: '0.875rem',
+                                                px: [1]
+                                            }} 
+                                        />
                                     </ListItem>
                                 )}
                             </List>
