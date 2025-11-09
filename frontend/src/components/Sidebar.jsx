@@ -3,7 +3,9 @@ import React, { useState, useMemo } from 'react';
 import { useLocation, Link, matchPath } from 'react-router-dom';
 
 // Importações do Contexto (assumindo que estão corretas)
+// eslint-disable-next-line no-unused-vars
 import { useThemeContext } from '../context/ThemeContext';
+// eslint-disable-next-line no-unused-vars
 import { useCourse } from '../context/CourseContext';
 
 // Importações do Material-UI
@@ -232,7 +234,7 @@ const Sidebar = () => {
                                 key={route.path}
                                 to={route.path}
                                 label={route.label}
-                                // icon={route.icon}
+                                // icon={route.icon} // Removido o ícone aqui pois ele não está sendo usado
                                 exact={route.exact}
                                 onClick={handleLinkClick} 
                             />
