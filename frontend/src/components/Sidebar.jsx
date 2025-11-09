@@ -198,12 +198,15 @@ const Sidebar = () => {
         if (!courses || courses.length === 0) return [];
 
         return [...courses].sort((a, b) => {
-            const dateA = a.createdAt || a.updatedAt || a._id;
-            const dateB = b.createdAt || b.updatedAt || b._id;
+            // CORREÇÃO APLICADA AQUI:
+            // 1. Usar _createdAt (campo do Sanity) para a ordenação.
+            // 2. Usar a comparação numérica (getTime) para garantir a ordem correta
+            //    do mais recente para o mais antigo (B - A).
+            const dateA = new Date(a._createdAt || a._updatedAt || a._id).getTime();
+            const dateB = new Date(b._createdAt || b._updatedAt || b._id).getTime();
             
-            if (dateA > dateB) return -1;
-            if (dateA < dateB) return 1;
-            return 0;
+            // Ordem Decrescente (do mais novo para o mais antigo)
+            return dateB - dateA;
         });
     }, [courses]);
 
