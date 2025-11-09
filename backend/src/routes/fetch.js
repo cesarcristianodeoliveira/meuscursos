@@ -6,18 +6,20 @@ const client = require('../config/sanityClient.js')
 router.get('/all', async (req, res) => {
   try {
     const [categories, subcategories, tags, courses] = await Promise.all([
-      // CORRIGIDO: Categoria já inclui icon e slug. Ordenação: title asc (OK)
+      // Categoria (OK)
       client.fetch(`*[_type == "category"]{_id, title, icon, "slug": slug.current} | order(title asc)`),
       
-      // CORRIGIDO: Subcategoria já inclui icon e slug. Ordenação: title asc (OK)
+      // Subcategoria (OK)
       client.fetch(`*[_type == "subcategory"]{_id, title, icon, "slug": slug.current, category->{_id, title}} | order(title asc)`),
       
-      // CORRIGIDO: Tag já inclui slug. Ordenação: title asc (OK)
+      // Tag (OK)
       client.fetch(`*[_type == "tag"]{_id, title, "slug": slug.current, subcategory->{_id, title}} | order(title asc)`),
       
-      // CORRIGIDO: Curso já inclui icon nas refs. Ordenação: _createdAt desc (OK)
+      // Curso: ADICIONANDO _createdAt e _updatedAt
       client.fetch(`*[_type == "course"]{
         _id,
+        _createdAt, // ADICIONADO para ordenação no frontend
+        _updatedAt, // ADICIONADO para ordenação no frontend
         title,
         "slug": slug.current,
         description,
@@ -38,7 +40,7 @@ router.get('/all', async (req, res) => {
   }
 })
 
-// --- 🔹 Categorias ---
+// --- 🔹 Categorias (Inalterado) ---
 router.get('/categories', async (_, res) => {
   try {
     // CORRIGIDO: Já inclui icon e slug. Ordenação: title asc (OK)
@@ -50,7 +52,7 @@ router.get('/categories', async (_, res) => {
   }
 })
 
-// --- 🔹 Subcategorias ---
+// --- 🔹 Subcategorias (Inalterado) ---
 router.get('/subcategories', async (req, res) => {
   try {
     const { categoryId } = req.query
@@ -67,7 +69,7 @@ router.get('/subcategories', async (req, res) => {
   }
 })
 
-// --- 🔹 Tags ---
+// --- 🔹 Tags (Inalterado) ---
 router.get('/tags', async (req, res) => {
   try {
     const { subcategoryId } = req.query
@@ -79,16 +81,18 @@ router.get('/tags', async (req, res) => {
     const data = await client.fetch(query, { subcategoryId })
     res.json(data)
   } catch (err) {
-    console.error('❌ Erro /tags', err)
+    console.    error('❌ Erro /tags', err)
     res.status(500).json({ error: 'Erro ao buscar tags' })
   }
 })
 
-// --- 🔹 Cursos (resumo) ---
+// --- 🔹 Cursos (resumo): ADICIONANDO _createdAt e _updatedAt ---
 router.get('/courses', async (_, res) => {
   try {
     const data = await client.fetch(`*[_type == "course"]{
       _id,
+      _createdAt, // ADICIONADO para ordenação no frontend
+      _updatedAt, // ADICIONADO para ordenação no frontend
       title,
       "slug": slug.current,
       description,
@@ -107,12 +111,14 @@ router.get('/courses', async (_, res) => {
   }
 })
 
-// --- 🔹 Curso por ID ---
+// --- 🔹 Curso por ID: ADICIONANDO _createdAt e _updatedAt ---
 router.get('/course/:id', async (req, res) => {
   try {
     const { id } = req.params
     const query = `*[_type == "course" && _id == $id][0]{
       _id,
+      _createdAt, // ADICIONADO
+      _updatedAt, // ADICIONADO
       title,
       "slug": slug.current,
       description,
@@ -157,13 +163,15 @@ router.get('/course/:id', async (req, res) => {
   }
 })
 
-// --- 🔹 Curso por SLUG ---
+// --- 🔹 Curso por SLUG: ADICIONANDO _createdAt e _updatedAt ---
 router.get('/course/slug/:slug', async (req, res) => {
   try {
     const { slug } = req.params
 
     const query = `*[_type == "course" && slug.current == $slug][0]{
       _id,
+      _createdAt, // ADICIONADO
+      _updatedAt, // ADICIONADO
       title,
       "slug": slug.current,
       description,
@@ -208,7 +216,7 @@ router.get('/course/slug/:slug', async (req, res) => {
   }
 })
 
-// --- 🔹 Estatísticas dos Cursos, Lessons e Exercises ---
+// --- 🔹 Estatísticas dos Cursos, Lessons e Exercises (Inalterado) ---
 router.get('/stats', async (req, res) => {
   try {
     const totalCourses = await client.fetch(`count(*[_type == "course"])`);
