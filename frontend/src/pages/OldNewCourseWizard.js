@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import {
-  Box, Button, Typography, Stepper, Step, StepLabel,
-  FormControl, InputLabel, Select, MenuItem, Checkbox,
-  FormGroup, FormControlLabel, Alert
+  Box, Button, Typography,
+  Alert,
+  Toolbar, List, ListItemButton, ListItemText, ListItemIcon, Checkbox
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { useCourse } from '../context/CourseContext'
@@ -93,115 +93,155 @@ function NewCourseWizard() {
   // --- voltar etapa
   const handleBack = () => setActiveStep(prev => prev - 1)
 
+  // --- Opções para cada passo
+  const levelOptions = [
+    { value: 'beginner', label: 'Iniciante' },
+    { value: 'intermediate', label: 'Intermediário' },
+    { value: 'advanced', label: 'Avançado' }
+  ]
+
   // --- renderizar conteúdo de cada passo
   const renderStepContent = () => {
     switch (activeStep) {
       case 0:
-        return React.createElement(
-          FormControl,
-          { fullWidth: true },
-          React.createElement(InputLabel, null, 'Nível'),
-          React.createElement(
-            Select,
-            { value: level, label: 'Nível', onChange: e => setLevel(e.target.value) },
-            [
-              React.createElement(MenuItem, { key: 'b', value: 'beginner' }, 'Iniciante'),
-              React.createElement(MenuItem, { key: 'i', value: 'intermediate' }, 'Intermediário'),
-              React.createElement(MenuItem, { key: 'a', value: 'advanced' }, 'Avançado'),
-            ]
-          )
+        return (
+          <List sx={{ width: '100%' }}>
+            {levelOptions.map(option => (
+              <ListItemButton
+                key={option.value}
+                selected={level === option.value}
+                onClick={() => setLevel(option.value)}
+                sx={{
+                  px: [1]
+                }}
+              >
+                <ListItemText 
+                  primary={option.label}
+                />
+              </ListItemButton>
+            ))}
+          </List>
         )
 
       case 1:
-        return Array.isArray(categories) && categories.length
-          ? React.createElement(
-              FormControl,
-              { fullWidth: true },
-              React.createElement(InputLabel, null, 'Categoria'),
-              React.createElement(
-                Select,
-                {
-                  value: categoryId,
-                  label: 'Categoria',
-                  onChange: e => {
-                    setCategoryId(e.target.value)
-                    setSubcategoryId('')
-                    setSelectedTags([])
-                    setAvailableTags([])
-                  }
-                },
-                categories.map(cat =>
-                  React.createElement(MenuItem, { key: cat._id, value: cat._id }, cat.title)
-                )
-              )
-            )
-          : React.createElement(
-              Typography,
-              { sx: { mt: 2 } },
-              loading ? 'Carregando categorias...' : 'Nenhuma categoria disponível.'
-            )
+        return Array.isArray(categories) && categories.length ? (
+          <List sx={{ width: '100%' }}>
+            {categories.map(cat => (
+              <ListItemButton
+                key={cat._id}
+                selected={categoryId === cat._id}
+                onClick={() => {
+                  setCategoryId(cat._id)
+                  setSubcategoryId('')
+                  setSelectedTags([])
+                  setAvailableTags([])
+                }}
+                sx={{
+                  px: [1]
+                }}
+              >
+                <ListItemText 
+                  primary={cat.title}
+                />
+              </ListItemButton>
+            ))}
+          </List>
+        ) : (
+          <Typography color='textSecondary' fontSize='small' sx={{ mt: 2, px: [1] }}>
+            {loading ? 'Carregando categorias...' : 'Nenhuma categoria disponível'}
+          </Typography>
+        )
 
       case 2:
-        return !filteredSubs.length
-          ? React.createElement(Typography, { sx: { mt: 2 } }, 'Nenhuma subcategoria disponível.')
-          : React.createElement(
-              FormControl,
-              { fullWidth: true },
-              React.createElement(InputLabel, null, 'Subcategoria'),
-              React.createElement(
-                Select,
-                {
-                  value: subcategoryId,
-                  label: 'Subcategoria',
-                  onChange: e => {
-                    setSubcategoryId(e.target.value)
-                    setSelectedTags([])
-                  }
-                },
-                filteredSubs.map(sub =>
-                  React.createElement(MenuItem, { key: sub._id, value: sub._id }, sub.title)
-                )
-              )
-            )
+        return !filteredSubs.length ? (
+          <Typography color='textSecondary' fontSize='small' sx={{ mt: 2, px: [1] }}>Nenhuma subcategoria disponível</Typography>
+        ) : (
+          <List sx={{ width: '100%' }}>
+            {filteredSubs.map(sub => (
+              <ListItemButton
+                key={sub._id}
+                selected={subcategoryId === sub._id}
+                onClick={() => {
+                  setSubcategoryId(sub._id)
+                  setSelectedTags([])
+                }}
+                sx={{
+                  px: [1]
+                }}
+              >
+                <ListItemText 
+                  primary={sub.title}
+                />
+              </ListItemButton>
+            ))}
+          </List>
+        )
 
-      // --- passo: seleção de tags ---
+      // --- passo: seleção de tags (estilo oficial Material-UI) ---
       case 3:
         if (loadingTags)
-          return React.createElement(Typography, { sx: { mt: 2 } }, 'Carregando tags...')
+          return <Typography sx={{ width: '100%', mt: 2, px: [1] }}>Carregando tags...</Typography>
 
         if (!availableTags.length)
-          return React.createElement(Typography, { sx: { mt: 2 } }, 'Nenhuma tag disponível para esta subcategoria.')
+          return <Typography sx={{ mt: 2 }}>Nenhuma tag disponível para esta subcategoria.</Typography>
 
-        return React.createElement(
-          Box,
-          null,
-          React.createElement(Typography, { variant: 'subtitle1', sx: { mb: 1 } }, 'Selecione as tags relacionadas'),
-          React.createElement(
-            FormGroup,
-            null,
-            availableTags.map(tag =>
-              React.createElement(FormControlLabel, {
-                key: tag._id,
-                control: React.createElement(Checkbox, {
-                  checked: selectedTags.includes(tag._id),
-                  onChange: () => toggleTag(tag._id)
-                }),
-                label: tag.title
-              })
-            )
-          )
+        return (
+          <Box sx={{ width: '100%' }}>
+            <Box sx={{ width: '100%', px: [1] }}>
+              <Typography variant="subtitle1" sx={{ mt: 2 }}>
+                Selecione as tags relacionadas
+              </Typography>
+            </Box>
+            <List dense sx={{ width: '100%' }}>
+              {availableTags.map(tag => {
+                const labelId = `checkbox-tag-label-${tag._id}`;
+                
+                return (
+                  <ListItemButton
+                    key={tag._id}
+                    role={undefined}
+                    onClick={() => toggleTag(tag._id)}
+                    dense
+                    sx={{
+                      px: [1]
+                    }}
+                  >
+                    <ListItemIcon
+                      sx={{
+                        '&.MuiListItemIcon-root': {
+                          minWidth: 'auto',
+                        }
+                      }}
+                    >
+                      <Checkbox
+                        edge="start"
+                        checked={selectedTags.includes(tag._id)}
+                        tabIndex={-1}
+                        disableRipple
+                        inputProps={{ 'aria-labelledby': labelId }}
+                      />
+                    </ListItemIcon>
+                    <ListItemText 
+                      id={labelId} 
+                      primary={tag.title}
+                    />
+                  </ListItemButton>
+                )
+              })}
+            </List>
+          </Box>
         )
 
       case 4:
-        return React.createElement(
-          Box,
-          { textAlign: 'center' },
-          React.createElement(Typography, { variant: 'h6', sx: { mb: 2 } }, 'Pronto para gerar seu curso?'),
-          React.createElement(
-            Typography,
-            { variant: 'body2', color: 'gray' },
-            'O conteúdo será gerado automaticamente com base nas opções selecionadas.'
-          )
+        return (
+          <Box sx={{ width: '100%', px: [1] }}>
+            <Typography variant="h6" sx={{ mt: 2 }}>
+              Pronto para gerar seu curso?
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              O conteúdo será gerado automaticamente com base nas opções selecionadas.
+            </Typography>
+          </Box>
         )
 
       default:
@@ -209,32 +249,98 @@ function NewCourseWizard() {
     }
   }
 
-  return React.createElement(
-    Box,
-    { sx: { maxWidth: 600, mx: 'auto', mt: 5 } },
-    React.createElement(Typography, { variant: 'h4', sx: { mb: 2 } }, 'Criar Novo Curso'),
-    React.createElement(Typography, { variant: 'body1', sx: { mb: 3 } }, 'Siga o passo a passo para configurar seu curso.'),
-    error && React.createElement(Alert, { severity: 'error', sx: { mb: 2 } }, error),
-    React.createElement(
-      Stepper,
-      { activeStep, alternativeLabel: true, sx: { mb: 4 } },
-      steps.map(label =>
-        React.createElement(Step, { key: label }, React.createElement(StepLabel, null, label))
-      )
-    ),
-    renderStepContent(),
-    React.createElement(
-      Box,
-      { sx: { display: 'flex', justifyContent: 'space-between', mt: 4 } },
-      React.createElement(Button, { disabled: activeStep === 0, onClick: handleBack, variant: 'outlined' }, 'Voltar'),
-      React.createElement(Button, {
-        variant: 'contained',
-        onClick: handleNext,
-        disabled:
-          (activeStep === 1 && !categoryId) ||
-          (activeStep === 2 && !subcategoryId)
-      }, activeStep === steps.length - 1 ? 'Gerar Curso' : 'Próximo')
-    )
+  return (
+    <>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          width: '100%',
+          height: '100dvh', // Altura total da viewport
+          overflow: 'hidden', // Remove scroll geral
+        }}
+      >
+        <Toolbar sx={{ px: 0, minHeight: '56px!important' }} />
+        
+        {/* Cabeçalho */}
+        <Box
+          sx={{
+            width: '100%',
+            pt: 1,
+            px: 1,
+            flexShrink: 0, // Não encolhe
+          }}
+        >
+          <Typography variant="h6">
+            Criar Novo Curso
+          </Typography>
+          <Typography variant="body1">
+            Siga o passo a passo para configurar seu curso
+          </Typography>
+        </Box>
+        
+        {/* Área de Alertas */}
+        {error && (
+          <Box sx={{ flexShrink: 0, width: '100%', px: 1 }}>
+            <Alert severity="error" sx={{ mb: 2, width: '100%' }}>
+              {error}
+            </Alert>
+          </Box>
+        )}
+        
+        {/* Conteúdo com Scroll */}
+        <Box sx={{ 
+          flex: 1, 
+          overflow: 'auto',
+          width: '100%',
+        }}>
+          {renderStepContent()}
+        </Box>
+        
+        {/* Botões Fixos no Bottom */}
+        <Box sx={{ 
+          flexShrink: 0, // Não encolhe
+          display: 'flex', 
+          width: '100%', 
+          justifyContent: activeStep === 0 ? 'flex-end' : 'space-between', 
+          p: 1,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          backgroundColor: 'background.paper' // Garante fundo sólido
+        }}>
+          {activeStep === 0 ? (
+            null
+          ) : (
+            <Button 
+              disabled={activeStep === 0} 
+              onClick={handleBack} 
+              variant="outlined"
+              disableElevation
+              sx={{
+                transition: 'none'
+              }}
+            >
+              Voltar
+            </Button>
+          )}
+          
+          <Button
+            variant="contained"
+            onClick={handleNext}
+            disableElevation
+            disabled={
+              (activeStep === 1 && !categoryId) ||
+              (activeStep === 2 && !subcategoryId)
+            }
+            sx={{
+              transition: 'none'
+            }}
+          >
+            {activeStep === steps.length - 1 ? 'Gerar Curso' : 'Próximo'}
+          </Button>
+        </Box>
+      </Box>
+    </>
   )
 }
 

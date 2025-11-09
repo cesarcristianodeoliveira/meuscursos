@@ -125,17 +125,17 @@ const LEVEL_CONFIG = {
     tone: 'explicativo e acessível, com linguagem simples e exemplos práticos',
   },
   intermediate: {
-    modules: 4,
-    lessonsPerModule: 3,
-    tips: 2,
-    exercises: 1,
+    modules: 4, // 👈 REDUZIDO: de 5 para 4
+    lessonsPerModule: 3, // 👈 REDUZIDO: de 4 para 3
+    tips: 2, // 👈 REDUZIDO: de 3 para 2
+    exercises: 1, // 👈 REDUZIDO: de 2 para 1
     tone: 'detalhado e aplicado, com exemplos reais e desafios práticos',
   },
   advanced: {
-    modules: 5,
-    lessonsPerModule: 4,
-    tips: 3,
-    exercises: 2,
+    modules: 5, // 👈 REDUZIDO: de 8 para 5
+    lessonsPerModule: 4, // 👈 REDUZIDO: de 5 para 4
+    tips: 3, // 👈 REDUZIDO: de 4 para 3
+    exercises: 2, // 👈 REDUZIDO: de 3 para 2
     tone: 'abrangente, técnico e aprofundado, voltado para profissionais experientes',
   },
 };
@@ -163,7 +163,7 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.75,
         response_format: { type: 'json_object' },
-        max_tokens: 3500,
+        max_tokens: 3500, // 👈 REDUZIDO: de 4000 para 3500
       });
 
       let rawResponse = completion.choices[0]?.message?.content?.trim();
@@ -213,7 +213,7 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
 }
 
 // =======================================================
-// 🧠 ROTA PRINCIPAL - GERAR CURSO (CORRIGIDA COM URL DE CATEGORIA/SUBCATEGORIA)
+// 🧠 ROTA PRINCIPAL - GERAR CURSO (CORRIGIDA)
 // =======================================================
 router.post('/course', async (req, res) => {
   try {
@@ -226,11 +226,10 @@ router.post('/course', async (req, res) => {
     // ✅ Tags opcionais
     const validTags = validateTags(tags || []);
 
-    // 🔄 Busca categoria e subcategoria COM SLUGS
     const [category, subcategory] = await Promise.all([
-      client.fetch(`*[_id == $categoryId][0]{_id, title, "slug": slug.current}`, { categoryId }),
+      client.fetch(`*[_id == "${categoryId}"][0]{title}`),
       subcategoryId
-        ? client.fetch(`*[_id == $subcategoryId][0]{_id, title, "slug": slug.current}`, { subcategoryId })
+        ? client.fetch(`*[_id == "${subcategoryId}"][0]{title}`)
         : null,
     ]);
 
@@ -313,11 +312,6 @@ IMPORTANTE:
       { slug }
     );
 
-    // 🔄 Constrói URL com categoria e subcategoria
-    const categorySlug = category?.slug || 'categoria';
-    const subcategorySlug = subcategory?.slug || 'subcategoria';
-    const courseUrl = `http://localhost:3000/${categorySlug}/${subcategorySlug}/${slug}`;
-
     if (existing?._id) {
       console.log('⚠️ Curso já existente:', existing._id);
       return res.json({
@@ -330,10 +324,8 @@ IMPORTANTE:
           description,
           level,
           duration,
-          category,
-          subcategory,
           sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${existing._id}`,
-          url: courseUrl,
+          url: `http://localhost:3000/curso/${slug}`,
         },
       });
     }
@@ -374,10 +366,8 @@ IMPORTANTE:
         description: created.description,
         level: created.level,
         duration: created.duration,
-        category,
-        subcategory,
         sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${created._id}`,
-        url: courseUrl,
+        url: `http://localhost:3000/curso/${created.slug?.current}`,
       },
     });
   } catch (err) {
