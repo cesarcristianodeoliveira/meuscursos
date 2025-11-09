@@ -7,6 +7,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { useCourse } from '../context/CourseContext'
 import { getTagsBySubcategory } from '../services/api'
+import IconResolver from '../components/IconResolver'
 
 const steps = ['Nível', 'Categoria', 'Subcategoria', 'Tags', 'Gerar Curso']
 
@@ -157,23 +158,26 @@ function NewCourseWizard() {
         return Array.isArray(categories) && categories.length ? (
           <List sx={{ width: '100%' }}>
             {categories.map(cat => (
-              <ListItemButton
-                key={cat._id}
-                selected={categoryId === cat._id}
-                onClick={() => {
-                  setCategoryId(cat._id)
-                  setSubcategoryId('')
-                  setSelectedTags([])
-                  setAvailableTags([])
-                }}
-                sx={{
-                  px: [1]
-                }}
-              >
-                <ListItemText 
-                  primary={cat.title}
-                />
-              </ListItemButton>
+                <ListItemButton
+                    key={cat._id}
+                    selected={categoryId === cat._id}
+                    onClick={() => {
+                        setCategoryId(cat._id)
+                        setSubcategoryId('')
+                        setSelectedTags([])
+                        setAvailableTags([])
+                    }}
+                    sx={{
+                        px: [1]
+                    }}
+                >
+                    <ListItemIcon sx={{ minWidth: 0, mr: 1 }}>
+                        <IconResolver iconName={cat.icon} />
+                    </ListItemIcon>
+                    <ListItemText 
+                        primary={cat.title}
+                    />
+                </ListItemButton>
             ))}
           </List>
         ) : (

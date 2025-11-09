@@ -21,7 +21,7 @@ router.get('/all', async (req, res) => {
         tags[]->{_id, title},
         status,
         provider
-      } | order(_createdAt asc)`),
+      } | order(_createdAt desc)`),
     ])
 
     res.json({ categories, subcategories, tags, courses })
