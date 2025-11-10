@@ -8,7 +8,6 @@ import {
 import StatCard from '../components/data/StatCard'
 import CreateCourseCard from '../components/data/CreateCourseCard'
 import { useCourse } from '../context/CourseContext'
-import ChartProvider from '../components/data/ChartProvider'
 
 const Welcome = () => {
   const { stats } = useCourse()
@@ -74,9 +73,6 @@ const Welcome = () => {
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <CreateCourseCard />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <ChartProvider />
         </Grid>
       </Grid>
     </Box>

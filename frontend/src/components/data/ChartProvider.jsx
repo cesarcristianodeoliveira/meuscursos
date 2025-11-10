@@ -11,43 +11,35 @@ import Stack from '@mui/material/Stack';
 import LinearProgress, { linearProgressClasses } from '@mui/material/LinearProgress';
 
 import {
-  IndiaFlag,
-  UsaFlag,
-  BrazilFlag,
-  GlobeFlag,
+  ChatGPTIcon,
+  DeepSeekIcon,
+  GeminiIcon,
 } from '../CustomIcons';
 
 const data = [
-  { label: 'India', value: 50000 },
-  { label: 'USA', value: 35000 },
-  { label: 'Brazil', value: 10000 },
-  { label: 'Other', value: 5000 },
+  { label: 'ChatGPT', value: 50000 },
+  { label: 'DeepSeek', value: 35000 },
+  { label: 'Gemini', value: 10000 },
 ];
 
 const countries = [
   {
-    name: 'India',
+    name: 'ChatGPT',
     value: 50,
-    flag: <IndiaFlag />,
+    flag: <ChatGPTIcon />,
     color: 'hsl(220, 25%, 65%)',
   },
   {
-    name: 'USA',
+    name: 'DeepSeek',
     value: 35,
-    flag: <UsaFlag />,
+    flag: <DeepSeekIcon />,
     color: 'hsl(220, 25%, 45%)',
   },
   {
-    name: 'Brazil',
+    name: 'Gemini',
     value: 10,
-    flag: <BrazilFlag />,
+    flag: <GeminiIcon />,
     color: 'hsl(220, 25%, 30%)',
-  },
-  {
-    name: 'Other',
-    value: 5,
-    flag: <GlobeFlag />,
-    color: 'hsl(220, 25%, 20%)',
   },
 ];
 
@@ -126,7 +118,7 @@ export default function ChartProvider() {
     >
       <CardContent>
         <Typography component="h2" variant="subtitle2">
-          Users by country
+          Provedores
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <PieChart
@@ -178,7 +170,7 @@ export default function ChartProvider() {
               </Stack>
               <LinearProgress
                 variant="determinate"
-                aria-label="Number of users by country"
+                aria-label="Provedores"
                 value={country.value}
                 sx={{
                   [`& .${linearProgressClasses.bar}`]: {
