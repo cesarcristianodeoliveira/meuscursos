@@ -30,7 +30,7 @@ router.get('/all', async (req, res) => {
         tags[]->{_id, title, "slug": slug.current}, // Incluindo slug na ref
         status,
         provider
-      } | order(_createdAt desc)`), // ORDENANDO NO BACKEND (desc)
+      } | order(_createdAt asc)`),
     ])
 
     res.json({ categories, subcategories, tags, courses })
@@ -103,7 +103,7 @@ router.get('/courses', async (_, res) => {
       tags[]->{_id, title, "slug": slug.current}, // Incluindo slug na ref
       status,
       provider
-    } | order(_createdAt desc)`) // ORDENANDO NO BACKEND (desc)
+    } | order(_createdAt asc)`) // ORDENANDO NO BACKEND (desc)
     res.json(data)
   } catch (err) {
     console.error('❌ Erro /courses', err)
