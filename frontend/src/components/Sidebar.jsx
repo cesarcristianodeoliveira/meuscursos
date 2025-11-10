@@ -28,8 +28,8 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 
 // Componentes Auxiliares
-import SearchField from '../components/SearchField';
-import MenuResponsive from '../components/MenuResponsive';
+import SearchField from './SearchField';
+import MenuResponsive from './MenuResponsive';
 
 // --- 1. Definição Centralizada das Rotas Principais ---
 const mainRoutes = [
@@ -49,18 +49,15 @@ const useIsActive = (path, exact) => {
         end: exact
     };
 
-    // Uso correto do matchPath. O end: exact cuida da maioria dos casos.
     const match = matchPath(matchOptions, location.pathname);
 
-    // Ajuste para lidar com rotas não exatas que devem corresponder apenas ao prefixo.
-    if (!exact && match) {
-        // Ex: /cursos/curso1 deve bater com /cursos, mas não /cursos-extras.
-        // matchPath já cuida de verificar se o path começa com o prefixo.
-        // Se a rota não for exata e houver um match, é ativo.
-        return true; 
+    if (exact) {
+        return !!match;
+    } else {
+        if (!match) return false;
+        const nextChar = location.pathname.charAt(path.length);
+        return match.path === path && (nextChar === '' || nextChar === '/');
     }
-    
-    return !!match;
 };
 
 
@@ -80,9 +77,7 @@ const SidebarLink = ({ to, label, icon: Icon, onClick, exact = false }) => {
                 dense
                 sx={{
                     transition: 'none',
-                    // CORREÇÃO: Usar paddingX ou paddingLeft/Right para evitar problemas com [1]
-                    // que não é um uso padrão da propriedade px do sx para arrays.
-                    paddingX: 1, // Equivalente a theme.spacing(1)
+                    '&.MuiListItemButton-root': { px: [1] },
                     '&.Mui-selected': { 
                         bgcolor: (theme) => theme.palette.action.selected,
                         borderRight: (theme) => `1px solid ${theme.palette.primary.main}`,
@@ -96,7 +91,6 @@ const SidebarLink = ({ to, label, icon: Icon, onClick, exact = false }) => {
                 }}
             >
                 {Icon && (
-                    // Ajuste: O padding do ListItemButton deve ser suficiente
                     <ListItemIcon sx={{ minWidth: 'auto', mr: 1 }}>
                         <Icon fontSize='small' />
                     </ListItemIcon>
@@ -104,8 +98,14 @@ const SidebarLink = ({ to, label, icon: Icon, onClick, exact = false }) => {
                 <ListItemText
                     primary={label}
                     primaryTypographyProps={{ noWrap: true }}
-                    // Ajuste: Removendo o sx no ListItemText. O `dense` no ListItemButton
-                    // deve ajustar o padding vertical adequadamente.
+                    sx={{
+                        '&.MuiListItemText-root': {
+                            mb: 0,
+                            mt: 0,
+                            pb: '3px',
+                            pt: '5px'
+                        }
+                    }}
                 />
             </ListItemButton>
         </ListItem>
@@ -128,8 +128,7 @@ const CourseSidebarLink = ({ to, title, secondaryText, onClick, isActive }) => {
                 dense
                 sx={{
                     transition: 'none',
-                    // CORREÇÃO: Usar paddingX para consistência
-                    paddingX: 1, 
+                    '&.MuiListItemButton-root': { px: [1] },
                     '&.Mui-selected': { 
                         bgcolor: (theme) => theme.palette.action.selected,
                         borderRight: (theme) => `1px solid ${theme.palette.primary.main}`,
@@ -143,7 +142,7 @@ const CourseSidebarLink = ({ to, title, secondaryText, onClick, isActive }) => {
                     primary={title}
                     primaryTypographyProps={{ 
                         noWrap: true,
-                        // Mantido fontSize para consistência visual
+                        // NOVO: Adicionado fontSize para manter a consistência de tamanho (0.875rem)
                         fontSize: '0.875rem', 
                     }}
                     secondary={secondaryText}
@@ -158,8 +157,7 @@ const CourseSidebarLink = ({ to, title, secondaryText, onClick, isActive }) => {
 
 const Sidebar = () => {
     const { courses, loading } = useCourse();
-    // Assumindo que drawerWidth está em pixels (ex: 240)
-    const { drawerWidth, darkMode, toggleDarkMode } = useThemeContext(); 
+    const { drawerWidth, darkMode, toggleDarkMode } = useThemeContext();
     const location = useLocation();
 
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -182,7 +180,6 @@ const Sidebar = () => {
     };
     
     const handleLinkClick = () => {
-        // Fechar o Drawer no mobile ao clicar em um link
         if (mobileOpen) {
             handleDrawerClose();
         }
@@ -191,6 +188,10 @@ const Sidebar = () => {
     const handleCoursesClick = () => {
         setOpenCourses(!openCourses);
     };
+    
+    // Lógica para Identificar o Slug Ativo
+    const courseMatch = matchPath('/curso/:slug', location.pathname);
+    const activeSlug = courseMatch ? courseMatch.params.slug : null;
 
 
     // Lógica de Ordenação dos Cursos (useMemo)
@@ -198,15 +199,12 @@ const Sidebar = () => {
         if (!courses || courses.length === 0) return [];
 
         return [...courses].sort((a, b) => {
-            // CORREÇÃO APLICADA AQUI:
-            // 1. Usar _createdAt (campo do Sanity) para a ordenação.
-            // 2. Usar a comparação numérica (getTime) para garantir a ordem correta
-            //    do mais recente para o mais antigo (B - A).
-            const dateA = new Date(a._createdAt || a._updatedAt || a._id).getTime();
-            const dateB = new Date(b._createdAt || b._updatedAt || b._id).getTime();
+            const dateA = a.createdAt || a.updatedAt || a._id;
+            const dateB = b.createdAt || b.updatedAt || b._id;
             
-            // Ordem Decrescente (do mais novo para o mais antigo)
-            return dateB - dateA;
+            if (dateA > dateB) return -1;
+            if (dateA < dateB) return 1;
+            return 0;
         });
     }, [courses]);
 
@@ -221,28 +219,20 @@ const Sidebar = () => {
             }}
         >
             {/* 1. Espaço para compensar o AppBar fixo no Desktop */}
-            <Toolbar 
-                // CORREÇÃO: Removendo px:[0] para permitir o padding padrão da Toolbar.
-                // Isso garante que o padding vertical e horizontal do tema seja aplicado.
-                sx={{ 
-                    minHeight: '56px!important', // Garantindo altura da AppBar
-                    display: { xs: 'none', sm: 'flex' } 
-                }} 
-            /> 
+            <Toolbar sx={{ px: [0], minHeight: '56px!important', display: { xs: 'none', sm: 'flex' } }} /> 
             
             {/* 2. CONTÊINER ROLÁVEL COMPLETO: flexGrow: 1, overflowY: 'auto' */}
             <Box sx={{ flexGrow: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             
                 {/* 2.1. Rotas Principais */}
                 <nav>
-                    {/* CORREÇÃO: Usar p: 0 ou padding: 0 em List, mas o List padrão não tem padding vertical */}
-                    <List dense sx={{ padding: 0 }}>
+                    <List dense sx={{ p: [0] }}>
                         {mainRoutes.map(route => (
                             <SidebarLink 
                                 key={route.path}
                                 to={route.path}
                                 label={route.label}
-                                icon={route.icon}
+                                // icon={route.icon}
                                 exact={route.exact}
                                 onClick={handleLinkClick} 
                             />
@@ -259,19 +249,18 @@ const Sidebar = () => {
                         onClick={handleCoursesClick}
                         sx={{ 
                             transition: 'none',
-                            // CORREÇÃO: Usar paddingX para consistência. px: [1] não é a sintaxe correta do array
-                            paddingX: 1, 
-                            minHeight: 36, // MinHeight para ListSubheader padrão
+                            px: [1], 
+                            // CORREÇÃO: minHeight para 36px
+                            minHeight: 36, 
                             
-                            bgcolor: 'background.paper', // Garante que a cor de fundo seja a do tema
+                            bgcolor: 'background.paper', 
                             color: 'text.primary',
                             
                             display: 'flex',
                             alignItems: 'center',
                             
-                            paddingTop: 0, // Ajuste fino, se necessário
+                            paddingTop: 0,
                             paddingBottom: 0,
-                            // O ListItemButton já garante que o flex seja usado
                         }}
                     >
                         
@@ -295,16 +284,12 @@ const Sidebar = () => {
                                 <CircularProgress size={20} />
                             </Box>
                         ) : (
-                            // CORREÇÃO: Usar padding: 0 para garantir que a lista não tenha margens indesejadas
-                            <List dense sx={{ padding: 0 }}>
+                            <List dense sx={{ p: [0] }}>
                                 {sortedCourses.length ? (
                                     sortedCourses.map(c => {
                                         const slug = typeof c.slug === 'object' ? c.slug.current : c.slug;
                                         const key = c._id || c.id || slug;
-                                        // A rota ativa é correta
-                                        const courseMatch = matchPath({ path: '/curso/:slug', end: false }, location.pathname);
-                                        const courseIsActive = courseMatch?.params.slug === slug;
-                                        
+                                        const courseIsActive = slug === activeSlug;
                                         const category = c.category?.title || 'Categoria Desconhecida';
                                         const subCategory = c.subcategory?.title ? ` - ${c.subcategory.title}` : ''; 
                                         const secondaryText = `${category}${subCategory}`;
@@ -327,9 +312,9 @@ const Sidebar = () => {
                                             primaryTypographyProps={{ 
                                                 color: 'textSecondary',
                                                 noWrap: true,
+                                                // NOVO: Adicionado fontSize para consistência
                                                 fontSize: '0.875rem',
-                                                // CORREÇÃO: Usar paddingX para consistência.
-                                                paddingX: 1
+                                                px: [1]
                                             }} 
                                         />
                                     </ListItem>
@@ -343,8 +328,7 @@ const Sidebar = () => {
             {/* 3. Botão Criar Curso (Fixo na parte inferior) */}
             <Box>
                 <Divider />
-                {/* CORREÇÃO: Usar p: 1 para o padding da Box */}
-                <Box sx={{ p: 1 }}> 
+                <Box sx={{ p: [1] }}>
                     <Button
                         variant='contained'
                         fullWidth
@@ -374,8 +358,7 @@ const Sidebar = () => {
                     borderColor: 'divider', 
                 }}
             >
-                <Toolbar sx={{ paddingX: 1, minHeight: '56px!important' }}>
-                    {/* Ícone Menu (Mobile) */}
+                <Toolbar sx={{ px: [1], minHeight: '56px!important' }}>
                     <IconButton
                         color='inherit'
                         onClick={handleDrawerToggle}
@@ -386,19 +369,16 @@ const Sidebar = () => {
                     >
                         <MenuIcon />
                     </IconButton>
-                    {/* Logo/Título */}
                     <Typography 
                         variant="h6" color='primary' noWrap component={Link} to={'/'} 
                         sx={{ alignItems: 'center', display: 'flex', textDecoration: 'none', lineHeight: 1, outline: 'none' }}
                     >
                         <RocketLaunchIcon color='primary' />
                     </Typography>
-                    {/* SearchField e MenuResponsive */}
                     <SearchField />
                     <Box flexGrow={1} />
                     <MenuResponsive />
                     <Box flexGrow={1} />
-                    {/* Ações Diretas */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <IconButton
                             color='inherit'
@@ -420,7 +400,6 @@ const Sidebar = () => {
 
             <Box
                 component="nav"
-                // O Drawer (permanente) deve ocupar o espaço (drawerWidth) no layout principal.
                 sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 }, minHeight: '100dvh' }}
             >
                 {/* 1. Drawer Mobile (temporário) */}
@@ -432,22 +411,14 @@ const Sidebar = () => {
                     ModalProps={{ keepMounted: true }} 
                     sx={{
                         display: { xs: 'block', sm: 'none' },
-                        // Garantindo que o Drawer Paper (o conteúdo) tenha 100% da altura e largura correta.
-                        '& .MuiDrawer-paper': { 
-                            backgroundImage: 'inherit', 
-                            boxSizing: 'border-box', 
-                            width: drawerWidth, 
-                            height: '100%' 
-                        }, 
+                        '& .MuiDrawer-paper': { backgroundImage: 'inherit', boxSizing: 'border-box', width: drawerWidth, height: '100%' }, 
                         zIndex: (theme) => theme.zIndex.drawer + 2
                     }}
                 >
-                    {/* AppBar interna para o Mobile (cabeçalho) */}
                     <AppBar color='inherit' elevation={0} position="sticky" 
                         sx={{ borderBottom: '1px solid', borderColor: 'divider' }}
                     >
-                        {/* CORREÇÃO: Usar paddingX no Toolbar interno também */}
-                        <Toolbar sx={{paddingX: 1, minHeight: '56px!important' }}>
+                        <Toolbar sx={{px: [1], minHeight: '56px!important' }}>
                             <IconButton color='inherit' onClick={handleDrawerToggle} sx={{ mr: 1 }}>
                                 <CloseIcon />
                             </IconButton>
@@ -457,7 +428,6 @@ const Sidebar = () => {
                             <Box flexGrow={1} />
                         </Toolbar>
                     </AppBar>
-                    {/* Conteúdo principal do Drawer */}
                     {drawer}
                 </Drawer>
 
@@ -466,19 +436,10 @@ const Sidebar = () => {
                     variant="permanent"
                     sx={{
                         display: { xs: 'none', sm: 'block' },
-                        '& .MuiDrawer-paper': { 
-                            boxSizing: 'border-box', 
-                            width: drawerWidth, 
-                            height: '100%', 
-                            // Propriedades adicionais para manter a aparência visual
-                            backgroundImage: 'inherit',
-                            borderRight: '1px solid',
-                            borderColor: 'divider',
-                        },
+                        '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, height: '100%' },
                     }}
                     open
                 >
-                    {/* Conteúdo principal do Drawer */}
                     {drawer}
                 </Drawer>
             </Box>

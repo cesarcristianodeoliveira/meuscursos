@@ -15,11 +15,11 @@ router.get('/all', async (req, res) => {
       // Tag (OK)
       client.fetch(`*[_type == "tag"]{_id, title, "slug": slug.current, subcategory->{_id, title}} | order(title asc)`),
       
-      // Curso: ADICIONANDO _createdAt e _updatedAt
+      // Curso: INCLUINDO DATAS E ORDENAÇÃO DECRESCENTE
       client.fetch(`*[_type == "course"]{
         _id,
-        _createdAt, // ADICIONADO para ordenação no frontend
-        _updatedAt, // ADICIONADO para ordenação no frontend
+        _createdAt, // ESSENCIAL para a ordenação no frontend
+        _updatedAt, // ESSENCIAL para a ordenação no frontend
         title,
         "slug": slug.current,
         description,
@@ -30,7 +30,7 @@ router.get('/all', async (req, res) => {
         tags[]->{_id, title, "slug": slug.current}, // Incluindo slug na ref
         status,
         provider
-      } | order(_createdAt desc)`),
+      } | order(_createdAt desc)`), // ORDENANDO NO BACKEND (desc)
     ])
 
     res.json({ categories, subcategories, tags, courses })
@@ -86,13 +86,13 @@ router.get('/tags', async (req, res) => {
   }
 })
 
-// --- 🔹 Cursos (resumo): ADICIONANDO _createdAt e _updatedAt ---
+// --- 🔹 Cursos (resumo): INCLUINDO DATAS E ORDENAÇÃO DECRESCENTE ---
 router.get('/courses', async (_, res) => {
   try {
     const data = await client.fetch(`*[_type == "course"]{
       _id,
-      _createdAt, // ADICIONADO para ordenação no frontend
-      _updatedAt, // ADICIONADO para ordenação no frontend
+      _createdAt, // ESSENCIAL para a ordenação no frontend
+      _updatedAt, // ESSENCIAL para a ordenação no frontend
       title,
       "slug": slug.current,
       description,
@@ -103,7 +103,7 @@ router.get('/courses', async (_, res) => {
       tags[]->{_id, title, "slug": slug.current}, // Incluindo slug na ref
       status,
       provider
-    } | order(_createdAt desc)`) // Ordenação: _createdAt desc (OK)
+    } | order(_createdAt desc)`) // ORDENANDO NO BACKEND (desc)
     res.json(data)
   } catch (err) {
     console.error('❌ Erro /courses', err)
@@ -111,14 +111,14 @@ router.get('/courses', async (_, res) => {
   }
 })
 
-// --- 🔹 Curso por ID: ADICIONANDO _createdAt e _updatedAt ---
+// --- 🔹 Curso por ID: INCLUINDO DATAS ---
 router.get('/course/:id', async (req, res) => {
   try {
     const { id } = req.params
     const query = `*[_type == "course" && _id == $id][0]{
       _id,
-      _createdAt, // ADICIONADO
-      _updatedAt, // ADICIONADO
+      _createdAt, // INCLUÍDO
+      _updatedAt, // INCLUÍDO
       title,
       "slug": slug.current,
       description,
@@ -163,15 +163,15 @@ router.get('/course/:id', async (req, res) => {
   }
 })
 
-// --- 🔹 Curso por SLUG: ADICIONANDO _createdAt e _updatedAt ---
+// --- 🔹 Curso por SLUG: INCLUINDO DATAS ---
 router.get('/course/slug/:slug', async (req, res) => {
   try {
     const { slug } = req.params
 
     const query = `*[_type == "course" && slug.current == $slug][0]{
       _id,
-      _createdAt, // ADICIONADO
-      _updatedAt, // ADICIONADO
+      _createdAt, // INCLUÍDO
+      _updatedAt, // INCLUÍDO
       title,
       "slug": slug.current,
       description,
