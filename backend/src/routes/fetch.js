@@ -7,13 +7,13 @@ router.get('/all', async (req, res) => {
   try {
     const [categories, subcategories, tags, courses] = await Promise.all([
       // Categoria (OK)
-      client.fetch(`*[_type == "category"]{_id, title, icon, "slug": slug.current} | order(title asc)`),
+      client.fetch(`*[_type == "category"]{_id, title, icon, "slug": slug.current} | order(title desc)`),
       
       // Subcategoria (OK)
-      client.fetch(`*[_type == "subcategory"]{_id, title, icon, "slug": slug.current, category->{_id, title}} | order(title asc)`),
+      client.fetch(`*[_type == "subcategory"]{_id, title, icon, "slug": slug.current, category->{_id, title}} | order(title desc)`),
       
       // Tag (OK)
-      client.fetch(`*[_type == "tag"]{_id, title, "slug": slug.current, subcategory->{_id, title}} | order(title asc)`),
+      client.fetch(`*[_type == "tag"]{_id, title, "slug": slug.current, subcategory->{_id, title}} | order(title desc)`),
       
       // Curso: INCLUINDO DATAS E ORDENAÇÃO DECRESCENTE
       client.fetch(`*[_type == "course"]{
@@ -30,7 +30,7 @@ router.get('/all', async (req, res) => {
         tags[]->{_id, title, "slug": slug.current}, // Incluindo slug na ref
         status,
         provider
-      } | order(_createdAt asc)`),
+      } | order(_createdAt desc)`),
     ])
 
     res.json({ categories, subcategories, tags, courses })
@@ -103,7 +103,7 @@ router.get('/courses', async (_, res) => {
       tags[]->{_id, title, "slug": slug.current}, // Incluindo slug na ref
       status,
       provider
-    } | order(_createdAt asc)`) 
+    } | order(_createdAt desc)`) 
     res.json(data)
   } catch (err) {
     console.error('❌ Erro /courses', err)
