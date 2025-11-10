@@ -103,7 +103,7 @@ router.get('/courses', async (_, res) => {
       tags[]->{_id, title, "slug": slug.current}, // Incluindo slug na ref
       status,
       provider
-    } | order(_createdAt asc)`) // ORDENANDO NO BACKEND (desc)
+    } | order(_createdAt asc)`) 
     res.json(data)
   } catch (err) {
     console.error('❌ Erro /courses', err)
@@ -117,8 +117,8 @@ router.get('/course/:id', async (req, res) => {
     const { id } = req.params
     const query = `*[_type == "course" && _id == $id][0]{
       _id,
-      _createdAt, // INCLUÍDO
-      _updatedAt, // INCLUÍDO
+      _createdAt,
+      _updatedAt,
       title,
       "slug": slug.current,
       description,
@@ -244,7 +244,7 @@ router.get('/stats', async (req, res) => {
         _createdAt,
         title,
         status
-      } | order(_createdAt desc)
+      } | order(_createdAt asc)
     `);
 
     const allCoursesForCharts = await client.fetch(`
