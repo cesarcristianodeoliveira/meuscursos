@@ -381,6 +381,7 @@ const Sidebar = () => {
       <Box component="nav" sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 }, minHeight: '100dvh' }}>
         <Drawer
           variant="temporary"
+          anchor="right"
           open={mobileOpen}
           onTransitionEnd={handleDrawerTransitionEnd}
           onClose={handleDrawerClose}
