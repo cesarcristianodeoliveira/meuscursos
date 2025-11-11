@@ -21,10 +21,12 @@ import LightModeIcon from '@mui/icons-material/LightMode'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
 import ExpandLess from '@mui/icons-material/ExpandLess'
 import ExpandMore from '@mui/icons-material/ExpandMore'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 
 // Componentes auxiliares
 import SearchField from './SearchField'
 import MenuResponsive from './MenuResponsive'
+import IconResolver from './IconResolver'
 
 // --- Rotas principais ---
 const mainRoutes = [
@@ -40,6 +42,12 @@ const useIsActive = (path, exact) => {
 
   if (exact) return !!match
   if (!match) return false
+  
+  // Para rotas não exatas, verifica se é a rota base ou uma sub-rota
+  if (path === '/cursos') {
+    return location.pathname === '/cursos' || location.pathname.startsWith('/cursos/')
+  }
+  
   const nextChar = location.pathname.charAt(path.length)
   return match.path === path && (nextChar === '' || nextChar === '/')
 }
@@ -61,7 +69,11 @@ const SidebarLink = ({ to, label, icon: Icon, onClick, exact = false }) => {
           '&.Mui-selected': {
             bgcolor: (theme) => theme.palette.action.selected,
             borderRight: (theme) => `1px solid ${theme.palette.primary.main}`,
-            '&:hover': { bgcolor: (theme) => theme.palette.action.hover }
+            '&:hover': { bgcolor: (theme) => theme.palette.action.hover },
+            '& .MuiListItemText-primary': {
+              color: (theme) => theme.palette.primary.main,
+              fontWeight: 600,
+            }
           },
           '&.Mui-selected .MuiListItemIcon-root': {
             color: (theme) => theme.palette.primary.main,
@@ -88,7 +100,7 @@ const SidebarLink = ({ to, label, icon: Icon, onClick, exact = false }) => {
 }
 
 // --- Link de curso ---
-const CourseSidebarLink = ({ to, title, secondaryText, onClick, isActive }) => (
+const CourseSidebarLink = ({ to, title, secondaryText, onClick, isActive, iconName }) => (
   <ListItem disablePadding>
     <ListItemButton
       component={Link}
@@ -104,9 +116,34 @@ const CourseSidebarLink = ({ to, title, secondaryText, onClick, isActive }) => (
           bgcolor: (theme) => theme.palette.action.selected,
           borderRight: (theme) => `1px solid ${theme.palette.primary.main}`,
           '&:hover': { bgcolor: (theme) => theme.palette.action.hover },
+          '& .MuiListItemText-primary': {
+            color: (theme) => theme.palette.primary.main,
+            fontWeight: 600,
+          },
+          '& .MuiListItemText-secondary': {
+            color: (theme) => theme.palette.primary.main,
+            opacity: 0.8,
+          },
+          '& .MuiListItemIcon-root': {
+            color: (theme) => theme.palette.primary.main,
+          }
         },
       }}
     >
+      {iconName && (
+        <ListItemIcon sx={{ 
+          minWidth: 32, 
+          mr: 1, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+        }}>
+          <IconResolver 
+            iconName={iconName} 
+            fontSize='small'
+          />
+        </ListItemIcon>
+      )}
       <ListItemText
         primary={title}
         primaryTypographyProps={{
@@ -115,6 +152,13 @@ const CourseSidebarLink = ({ to, title, secondaryText, onClick, isActive }) => (
         }}
         secondary={secondaryText}
         secondaryTypographyProps={{ noWrap: true }}
+        sx={{ 
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          minHeight: '48px',
+          marginLeft: iconName ? 0 : 1
+        }}
       />
     </ListItemButton>
   </ListItem>
@@ -156,117 +200,130 @@ const Sidebar = () => {
 
   // --- Drawer ---
   const drawer = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <Toolbar sx={{ px: [0], minHeight: '56px!important', display: { xs: 'none', sm: 'flex' } }} />
 
-      <Box sx={{ flexGrow: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        {/* Rotas principais */}
-        <nav>
-          <List dense sx={{ p: [0] }}>
-            {mainRoutes.map(route => (
-              <SidebarLink
-                key={route.path}
-                to={route.path}
-                label={route.label}
-                icon={route.icon}
-                exact={route.exact}
-                onClick={handleLinkClick}
-              />
-            ))}
-          </List>
-        </nav>
+      <Box sx={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {/* Conteúdo rolável */}
+        <Box sx={{ flexGrow: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {/* Rotas principais */}
+          <nav>
+            <List dense sx={{ p: [0] }}>
+              {mainRoutes.map(route => (
+                <SidebarLink
+                  key={route.path}
+                  to={route.path}
+                  label={route.label}
+                  icon={route.icon}
+                  exact={route.exact}
+                  onClick={handleLinkClick}
+                />
+              ))}
+            </List>
+          </nav>
 
-        <Divider />
+          <Divider />
 
-        {/* Cursos Recentes */}
-        <nav>
-          <ListSubheader
-            component={ListItemButton}
-            onClick={handleCoursesClick}
-            sx={{
-              transition: 'none',
-              px: [1],
-              minHeight: 36,
-              bgcolor: 'background.paper',
-              color: 'text.primary',
-              display: 'flex',
-              alignItems: 'center',
-              py: 0,
-            }}
-          >
-            <ListItemText
-              primary="Recentes"
-              primaryTypographyProps={{
-                noWrap: true,
-                fontSize: '0.875rem',
+          {/* Cursos Recentes */}
+          <nav>
+            <ListSubheader
+              component={ListItemButton}
+              onClick={handleCoursesClick}
+              sx={{
+                transition: 'none',
+                px: [1],
+                minHeight: 36,
+                bgcolor: 'background.paper',
+                color: 'text.primary',
+                display: 'flex',
+                alignItems: 'center',
+                py: 0,
+                '&.MuiListSubheader-root:hover': {
+                  bgcolor: 'background.paper',
+                },
               }}
-            />
-            <Box sx={{ flexGrow: 1 }} />
-            {openCourses ? <ExpandLess /> : <ExpandMore />}
-          </ListSubheader>
+            >
+              <ListItemIcon sx={{ minWidth: 'auto', mr: 1 }}>
+                <AutoAwesomeIcon fontSize='small' />
+              </ListItemIcon>
+              <ListItemText
+                primary="Recentes"
+                primaryTypographyProps={{
+                  noWrap: true,
+                  fontSize: '0.875rem',
+                }}
+              />
+              <Box sx={{ flexGrow: 1 }} />
+              {openCourses ? <ExpandLess /> : <ExpandMore />}
+            </ListSubheader>
 
-          <Collapse in={openCourses} timeout="auto" unmountOnExit>
-            {loading ? (
-              <Box sx={{ alignItems: 'center', display: 'flex', p: 1 }}>
-                <CircularProgress size={20} />
-              </Box>
-            ) : (
-              <List dense sx={{ p: [0] }}>
-                {sortedCourses.length ? (
-                  sortedCourses.map(c => {
-                    const slug = typeof c.slug === 'object' ? c.slug.current : c.slug
-                    const key = c._id || c.id || slug
-                    const courseIsActive = slug === activeSlug
-                    const category = c.category?.title || 'Categoria Desconhecida'
-                    const subCategory = c.subcategory?.title ? ` - ${c.subcategory.title}` : ''
-                    const secondaryText = `${category}${subCategory}`
+            <Collapse in={openCourses} timeout="auto" unmountOnExit>
+              {loading ? (
+                <Box sx={{ alignItems: 'center', display: 'flex', p: 1 }}>
+                  <CircularProgress size={20} />
+                </Box>
+              ) : (
+                <List dense sx={{ p: [0] }}>
+                  {sortedCourses.length ? (
+                    sortedCourses.map(c => {
+                      const slug = typeof c.slug === 'object' ? c.slug.current : c.slug
+                      const key = c._id || c.id || slug
+                      const courseIsActive = slug === activeSlug
+                      const category = c.category?.title || 'Categoria Desconhecida'
+                      const subCategory = c.subcategory?.title ? ` - ${c.subcategory.title}` : ''
+                      const secondaryText = `${category}${subCategory}`
+                      
+                      // Obtém o nome do ícone da categoria (pode ser null)
+                      const iconName = c.category?.icon || null
 
-                    return (
-                      <CourseSidebarLink
-                        key={key}
-                        to={`/curso/${slug}`}
-                        title={c.title}
-                        secondaryText={secondaryText}
-                        onClick={handleLinkClick}
-                        isActive={courseIsActive}
+                      return (
+                        <CourseSidebarLink
+                          key={key}
+                          to={`/curso/${slug}`}
+                          title={c.title}
+                          secondaryText={secondaryText}
+                          onClick={handleLinkClick}
+                          isActive={courseIsActive}
+                          iconName={iconName}
+                        />
+                      )
+                    })
+                  ) : (
+                    <ListItem disablePadding>
+                      <ListItemText
+                        primary="Nenhum curso no momento"
+                        primaryTypographyProps={{
+                          color: 'textSecondary',
+                          noWrap: true,
+                          fontSize: '0.875rem',
+                          px: [1]
+                        }}
                       />
-                    )
-                  })
-                ) : (
-                  <ListItem disablePadding>
-                    <ListItemText
-                      primary="Nenhum curso no momento"
-                      primaryTypographyProps={{
-                        color: 'textSecondary',
-                        noWrap: true,
-                        fontSize: '0.875rem',
-                        px: [1]
-                      }}
-                    />
-                  </ListItem>
-                )}
-              </List>
-            )}
-          </Collapse>
-        </nav>
-      </Box>
+                    </ListItem>
+                  )}
+                </List>
+              )}
+            </Collapse>
+          </nav>
+        </Box>
 
-      {/* Botão Criar Curso */}
-      <Box>
-        <Divider />
-        <Box sx={{ p: [1] }}>
-          <Button
-            variant='contained'
-            fullWidth
-            disableElevation
-            LinkComponent={Link}
-            to='/criar'
-            onClick={handleLinkClick}
-            sx={{ transition: 'none' }}
-            color='success'
-          >
-            Criar Curso
-          </Button>
+        {/* Botão Criar Curso - FIXO NO BOTTOM */}
+        <Box sx={{ mt: 'auto', flexShrink: 0 }}>
+          <Divider />
+          <Box sx={{ p: [1] }}>
+            <Button
+              variant='contained'
+              fullWidth
+              disableElevation
+              LinkComponent={Link}
+              to='/criar'
+              onClick={handleLinkClick}
+              sx={{ transition: 'none' }}
+              color='success'
+            >
+              Criar Curso
+            </Button>
+          </Box>
         </Box>
       </Box>
     </Box>
@@ -286,14 +343,6 @@ const Sidebar = () => {
         }}
       >
         <Toolbar sx={{ px: [1], minHeight: '56px!important' }}>
-          <IconButton
-            color='inherit'
-            onClick={handleDrawerToggle}
-            sx={{ display: { xs: 'flex', sm: 'none' }, mr: 1 }}
-          >
-            <MenuIcon />
-          </IconButton>
-
           <Typography
             variant="h6"
             color='primary'
@@ -317,11 +366,18 @@ const Sidebar = () => {
             <IconButton color='inherit' onClick={toggleDarkMode}>
               {darkMode ? <DarkModeIcon /> : <LightModeIcon />}
             </IconButton>
+            <IconButton
+              color='inherit'
+              onClick={handleDrawerToggle}
+              sx={{ display: { xs: 'flex', sm: 'none' } }}
+            >
+              <MenuIcon />
+            </IconButton>
           </Box>
         </Toolbar>
       </AppBar>
 
-      {/* Drawer Mobile */}
+      {/* Drawer Mobile - CORRIGIDO: 100% width e animação da direita pra esquerda */}
       <Box component="nav" sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 }, minHeight: '100dvh' }}>
         <Drawer
           variant="temporary"
@@ -334,7 +390,7 @@ const Sidebar = () => {
             '& .MuiDrawer-paper': {
               backgroundImage: 'inherit',
               boxSizing: 'border-box',
-              width: drawerWidth,
+              width: '100%',
               height: '100%',
             },
             zIndex: (theme) => theme.zIndex.drawer + 2,
@@ -342,13 +398,12 @@ const Sidebar = () => {
         >
           <AppBar color='inherit' elevation={0} position="sticky" sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
             <Toolbar sx={{ px: [1], minHeight: '56px!important' }}>
-              <IconButton color='inherit' onClick={handleDrawerToggle} sx={{ mr: 1 }}>
-                <CloseIcon />
-              </IconButton>
-              <Typography variant="h6" color='primary' noWrap sx={{ display: 'flex', alignItems: 'center', lineHeight: 1 }}>
+              <Typography variant="h6" color='primary' noWrap sx={{ display: 'flex', alignItems: 'center', lineHeight: 1, flexGrow: 1 }}>
                 <RocketLaunchIcon color='primary' />
               </Typography>
-              <Box flexGrow={1} />
+              <IconButton color='inherit' onClick={handleDrawerToggle}>
+                <CloseIcon />
+              </IconButton>
             </Toolbar>
           </AppBar>
           {drawer}
@@ -359,7 +414,12 @@ const Sidebar = () => {
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth, height: '100%' },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth, 
+              height: '100%',
+              overflow: 'hidden'
+            },
           }}
           open
         >

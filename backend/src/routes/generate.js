@@ -119,23 +119,23 @@ function validateTags(tags) {
 const LEVEL_CONFIG = {
   beginner: {
     modules: 3,
-    lessonsPerModule: 3,
-    tips: 2,
+    lessonsPerModule: 1,
+    tips: 1,
     exercises: 1,
     tone: 'explicativo e acessível, com linguagem simples e exemplos práticos',
   },
   intermediate: {
-    modules: 4,
-    lessonsPerModule: 3,
+    modules: 3,
+    lessonsPerModule: 2,
     tips: 2,
-    exercises: 1,
+    exercises: 2,
     tone: 'detalhado e aplicado, com exemplos reais e desafios práticos',
   },
   advanced: {
-    modules: 5,
-    lessonsPerModule: 4,
+    modules: 3,
+    lessonsPerModule: 3,
     tips: 3,
-    exercises: 2,
+    exercises: 3,
     tone: 'abrangente, técnico e aprofundado, voltado para profissionais experientes',
   },
 };

@@ -7,7 +7,6 @@ router.get('/', async (req, res) => {
     const providers = [
       { id: 'openai', name: 'ChatGPT (OpenAI)', enabled: !!process.env.OPENAI_API_KEY },
       { id: 'gemini', name: 'Gemini', enabled: !!process.env.GEMINI_API_KEY },
-      { id: 'custom', name: 'Custom API', enabled: !!process.env.CUSTOM_PROVIDER_URL }
     ];
     res.json(providers);
   } catch (err) {

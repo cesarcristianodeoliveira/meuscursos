@@ -195,7 +195,7 @@ const SearchPage = () => {
 
           <Grid container spacing={3}>
             {searchResults.map((course) => (
-              <Grid item xs={12} sm={6} md={4} key={course._id}>
+              <Grid xs={12} sm={6} md={4} key={course._id}>
                 <Card 
                   sx={{ 
                     height: '100%',
