@@ -7,5 +7,5 @@ export default sanityClient({
   dataset: process.env.SANITY_DATASET,
   token: process.env.SANITY_API_TOKEN,
   useCdn: false,
-  apiVersion: '2023-01-01',
+  apiVersion: process.env.SANITY_API_VERSION,
 });
