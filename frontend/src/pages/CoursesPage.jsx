@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { 
   Box, 
   Typography,
@@ -16,6 +16,16 @@ import { useNavigate } from 'react-router-dom'
 const CoursesPage = () => {
   const { courses, loading } = useCourse()
   const navigate = useNavigate()
+
+  // ✅ Ordena cursos do mais novo para o mais antigo
+  const sortedCourses = useMemo(() => {
+    if (!courses || courses.length === 0) return []
+    return [...courses].sort((a, b) => {
+      const dateA = new Date(a._createdAt || 0)
+      const dateB = new Date(b._createdAt || 0)
+      return dateB - dateA // Descendente (mais novo primeiro)
+    })
+  }, [courses])
 
   const handleCourseClick = (course) => {
     navigate(`/curso/${course.slug}`)
@@ -41,10 +51,8 @@ const CoursesPage = () => {
 
   const formatDuration = (minutes) => {
     if (!minutes) return 'Duração não informada'
-    
     const hours = Math.floor(minutes / 60)
     const mins = minutes % 60
-    
     if (hours > 0) {
       return `${hours}h ${mins > 0 ? `${mins}min` : ''}`.trim()
     }
@@ -94,170 +102,167 @@ const CoursesPage = () => {
         Cursos
       </Typography>
 
-      {courses.length === 0 ? (
+      {sortedCourses.length === 0 ? (
         <Typography 
           color='text.secondary'
-          sx={{
-            fontSize: '0.875rem'
-          }}
+          sx={{ fontSize: '0.875rem' }}
         >
           Nenhum curso no momento
         </Typography>
       ) : (
-        <>
-          <Grid container spacing={1}>
-            {courses.map((course) => (
-              <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={course._id}>
-                <Card 
+        <Grid container spacing={1}>
+          {sortedCourses.map((course) => (
+            <Grid item size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={course._id}>
+              <Card 
+                sx={{ 
+                  height: '100%',
+                  transition: 'none',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <CardActionArea 
+                  onClick={() => handleCourseClick(course)}
                   sx={{ 
-                    height: '100%',
-                    transition: 'none',
-                    border: '1px solid',
-                    borderColor: 'divider',
                     display: 'flex',
                     flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    p: 1,
+                    height: '100%',
+                    flex: 1
                   }}
                 >
-                  <CardActionArea 
-                    onClick={() => handleCourseClick(course)}
+                  <CardContent 
                     sx={{ 
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-start',
-                      p: 1,
-                      height: '100%',
-                      flex: 1
+                      p: 0, 
+                      width: '100%', 
+                      flex: 1, 
+                      display: 'flex', 
+                      flexDirection: 'column' 
                     }}
                   >
-                    <CardContent sx={{ p: 0, width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                      {/* Título */}
-                      <Typography 
-                        variant="h6" 
-                        component="h2" 
-                        gutterBottom
-                        sx={{
-                          fontWeight: 600,
-                          lineHeight: 1.3,
-                          minHeight: '3.9em',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        {course.title}
-                      </Typography>
-                      
-                      {/* Descrição */}
-                      <Typography 
-                        variant="body2" 
-                        color="text.secondary" 
-                        sx={{ 
-                          mb: 2,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 3,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          minHeight: '4.5em',
-                          flex: 1
-                        }}
-                      >
-                        {course.description || 'Sem descrição disponível.'}
-                      </Typography>
+                    {/* Título */}
+                    <Typography 
+                      variant="h6" 
+                      component="h2" 
+                      gutterBottom
+                      sx={{
+                        fontWeight: 600,
+                        lineHeight: 1.3,
+                        minHeight: '3.9em',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {course.title}
+                    </Typography>
+                    
+                    {/* Descrição */}
+                    <Typography 
+                      variant="body2" 
+                      color="text.secondary" 
+                      sx={{ 
+                        mb: 2,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        minHeight: '4.5em',
+                        flex: 1
+                      }}
+                    >
+                      {course.description || 'Sem descrição disponível.'}
+                    </Typography>
 
-                      {/* Chips de nível e duração */}
-                      <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {/* Chips de nível e duração */}
+                    <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      <Chip 
+                        label={getLevelText(course.level)} 
+                        size="small" 
+                        color={getLevelColor(course.level)}
+                        variant="filled"
+                      />
+                      {course.duration && (
                         <Chip 
-                          label={getLevelText(course.level)} 
+                          label={formatDuration(course.duration)} 
                           size="small" 
-                          color={getLevelColor(course.level)}
-                          variant="filled"
+                          variant="outlined"
                         />
-                        
-                        {course.duration && (
-                          <Chip 
-                            label={formatDuration(course.duration)} 
-                            size="small" 
-                            variant="outlined"
-                          />
+                      )}
+                    </Box>
+
+                    {/* Estatísticas */}
+                    <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        <strong>{countTotalLessons(course)}</strong> aulas
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        <strong>{countTotalExercises(course)}</strong> exercícios
+                      </Typography>
+                    </Box>
+
+                    {/* Categoria e Subcategoria */}
+                    {(course.category || course.subcategory) && (
+                      <Box sx={{ mb: 2 }}>
+                        {course.category && (
+                          <Typography variant="caption" display="block" color="text.secondary" gutterBottom>
+                            <strong>Categoria:</strong> {course.category.title}
+                          </Typography>
+                        )}
+                        {course.subcategory && (
+                          <Typography variant="caption" display="block" color="text.secondary">
+                            <strong>Subcategoria:</strong> {course.subcategory.title}
+                          </Typography>
                         )}
                       </Box>
+                    )}
 
-                      {/* Estatísticas do curso */}
-                      <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                        <Typography variant="caption" color="text.secondary">
-                          <strong>{countTotalLessons(course)}</strong> aulas
+                    {/* Tags */}
+                    {course.tags && course.tags.length > 0 && (
+                      <Box sx={{ mt: 'auto', pt: 2 }}>
+                        <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                          <strong>Tags:</strong>
                         </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {course.tags.slice(0, 3).map((tag) => (
+                            <Chip
+                              key={tag._id}
+                              label={tag.title}
+                              size="small"
+                              variant="outlined"
+                              sx={{ fontSize: '0.7rem', height: 24 }}
+                            />
+                          ))}
+                          {course.tags.length > 3 && (
+                            <Chip
+                              label={`+${course.tags.length - 3}`}
+                              size="small"
+                              variant="outlined"
+                              sx={{ fontSize: '0.7rem', height: 24 }}
+                            />
+                          )}
+                        </Box>
+                      </Box>
+                    )}
+
+                    {/* Provider */}
+                    {course.provider && (
+                      <Box sx={{ mt: 2, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
                         <Typography variant="caption" color="text.secondary">
-                          <strong>{countTotalExercises(course)}</strong> exercícios
+                          <strong>Fonte:</strong> {course.provider}
                         </Typography>
                       </Box>
-
-                      {/* Categoria e Subcategoria */}
-                      {(course.category || course.subcategory) && (
-                        <Box sx={{ mb: 2 }}>
-                          {course.category && (
-                            <Typography variant="caption" display="block" color="text.secondary" gutterBottom>
-                              <strong>Categoria:</strong> {course.category.title}
-                            </Typography>
-                          )}
-                          {course.subcategory && (
-                            <Typography variant="caption" display="block" color="text.secondary">
-                              <strong>Subcategoria:</strong> {course.subcategory.title}
-                            </Typography>
-                          )}
-                        </Box>
-                      )}
-
-                      {/* Tags */}
-                      {course.tags && course.tags.length > 0 && (
-                        <Box sx={{ mt: 'auto', pt: 2 }}>
-                          <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                            <strong>Tags:</strong>
-                          </Typography>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                            {course.tags.slice(0, 3).map((tag) => (
-                              <Chip
-                                key={tag._id}
-                                label={tag.title}
-                                size="small"
-                                variant="outlined"
-                                sx={{ 
-                                  fontSize: '0.7rem',
-                                  height: 24
-                                }}
-                              />
-                            ))}
-                            {course.tags.length > 3 && (
-                              <Chip
-                                label={`+${course.tags.length - 3}`}
-                                size="small"
-                                variant="outlined"
-                                sx={{ 
-                                  fontSize: '0.7rem',
-                                  height: 24
-                                }}
-                              />
-                            )}
-                          </Box>
-                        </Box>
-                      )}
-
-                      {/* Provider */}
-                      {course.provider && (
-                        <Box sx={{ mt: 2, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-                          <Typography variant="caption" color="text.secondary">
-                            <strong>Fonte:</strong> {course.provider}
-                          </Typography>
-                        </Box>
-                      )}
-                    </CardContent>
-                  </CardActionArea>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </>
+                    )}
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
       )}
     </Box>
   )

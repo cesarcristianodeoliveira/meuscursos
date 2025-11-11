@@ -2,332 +2,296 @@ const express = require('express')
 const router = express.Router()
 const client = require('../config/sanityClient.js')
 
-// --- 🔹 /all (categorias, subcategorias, tags e cursos resumidos) ---
+// --- 🔹 /all (categorias, subcategororias, tags e cursos resumidos) ---
 router.get('/all', async (req, res) => {
-  try {
-    const [categories, subcategories, tags, courses] = await Promise.all([
-      // Categoria (OK)
-      client.fetch(`*[_type == "category"]{_id, title, icon, "slug": slug.current} | order(title desc)`),
-      
-      // Subcategoria (OK)
-      client.fetch(`*[_type == "subcategory"]{_id, title, icon, "slug": slug.current, category->{_id, title}} | order(title desc)`),
-      
-      // Tag (OK)
-      client.fetch(`*[_type == "tag"]{_id, title, "slug": slug.current, subcategory->{_id, title}} | order(title desc)`),
-      
-      // Curso: INCLUINDO DATAS E ORDENAÇÃO DECRESCENTE
-      client.fetch(`*[_type == "course"]{
-        _id,
-        _createdAt, // ESSENCIAL para a ordenação no frontend
-        _updatedAt, // ESSENCIAL para a ordenação no frontend
-        title,
-        "slug": slug.current,
-        description,
-        level,
-        duration,
-        category->{_id, title, icon, "slug": slug.current}, // Incluindo slug na ref
-        subcategory->{_id, title, icon, "slug": slug.current}, // Incluindo slug na ref
-        tags[]->{_id, title, "slug": slug.current}, // Incluindo slug na ref
-        status,
-        provider
-      } | order(_createdAt desc)`),
-    ])
+  try {
+    const [categories, subcategories, tags, courses] = await Promise.all([
+      // Categoria
+      client.fetch(`*[_type == "category"]{_id, title, icon, "slug": slug.current} | order(title asc)`),
 
-    res.json({ categories, subcategories, tags, courses })
-  } catch (err) {
-    console.error('❌ Erro /all', err)
-    res.status(500).json({ error: 'Erro ao buscar todos os dados' })
-  }
+      // Subcategoria
+      client.fetch(`*[_type == "subcategory"]{_id, title, icon, "slug": slug.current, category->{_id, title}} | order(title asc)`),
+
+      // Tag
+      client.fetch(`*[_type == "tag"]{_id, title, "slug": slug.current, subcategory->{_id, title}} | order(title asc)`),
+
+      // Curso — ordenação decrescente por data de criação
+      client.fetch(`*[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
+        _id,
+        _createdAt,
+        _updatedAt,
+        title,
+        "slug": slug.current,
+        description,
+        level,
+        duration,
+        category->{_id, title, icon, "slug": slug.current},
+        subcategory->{_id, title, icon, "slug": slug.current},
+        tags[]->{_id, title, "slug": slug.current},
+        status,
+        provider
+      }`)
+    ])
+
+    res.json({ categories, subcategories, tags, courses })
+  } catch (err) {
+    console.error('❌ Erro /all', err)
+    res.status(500).json({ error: 'Erro ao buscar todos os dados' })
+  }
 })
 
-// --- 🔹 Categorias (Inalterado) ---
+// --- 🔹 Categorias ---
 router.get('/categories', async (_, res) => {
-  try {
-    // CORRIGIDO: Já inclui icon e slug. Ordenação: title asc (OK)
-    const data = await client.fetch(`*[_type == "category"]{_id, title, "slug": slug.current, icon} | order(title asc)`)
-    res.json(data)
-  } catch (err) {
-    console.error('❌ Erro /categories', err)
-    res.status(500).json({ error: 'Erro ao buscar categorias' })
-  }
+  try {
+    const data = await client.fetch(
+      `*[_type == "category"]{_id, title, "slug": slug.current, icon} | order(title asc)`
+    )
+    res.json(data)
+  } catch (err) {
+    console.error('❌ Erro /categories', err)
+    res.status(500).json({ error: 'Erro ao buscar categorias' })
+  }
 })
 
-// --- 🔹 Subcategorias (Inalterado) ---
+// --- 🔹 Subcategorias ---
 router.get('/subcategories', async (req, res) => {
-  try {
-    const { categoryId } = req.query
-    const query = categoryId
-      // CORRIGIDO: Inclui icon e slug na subcategoria. Category ref simplificada. Ordenação: title asc (OK)
-      ? `*[_type == "subcategory" && references($categoryId)]{_id, title, "slug": slug.current, icon, category->{_id, title}} | order(title asc)`
-      // CORRIGIDO: Se não houver filtro, a subcategoria deve retornar icon e slug. Category ref simplificada. Ordenação: title asc (OK)
-      : `*[_type == "subcategory"]{_id, title, "slug": slug.current, icon, category->{_id, title}} | order(title asc)`
-    const data = await client.fetch(query, { categoryId })
-    res.json(data)
-  } catch (err) {
-    console.error('❌ Erro /subcategories', err)
-    res.status(500).json({ error: 'Erro ao buscar subcategorias' })
-  }
+  try {
+    const { categoryId } = req.query
+    const query = categoryId
+      ? `*[_type == "subcategory" && references($categoryId)]{_id, title, "slug": slug.current, icon, category->{_id, title}} | order(title asc)`
+      : `*[_type == "subcategory"]{_id, title, "slug": slug.current, icon, category->{_id, title}} | order(title asc)`
+    const data = await client.fetch(query, { categoryId })
+    res.json(data)
+  } catch (err) {
+    console.error('❌ Erro /subcategories', err)
+    res.status(500).json({ error: 'Erro ao buscar subcategorias' })
+  }
 })
 
-// --- 🔹 Tags (Inalterado) ---
+// --- 🔹 Tags ---
 router.get('/tags', async (req, res) => {
-  try {
-    const { subcategoryId } = req.query
-    const query = subcategoryId
-      // CORRIGIDO: Inclui slug na tag. Subcategory ref simplificada. Ordenação: title asc (OK)
-      ? `*[_type == "tag" && references($subcategoryId)]{_id, title, "slug": slug.current, subcategory->{_id, title}} | order(title asc)`
-      // CORRIGIDO: Tag inclui slug. Subcategory ref simplificada. Ordenação: title asc (OK)
-      : `*[_type == "tag"]{_id, title, "slug": slug.current, subcategory->{_id, title}} | order(title asc)`
-    const data = await client.fetch(query, { subcategoryId })
-    res.json(data)
-  } catch (err) {
-    console.    error('❌ Erro /tags', err)
-    res.status(500).json({ error: 'Erro ao buscar tags' })
-  }
+  try {
+    const { subcategoryId } = req.query
+    const query = subcategoryId
+      ? `*[_type == "tag" && references($subcategoryId)]{_id, title, "slug": slug.current, subcategory->{_id, title}} | order(title asc)`
+      : `*[_type == "tag"]{_id, title, "slug": slug.current, subcategory->{_id, title}} | order(title asc)`
+    const data = await client.fetch(query, { subcategoryId })
+    res.json(data)
+  } catch (err) {
+    console.error('❌ Erro /tags', err)
+    res.status(500).json({ error: 'Erro ao buscar tags' })
+  }
 })
 
-// --- 🔹 Cursos (resumo): INCLUINDO DATAS E ORDENAÇÃO DECRESCENTE ---
+// --- 🔹 Cursos (resumo) ---
 router.get('/courses', async (_, res) => {
-  try {
-    const data = await client.fetch(`*[_type == "course"]{
-      _id,
-      _createdAt, // ESSENCIAL para a ordenação no frontend
-      _updatedAt, // ESSENCIAL para a ordenação no frontend
-      title,
-      "slug": slug.current,
-      description,
-      level,
-      duration,
-      category->{_id, title, icon, "slug": slug.current}, // Incluindo icon e slug na ref
-      subcategory->{_id, title, icon, "slug": slug.current}, // Incluindo icon e slug na ref
-      tags[]->{_id, title, "slug": slug.current}, // Incluindo slug na ref
-      status,
-      provider
-    } | order(_createdAt desc)`) 
-    res.json(data)
-  } catch (err) {
-    console.error('❌ Erro /courses', err)
-    res.status(500).json({ error: 'Erro ao buscar cursos' })
-  }
+  try {
+    const data = await client.fetch(`*[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
+      _id,
+      _createdAt,
+      _updatedAt,
+      title,
+      "slug": slug.current,
+      description,
+      level,
+      duration,
+      category->{_id, title, icon, "slug": slug.current},
+      subcategory->{_id, title, icon, "slug": slug.current},
+      tags[]->{_id, title, "slug": slug.current},
+      status,
+      provider
+    }`)
+    res.json(data)
+  } catch (err) {
+    console.error('❌ Erro /courses', err)
+    res.status(500).json({ error: 'Erro ao buscar cursos' })
+  }
 })
 
-// --- 🔹 Curso por ID: INCLUINDO DATAS ---
+// --- 🔹 Curso por ID ---
 router.get('/course/:id', async (req, res) => {
-  try {
-    const { id } = req.params
-    const query = `*[_type == "course" && _id == $id][0]{
-      _id,
-      _createdAt,
-      _updatedAt,
-      title,
-      "slug": slug.current,
-      description,
-      level,
-      duration,
-      category->{_id, title, icon, "slug": slug.current}, // Incluindo icon e slug na ref
-      subcategory->{_id, title, icon, "slug": slug.current}, // Incluindo icon e slug na ref
-      tags[]->{_id, title, "slug": slug.current}, // Incluindo slug na ref
-      thumbnail->{_id, title, url},
-      video->{_id, title, url},
-      certificate,
-      audioMasculino{asset->{url}},
-      audioFeminino{asset->{url}},
-      provider,
-      status,
-      modules[]{
-        _key,
-        title,
-        description,
-        lessons[]{
-          _key,
-          title,
-          content,
-          tips,
-          exercises[]{
-            _key,
-            question,
-            answer,
-            options
-          }
-        }
-      }
-    }`
-
-    const course = await client.fetch(query, { id })
-    if (!course) return res.status(404).json({ error: 'Curso não encontrado' })
-
-    res.json(course)
-  } catch (err) {
-    console.error('❌ Erro /course/:id', err)
-    res.status(500).json({ error: 'Erro ao buscar curso por ID' })
-  }
+  try {
+    const { id } = req.params
+    const query = `*[_type == "course" && _id == $id][0]{
+      _id,
+      _createdAt,
+      _updatedAt,
+      title,
+      "slug": slug.current,
+      description,
+      level,
+      duration,
+      category->{_id, title, icon, "slug": slug.current},
+      subcategory->{_id, title, icon, "slug": slug.current},
+      tags[]->{_id, title, "slug": slug.current},
+      thumbnail->{_id, title, url},
+      video->{_id, title, url},
+      certificate,
+      audioMasculino{asset->{url}},
+      audioFeminino{asset->{url}},
+      provider,
+      status,
+      modules[]{
+        _key,
+        title,
+        description,
+        lessons[]{
+          _key,
+          title,
+          content,
+          tips,
+          exercises[]{
+            _key,
+            question,
+            answer,
+            options
+          }
+        }
+      }
+    }`
+    const course = await client.fetch(query, { id })
+    if (!course) return res.status(404).json({ error: 'Curso não encontrado' })
+    res.json(course)
+  } catch (err) {
+    console.error('❌ Erro /course/:id', err)
+    res.status(500).json({ error: 'Erro ao buscar curso por ID' })
+  }
 })
 
-// --- 🔹 Curso por SLUG: INCLUINDO DATAS ---
+// --- 🔹 Curso por SLUG ---
 router.get('/course/slug/:slug', async (req, res) => {
-  try {
-    const { slug } = req.params
-
-    const query = `*[_type == "course" && slug.current == $slug][0]{
-      _id,
-      _createdAt, // INCLUÍDO
-      _updatedAt, // INCLUÍDO
-      title,
-      "slug": slug.current,
-      description,
-      level,
-      duration,
-      category->{_id, title, icon, "slug": slug.current}, // Incluindo icon e slug na ref
-      subcategory->{_id, title, icon, "slug": slug.current}, // Incluindo icon e slug na ref
-      tags[]->{_id, title, "slug": slug.current}, // Incluindo slug na ref
-      thumbnail->{_id, title, url},
-      video->{_id, title, url},
-      certificate,
-      audioMasculino{asset->{url}},
-      audioFeminino{asset->{url}},
-      provider,
-      status,
-      modules[]{
-        _key,
-        title,
-        description,
-        lessons[]{
-          _key,
-          title,
-          content,
-          tips,
-          exercises[]{
-            _key,
-            question,
-            answer,
-            options
-          }
-        }
-      }
-    }`
-
-    const course = await client.fetch(query, { slug })
-    if (!course) return res.status(404).json({ error: 'Curso não encontrado' })
-
-    res.json(course)
-  } catch (err) {
-    console.error('❌ Erro /course/slug/:slug', err)
-    res.status(500).json({ error: 'Erro ao buscar curso por slug' })
-  }
+  try {
+    const { slug } = req.params
+    const query = `*[_type == "course" && slug.current == $slug][0]{
+      _id,
+      _createdAt,
+      _updatedAt,
+      title,
+      "slug": slug.current,
+      description,
+      level,
+      duration,
+      category->{_id, title, icon, "slug": slug.current},
+      subcategory->{_id, title, icon, "slug": slug.current},
+      tags[]->{_id, title, "slug": slug.current},
+      thumbnail->{_id, title, url},
+      video->{_id, title, url},
+      certificate,
+      audioMasculino{asset->{url}},
+      audioFeminino{asset->{url}},
+      provider,
+      status,
+      modules[]{
+        _key,
+        title,
+        description,
+        lessons[]{
+          _key,
+          title,
+          content,
+          tips,
+          exercises[]{
+            _key,
+            question,
+            answer,
+            options
+          }
+        }
+      }
+    }`
+    const course = await client.fetch(query, { slug })
+    if (!course) return res.status(404).json({ error: 'Curso não encontrado' })
+    res.json(course)
+  } catch (err) {
+    console.error('❌ Erro /course/slug/:slug', err)
+    res.status(500).json({ error: 'Erro ao buscar curso por slug' })
+  }
 })
 
-// --- 🔹 Estatísticas dos Cursos, Lessons e Exercises (Inalterado) ---
+// --- 🔹 Estatísticas dos Cursos, Lessons e Exercises ---
 router.get('/stats', async (req, res) => {
-  try {
-    const totalCourses = await client.fetch(`count(*[_type == "course"])`);
-    
-    const publishedCourses = await client.fetch(`count(*[_type == "course" && status == "published"])`);
-    
-    // 👇 BUSCA TODOS os cursos com modules, lessons e exercises
-    const allCoursesWithContent = await client.fetch(`
-      *[_type == "course"]{
-        _createdAt,
-        title,
-        status,
-        "totalLessons": count(modules[].lessons[]),
-        "totalExercises": count(modules[].lessons[].exercises[])
-      }
-    `);
+  try {
+    const totalCourses = await client.fetch(`count(*[_type == "course"])`)
+    const publishedCourses = await client.fetch(`count(*[_type == "course" && status == "published"])`)
 
-    // 👇 Calcula totais
-    const totalLessons = allCoursesWithContent.reduce((sum, course) => sum + (course.totalLessons || 0), 0);
-    const totalExercises = allCoursesWithContent.reduce((sum, course) => sum + (course.totalExercises || 0), 0);
-    
-    // 👇 BUSCA cursos publicados para gráficos
-    const allPublishedCourses = await client.fetch(`
-      *[_type == "course" && status == "published"]{
-        _createdAt,
-        title,
-        status
-      } | order(_createdAt asc)
-    `);
+    const allCoursesWithContent = await client.fetch(`
+      *[_type == "course"]{
+        _createdAt,
+        title,
+        status,
+        "totalLessons": count(modules[].lessons[]),
+        "totalExercises": count(modules[].lessons[].exercises[])
+      } | order(_updatedAt desc, _createdAt desc)
+    `)
 
-    const allCoursesForCharts = await client.fetch(`
-      *[_type == "course" && status == "published"]{
-        _createdAt,
-        title,
-        status,
-        "lessonsCount": count(modules[].lessons[]),
-        "exercisesCount": count(modules[].lessons[].exercises[])
-      } | order(_createdAt asc)
-    `);
+    const totalLessons = allCoursesWithContent.reduce((sum, c) => sum + (c.totalLessons || 0), 0)
+    const totalExercises = allCoursesWithContent.reduce((sum, c) => sum + (c.totalExercises || 0), 0)
 
-    // 👇 Inicializa dados para gráficos
-    const dailyCourseData = {};
-    const dailyLessonData = {};
-    const dailyExerciseData = {};
-    const now = new Date();
-    
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(now.getDate() - i);
-      const monthName = date.toLocaleDateString('pt-BR', { month: 'short' });
-      const dayLabel = `${monthName} ${date.getDate()}`;
-      dailyCourseData[dayLabel] = 0;
-      dailyLessonData[dayLabel] = 0;
-      dailyExerciseData[dayLabel] = 0;
-    }
-    
-    // 👇 Preenche com CURSOS
-    allPublishedCourses.forEach((course) => {
-      try {
-        const courseDate = new Date(course._createdAt);
-        const monthName = courseDate.toLocaleDateString('pt-BR', { month: 'short' });
-        const dayLabel = `${monthName} ${courseDate.getDate()}`;
-        
-        if (dailyCourseData[dayLabel] !== undefined) {
-          dailyCourseData[dayLabel] += 1;
-        }
-      } catch (err) {
-        console.warn('⚠️ Erro ao processar data do curso:', course._id);
-      }
-    });
+    const allPublishedCourses = await client.fetch(`
+      *[_type == "course" && status == "published"] | order(_updatedAt desc, _createdAt desc) {
+        _createdAt,
+        title,
+        status
+      }
+    `)
 
-    // 👇 Preenche com LESSONS e EXERCISES
-    allCoursesForCharts.forEach((course) => {
-      try {
-        const courseDate = new Date(course._createdAt);
-        const monthName = courseDate.toLocaleDateString('pt-BR', { month: 'short' });
-        const dayLabel = `${monthName} ${courseDate.getDate()}`;
-        
-        if (dailyLessonData[dayLabel] !== undefined && course.lessonsCount > 0) {
-          dailyLessonData[dayLabel] += course.lessonsCount;
-        }
-        
-        if (dailyExerciseData[dayLabel] !== undefined && course.exercisesCount > 0) {
-          dailyExerciseData[dayLabel] += course.exercisesCount;
-        }
-      } catch (err) {
-        console.warn('⚠️ Erro ao processar data do curso para conteúdo:', course._id);
-      }
-    });
+    const allCoursesForCharts = await client.fetch(`
+      *[_type == "course" && status == "published"] | order(_updatedAt desc, _createdAt desc) {
+        _createdAt,
+        title,
+        status,
+        "lessonsCount": count(modules[].lessons[]),
+        "exercisesCount": count(modules[].lessons[].exercises[])
+      }
+    `)
 
-    const chartLabels = Object.keys(dailyCourseData);
-    const courseChartData = Object.values(dailyCourseData);
-    const lessonChartData = Object.values(dailyLessonData);
-    const exerciseChartData = Object.values(dailyExerciseData);
+    const dailyCourseData = {}
+    const dailyLessonData = {}
+    const dailyExerciseData = {}
+    const now = new Date()
 
-    res.json({
-      totalCourses: totalCourses,
-      publishedCourses: publishedCourses, 
-      totalLessons: totalLessons,
-      totalExercises: totalExercises,
-      chartData: courseChartData,
-      lessonChartData: lessonChartData,
-      exerciseChartData: exerciseChartData,
-      chartLabels,
-      lastUpdated: new Date().toISOString()
-    });
-    
-  } catch (err) {
-    console.error('❌ Erro /stats', err);
-    res.status(500).json({ error: 'Erro ao buscar estatísticas' });
-  }
-});
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date()
+      date.setDate(now.getDate() - i)
+      const monthName = date.toLocaleDateString('pt-BR', { month: 'short' })
+      const dayLabel = `${monthName} ${date.getDate()}`
+      dailyCourseData[dayLabel] = 0
+      dailyLessonData[dayLabel] = 0
+      dailyExerciseData[dayLabel] = 0
+    }
+
+    allPublishedCourses.forEach((c) => {
+      try {
+        const d = new Date(c._createdAt)
+        const label = `${d.toLocaleDateString('pt-BR', { month: 'short' })} ${d.getDate()}`
+        if (dailyCourseData[label] !== undefined) dailyCourseData[label]++
+      } catch {}
+    })
+
+    allCoursesForCharts.forEach((c) => {
+      try {
+        const d = new Date(c._createdAt)
+        const label = `${d.toLocaleDateString('pt-BR', { month: 'short' })} ${d.getDate()}`
+        if (dailyLessonData[label] !== undefined) dailyLessonData[label] += c.lessonsCount || 0
+        if (dailyExerciseData[label] !== undefined) dailyExerciseData[label] += c.exercisesCount || 0
+      } catch {}
+    })
+
+    res.json({
+      totalCourses,
+      publishedCourses,
+      totalLessons,
+      totalExercises,
+      chartData: Object.values(dailyCourseData),
+      lessonChartData: Object.values(dailyLessonData),
+      exerciseChartData: Object.values(dailyExerciseData),
+      chartLabels: Object.keys(dailyCourseData),
+      lastUpdated: new Date().toISOString()
+    })
+  } catch (err) {
+    console.error('❌ Erro /stats', err)
+    res.status(500).json({ error: 'Erro ao buscar estatísticas' })
+  }
+})
 
 module.exports = router
