@@ -1,11 +1,12 @@
-import sanityClient from '@sanity/client';
-import dotenv from 'dotenv';
-dotenv.config();
+const { createClient } = require('@sanity/client');
+require('dotenv').config();
 
-export default sanityClient({
+const client = createClient({
   projectId: process.env.SANITY_PROJECT_ID,
   dataset: process.env.SANITY_DATASET,
-  token: process.env.SANITY_API_TOKEN,
-  useCdn: false,
   apiVersion: process.env.SANITY_API_VERSION,
+  token: process.env.SANITY_TOKEN,
+  useCdn: false,
 });
+
+module.exports = client;
