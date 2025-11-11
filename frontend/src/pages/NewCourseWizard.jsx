@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Box, Button, Typography,
   Alert,
@@ -23,6 +23,16 @@ function NewCourseWizard() {
   const [availableTags, setAvailableTags] = useState([])
   const [loadingTags, setLoadingTags] = useState(false)
   const [error, setError] = useState(null)
+
+  // Ref para o container de conteúdo que faz scroll
+  const contentRef = useRef(null)
+
+  // --- Efeito para scrollar para o topo quando o step mudar
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [activeStep])
 
   // --- subcategorias filtradas pela categoria escolhida
   const filteredSubs = useMemo(
@@ -203,6 +213,9 @@ function NewCourseWizard() {
                   px: [1]
                 }}
               >
+                <ListItemIcon sx={{ minWidth: 0, mr: 1 }}>
+                  <IconResolver iconName={sub.icon} />
+                </ListItemIcon>
                 <ListItemText 
                   primary={sub.title}
                 />
@@ -278,12 +291,7 @@ function NewCourseWizard() {
               })}
             </List>
             
-            {/* Mensagem de validação */}
-            {selectedTags.length === 0 && (
-              <Alert severity="warning" sx={{ mt: 2, mx: 1 }}>
-                Selecione pelo menos 1 tag para continuar
-              </Alert>
-            )}
+            {/* REMOVIDO: Alert de validação desnecessário */}
           </Box>
         )
 
@@ -343,16 +351,19 @@ function NewCourseWizard() {
           </Box>
         )}
         
-        {/* Conteúdo com Scroll */}
-        <Box sx={{ 
-          flex: 1, 
-          overflow: 'auto',
-          width: '100%',
-        }}>
+        {/* Conteúdo com Scroll - ADICIONADO REF AQUI */}
+        <Box 
+          ref={contentRef}
+          sx={{ 
+            flex: 1, 
+            overflow: 'auto',
+            width: '100%',
+          }}
+        >
           {renderStepContent()}
         </Box>
         
-        {/* Botões Fixos no Bottom */}
+        {/* Botões Fixos no Bottom - CORRIGIDO: desabilitar quando não há tags selecionadas */}
         <Box sx={{ 
           flexShrink: 0, // Não encolhe
           display: 'flex', 
@@ -385,7 +396,8 @@ function NewCourseWizard() {
             disableElevation
             disabled={
               (activeStep === 1 && !categoryId) ||
-              (activeStep === 2 && !subcategoryId)
+              (activeStep === 2 && !subcategoryId) ||
+              (activeStep === 3 && selectedTags.length === 0)
             }
             sx={{
               transition: 'none'

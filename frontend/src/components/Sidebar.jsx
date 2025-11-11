@@ -132,7 +132,7 @@ const CourseSidebarLink = ({ to, title, secondaryText, onClick, isActive, iconNa
     >
       {iconName && (
         <ListItemIcon sx={{ 
-          minWidth: 32, 
+          minWidth: 0, 
           mr: 1, 
           display: 'flex', 
           alignItems: 'center', 

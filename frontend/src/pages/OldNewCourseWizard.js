@@ -7,6 +7,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { useCourse } from '../context/CourseContext'
 import { getTagsBySubcategory } from '../services/api'
+import IconResolver from '../components/IconResolver'
 
 const steps = ['Nível', 'Categoria', 'Subcategoria', 'Tags', 'Gerar Curso']
 
@@ -31,7 +32,23 @@ function NewCourseWizard() {
     [subcategories, categoryId]
   )
 
-  // --- buscar tags ao mudar de subcategoria
+  // --- Limpar tags quando categoria mudar
+  useEffect(() => {
+    if (categoryId) {
+      setSubcategoryId('')
+      setSelectedTags([])
+      setAvailableTags([])
+    }
+  }, [categoryId])
+
+  // --- Limpar tags quando subcategoria mudar  
+  useEffect(() => {
+    if (subcategoryId) {
+      setSelectedTags([])
+    }
+  }, [subcategoryId])
+
+  // --- buscar tags ao mudar de subcategoria (mantenha este)
   useEffect(() => {
     const loadTags = async () => {
       if (!subcategoryId) {
@@ -74,15 +91,29 @@ function NewCourseWizard() {
       setError('Selecione uma subcategoria antes de continuar.')
       return
     }
-    if (activeStep === 3 && availableTags.length > 0 && selectedTags.length === 0) {
-      setError('Selecione pelo menos uma tag antes de continuar.')
+    if (activeStep === 3 && (selectedTags.length === 0 || selectedTags.length > 3)) {
+      setError('Selecione entre 1 e 3 tags antes de continuar.')
       return
     }
 
     // último passo → gerar curso
     if (activeStep === steps.length - 1) {
-      const payload = { categoryId, subcategoryId, level, tags: selectedTags }
-      navigate('/curso/gerando', { state: { payload } })
+      const payload = { 
+        categoryId, 
+        subcategoryId, 
+        level, 
+        tags: selectedTags 
+      }
+      
+      // Navega para a página de geração com o payload
+      navigate('/curso/gerando', { 
+        state: { 
+          payload,
+          // Inclui informações para construir a URL depois
+          categoryId,
+          subcategoryId
+        } 
+      })
       return
     }
 
@@ -127,23 +158,26 @@ function NewCourseWizard() {
         return Array.isArray(categories) && categories.length ? (
           <List sx={{ width: '100%' }}>
             {categories.map(cat => (
-              <ListItemButton
-                key={cat._id}
-                selected={categoryId === cat._id}
-                onClick={() => {
-                  setCategoryId(cat._id)
-                  setSubcategoryId('')
-                  setSelectedTags([])
-                  setAvailableTags([])
-                }}
-                sx={{
-                  px: [1]
-                }}
-              >
-                <ListItemText 
-                  primary={cat.title}
-                />
-              </ListItemButton>
+                <ListItemButton
+                    key={cat._id}
+                    selected={categoryId === cat._id}
+                    onClick={() => {
+                        setCategoryId(cat._id)
+                        setSubcategoryId('')
+                        setSelectedTags([])
+                        setAvailableTags([])
+                    }}
+                    sx={{
+                        px: [1]
+                    }}
+                >
+                    <ListItemIcon sx={{ minWidth: 0, mr: 1 }}>
+                        <IconResolver iconName={cat.icon} />
+                    </ListItemIcon>
+                    <ListItemText 
+                        primary={cat.title}
+                    />
+                </ListItemButton>
             ))}
           </List>
         ) : (
@@ -177,7 +211,7 @@ function NewCourseWizard() {
           </List>
         )
 
-      // --- passo: seleção de tags (estilo oficial Material-UI) ---
+      // --- passo: seleção de tags ---
       case 3:
         if (loadingTags)
           return <Typography sx={{ width: '100%', mt: 2, px: [1] }}>Carregando tags...</Typography>
@@ -185,25 +219,38 @@ function NewCourseWizard() {
         if (!availableTags.length)
           return <Typography sx={{ mt: 2 }}>Nenhuma tag disponível para esta subcategoria.</Typography>
 
+        const maxTags = 3
+        const reachedMax = selectedTags.length >= maxTags
+
         return (
           <Box sx={{ width: '100%' }}>
             <Box sx={{ width: '100%', px: [1] }}>
               <Typography variant="subtitle1" sx={{ mt: 2 }}>
-                Selecione as tags relacionadas
+                Selecione as tags relacionadas ({selectedTags.length}/{maxTags})
+              </Typography>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                Selecione no mínimo 1 e no máximo {maxTags} tags
               </Typography>
             </Box>
             <List dense sx={{ width: '100%' }}>
               {availableTags.map(tag => {
-                const labelId = `checkbox-tag-label-${tag._id}`;
-                
+                const labelId = `checkbox-tag-label-${tag._id}`
+                const isSelected = selectedTags.includes(tag._id)
+                const isDisabled = reachedMax && !isSelected
+
                 return (
                   <ListItemButton
                     key={tag._id}
                     role={undefined}
-                    onClick={() => toggleTag(tag._id)}
+                    onClick={() => !isDisabled && toggleTag(tag._id)}
                     dense
+                    disabled={isDisabled}
                     sx={{
-                      px: [1]
+                      px: [1],
+                      opacity: isDisabled ? 0.5 : 1,
+                      '&.Mui-disabled': {
+                        opacity: 0.5
+                      }
                     }}
                   >
                     <ListItemIcon
@@ -215,9 +262,10 @@ function NewCourseWizard() {
                     >
                       <Checkbox
                         edge="start"
-                        checked={selectedTags.includes(tag._id)}
+                        checked={isSelected}
                         tabIndex={-1}
                         disableRipple
+                        disabled={isDisabled}
                         inputProps={{ 'aria-labelledby': labelId }}
                       />
                     </ListItemIcon>
@@ -229,6 +277,13 @@ function NewCourseWizard() {
                 )
               })}
             </List>
+            
+            {/* Mensagem de validação */}
+            {selectedTags.length === 0 && (
+              <Alert severity="warning" sx={{ mt: 2, mx: 1 }}>
+                Selecione pelo menos 1 tag para continuar
+              </Alert>
+            )}
           </Box>
         )
 
