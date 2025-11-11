@@ -120,21 +120,21 @@ const LEVEL_CONFIG = {
   beginner: {
     modules: 3,
     lessonsPerModule: 2,
-    tips: 1,
+    tips: 2,
     exercises: 1,
     tone: 'explicativo e acessível, com linguagem simples e exemplos práticos',
   },
   intermediate: {
     modules: 3,
     lessonsPerModule: 3,
-    tips: 2,
+    tips: 3,
     exercises: 2,
     tone: 'detalhado e aplicado, com exemplos reais e desafios práticos',
   },
   advanced: {
     modules: 3,
     lessonsPerModule: 4,
-    tips: 3,
+    tips: 4,
     exercises: 3,
     tone: 'abrangente, técnico e aprofundado, voltado para profissionais experientes',
   },
@@ -213,7 +213,7 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
 }
 
 // =======================================================
-// 🧠 ROTA PRINCIPAL - GERAR CURSO (CORRIGIDA COM URL DE CATEGORIA/SUBCATEGORIA)
+// 🧠 ROTA PRINCIPAL - GERAR CURSO (CORRIGIDA COM ICONS)
 // =======================================================
 router.post('/course', async (req, res) => {
   try {
@@ -226,11 +226,11 @@ router.post('/course', async (req, res) => {
     // ✅ Tags opcionais
     const validTags = validateTags(tags || []);
 
-    // 🔄 Busca categoria e subcategoria COM SLUGS
+    // 🔄 CORREÇÃO: Busca categoria e subcategoria COM ICONS
     const [category, subcategory] = await Promise.all([
-      client.fetch(`*[_id == $categoryId][0]{_id, title, "slug": slug.current}`, { categoryId }),
+      client.fetch(`*[_id == $categoryId][0]{_id, title, icon, "slug": slug.current}`, { categoryId }),
       subcategoryId
-        ? client.fetch(`*[_id == $subcategoryId][0]{_id, title, "slug": slug.current}`, { subcategoryId })
+        ? client.fetch(`*[_id == $subcategoryId][0]{_id, title, icon, "slug": slug.current}`, { subcategoryId })
         : null,
     ]);
 
