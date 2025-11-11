@@ -79,7 +79,7 @@ function addKeysRecursively(obj) {
   return obj;
 }
 
-// 👈 FUNÇÃO CORRIGIDA: Agora converte respostas "A", "B", "C" para o texto completo
+// 👈 FUNÇÃO CORRIGIDA: Remove "A.", "B.", "C." das opções e respostas
 function sanitizeCourseData(courseData) {
   if (!courseData || !Array.isArray(courseData.modules)) return courseData;
 
@@ -91,21 +91,25 @@ function sanitizeCourseData(courseData) {
         typeof tip === 'string' ? tip : Object.values(tip).join('')
       ),
       exercises: (lesson.exercises || []).map((ex) => {
-        // Converte resposta "A", "B", "C" para o texto completo da opção
-        let correctAnswer = ex.answer;
-        if (ex.answer && ex.options && Array.isArray(ex.options)) {
-          const answerIndex = ex.answer.charCodeAt(0) - 65; // Converte "A"->0, "B"->1, "C"->2
-          if (answerIndex >= 0 && answerIndex < ex.options.length) {
-            correctAnswer = ex.options[answerIndex];
+        // Remove "A.", "B.", "C." das opções
+        const cleanOptions = (ex.options || []).map((opt) => {
+          if (typeof opt === 'string') {
+            // Remove "A. ", "B. ", "C. " do início das opções
+            return opt.replace(/^[A-Z]\.\s*/, '');
           }
+          return Object.values(opt).join('');
+        });
+
+        // Remove "A.", "B.", "C." da resposta
+        let cleanAnswer = ex.answer;
+        if (typeof cleanAnswer === 'string') {
+          cleanAnswer = cleanAnswer.replace(/^[A-Z]\.\s*/, '');
         }
         
         return {
           ...ex,
-          answer: correctAnswer,
-          options: (ex.options || []).map((opt) =>
-            typeof opt === 'string' ? opt : Object.values(opt).join('')
-          ),
+          answer: cleanAnswer,
+          options: cleanOptions,
         };
       }),
     })),
@@ -322,7 +326,7 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
 }
 
 // =======================================================
-// 🧠 ROTA PRINCIPAL - GERAR CURSO (CORRIGIDA COM DURAÇÃO PRECISA)
+// 🧠 ROTA PRINCIPAL - GERAR CURSO (CORRIGIDA COM OPÇÕES LIMPAS)
 // =======================================================
 router.post('/course', async (req, res) => {
   try {
@@ -348,7 +352,7 @@ router.post('/course', async (req, res) => {
 
     const cfg = LEVEL_CONFIG[level] || LEVEL_CONFIG.beginner;
 
-    // 👈 PROMPT CORRIGIDO: Agora pede resposta completa, não apenas "A", "B", "C"
+    // 👈 PROMPT CORRIGIDO: Agora especifica que NÃO deve usar "A.", "B.", "C."
     const prompt = `
 Crie um curso em JSON válido com estas especificações EXATAS:
 
@@ -390,8 +394,9 @@ IMPORTANTE:
 - Conteúdo em português do Brasil
 - Tono: ${cfg.tone}
 - Foco em aplicação prática
-- Exercícios com 3 opções (A, B, C)
-- A RESPOSTA deve ser o TEXTO COMPLETO da opção correta, não apenas "A", "B" ou "C"
+- Exercícios com 3 opções
+- NÃO use "A.", "B.", "C." nas opções - use apenas o texto da opção
+- A RESPOSTA deve ser o TEXTO COMPLETO da opção correta
 - Garanta que a resposta corresponda exatamente a uma das opções fornecidas
 `.trim();
 
