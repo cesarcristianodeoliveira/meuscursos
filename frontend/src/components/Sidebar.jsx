@@ -233,7 +233,6 @@ const Sidebar = () => {
                 transition: 'none',
                 px: [1],
                 minHeight: 36,
-                bgcolor: 'background.paper',
                 color: 'text.primary',
                 display: 'flex',
                 alignItems: 'center',
