@@ -17,7 +17,6 @@ import AddIcon from '@mui/icons-material/Add'
 import CloseIcon from '@mui/icons-material/Close'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import SchoolIcon from '@mui/icons-material/School'
-import RssFeedIcon from '@mui/icons-material/RssFeed'
 import LightModeIcon from '@mui/icons-material/LightMode'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
 import ExpandLess from '@mui/icons-material/ExpandLess'
@@ -31,7 +30,6 @@ import MenuResponsive from './MenuResponsive'
 const mainRoutes = [
   { label: 'Painel', path: '/', icon: DashboardIcon, exact: true },
   { label: 'Cursos', path: '/cursos', icon: SchoolIcon, exact: false },
-  { label: 'Blog', path: '/blog', icon: RssFeedIcon, exact: false },
 ]
 
 // --- Hook customizado para detectar rota ativa ---

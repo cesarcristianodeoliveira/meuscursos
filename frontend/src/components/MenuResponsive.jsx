@@ -7,7 +7,6 @@ import { Tabs, Tab } from '@mui/material';
 const routes = [
   { label: 'Painel', path: '/' },
   { label: 'Cursos', path: '/cursos' },
-  { label: 'Blog', path: '/blog' },
 ];
 
 // O LinkTab permanece o mesmo
@@ -45,7 +44,7 @@ const MenuResponsive = () => {
       // 1. Defina as opções de correspondência (Match Options)
       let matchOptions = { 
           path: routePath, 
-          // Para todas as rotas de nível superior ('/cursos', '/blog'), 
+          // Para todas as rotas de nível superior ('/cursos'), 
           // NÃO queremos correspondência exata, permitindo sub-rotas.
           end: routePath === '/' // APENAS a rota raiz '/' deve ter correspondência exata (end: true)
       };
