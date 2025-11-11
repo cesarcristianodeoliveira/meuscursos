@@ -36,8 +36,30 @@ router.get('/all', async (req, res) => {
         category->{_id, title, icon, "slug": slug.current},
         subcategory->{_id, title, icon, "slug": slug.current},
         tags[]->{_id, title, "slug": slug.current},
+        thumbnail->{_id, title, url},
+        video->{_id, title, url},
+        certificate,
+        audioMasculino{asset->{url}},
+        audioFeminino{asset->{url}},
+        provider,
         status,
-        provider
+        modules[] {
+          _key,
+          title,
+          description,
+          lessons[] {
+            _key,
+            title,
+            content,
+            tips,
+            exercises[] {
+              _key,
+              question,
+              answer,
+              options
+            }
+          }
+        }
       }`)
     ])
 
@@ -105,7 +127,7 @@ router.get('/tags', async (req, res) => {
   }
 })
 
-// --- 🔹 Cursos (resumo) ---
+// --- 🔹 Cursos (completo) ---
 router.get('/courses', async (_, res) => {
   try {
     const data = await client.fetch(`*[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
@@ -120,8 +142,30 @@ router.get('/courses', async (_, res) => {
       category->{_id, title, icon, "slug": slug.current},
       subcategory->{_id, title, icon, "slug": slug.current},
       tags[]->{_id, title, "slug": slug.current},
+      thumbnail->{_id, title, url},
+      video->{_id, title, url},
+      certificate,
+      audioMasculino{asset->{url}},
+      audioFeminino{asset->{url}},
+      provider,
       status,
-      provider
+      modules[] {
+        _key,
+        title,
+        description,
+        lessons[] {
+          _key,
+          title,
+          content,
+          tips,
+          exercises[] {
+            _key,
+            question,
+            answer,
+            options
+          }
+        }
+      }
     }`)
     res.json(data)
   } catch (err) {
