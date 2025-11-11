@@ -79,6 +79,7 @@ function addKeysRecursively(obj) {
   return obj;
 }
 
+// 👈 FUNÇÃO CORRIGIDA: Agora converte respostas "A", "B", "C" para o texto completo
 function sanitizeCourseData(courseData) {
   if (!courseData || !Array.isArray(courseData.modules)) return courseData;
 
@@ -89,23 +90,131 @@ function sanitizeCourseData(courseData) {
       tips: (lesson.tips || []).map((tip) =>
         typeof tip === 'string' ? tip : Object.values(tip).join('')
       ),
-      exercises: (lesson.exercises || []).map((ex) => ({
-        ...ex,
-        options: (ex.options || []).map((opt) =>
-          typeof opt === 'string' ? opt : Object.values(opt).join('')
-        ),
-      })),
+      exercises: (lesson.exercises || []).map((ex) => {
+        // Converte resposta "A", "B", "C" para o texto completo da opção
+        let correctAnswer = ex.answer;
+        if (ex.answer && ex.options && Array.isArray(ex.options)) {
+          const answerIndex = ex.answer.charCodeAt(0) - 65; // Converte "A"->0, "B"->1, "C"->2
+          if (answerIndex >= 0 && answerIndex < ex.options.length) {
+            correctAnswer = ex.options[answerIndex];
+          }
+        }
+        
+        return {
+          ...ex,
+          answer: correctAnswer,
+          options: (ex.options || []).map((opt) =>
+            typeof opt === 'string' ? opt : Object.values(opt).join('')
+          ),
+        };
+      }),
     })),
   }));
 
   return courseData;
 }
 
-function estimateDurationFromText(text) {
-  if (!text) return 30;
-  const chars = text.length;
-  const minutes = Math.max(10, Math.round(chars / 900));
-  return Math.min(minutes, 600);
+// 👈 FUNÇÃO MELHORADA: Calcula duração considerando TODO o conteúdo do curso
+function estimateCourseDuration(courseData, categoryName, subcategoryName, tags = []) {
+  if (!courseData) return 30;
+  
+  let totalCharacters = 0;
+  
+  // 1. Título do curso
+  totalCharacters += (courseData.title || '').length;
+  
+  // 2. Descrição do curso
+  totalCharacters += (courseData.description || '').length;
+  
+  // 3. Nome da categoria e subcategoria
+  totalCharacters += (categoryName || '').length;
+  totalCharacters += (subcategoryName || '').length;
+  
+  // 4. Tags (se houver)
+  if (Array.isArray(tags)) {
+    tags.forEach(tag => {
+      if (tag && typeof tag === 'string') {
+        totalCharacters += tag.length;
+      }
+    });
+  }
+  
+  // 5. Módulos e lições
+  if (Array.isArray(courseData.modules)) {
+    courseData.modules.forEach(module => {
+      // Título do módulo
+      totalCharacters += (module.title || '').length;
+      
+      // Descrição do módulo
+      totalCharacters += (module.description || '').length;
+      
+      // Lições
+      if (Array.isArray(module.lessons)) {
+        module.lessons.forEach(lesson => {
+          // Título da lição
+          totalCharacters += (lesson.title || '').length;
+          
+          // Conteúdo da lição
+          totalCharacters += (lesson.content || '').length;
+          
+          // Dicas
+          if (Array.isArray(lesson.tips)) {
+            lesson.tips.forEach(tip => {
+              totalCharacters += (tip || '').length;
+            });
+          }
+          
+          // Exercícios
+          if (Array.isArray(lesson.exercises)) {
+            lesson.exercises.forEach(exercise => {
+              // Pergunta
+              totalCharacters += (exercise.question || '').length;
+              
+              // Opções
+              if (Array.isArray(exercise.options)) {
+                exercise.options.forEach(option => {
+                  totalCharacters += (option || '').length;
+                });
+              }
+              
+              // Resposta
+              totalCharacters += (exercise.answer || '').length;
+            });
+          }
+        });
+      }
+    });
+  }
+  
+  console.log(`📊 Total de caracteres do curso: ${totalCharacters}`);
+  
+  // Cálculo baseado em velocidade de leitura e complexidade
+  // Velocidade média de leitura: 200-250 palavras por minuto
+  // Considerando que palavras em português têm em média 5-6 caracteres
+  const palavrasPorMinuto = 200; // Velocidade conservadora
+  const caracteresPorPalavra = 5.5; // Média para português
+  const palavrasTotais = totalCharacters / caracteresPorPalavra;
+  
+  // Tempo base de leitura
+  let minutosLeitura = Math.round(palavrasTotais / palavrasPorMinuto);
+  
+  // Adiciona tempo para exercícios e reflexão
+  const totalExercicios = courseData.modules?.reduce((total, modulo) => {
+    return total + (modulo.lessons?.reduce((subtotal, aula) => {
+      return subtotal + (aula.exercises?.length || 0);
+    }, 0) || 0);
+  }, 0) || 0;
+  
+  // Adiciona 2 minutos por exercício para resolução
+  minutosLeitura += totalExercicios * 2;
+  
+  // Garante mínimo e máximo razoáveis
+  minutosLeitura = Math.max(15, minutosLeitura); // Mínimo 15 minutos
+  minutosLeitura = Math.min(180, minutosLeitura); // Máximo 3 horas
+  
+  console.log(`⏱️ Duração estimada: ${minutosLeitura} minutos`);
+  
+  return minutosLeitura;
 }
 
 // ⚙️ Tags opcionais e deduplicadas
@@ -125,14 +234,14 @@ const LEVEL_CONFIG = {
     tone: 'explicativo e acessível, com linguagem simples e exemplos práticos',
   },
   intermediate: {
-    modules: 3,
+    modules: 4,
     lessonsPerModule: 3,
     tips: 3,
     exercises: 2,
     tone: 'detalhado e aplicado, com exemplos reais e desafios práticos',
   },
   advanced: {
-    modules: 3,
+    modules: 5,
     lessonsPerModule: 4,
     tips: 4,
     exercises: 3,
@@ -213,7 +322,7 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
 }
 
 // =======================================================
-// 🧠 ROTA PRINCIPAL - GERAR CURSO (CORRIGIDA COM ICONS)
+// 🧠 ROTA PRINCIPAL - GERAR CURSO (CORRIGIDA COM DURAÇÃO PRECISA)
 // =======================================================
 router.post('/course', async (req, res) => {
   try {
@@ -239,7 +348,7 @@ router.post('/course', async (req, res) => {
 
     const cfg = LEVEL_CONFIG[level] || LEVEL_CONFIG.beginner;
 
-    // 👈 PROMPT OTIMIZADO - mais específico e com menos tokens
+    // 👈 PROMPT CORRIGIDO: Agora pede resposta completa, não apenas "A", "B", "C"
     const prompt = `
 Crie um curso em JSON válido com estas especificações EXATAS:
 
@@ -268,7 +377,7 @@ ESTRUTURA EXATA DO JSON:
             {
               "question": "Pergunta múltipla escolha",
               "options": ["Opção A", "Opção B", "Opção C"],
-              "answer": "A"
+              "answer": "Texto completo da opção correta"
             }
           ]
         }
@@ -282,7 +391,8 @@ IMPORTANTE:
 - Tono: ${cfg.tone}
 - Foco em aplicação prática
 - Exercícios com 3 opções (A, B, C)
-- Respostas sempre "A", "B" ou "C"
+- A RESPOSTA deve ser o TEXTO COMPLETO da opção correta, não apenas "A", "B" ou "C"
+- Garanta que a resposta corresponda exatamente a uma das opções fornecidas
 `.trim();
 
     // 🧠 Geração COM FALLBACK
@@ -301,11 +411,8 @@ IMPORTANTE:
     const slug = slugify(title);
     const description = sanitizedData.description.trim();
 
-    // 🕐 Calcula duração estimada
-    const totalText = sanitizedData.modules
-      .map((m) => m.lessons.map((l) => l.content).join(' '))
-      .join(' ');
-    const duration = estimateDurationFromText(totalText);
+    // 🕐 CALCULA DURAÇÃO MELHORADA: Considera TODO o conteúdo do curso
+    const duration = estimateCourseDuration(sanitizedData, categoryName, subcategoryName, validTags);
 
     // ⚠️ Antes de criar, verifica duplicados
     const existing = await client.fetch(
