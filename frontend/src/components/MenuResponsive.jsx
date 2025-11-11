@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, Link, matchPath } from 'react-router-dom'; 
 import PropTypes from 'prop-types';
 import { Tabs, Tab } from '@mui/material';
+import DashboardIcon from '@mui/icons-material/Dashboard'
+import SchoolIcon from '@mui/icons-material/School'
 
 // Definindo as rotas, o 'path' agora será o 'value' do Tab
 const routes = [
-  { label: 'Painel', path: '/' },
-  { label: 'Cursos', path: '/cursos' },
+  { label: 'Painel', path: '/', icon: <DashboardIcon /> },
+  { label: 'Cursos', path: '/cursos', icon: <SchoolIcon /> },
 ];
 
 // O LinkTab permanece o mesmo
@@ -94,7 +96,8 @@ const MenuResponsive = () => {
       {routes.map((route) => (
         <LinkTab
           key={route.path}
-          label={route.label}
+          aria-label={route.label}
+          icon={route.icon}
           href={route.path}
           value={route.path}
           sx={{
