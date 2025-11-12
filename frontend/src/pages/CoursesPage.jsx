@@ -79,9 +79,9 @@ const CoursesPage = () => {
   if (loading) {
     return (
       <Box sx={{ width: '100%', px: [1] }}>
-        <Toolbar sx={{ px: [0], minHeight: '56px!important' }} />
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="100dvh">
-          <CircularProgress size={60} />
+          <Toolbar sx={{ px: [0], minHeight: '56px!important' }} />
+          <CircularProgress />
         </Box>
       </Box>
     )

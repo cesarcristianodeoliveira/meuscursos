@@ -69,7 +69,6 @@ const CoursePage = () => {
       >
         <Toolbar sx={{ px: [0], minHeight: '56px!important' }} />
         <CircularProgress />
-        <Typography variant='caption' color='textSecondary' sx={{ mt: 2 }}>Carregando curso...</Typography>
       </Box>
     )
   }
