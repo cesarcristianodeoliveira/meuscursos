@@ -39,7 +39,7 @@ const IconResolver = ({ iconName, sx, ...props }) => {
   }
 
   // Se o ícone não for encontrado, exibe o fallback e um aviso.
-  console.warn(`⚠️ Ícone "${iconName}" (normalizado para "${normalizedName}") não encontrado no Material-UI. Usando HelpOutline.`);
+  // console.warn(`⚠️ Ícone "${iconName}" (normalizado para "${normalizedName}") não encontrado no Material-UI. Usando HelpOutline.`);
   
   return (
     <Box 
