@@ -23,7 +23,7 @@ router.get('/all', async (req, res) => {
         subcategory->{_id, title}
       }`),
 
-      // Curso — ordenação decrescente por data de atualização e criação
+      // 👈 CURSO COM CONTAGENS de aulas e exercícios
       client.fetch(`*[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
         _id,
         _createdAt,
@@ -36,30 +36,10 @@ router.get('/all', async (req, res) => {
         category->{_id, title, icon, "slug": slug.current},
         subcategory->{_id, title, icon, "slug": slug.current},
         tags[]->{_id, title, "slug": slug.current},
-        thumbnail->{_id, title, url},
-        video->{_id, title, url},
-        certificate,
-        audioMasculino{asset->{url}},
-        audioFeminino{asset->{url}},
-        provider,
         status,
-        modules[] {
-          _key,
-          title,
-          description,
-          lessons[] {
-            _key,
-            title,
-            content,
-            tips,
-            exercises[] {
-              _key,
-              question,
-              answer,
-              options
-            }
-          }
-        }
+        provider,
+        "totalLessons": count(modules[].lessons[]),
+        "totalExercises": count(modules[].lessons[].exercises[])
       }`)
     ])
 
@@ -127,7 +107,7 @@ router.get('/tags', async (req, res) => {
   }
 })
 
-// --- 🔹 Cursos (completo) ---
+// --- 🔹 Cursos (resumo) ---
 router.get('/courses', async (_, res) => {
   try {
     const data = await client.fetch(`*[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
@@ -142,30 +122,10 @@ router.get('/courses', async (_, res) => {
       category->{_id, title, icon, "slug": slug.current},
       subcategory->{_id, title, icon, "slug": slug.current},
       tags[]->{_id, title, "slug": slug.current},
-      thumbnail->{_id, title, url},
-      video->{_id, title, url},
-      certificate,
-      audioMasculino{asset->{url}},
-      audioFeminino{asset->{url}},
-      provider,
       status,
-      modules[] {
-        _key,
-        title,
-        description,
-        lessons[] {
-          _key,
-          title,
-          content,
-          tips,
-          exercises[] {
-            _key,
-            question,
-            answer,
-            options
-          }
-        }
-      }
+      provider,
+      "totalLessons": count(modules[].lessons[]),
+      "totalExercises": count(modules[].lessons[].exercises[])
     }`)
     res.json(data)
   } catch (err) {
@@ -280,44 +240,11 @@ router.get('/stats', async (req, res) => {
     const totalCourses = await client.fetch(`count(*[_type == "course"])`)
     const publishedCourses = await client.fetch(`count(*[_type == "course" && status == "published"])`)
 
-    // 🔄 CORREÇÃO: Busca todos os cursos completos (igual outras rotas)
     const allCoursesWithContent = await client.fetch(`
       *[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
-        _id,
         _createdAt,
-        _updatedAt,
         title,
-        "slug": slug.current,
-        description,
-        level,
-        duration,
-        category->{_id, title, icon, "slug": slug.current},
-        subcategory->{_id, title, icon, "slug": slug.current},
-        tags[]->{_id, title, "slug": slug.current},
-        thumbnail->{_id, title, url},
-        video->{_id, title, url},
-        certificate,
-        audioMasculino{asset->{url}},
-        audioFeminino{asset->{url}},
-        provider,
         status,
-        modules[] {
-          _key,
-          title,
-          description,
-          lessons[] {
-            _key,
-            title,
-            content,
-            tips,
-            exercises[] {
-              _key,
-              question,
-              answer,
-              options
-            }
-          }
-        },
         "totalLessons": count(modules[].lessons[]),
         "totalExercises": count(modules[].lessons[].exercises[])
       }
@@ -326,85 +253,19 @@ router.get('/stats', async (req, res) => {
     const totalLessons = allCoursesWithContent.reduce((sum, c) => sum + (c.totalLessons || 0), 0)
     const totalExercises = allCoursesWithContent.reduce((sum, c) => sum + (c.totalExercises || 0), 0)
 
-    // 🔄 CORREÇÃO: Busca cursos publicados completos
     const allPublishedCourses = await client.fetch(`
       *[_type == "course" && status == "published"] | order(_updatedAt desc, _createdAt desc) {
-        _id,
         _createdAt,
-        _updatedAt,
         title,
-        "slug": slug.current,
-        description,
-        level,
-        duration,
-        category->{_id, title, icon, "slug": slug.current},
-        subcategory->{_id, title, icon, "slug": slug.current},
-        tags[]->{_id, title, "slug": slug.current},
-        thumbnail->{_id, title, url},
-        video->{_id, title, url},
-        certificate,
-        audioMasculino{asset->{url}},
-        audioFeminino{asset->{url}},
-        provider,
-        status,
-        modules[] {
-          _key,
-          title,
-          description,
-          lessons[] {
-            _key,
-            title,
-            content,
-            tips,
-            exercises[] {
-              _key,
-              question,
-              answer,
-              options
-            }
-          }
-        }
+        status
       }
     `)
 
-    // 🔄 CORREÇÃO: Busca cursos para gráficos completos
     const allCoursesForCharts = await client.fetch(`
       *[_type == "course" && status == "published"] | order(_updatedAt desc, _createdAt desc) {
-        _id,
         _createdAt,
-        _updatedAt,
         title,
-        "slug": slug.current,
-        description,
-        level,
-        duration,
-        category->{_id, title, icon, "slug": slug.current},
-        subcategory->{_id, title, icon, "slug": slug.current},
-        tags[]->{_id, title, "slug": slug.current},
-        thumbnail->{_id, title, url},
-        video->{_id, title, url},
-        certificate,
-        audioMasculino{asset->{url}},
-        audioFeminino{asset->{url}},
-        provider,
         status,
-        modules[] {
-          _key,
-          title,
-          description,
-          lessons[] {
-            _key,
-            title,
-            content,
-            tips,
-            exercises[] {
-              _key,
-              question,
-              answer,
-              options
-            }
-          }
-        },
         "lessonsCount": count(modules[].lessons[]),
         "exercisesCount": count(modules[].lessons[].exercises[])
       }
