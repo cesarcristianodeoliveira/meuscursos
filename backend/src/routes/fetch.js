@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const client = require('../config/sanityClient.js')
 
-// --- 🔹 /all (categorias, subcategororias, tags e cursos com CONTAGENS) ---
+// --- 🔹 /all (CORRIGIDO com contagens funcionais) ---
 router.get('/all', async (req, res) => {
   try {
     const [categories, subcategories, tags, courses] = await Promise.all([
@@ -23,7 +23,7 @@ router.get('/all', async (req, res) => {
         subcategory->{_id, title}
       }`),
 
-      // 👈 CURSO COM CONTAGENS - Versão leve e rápida
+      // 👈 CURSO COM ESTRUTURA PARA CALCULAR CONTAGENS
       client.fetch(`*[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
         _id,
         _createdAt,
@@ -38,12 +38,52 @@ router.get('/all', async (req, res) => {
         tags[]->{_id, title, "slug": slug.current},
         status,
         provider,
-        "totalLessons": count(modules[].lessons[]),
-        "totalExercises": count(modules[].lessons[].exercises[])
+        modules[] {
+          lessons[] {
+            exercises[]
+          }
+        }
       }`)
     ])
 
-    res.json({ categories, subcategories, tags, courses })
+    // 👈 CALCULA CONTAGENS MANUALMENTE - MÉTODO CONFIÁVEL
+    const coursesWithCounts = courses.map(course => {
+      let totalLessons = 0
+      let totalExercises = 0
+
+      if (course.modules && Array.isArray(course.modules)) {
+        course.modules.forEach(module => {
+          if (module.lessons && Array.isArray(module.lessons)) {
+            totalLessons += module.lessons.length
+            
+            module.lessons.forEach(lesson => {
+              if (lesson.exercises && Array.isArray(lesson.exercises)) {
+                totalExercises += lesson.exercises.length
+              }
+            })
+          }
+        })
+      }
+
+      // Remove os arrays completos para economizar banda
+      const { modules, ...courseWithoutModules } = course
+      
+      return {
+        ...courseWithoutModules,
+        totalLessons,
+        totalExercises
+      }
+    })
+
+    console.log(`📊 Cursos processados: ${coursesWithCounts.length}`)
+    console.log(`📊 Exemplo de contagens: ${coursesWithCounts[0]?.title} - ${coursesWithCounts[0]?.totalLessons} aulas, ${coursesWithCounts[0]?.totalExercises} exercícios`)
+
+    res.json({ 
+      categories, 
+      subcategories, 
+      tags, 
+      courses: coursesWithCounts 
+    })
   } catch (err) {
     console.error('❌ Erro /all', err)
     res.status(500).json({ error: 'Erro ao buscar todos os dados' })
@@ -107,10 +147,10 @@ router.get('/tags', async (req, res) => {
   }
 })
 
-// --- 🔹 Cursos (com contagens) ---
+// --- 🔹 Cursos (com contagens CORRIGIDAS) ---
 router.get('/courses', async (_, res) => {
   try {
-    const data = await client.fetch(`*[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
+    const courses = await client.fetch(`*[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
       _id,
       _createdAt,
       _updatedAt,
@@ -124,10 +164,45 @@ router.get('/courses', async (_, res) => {
       tags[]->{_id, title, "slug": slug.current},
       status,
       provider,
-      "totalLessons": count(modules[].lessons[]),
-      "totalExercises": count(modules[].lessons[].exercises[])
+      modules[] {
+        lessons[] {
+          exercises[]
+        }
+      }
     }`)
-    res.json(data)
+    
+    // 👈 CALCULA CONTAGENS MANUALMENTE
+    const coursesWithCounts = courses.map(course => {
+      let totalLessons = 0
+      let totalExercises = 0
+
+      if (course.modules && Array.isArray(course.modules)) {
+        course.modules.forEach(module => {
+          if (module.lessons && Array.isArray(module.lessons)) {
+            totalLessons += module.lessons.length
+            
+            module.lessons.forEach(lesson => {
+              if (lesson.exercises && Array.isArray(lesson.exercises)) {
+                totalExercises += lesson.exercises.length
+              }
+            })
+          }
+        })
+      }
+
+      // Remove arrays completos
+      const { modules, ...courseWithoutModules } = course
+      
+      return {
+        ...courseWithoutModules,
+        totalLessons,
+        totalExercises
+      }
+    })
+    
+    console.log(`📊 /courses: ${coursesWithCounts.length} cursos processados`)
+    
+    res.json(coursesWithCounts)
   } catch (err) {
     console.error('❌ Erro /courses', err)
     res.status(500).json({ error: 'Erro ao buscar cursos' })
@@ -138,7 +213,7 @@ router.get('/courses', async (_, res) => {
 router.get('/course/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const query = `*[_type == "course" && _id == $id][0]{
+    const course = await client.fetch(`*[_type == "course" && _id == $id][0]{
       _id,
       _createdAt,
       _updatedAt,
@@ -173,13 +248,34 @@ router.get('/course/:id', async (req, res) => {
             options
           }
         }
-      },
-      "totalLessons": count(modules[].lessons[]),
-      "totalExercises": count(modules[].lessons[].exercises[])
-    }`
-    const course = await client.fetch(query, { id })
+      }
+    }`, { id })
+    
     if (!course) return res.status(404).json({ error: 'Curso não encontrado' })
-    res.json(course)
+    
+    // 👈 CALCULA CONTAGENS MANUALMENTE
+    let totalLessons = 0
+    let totalExercises = 0
+
+    if (course.modules && Array.isArray(course.modules)) {
+      course.modules.forEach(module => {
+        if (module.lessons && Array.isArray(module.lessons)) {
+          totalLessons += module.lessons.length
+          
+          module.lessons.forEach(lesson => {
+            if (lesson.exercises && Array.isArray(lesson.exercises)) {
+              totalExercises += lesson.exercises.length
+            }
+          })
+        }
+      })
+    }
+    
+    res.json({
+      ...course,
+      totalLessons,
+      totalExercises
+    })
   } catch (err) {
     console.error('❌ Erro /course/:id', err)
     res.status(500).json({ error: 'Erro ao buscar curso por ID' })
@@ -190,7 +286,7 @@ router.get('/course/:id', async (req, res) => {
 router.get('/course/slug/:slug', async (req, res) => {
   try {
     const { slug } = req.params
-    const query = `*[_type == "course" && slug.current == $slug][0]{
+    const course = await client.fetch(`*[_type == "course" && slug.current == $slug][0]{
       _id,
       _createdAt,
       _updatedAt,
@@ -225,56 +321,116 @@ router.get('/course/slug/:slug', async (req, res) => {
             options
           }
         }
-      },
-      "totalLessons": count(modules[].lessons[]),
-      "totalExercises": count(modules[].lessons[].exercises[])
-    }`
-    const course = await client.fetch(query, { slug })
+      }
+    }`, { slug })
+    
     if (!course) return res.status(404).json({ error: 'Curso não encontrado' })
-    res.json(course)
+    
+    // 👈 CALCULA CONTAGENS MANUALMENTE
+    let totalLessons = 0
+    let totalExercises = 0
+
+    if (course.modules && Array.isArray(course.modules)) {
+      course.modules.forEach(module => {
+        if (module.lessons && Array.isArray(module.lessons)) {
+          totalLessons += module.lessons.length
+          
+          module.lessons.forEach(lesson => {
+            if (lesson.exercises && Array.isArray(lesson.exercises)) {
+              totalExercises += lesson.exercises.length
+            }
+          })
+        }
+      })
+    }
+    
+    res.json({
+      ...course,
+      totalLessons,
+      totalExercises
+    })
   } catch (err) {
     console.error('❌ Erro /course/slug/:slug', err)
     res.status(500).json({ error: 'Erro ao buscar curso por slug' })
   }
 })
 
-// --- 🔹 Estatísticas ---
+// --- 🔹 Estatísticas (CORRIGIDO) ---
 router.get('/stats', async (req, res) => {
   try {
     const totalCourses = await client.fetch(`count(*[_type == "course"])`)
     const publishedCourses = await client.fetch(`count(*[_type == "course" && status == "published"])`)
 
-    // Busca cursos para contagens
-    const allCoursesWithContent = await client.fetch(`
-      *[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
-        _createdAt,
-        title,
-        status,
-        "totalLessons": count(modules[].lessons[]),
-        "totalExercises": count(modules[].lessons[].exercises[])
+    // Busca cursos para calcular contagens totais
+    const allCourses = await client.fetch(`
+      *[_type == "course"] {
+        modules[] {
+          lessons[] {
+            exercises[]
+          }
+        }
       }
     `)
 
-    const totalLessons = allCoursesWithContent.reduce((sum, c) => sum + (c.totalLessons || 0), 0)
-    const totalExercises = allCoursesWithContent.reduce((sum, c) => sum + (c.totalExercises || 0), 0)
+    // 👈 CALCULA CONTAGENS MANUALMENTE
+    let totalLessons = 0
+    let totalExercises = 0
 
+    allCourses.forEach(course => {
+      if (course.modules && Array.isArray(course.modules)) {
+        course.modules.forEach(module => {
+          if (module.lessons && Array.isArray(module.lessons)) {
+            totalLessons += module.lessons.length
+            
+            module.lessons.forEach(lesson => {
+              if (lesson.exercises && Array.isArray(lesson.exercises)) {
+                totalExercises += lesson.exercises.length
+              }
+            })
+          }
+        })
+      }
+    })
+
+    // Busca cursos publicados para gráficos
     const allPublishedCourses = await client.fetch(`
       *[_type == "course" && status == "published"] | order(_updatedAt desc, _createdAt desc) {
         _createdAt,
         title,
-        status
+        status,
+        modules[] {
+          lessons[] {
+            exercises[]
+          }
+        }
       }
     `)
 
-    const allCoursesForCharts = await client.fetch(`
-      *[_type == "course" && status == "published"] | order(_updatedAt desc, _createdAt desc) {
-        _createdAt,
-        title,
-        status,
-        "lessonsCount": count(modules[].lessons[]),
-        "exercisesCount": count(modules[].lessons[].exercises[])
+    // 👈 CALCULA CONTAGENS PARA GRÁFICOS
+    const allCoursesForCharts = allPublishedCourses.map(course => {
+      let lessonsCount = 0
+      let exercisesCount = 0
+
+      if (course.modules && Array.isArray(course.modules)) {
+        course.modules.forEach(module => {
+          if (module.lessons && Array.isArray(module.lessons)) {
+            lessonsCount += module.lessons.length
+            
+            module.lessons.forEach(lesson => {
+              if (lesson.exercises && Array.isArray(lesson.exercises)) {
+                exercisesCount += lesson.exercises.length
+              }
+            })
+          }
+        })
       }
-    `)
+
+      return {
+        ...course,
+        lessonsCount,
+        exercisesCount
+      }
+    })
 
     const dailyCourseData = {}
     const dailyLessonData = {}
