@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const client = require('../config/sanityClient.js')
 
-// --- 🔹 /all (categorias, subcategororias, tags e cursos resumidos) ---
+// --- 🔹 /all (categorias, subcategororias, tags e cursos com CONTAGENS) ---
 router.get('/all', async (req, res) => {
   try {
     const [categories, subcategories, tags, courses] = await Promise.all([
@@ -23,7 +23,7 @@ router.get('/all', async (req, res) => {
         subcategory->{_id, title}
       }`),
 
-      // 👈 CURSO COM CONTAGENS de aulas e exercícios
+      // 👈 CURSO COM CONTAGENS - Versão leve e rápida
       client.fetch(`*[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
         _id,
         _createdAt,
@@ -107,7 +107,7 @@ router.get('/tags', async (req, res) => {
   }
 })
 
-// --- 🔹 Cursos (resumo) ---
+// --- 🔹 Cursos (com contagens) ---
 router.get('/courses', async (_, res) => {
   try {
     const data = await client.fetch(`*[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
@@ -134,7 +134,7 @@ router.get('/courses', async (_, res) => {
   }
 })
 
-// --- 🔹 Curso por ID ---
+// --- 🔹 Curso por ID (completo) ---
 router.get('/course/:id', async (req, res) => {
   try {
     const { id } = req.params
@@ -173,7 +173,9 @@ router.get('/course/:id', async (req, res) => {
             options
           }
         }
-      }
+      },
+      "totalLessons": count(modules[].lessons[]),
+      "totalExercises": count(modules[].lessons[].exercises[])
     }`
     const course = await client.fetch(query, { id })
     if (!course) return res.status(404).json({ error: 'Curso não encontrado' })
@@ -184,7 +186,7 @@ router.get('/course/:id', async (req, res) => {
   }
 })
 
-// --- 🔹 Curso por SLUG ---
+// --- 🔹 Curso por SLUG (completo) ---
 router.get('/course/slug/:slug', async (req, res) => {
   try {
     const { slug } = req.params
@@ -223,7 +225,9 @@ router.get('/course/slug/:slug', async (req, res) => {
             options
           }
         }
-      }
+      },
+      "totalLessons": count(modules[].lessons[]),
+      "totalExercises": count(modules[].lessons[].exercises[])
     }`
     const course = await client.fetch(query, { slug })
     if (!course) return res.status(404).json({ error: 'Curso não encontrado' })
@@ -240,6 +244,7 @@ router.get('/stats', async (req, res) => {
     const totalCourses = await client.fetch(`count(*[_type == "course"])`)
     const publishedCourses = await client.fetch(`count(*[_type == "course" && status == "published"])`)
 
+    // Busca cursos para contagens
     const allCoursesWithContent = await client.fetch(`
       *[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
         _createdAt,

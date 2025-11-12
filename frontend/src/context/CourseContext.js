@@ -109,16 +109,16 @@ export const CourseProvider = ({ children }) => {
       id: course.id || course._id,
       slug,
       url: `/curso/${slug}`,
-      // Adicionando os campos de data, se ausentes, para garantir a ordenação no Sidebar
       _createdAt: course._createdAt || new Date().toISOString(),
       _updatedAt: course._updatedAt || new Date().toISOString(),
+      // 👈 Garante que tenha as contagens mesmo se vierem vazias
+      totalLessons: course.totalLessons || 0,
+      totalExercises: course.totalExercises || 0,
     };
 
     setCourses((prev) => {
-      // CORREÇÃO: Usar newCourse.slug (string) para verificar a existência.
       const exists = prev.some((c) => c.slug === newCourse.slug); 
       if (exists) return prev;
-      // Inserir no início, o Sidebar usará useMemo para reordenar.
       return [newCourse, ...prev];
     });
 

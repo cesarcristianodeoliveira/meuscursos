@@ -59,23 +59,22 @@ const CoursesPage = () => {
     return `${mins} min`
   }
 
-  // 👈 REMOVA estas funções - agora as contagens vêm da API
-  // const countTotalLessons = (course) => {
-  //   if (!course.modules) return 0
-  //   return course.modules.reduce((total, module) => {
-  //     return total + (module.lessons?.length || 0)
-  //   }, 0)
-  // }
+  const countTotalLessons = (course) => {
+    if (!course.modules) return 0
+    return course.modules.reduce((total, module) => {
+      return total + (module.lessons?.length || 0)
+    }, 0)
+  }
 
-  // const countTotalExercises = (course) => {
-  //   if (!course.modules) return 0
-  //   return course.modules.reduce((total, module) => {
-  //     const moduleExercises = module.lessons?.reduce((lessonTotal, lesson) => {
-  //       return lessonTotal + (lesson.exercises?.length || 0)
-  //     }, 0) || 0
-  //     return total + moduleExercises
-  //   }, 0)
-  // }
+  const countTotalExercises = (course) => {
+    if (!course.modules) return 0
+    return course.modules.reduce((total, module) => {
+      const moduleExercises = module.lessons?.reduce((lessonTotal, lesson) => {
+        return lessonTotal + (lesson.exercises?.length || 0)
+      }, 0) || 0
+      return total + moduleExercises
+    }, 0)
+  }
 
   if (loading) {
     return (
@@ -196,13 +195,13 @@ const CoursesPage = () => {
                       )}
                     </Box>
 
-                    {/* 👈 ESTATÍSTICAS ATUALIZADAS - Agora usa os campos diretos da API */}
+                    {/* Estatísticas */}
                     <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                       <Typography variant="caption" color="text.secondary">
-                        <strong>{course.totalLessons || 0}</strong> aulas
+                        <strong>{countTotalLessons(course)}</strong> aulas
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        <strong>{course.totalExercises || 0}</strong> exercícios
+                        <strong>{countTotalExercises(course)}</strong> exercícios
                       </Typography>
                     </Box>
 
