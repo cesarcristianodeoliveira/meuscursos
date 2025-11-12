@@ -37,16 +37,25 @@ function sanitizeJSON(raw) {
     .trim();
 }
 
+// 👈 NOVA FUNÇÃO: Recupera JSON de resposta incompleta
 function recoverJSONFromIncomplete(rawText) {
   if (!rawText) return null;
   
   try {
+    // Tenta encontrar JSON completo ou parcial
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       let jsonStr = jsonMatch[0];
+      
+      // Tenta fechar arrays abertos
       jsonStr = jsonStr.replace(/(\[[\s\S]*?)(?=\])/g, '$1]');
+      
+      // Tenta fechar objetos abertos  
       jsonStr = jsonStr.replace(/(\{[\s\S]*?)(?=\})/g, '$1}');
+      
+      // Remove vírgulas soltas no final
       jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
+      
       return JSON.parse(jsonStr);
     }
   } catch (error) {
@@ -56,93 +65,76 @@ function recoverJSONFromIncomplete(rawText) {
   return null;
 }
 
-// 👈 FUNÇÃO CORRIGIDA: Estrutura correta para o schema do Sanity
 function addKeysRecursively(obj) {
   if (Array.isArray(obj)) {
-    return obj.map((item) => ({
-      ...addKeysRecursively(item),
-      _key: uuidv4()
-    }));
+    return obj.map((item) => addKeysRecursively(item));
   } else if (typeof obj === 'object' && obj !== null) {
     const newObj = {};
     for (const [key, value] of Object.entries(obj)) {
       newObj[key] = addKeysRecursively(value);
     }
+    newObj._key = uuidv4();
     return newObj;
   }
   return obj;
 }
 
-// 👈 FUNÇÃO COMPLETAMENTE REFEITA: Estrutura correta para o schema
+// 👈 FUNÇÃO CORRIGIDA: Remove "A.", "B.", "C." das opções e respostas
 function sanitizeCourseData(courseData) {
   if (!courseData || !Array.isArray(courseData.modules)) return courseData;
 
-  const sanitizedModules = courseData.modules.map((module, moduleIndex) => ({
-    _key: uuidv4(),
-    title: module.title || `Módulo ${moduleIndex + 1}`,
-    description: module.description || '',
-    lessons: (module.lessons || []).map((lesson, lessonIndex) => {
-      // 👈 CORREÇÃO CRÍTICA: Tips deve ser array de strings simples
-      const cleanTips = Array.isArray(lesson.tips) 
-        ? lesson.tips.map(tip => {
-            if (typeof tip === 'string') {
-              return tip.replace(/^[A-Z]\.\s*/, '');
-            }
-            // Se for objeto, pega o primeiro valor
-            return Object.values(tip).join('').replace(/^[A-Z]\.\s*/, '');
-          })
-        : [];
-
-      // 👈 CORREÇÃO CRÍTICA: Options deve ser array de strings simples
-      const cleanExercises = (lesson.exercises || []).map((ex, exIndex) => {
-        const cleanOptions = (ex.options || []).map(opt => {
+  courseData.modules = courseData.modules.map((module) => ({
+    ...module,
+    lessons: (module.lessons || []).map((lesson) => ({
+      ...lesson,
+      tips: (lesson.tips || []).map((tip) =>
+        typeof tip === 'string' ? tip : Object.values(tip).join('')
+      ),
+      exercises: (lesson.exercises || []).map((ex) => {
+        // Remove "A.", "B.", "C." das opções
+        const cleanOptions = (ex.options || []).map((opt) => {
           if (typeof opt === 'string') {
+            // Remove "A. ", "B. ", "C. " do início das opções
             return opt.replace(/^[A-Z]\.\s*/, '');
           }
-          // Se for objeto, pega o primeiro valor
-          return Object.values(opt).join('').replace(/^[A-Z]\.\s*/, '');
+          return Object.values(opt).join('');
         });
 
+        // Remove "A.", "B.", "C." da resposta
         let cleanAnswer = ex.answer;
         if (typeof cleanAnswer === 'string') {
           cleanAnswer = cleanAnswer.replace(/^[A-Z]\.\s*/, '');
         }
-
+        
         return {
-          _key: uuidv4(),
-          question: ex.question || '',
-          answer: cleanAnswer || '',
-          options: cleanOptions, // 👈 Array de strings simples
+          ...ex,
+          answer: cleanAnswer,
+          options: cleanOptions,
         };
-      });
-
-      return {
-        _key: uuidv4(),
-        title: lesson.title || `Aula ${lessonIndex + 1}`,
-        content: lesson.content || '',
-        tips: cleanTips, // 👈 Array de strings simples
-        exercises: cleanExercises,
-      };
-    })
+      }),
+    })),
   }));
 
-  return {
-    ...courseData,
-    modules: sanitizedModules
-  };
+  return courseData;
 }
 
-// 👈 FUNÇÃO MELHORADA: Calcula duração
+// 👈 FUNÇÃO MELHORADA: Calcula duração considerando TODO o conteúdo do curso
 function estimateCourseDuration(courseData, categoryName, subcategoryName, tags = []) {
   if (!courseData) return 30;
   
   let totalCharacters = 0;
   
+  // 1. Título do curso
   totalCharacters += (courseData.title || '').length;
+  
+  // 2. Descrição do curso
   totalCharacters += (courseData.description || '').length;
+  
+  // 3. Nome da categoria e subcategoria
   totalCharacters += (categoryName || '').length;
   totalCharacters += (subcategoryName || '').length;
   
+  // 4. Tags (se houver)
   if (Array.isArray(tags)) {
     tags.forEach(tag => {
       if (tag && typeof tag === 'string') {
@@ -151,32 +143,46 @@ function estimateCourseDuration(courseData, categoryName, subcategoryName, tags 
     });
   }
   
+  // 5. Módulos e lições
   if (Array.isArray(courseData.modules)) {
     courseData.modules.forEach(module => {
+      // Título do módulo
       totalCharacters += (module.title || '').length;
+      
+      // Descrição do módulo
       totalCharacters += (module.description || '').length;
       
+      // Lições
       if (Array.isArray(module.lessons)) {
         module.lessons.forEach(lesson => {
+          // Título da lição
           totalCharacters += (lesson.title || '').length;
+          
+          // Conteúdo da lição
           totalCharacters += (lesson.content || '').length;
           
+          // Dicas
           if (Array.isArray(lesson.tips)) {
             lesson.tips.forEach(tip => {
               totalCharacters += (tip || '').length;
             });
           }
           
+          // Exercícios
           if (Array.isArray(lesson.exercises)) {
             lesson.exercises.forEach(exercise => {
+              // Pergunta
               totalCharacters += (exercise.question || '').length;
-              totalCharacters += (exercise.answer || '').length;
               
+              // Opções
               if (Array.isArray(exercise.options)) {
                 exercise.options.forEach(option => {
                   totalCharacters += (option || '').length;
                 });
               }
+              
+              // Resposta
+              totalCharacters += (exercise.answer || '').length;
             });
           }
         });
@@ -186,21 +192,29 @@ function estimateCourseDuration(courseData, categoryName, subcategoryName, tags 
   
   console.log(`📊 Total de caracteres do curso: ${totalCharacters}`);
   
-  const palavrasPorMinuto = 200;
-  const caracteresPorPalavra = 5.5;
+  // Cálculo baseado em velocidade de leitura e complexidade
+  // Velocidade média de leitura: 200-250 palavras por minuto
+  // Considerando que palavras em português têm em média 5-6 caracteres
+  const palavrasPorMinuto = 200; // Velocidade conservadora
+  const caracteresPorPalavra = 5.5; // Média para português
   const palavrasTotais = totalCharacters / caracteresPorPalavra;
   
+  // Tempo base de leitura
   let minutosLeitura = Math.round(palavrasTotais / palavrasPorMinuto);
   
+  // Adiciona tempo para exercícios e reflexão
   const totalExercicios = courseData.modules?.reduce((total, modulo) => {
     return total + (modulo.lessons?.reduce((subtotal, aula) => {
       return subtotal + (aula.exercises?.length || 0);
     }, 0) || 0);
   }, 0) || 0;
   
+  // Adiciona 2 minutos por exercício para resolução
   minutosLeitura += totalExercicios * 2;
-  minutosLeitura = Math.max(15, minutosLeitura);
-  minutosLeitura = Math.min(180, minutosLeitura);
+  
+  // Garante mínimo e máximo razoáveis
+  minutosLeitura = Math.max(15, minutosLeitura); // Mínimo 15 minutos
+  minutosLeitura = Math.min(180, minutosLeitura); // Máximo 3 horas
   
   console.log(`⏱️ Duração estimada: ${minutosLeitura} minutos`);
   
@@ -249,7 +263,7 @@ function validateCourseData(courseData) {
   return { valid: true };
 }
 
-// 👈 FUNÇÃO MELHORADA: Geração com fallback
+// 👈 NOVA FUNÇÃO: Geração com fallback
 async function generateCourseWithFallback(prompt, maxRetries = 2) {
   let lastError;
   
@@ -279,6 +293,8 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
         courseData = JSON.parse(rawResponse);
       } catch (parseError) {
         console.log(`❌ JSON inválido na tentativa ${attempt}, tentando recuperar...`);
+        
+        // Tenta recuperar JSON incompleto
         courseData = recoverJSONFromIncomplete(rawResponse);
         
         if (!courseData) {
@@ -288,6 +304,7 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
         console.log('✅ JSON recuperado com sucesso!');
       }
 
+      // Validação básica
       if (courseData && courseData.title && Array.isArray(courseData.modules)) {
         return courseData;
       } else {
@@ -299,6 +316,7 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
       console.log(`❌ Tentativa ${attempt} falhou:`, error.message);
       
       if (attempt < maxRetries) {
+        // Espera um pouco antes da próxima tentativa
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
@@ -308,7 +326,7 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
 }
 
 // =======================================================
-// 🧠 ROTA PRINCIPAL - GERAR CURSO (COMPLETAMENTE CORRIGIDA)
+// 🧠 ROTA PRINCIPAL - GERAR CURSO (CORRIGIDA COM OPÇÕES LIMPAS)
 // =======================================================
 router.post('/course', async (req, res) => {
   try {
@@ -318,8 +336,10 @@ router.post('/course', async (req, res) => {
     if (!categoryId)
       return res.status(400).json({ error: 'categoryId é obrigatório.' });
 
+    // ✅ Tags opcionais
     const validTags = validateTags(tags || []);
 
+    // 🔄 CORREÇÃO: Busca categoria e subcategoria COM ICONS
     const [category, subcategory] = await Promise.all([
       client.fetch(`*[_id == $categoryId][0]{_id, title, icon, "slug": slug.current}`, { categoryId }),
       subcategoryId
@@ -332,7 +352,7 @@ router.post('/course', async (req, res) => {
 
     const cfg = LEVEL_CONFIG[level] || LEVEL_CONFIG.beginner;
 
-    // 👈 PROMPT MELHORADO: Especifica estrutura SIMPLES
+    // 👈 PROMPT CORRIGIDO: Agora especifica que NÃO deve usar "A.", "B.", "C."
     const prompt = `
 Crie um curso em JSON válido com estas especificações EXATAS:
 
@@ -370,27 +390,23 @@ ESTRUTURA EXATA DO JSON:
   ]
 }
 
-REGRAS CRÍTICAS:
+IMPORTANTE: 
 - Conteúdo em português do Brasil
 - Tono: ${cfg.tone}
 - Foco em aplicação prática
-- Exercícios com 3 opções cada
+- Exercícios com 3 opções
 - NÃO use "A.", "B.", "C." nas opções - use apenas o texto da opção
 - A RESPOSTA deve ser o TEXTO COMPLETO da opção correta
 - Garanta que a resposta corresponda exatamente a uma das opções fornecidas
-- Cada módulo deve ter exatamente ${cfg.lessonsPerModule} aulas
-- Cada aula deve ter exatamente ${cfg.exercises} exercício(s)
-- "tips" deve ser um array de strings simples
-- "options" deve ser um array de strings simples
 `.trim();
 
+    // 🧠 Geração COM FALLBACK
     const courseData = await generateCourseWithFallback(prompt, 2);
     
     if (!courseData) {
       throw new Error('Não foi possível gerar o curso após todas as tentativas');
     }
 
-    // 👈 CORREÇÃO PRINCIPAL: Sanitização correta
     const sanitizedData = sanitizeCourseData(courseData);
     const validation = validateCourseData(sanitizedData);
     if (!validation.valid)
@@ -400,13 +416,16 @@ REGRAS CRÍTICAS:
     const slug = slugify(title);
     const description = sanitizedData.description.trim();
 
+    // 🕐 CALCULA DURAÇÃO MELHORADA: Considera TODO o conteúdo do curso
     const duration = estimateCourseDuration(sanitizedData, categoryName, subcategoryName, validTags);
 
+    // ⚠️ Antes de criar, verifica duplicados
     const existing = await client.fetch(
       `*[_type == "course" && slug.current == $slug][0]{_id}`,
       { slug }
     );
 
+    // 🔄 Constrói URL com categoria e subcategoria
     const categorySlug = category?.slug || 'categoria';
     const subcategorySlug = subcategory?.slug || 'subcategoria';
     const courseUrl = `http://localhost:3000/${categorySlug}/${subcategorySlug}/${slug}`;
@@ -431,7 +450,7 @@ REGRAS CRÍTICAS:
       });
     }
 
-    // 👈 ESTRUTURA FINAL CORRIGIDA
+    // 🆕 Cria novo curso
     const newCourse = {
       _type: 'course',
       title,
@@ -444,44 +463,18 @@ REGRAS CRÍTICAS:
       subcategory: subcategoryId
         ? { _type: 'reference', _ref: subcategoryId }
         : undefined,
-      tags: validTags.map((tagId) => ({
+      tags: (validTags || []).map((t) => ({
         _key: uuidv4(),
         _type: 'reference',
-        _ref: tagId,
+        _ref: t,
       })),
-      modules: sanitizedData.modules,
+      modules: addKeysRecursively(sanitizedData.modules || []),
       certificate: '',
       status: 'published',
     };
 
-    console.log('📦 Estrutura final do curso:');
-    console.log('- Módulos:', newCourse.modules.length);
-    newCourse.modules.forEach((module, i) => {
-      console.log(`  Módulo ${i + 1}:`, module.lessons?.length || 0, 'aulas');
-      module.lessons?.forEach((lesson, j) => {
-        console.log(`    Aula ${j + 1}:`, lesson.exercises?.length || 0, 'exercícios');
-        console.log(`    Tips:`, Array.isArray(lesson.tips) ? lesson.tips.length : 'inválido');
-        console.log(`    Options no primeiro exercício:`, 
-          lesson.exercises?.[0]?.options ? 
-          (Array.isArray(lesson.exercises[0].options) ? 'array válido' : 'inválido') : 
-          'sem exercícios'
-        );
-      });
-    });
-
     const created = await client.create(newCourse);
     console.log('✅ Curso criado com sucesso:', created._id);
-
-    const totalLessons = sanitizedData.modules.reduce((total, module) => 
-      total + (module.lessons?.length || 0), 0
-    );
-    const totalExercises = sanitizedData.modules.reduce((total, module) => 
-      total + (module.lessons?.reduce((sub, lesson) => 
-        sub + (lesson.exercises?.length || 0), 0) || 0
-      ), 0
-    );
-
-    console.log(`📊 Estatísticas finais: ${totalLessons} aulas, ${totalExercises} exercícios`);
 
     res.json({
       success: true,
@@ -493,8 +486,6 @@ REGRAS CRÍTICAS:
         description: created.description,
         level: created.level,
         duration: created.duration,
-        modules: totalLessons,
-        exercises: totalExercises,
         category,
         subcategory,
         sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${created._id}`,
