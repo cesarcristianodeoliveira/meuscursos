@@ -2,15 +2,15 @@ const express = require('express');
 const router = express.Router();
 const client = require('../config/sanityClient');
 const OpenAI = require('openai');
-const { GoogleGenerativeAI } = require('@google/generative-ai'); // 👈 NOVA IMPORTAÇÃO
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { v4: uuidv4 } = require('uuid');
 
-// 👈 CONFIGURAÇÃO DAS APIS
+// 👇 CONFIGURAÇÃO DAS APIS
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY); // 👈 NOVA CONFIGURAÇÃO
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // =======================================================
 // 🔧 FUNÇÕES AUXILIARES
@@ -60,7 +60,7 @@ function recoverJSONFromIncomplete(rawText) {
   return null;
 }
 
-// 👈 FUNÇÃO NOVA: Gerar curso com OpenAI
+// 👇 FUNÇÃO: Gerar curso com OpenAI
 async function generateWithOpenAI(prompt, level = 'beginner', maxRetries = 2) {
   let lastError;
   
@@ -123,7 +123,7 @@ async function generateWithOpenAI(prompt, level = 'beginner', maxRetries = 2) {
   throw lastError;
 }
 
-// 👈 FUNÇÃO NOVA: Gerar curso com Gemini
+// 👇 FUNÇÃO CORRIGIDA: Gerar curso com Gemini (MODELO CORRIGIDO)
 async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
   let lastError;
   
@@ -133,8 +133,9 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
     try {
       console.log(`🔄 Gemini - Tentativa ${attempt} (nível: ${level})...`);
       
+      // 👇 MODELO CORRIGIDO: gemini-1.5-flash → gemini-pro
       const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
+        model: "gemini-pro", // ✅ CORREÇÃO AQUI
         generationConfig: {
           temperature: 0.7,
           topK: 40,
@@ -143,7 +144,10 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
         }
       });
 
-      const result = await model.generateContent(prompt);
+      // 👇 PROMPT OTIMIZADO PARA GEMINI
+      const jsonPrompt = `${prompt}\n\nIMPORTANTE: Retorne APENAS o JSON válido, sem texto adicional, sem markdown, sem explicações.`;
+      
+      const result = await model.generateContent(jsonPrompt);
       const response = await result.response;
       let rawResponse = response.text().trim();
 
@@ -190,7 +194,7 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
   throw lastError;
 }
 
-// 👈 FUNÇÃO PRINCIPAL ATUALIZADA: Escolhe o provider
+// 👇 FUNÇÃO PRINCIPAL ATUALIZADA: Escolhe o provider
 async function generateCourseWithProvider(prompt, provider = 'openai', level = 'beginner', maxRetries = 2) {
   console.log(`🎯 Usando provider: ${provider.toUpperCase()}`);
   
@@ -204,7 +208,7 @@ async function generateCourseWithProvider(prompt, provider = 'openai', level = '
   }
 }
 
-// 👈 FUNÇÃO CORRIGIDA: Adiciona _key recursivamente
+// 👇 FUNÇÃO: Adiciona _key recursivamente
 function addKeysRecursively(obj) {
   if (Array.isArray(obj)) {
     return obj.map((item) => ({
@@ -221,7 +225,7 @@ function addKeysRecursively(obj) {
   return obj;
 }
 
-// 👈 FUNÇÃO CORRIGIDA: Sanitiza dados mantendo estrutura correta
+// 👇 FUNÇÃO: Sanitiza dados mantendo estrutura correta
 function sanitizeCourseData(courseData) {
   if (!courseData || !Array.isArray(courseData.modules)) return courseData;
 
@@ -265,7 +269,7 @@ function sanitizeCourseData(courseData) {
   };
 }
 
-// 👈 FUNÇÃO MELHORADA: Calcula duração
+// 👇 FUNÇÃO: Calcula duração
 function estimateCourseDuration(courseData, categoryName, subcategoryName, tags = []) {
   if (!courseData) return 30;
   
@@ -341,7 +345,7 @@ function estimateCourseDuration(courseData, categoryName, subcategoryName, tags 
   return minutosLeitura;
 }
 
-// ⚙️ Tags opcionais e deduplicadas
+// 👇 Tags opcionais e deduplicadas
 function validateTags(tags) {
   if (!Array.isArray(tags)) return [];
   const unique = [...new Set(tags.filter(Boolean))];
@@ -387,17 +391,16 @@ function validateCourseData(courseData) {
 }
 
 // =======================================================
-// 🧠 ROTA PRINCIPAL - GERAR CURSO (COMPLETAMENTE ATUALIZADA)
+// 🧠 ROTA PRINCIPAL - GERAR CURSO
 // =======================================================
 router.post('/course', async (req, res) => {
   try {
-    const { level = 'beginner', categoryId, subcategoryId, tags = [], provider = 'openai' } = req.body; // 👈 ADICIONADO provider
+    const { level = 'beginner', categoryId, subcategoryId, tags = [], provider = 'openai' } = req.body;
     console.log('🧾 Payload recebido:', req.body);
 
     if (!categoryId)
       return res.status(400).json({ error: 'categoryId é obrigatório.' });
 
-    // 👈 VALIDAÇÃO DO PROVIDER
     if (!['openai', 'gemini'].includes(provider)) {
       return res.status(400).json({ error: 'Provider deve ser "openai" ou "gemini".' });
     }
@@ -466,7 +469,6 @@ IMPORTANTE:
 
     console.log(`🎯 Gerando curso ${level.toUpperCase()} com ${provider.toUpperCase()}...`);
 
-    // 👈 USA A NOVA FUNÇÃO COM PROVIDER
     const courseData = await generateCourseWithProvider(prompt, provider, level, 2);
     
     if (!courseData) {
@@ -508,7 +510,7 @@ IMPORTANTE:
           category,
           subcategory,
           tags: validTags.map(tagId => ({ _id: tagId })),
-          provider: provider, // 👈 USA O PROVIDER
+          provider: provider,
           sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${existing._id}`,
           url: courseUrl,
         },
@@ -523,7 +525,7 @@ IMPORTANTE:
       description,
       level,
       duration,
-      provider: provider, // 👈 USA O PROVIDER
+      provider: provider,
       category: { _type: 'reference', _ref: categoryId },
       subcategory: subcategoryId
         ? { _type: 'reference', _ref: subcategoryId }
@@ -560,7 +562,7 @@ IMPORTANTE:
         description: created.description,
         level: created.level,
         duration: created.duration,
-        provider: provider, // 👈 INCLUI NA RESPOSTA
+        provider: provider,
         category,
         subcategory,
         tags: validTags.map(tagId => ({ _id: tagId })),
