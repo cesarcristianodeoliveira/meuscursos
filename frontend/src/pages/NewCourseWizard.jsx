@@ -3,14 +3,13 @@ import {
   Box, Button, Typography,
   Alert,
   Toolbar, List, ListItemButton, ListItemText, ListItemIcon, Checkbox,
-  Radio, RadioGroup, FormControlLabel, FormControl // 👈 IMPORTAÇÕES ADICIONADAS
+  RadioGroup, Radio, FormControlLabel, FormControl
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { useCourse } from '../context/CourseContext'
 import { getTagsBySubcategory } from '../services/api'
 import IconResolver from '../components/IconResolver'
 
-// 👈 ATUALIZADO: Adicionado step "Provider"
 const steps = ['Nível', 'Categoria', 'Subcategoria', 'Tags', 'Provider', 'Gerar Curso']
 
 function NewCourseWizard() {
@@ -25,9 +24,8 @@ function NewCourseWizard() {
   const [availableTags, setAvailableTags] = useState([])
   const [loadingTags, setLoadingTags] = useState(false)
   const [error, setError] = useState(null)
-  const [provider, setProvider] = useState('') // 👈 NOVO STATE - SEM VALOR PRÉ-DEFINIDO
+  const [provider, setProvider] = useState('')
 
-  // 👈 OPÇÕES DE PROVIDERS ATUALIZADAS
   const providerOptions = [
     { 
       value: 'openai', 
@@ -43,17 +41,19 @@ function NewCourseWizard() {
     }
   ]
 
-  // Ref para o container de conteúdo que faz scroll
   const contentRef = useRef(null)
+  const levelOptions = [
+    { value: 'beginner', label: 'Iniciante' },
+    { value: 'intermediate', label: 'Intermediário' },
+    { value: 'advanced', label: 'Avançado' }
+  ]
 
-  // --- Efeito para scrollar para o topo quando o step mudar
   useEffect(() => {
     if (contentRef.current) {
       contentRef.current.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }, [activeStep])
 
-  // --- subcategorias filtradas pela categoria escolhida
   const filteredSubs = useMemo(
     () => (subcategories || []).filter(
       sub => sub.category?._ref === categoryId || sub.category?._id === categoryId
@@ -61,7 +61,6 @@ function NewCourseWizard() {
     [subcategories, categoryId]
   )
 
-  // --- Limpar tags quando categoria mudar
   useEffect(() => {
     if (categoryId) {
       setSubcategoryId('')
@@ -70,14 +69,12 @@ function NewCourseWizard() {
     }
   }, [categoryId])
 
-  // --- Limpar tags quando subcategoria mudar  
   useEffect(() => {
     if (subcategoryId) {
       setSelectedTags([])
     }
   }, [subcategoryId])
 
-  // --- buscar tags ao mudar de subcategoria
   useEffect(() => {
     const loadTags = async () => {
       if (!subcategoryId) {
@@ -98,7 +95,6 @@ function NewCourseWizard() {
     loadTags()
   }, [subcategoryId])
 
-  // --- alternar tags
   const toggleTag = tagId => {
     setSelectedTags(prev =>
       prev.includes(tagId)
@@ -107,11 +103,9 @@ function NewCourseWizard() {
     )
   }
 
-  // --- avançar etapas
   const handleNext = () => {
     setError(null)
 
-    // validações básicas
     if (activeStep === 1 && !categoryId) {
       setError('Selecione uma categoria antes de continuar.')
       return
@@ -124,23 +118,20 @@ function NewCourseWizard() {
       setError('Selecione entre 1 e 3 tags antes de continuar.')
       return
     }
-    // 👈 NOVA VALIDAÇÃO: Provider obrigatório
     if (activeStep === 4 && !provider) {
       setError('Selecione um provider de IA antes de continuar.')
       return
     }
 
-    // último passo → gerar curso
     if (activeStep === steps.length - 1) {
       const payload = { 
         categoryId, 
         subcategoryId, 
         level, 
         tags: selectedTags,
-        provider // 👈 INCLUI PROVIDER NO PAYLOAD
+        provider
       }
       
-      // Navega para a página de geração com o payload
       navigate('/curso/gerando', { 
         state: { 
           payload,
@@ -151,21 +142,11 @@ function NewCourseWizard() {
       return
     }
 
-    // próximo passo normal
     setActiveStep(prev => prev + 1)
   }
 
-  // --- voltar etapa
   const handleBack = () => setActiveStep(prev => prev - 1)
 
-  // --- Opções para cada passo
-  const levelOptions = [
-    { value: 'beginner', label: 'Iniciante' },
-    { value: 'intermediate', label: 'Intermediário' },
-    { value: 'advanced', label: 'Avançado' }
-  ]
-
-  // --- renderizar conteúdo de cada passo
   const renderStepContent = () => {
     switch (activeStep) {
       case 0:
@@ -176,13 +157,9 @@ function NewCourseWizard() {
                 key={option.value}
                 selected={level === option.value}
                 onClick={() => setLevel(option.value)}
-                sx={{
-                  px: [1]
-                }}
+                sx={{ px: [1] }}
               >
-                <ListItemText 
-                  primary={option.label}
-                />
+                <ListItemText primary={option.label} />
               </ListItemButton>
             ))}
           </List>
@@ -192,26 +169,22 @@ function NewCourseWizard() {
         return Array.isArray(categories) && categories.length ? (
           <List sx={{ width: '100%' }}>
             {categories.map(cat => (
-                <ListItemButton
-                    key={cat._id}
-                    selected={categoryId === cat._id}
-                    onClick={() => {
-                        setCategoryId(cat._id)
-                        setSubcategoryId('')
-                        setSelectedTags([])
-                        setAvailableTags([])
-                    }}
-                    sx={{
-                        px: [1]
-                    }}
-                >
-                    <ListItemIcon sx={{ minWidth: 0, mr: 1 }}>
-                        <IconResolver iconName={cat.icon} />
-                    </ListItemIcon>
-                    <ListItemText 
-                        primary={cat.title}
-                    />
-                </ListItemButton>
+              <ListItemButton
+                key={cat._id}
+                selected={categoryId === cat._id}
+                onClick={() => {
+                  setCategoryId(cat._id)
+                  setSubcategoryId('')
+                  setSelectedTags([])
+                  setAvailableTags([])
+                }}
+                sx={{ px: [1] }}
+              >
+                <ListItemIcon sx={{ minWidth: 0, mr: 1 }}>
+                  <IconResolver iconName={cat.icon} />
+                </ListItemIcon>
+                <ListItemText primary={cat.title} />
+              </ListItemButton>
             ))}
           </List>
         ) : (
@@ -222,7 +195,9 @@ function NewCourseWizard() {
 
       case 2:
         return !filteredSubs.length ? (
-          <Typography color='textSecondary' fontSize='small' sx={{ mt: 2, px: [1] }}>Nenhuma subcategoria disponível</Typography>
+          <Typography color='textSecondary' fontSize='small' sx={{ mt: 2, px: [1] }}>
+            Nenhuma subcategoria disponível
+          </Typography>
         ) : (
           <List sx={{ width: '100%' }}>
             {filteredSubs.map(sub => (
@@ -233,16 +208,12 @@ function NewCourseWizard() {
                   setSubcategoryId(sub._id)
                   setSelectedTags([])
                 }}
-                sx={{
-                  px: [1]
-                }}
+                sx={{ px: [1] }}
               >
                 <ListItemIcon sx={{ minWidth: 0, mr: 1 }}>
                   <IconResolver iconName={sub.icon} />
                 </ListItemIcon>
-                <ListItemText 
-                  primary={sub.title}
-                />
+                <ListItemText primary={sub.title} />
               </ListItemButton>
             ))}
           </List>
@@ -284,18 +255,10 @@ function NewCourseWizard() {
                     sx={{
                       px: [1],
                       opacity: isDisabled ? 0.5 : 1,
-                      '&.Mui-disabled': {
-                        opacity: 0.5
-                      }
+                      '&.Mui-disabled': { opacity: 0.5 }
                     }}
                   >
-                    <ListItemIcon
-                      sx={{
-                        '&.MuiListItemIcon-root': {
-                          minWidth: 'auto',
-                        }
-                      }}
-                    >
+                    <ListItemIcon sx={{ minWidth: 'auto' }}>
                       <Checkbox
                         edge="start"
                         checked={isSelected}
@@ -305,10 +268,7 @@ function NewCourseWizard() {
                         inputProps={{ 'aria-labelledby': labelId }}
                       />
                     </ListItemIcon>
-                    <ListItemText 
-                      id={labelId} 
-                      primary={tag.title}
-                    />
+                    <ListItemText id={labelId} primary={tag.title} />
                   </ListItemButton>
                 )
               })}
@@ -316,7 +276,6 @@ function NewCourseWizard() {
           </Box>
         )
 
-      // 👈 NOVO STEP: Seleção de Provider
       case 4:
         return (
           <Box sx={{ width: '100%', px: [1] }}>
@@ -360,7 +319,6 @@ function NewCourseWizard() {
                           <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
                             {option.description}
                           </Typography>
-                          {/* 👈 RECOMENDAÇÃO BASEADA NO NÍVEL */}
                           {level === 'advanced' && option.value === 'openai' && (
                             <Typography variant="caption" color="success.main" sx={{ mt: 1, display: 'block' }}>
                               ⭐ {option.recommendation}
@@ -376,9 +334,7 @@ function NewCourseWizard() {
                       sx={{ 
                         width: '100%',
                         m: 0,
-                        '& .MuiFormControlLabel-label': {
-                          width: '100%'
-                        }
+                        '& .MuiFormControlLabel-label': { width: '100%' }
                       }}
                     />
                   </Box>
@@ -386,7 +342,6 @@ function NewCourseWizard() {
               </RadioGroup>
             </FormControl>
             
-            {/* 👈 DICA DINÂMICA BASEADA NO NÍVEL */}
             <Box sx={{ mt: 3, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
               <Typography variant="body2" color="info.contrastText">
                 <strong>💡 Dica:</strong> {
@@ -438,102 +393,77 @@ function NewCourseWizard() {
   }
 
   return (
-    <>
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        height: '100dvh',
+        overflow: 'hidden',
+      }}
+    >
+      <Toolbar sx={{ px: 0, minHeight: '56px!important' }} />
+      
+      <Box sx={{ width: '100%', pt: 1, px: 1, flexShrink: 0 }}>
+        <Typography variant="h6">Criar Novo Curso</Typography>
+        <Typography variant="body1">Siga o passo a passo para configurar seu curso</Typography>
+      </Box>
+      
+      {error && (
+        <Box sx={{ flexShrink: 0, width: '100%', px: 1 }}>
+          <Alert severity="error" sx={{ mb: 2, width: '100%' }}>{error}</Alert>
+        </Box>
+      )}
+      
+      <Box 
+        ref={contentRef}
+        sx={{ 
+          flex: 1, 
+          overflow: 'auto',
           width: '100%',
-          height: '100dvh',
-          overflow: 'hidden',
         }}
       >
-        <Toolbar sx={{ px: 0, minHeight: '56px!important' }} />
-        
-        {/* Cabeçalho */}
-        <Box
-          sx={{
-            width: '100%',
-            pt: 1,
-            px: 1,
-            flexShrink: 0,
-          }}
-        >
-          <Typography variant="h6">
-            Criar Novo Curso
-          </Typography>
-          <Typography variant="body1">
-            Siga o passo a passo para configurar seu curso
-          </Typography>
-        </Box>
-        
-        {/* Área de Alertas */}
-        {error && (
-          <Box sx={{ flexShrink: 0, width: '100%', px: 1 }}>
-            <Alert severity="error" sx={{ mb: 2, width: '100%' }}>
-              {error}
-            </Alert>
-          </Box>
+        {renderStepContent()}
+      </Box>
+      
+      <Box sx={{ 
+        flexShrink: 0,
+        display: 'flex', 
+        width: '100%', 
+        justifyContent: activeStep === 0 ? 'flex-end' : 'space-between', 
+        p: 1,
+        borderTop: '1px solid',
+        borderColor: 'divider',
+        backgroundColor: 'background.paper'
+      }}>
+        {activeStep === 0 ? null : (
+          <Button 
+            onClick={handleBack} 
+            variant="outlined"
+            disableElevation
+            sx={{ transition: 'none' }}
+          >
+            Voltar
+          </Button>
         )}
         
-        {/* Conteúdo com Scroll */}
-        <Box 
-          ref={contentRef}
-          sx={{ 
-            flex: 1, 
-            overflow: 'auto',
-            width: '100%',
-          }}
+        <Button
+          variant="contained"
+          onClick={handleNext}
+          disableElevation
+          disabled={
+            (activeStep === 0 && !level) ||
+            (activeStep === 1 && !categoryId) ||
+            (activeStep === 2 && !subcategoryId) ||
+            (activeStep === 3 && (selectedTags.length === 0 || selectedTags.length > 3)) ||
+            (activeStep === 4 && !provider)
+          }
+          sx={{ transition: 'none' }}
         >
-          {renderStepContent()}
-        </Box>
-        
-        {/* Botões Fixos no Bottom - ATUALIZADO COM NOVA VALIDAÇÃO */}
-        <Box sx={{ 
-          flexShrink: 0,
-          display: 'flex', 
-          width: '100%', 
-          justifyContent: activeStep === 0 ? 'flex-end' : 'space-between', 
-          p: 1,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          backgroundColor: 'background.paper'
-        }}>
-          {activeStep === 0 ? (
-            null
-          ) : (
-            <Button 
-              disabled={activeStep === 0} 
-              onClick={handleBack} 
-              variant="outlined"
-              disableElevation
-              sx={{
-                transition: 'none'
-              }}
-            >
-              Voltar
-            </Button>
-          )}
-          
-          <Button
-            variant="contained"
-            onClick={handleNext}
-            disableElevation
-            disabled={
-              (activeStep === 1 && !categoryId) ||
-              (activeStep === 2 && !subcategoryId) ||
-              (activeStep === 3 && selectedTags.length === 0) ||
-              (activeStep === 4 && !provider) // 👈 NOVA VALIDAÇÃO
-            }
-            sx={{
-              transition: 'none'
-            }}
-          >
-            {activeStep === steps.length - 1 ? 'Gerar Curso' : 'Próximo'}
-          </Button>
-        </Box>
+          {activeStep === steps.length - 1 ? 'Gerar Curso' : 'Próximo'}
+        </Button>
       </Box>
-    </>
+    </Box>
   )
 }
 
