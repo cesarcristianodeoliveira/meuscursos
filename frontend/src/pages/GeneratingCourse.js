@@ -32,6 +32,13 @@ function GeneratingCourse() {
   const [generatedCourse, setGeneratedCourse] = useState(null)
   const [isGenerating, setIsGenerating] = useState(false)
 
+  // 👇 DEBUG CRÍTICO - Verifica se o payload chegou
+  console.log('🎯 DEBUG CRÍTICO - GeneratingCourse montado')
+  console.log('🔍 DEBUG - Location.state completo:', location.state)
+  console.log('🔍 DEBUG - Payload recebido:', payload)
+  console.log('🔍 DEBUG - Tem payload?', !!payload)
+  console.log('🔍 DEBUG - Provider no payload:', payload?.provider)
+
   // 👇 PROGRESSO AUTOMÁTICO
   useEffect(() => {
     const timer = setInterval(() => {
@@ -81,10 +88,19 @@ function GeneratingCourse() {
 
   // 👇 EFEITO PRINCIPAL COM TIMEOUT DE SEGURANÇA
   useEffect(() => {
-    if (!payload || createdRef.current || isGenerating) return
+    console.log('🔍 DEBUG - useEffect principal executando')
+    console.log('🔍 DEBUG - Payload disponível?', !!payload)
+    console.log('🔍 DEBUG - Já criado?', createdRef.current)
+    console.log('🔍 DEBUG - Está gerando?', isGenerating)
+    
+    if (!payload || createdRef.current || isGenerating) {
+      console.log('🔍 DEBUG - Condições não atendidas, saindo...')
+      return
+    }
     
     createdRef.current = true
     setIsGenerating(true)
+    console.log('🔍 DEBUG - Iniciando geração do curso...')
 
     // 👇 TIMEOUT DE SEGURANÇA (45 segundos)
     const safetyTimeout = setTimeout(() => {
@@ -102,6 +118,7 @@ function GeneratingCourse() {
         console.log('🔍 Provider selecionado:', payload.provider)
         
         const result = await generateCourse(payload)
+        console.log('🔍 DEBUG - Resultado da API:', result)
 
         if (result?.success && result?.course) {
           console.log('✅ Curso gerado com sucesso:', result.course)
@@ -319,6 +336,9 @@ function GeneratingCourse() {
           </Typography>
           <Typography variant="caption" color="text.secondary" display="block">
             Is Generating: {isGenerating ? '✅' : '❌'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block">
+            Created Ref: {createdRef.current ? '✅' : '❌'}
           </Typography>
           {generatedCourse && (
             <>

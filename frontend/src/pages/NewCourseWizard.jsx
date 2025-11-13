@@ -132,6 +132,13 @@ function NewCourseWizard() {
         provider
       }
       
+      // 👇 DEBUG CRÍTICO - Verifica se o payload está correto
+      console.log('🎯 DEBUG CRÍTICO - Payload antes de navegar:', JSON.stringify(payload, null, 2))
+      console.log('🔍 DEBUG - Provider selecionado:', provider)
+      console.log('🔍 DEBUG - Tem categoryId?', !!categoryId)
+      console.log('🔍 DEBUG - Tem subcategoryId?', !!subcategoryId)
+      console.log('🔍 DEBUG - Tem tags?', selectedTags.length)
+      
       navigate('/curso/gerando', { 
         state: { 
           payload,
