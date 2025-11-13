@@ -32,7 +32,6 @@ function sanitizeJSON(raw) {
     .replace(/```json/gi, '')
     .replace(/```/g, '')
     .replace(/\n+/g, ' ')
-    .replace(/\r/g, '')
     .replace(/,\s*([}\]])/g, '$1')
     .replace(/“|”/g, '"')
     .replace(/‘|’/g, "'")
@@ -123,7 +122,7 @@ async function generateWithOpenAI(prompt, level = 'beginner', maxRetries = 2) {
   throw lastError;
 }
 
-// 👇 FUNÇÃO CORRIGIDA: Gerar curso com Gemini (MODELO CORRIGIDO)
+// 👇 FUNÇÃO CORRIGIDA: Gerar curso com Gemini (COM DEBUGS E FALLBACK)
 async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
   let lastError;
   
@@ -133,9 +132,14 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
     try {
       console.log(`🔄 Gemini - Tentativa ${attempt} (nível: ${level})...`);
       
+      // 👇 DEBUG: Verifica se a API Key está presente
+      console.log(`🔍 DEBUG - Gemini API Key presente: ${!!process.env.GEMINI_API_KEY}`);
+      console.log(`🔍 DEBUG - Gemini API Key (primeiros 10 chars): ${process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.substring(0, 10) + '...' : 'N/A'}`);
+      console.log(`🔍 DEBUG - Prompt length: ${prompt.length} caracteres`);
+      
       // 👇 MODELO CORRIGIDO: gemini-1.5-flash → gemini-pro
       const model = genAI.getGenerativeModel({ 
-        model: "gemini-pro", // ✅ CORREÇÃO AQUI
+        model: "gemini-pro",
         generationConfig: {
           temperature: 0.7,
           topK: 40,
@@ -147,10 +151,16 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
       // 👇 PROMPT OTIMIZADO PARA GEMINI
       const jsonPrompt = `${prompt}\n\nIMPORTANTE: Retorne APENAS o JSON válido, sem texto adicional, sem markdown, sem explicações.`;
       
+      console.log(`🔍 DEBUG - Chamando Gemini API...`);
+      
       const result = await model.generateContent(jsonPrompt);
+      console.log(`🔍 DEBUG - Gemini respondeu, processando...`);
+      
       const response = await result.response;
       let rawResponse = response.text().trim();
 
+      console.log(`🔍 DEBUG - Response recebida!`);
+      
       if (!rawResponse) {
         throw new Error('Resposta vazia da Gemini.');
       }
@@ -184,8 +194,10 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
     } catch (error) {
       lastError = error;
       console.log(`❌ Gemini - Tentativa ${attempt} falhou:`, error.message);
+      console.log(`🔍 DEBUG - Error completo:`, error);
       
       if (attempt < maxRetries) {
+        console.log(`⏳ Esperando 1.5s antes da próxima tentativa...`);
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
     }
@@ -194,18 +206,26 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
   throw lastError;
 }
 
-// 👇 FUNÇÃO PRINCIPAL ATUALIZADA: Escolhe o provider
+// 👇 FUNÇÃO PRINCIPAL ATUALIZADA: Escolhe o provider COM FALLBACK AUTOMÁTICO
 async function generateCourseWithProvider(prompt, provider = 'openai', level = 'beginner', maxRetries = 2) {
   console.log(`🎯 Usando provider: ${provider.toUpperCase()}`);
   
-  switch (provider) {
-    case 'openai':
+  // 👇 SE FOR GEMINI, TENTA COM FALLBACK PARA OPENAI
+  if (provider === 'gemini') {
+    try {
+      console.log('🔄 Tentando Gemini primeiro...');
+      const result = await generateWithGemini(prompt, level, 1); // Só 1 tentativa
+      console.log('✅ Gemini funcionou!');
+      return result;
+    } catch (error) {
+      console.log('🔄 Gemini falhou, usando OpenAI como fallback...');
+      console.log(`🔍 Erro do Gemini: ${error.message}`);
       return await generateWithOpenAI(prompt, level, maxRetries);
-    case 'gemini':
-      return await generateWithGemini(prompt, level, maxRetries);
-    default:
-      throw new Error(`Provider não suportado: ${provider}`);
+    }
   }
+  
+  // 👇 OPENAI NORMAL
+  return await generateWithOpenAI(prompt, level, maxRetries);
 }
 
 // 👇 FUNÇÃO: Adiciona _key recursivamente

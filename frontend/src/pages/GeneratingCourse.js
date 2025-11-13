@@ -30,7 +30,9 @@ function GeneratingCourse() {
   const [messageIndex, setMessageIndex] = useState(0)
   const [error, setError] = useState(null)
   const [generatedCourse, setGeneratedCourse] = useState(null)
+  const [isGenerating, setIsGenerating] = useState(false)
 
+  // 👇 PROGRESSO AUTOMÁTICO
   useEffect(() => {
     const timer = setInterval(() => {
       setProgress(old => {
@@ -41,12 +43,14 @@ function GeneratingCourse() {
     return () => clearInterval(timer)
   }, [])
 
+  // 👇 ATUALIZA MENSAGENS CONFORME PROGRESSO
   useEffect(() => {
     const thresholds = [15, 30, 50, 70, 85, 95]
     const newIndex = thresholds.findIndex(threshold => progress < threshold)
     setMessageIndex(newIndex >= 0 ? newIndex : MESSAGES.length - 1)
   }, [progress])
 
+  // 👇 NORMALIZA CURSO
   const normalizeCourse = (course) => {
     if (!course) return null
     
@@ -75,13 +79,27 @@ function GeneratingCourse() {
     }
   }
 
+  // 👇 EFEITO PRINCIPAL COM TIMEOUT DE SEGURANÇA
   useEffect(() => {
-    if (!payload || createdRef.current) return
+    if (!payload || createdRef.current || isGenerating) return
+    
     createdRef.current = true
+    setIsGenerating(true)
+
+    // 👇 TIMEOUT DE SEGURANÇA (45 segundos)
+    const safetyTimeout = setTimeout(() => {
+      if (!generatedCourse && !error) {
+        console.log('⏰ Timeout de segurança - API não respondeu em 45s')
+        setError('Tempo limite excedido. A geração está demorando mais que o normal. Tente novamente.')
+        setProgress(100)
+        setIsGenerating(false)
+      }
+    }, 45000)
 
     const criarCurso = async () => {
       try {
         console.log('🚀 Iniciando geração do curso com payload:', payload)
+        console.log('🔍 Provider selecionado:', payload.provider)
         
         const result = await generateCourse(payload)
 
@@ -100,6 +118,7 @@ function GeneratingCourse() {
 
           setProgress(100)
           setMessageIndex(MESSAGES.length - 1)
+          setIsGenerating(false)
 
           const redirectUrl = normalizedCourse.url || `/curso/${normalizedCourse.slug}`
 
@@ -117,6 +136,9 @@ function GeneratingCourse() {
         setError(err.message || 'Erro ao gerar curso. Tente novamente.')
         setProgress(100)
         setMessageIndex(MESSAGES.length - 1)
+        setIsGenerating(false)
+      } finally {
+        clearTimeout(safetyTimeout)
       }
     }
 
@@ -124,19 +146,25 @@ function GeneratingCourse() {
       criarCurso()
     }, 1000)
 
-    return () => clearTimeout(timeoutId)
-  }, [payload, navigate, addCourse, resetCourse])
+    return () => {
+      clearTimeout(timeoutId)
+      clearTimeout(safetyTimeout)
+    }
+  }, [payload, navigate, addCourse, resetCourse, generatedCourse, error, isGenerating])
 
+  // 👇 TENTAR NOVAMENTE
   const handleRetry = () => {
     createdRef.current = false
     setProgress(0)
     setMessageIndex(0)
     setError(null)
     setGeneratedCourse(null)
+    setIsGenerating(false)
     
     setTimeout(() => {
       const criarCurso = async () => {
         try {
+          setIsGenerating(true)
           const result = await generateCourse(payload)
           if (result?.success && result?.course) {
             const normalizedCourse = normalizeCourse(result.course)
@@ -149,6 +177,7 @@ function GeneratingCourse() {
           }
         } catch (err) {
           setError(err.message || 'Erro ao gerar curso.')
+          setIsGenerating(false)
         }
       }
       criarCurso()
@@ -242,8 +271,9 @@ function GeneratingCourse() {
             color="primary"
             onClick={handleRetry}
             disableElevation
+            disabled={isGenerating}
           >
-            Tentar Novamente
+            {isGenerating ? 'Tentando...' : 'Tentar Novamente'}
           </Button>
         )}
         
@@ -275,6 +305,7 @@ function GeneratingCourse() {
         </Typography>
       )}
 
+      {/* 👇 DEBUG INFO MELHORADA */}
       {process.env.NODE_ENV === 'development' && (
         <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
           <Typography variant="caption" color="text.secondary" display="block">
@@ -282,6 +313,12 @@ function GeneratingCourse() {
           </Typography>
           <Typography variant="caption" color="text.secondary" display="block">
             Payload: {payload ? '✅' : '❌'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block">
+            Provider: {payload?.provider || 'N/A'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block">
+            Is Generating: {isGenerating ? '✅' : '❌'}
           </Typography>
           {generatedCourse && (
             <>
