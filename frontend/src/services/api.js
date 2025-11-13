@@ -73,39 +73,63 @@ export const getTagsBySubcategory = async (subcategoryId) => {
 }
 
 // ============================================================
-// 🔹 Geração de curso (OpenAI + Sanity)
+// 🔹 Geração de curso (OpenAI + Sanity) - COM DEBUGS CRÍTICOS
 // ============================================================
 export const generateCourse = async (payload) => {
   try {
-    console.log('📤 Payload original recebido:', payload); // 👈 DEBUG
+    console.log('🎯 DEBUG CRÍTICO - generateCourse() iniciado')
+    console.log('📤 Payload original recebido:', payload)
     
     const cleanPayload = {
       categoryId: payload.categoryId || payload.category?._id,
       subcategoryId: payload.subcategoryId || payload.subcategory?._id,
       level: payload.level || 'beginner',
       tags: payload.tags ? payload.tags.map((t) => t._id || t._ref || t) : [],
-      provider: payload.provider || 'openai', // 👈 CORREÇÃO CRÍTICA - ADICIONADO provider
+      provider: payload.provider || 'openai',
     }
 
-    console.log('📤 Payload limpo sendo enviado:', cleanPayload); // 👈 DEBUG
+    console.log('📤 Payload limpo sendo enviado:', cleanPayload)
     
     if (!cleanPayload.categoryId) throw new Error('categoryId é obrigatório.')
     if (!cleanPayload.subcategoryId) throw new Error('subcategoryId é obrigatório.')
 
-    const res = await fetch(`${BASE_GEN}/course`, {
+    // 👇 DEBUG CRÍTICO - URL e fetch
+    const apiUrl = `${BASE_GEN}/course`
+    console.log('🔍 DEBUG - URL da API:', apiUrl)
+    console.log('🔍 DEBUG - Fazendo fetch para a API...')
+
+    const res = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cleanPayload),
     })
 
-    const data = await res.json().catch(() => {
-      throw new Error('Resposta inválida do servidor.')
-    })
+    // 👇 DEBUG CRÍTICO - Status da resposta
+    console.log('🔍 DEBUG - Resposta da API recebida')
+    console.log('🔍 DEBUG - Status:', res.status)
+    console.log('🔍 DEBUG - OK?', res.ok)
+    console.log('🔍 DEBUG - Status Text:', res.statusText)
+
+    let data
+    try {
+      data = await res.json()
+      console.log('🔍 DEBUG - JSON parseado com sucesso:', data)
+    } catch (parseError) {
+      console.error('❌ Erro ao parsear JSON da resposta:', parseError)
+      
+      // 👇 Tenta ler a resposta como texto para debug
+      const textResponse = await res.text()
+      console.error('❌ Resposta em texto:', textResponse.substring(0, 500))
+      
+      throw new Error(`Resposta inválida do servidor: ${textResponse.substring(0, 200)}`)
+    }
 
     if (!res.ok) {
-      console.error('❌ Erro ao gerar curso:', data)
-      throw new Error(data?.error || 'Falha ao criar curso')
+      console.error('❌ Erro HTTP ao gerar curso:', data)
+      throw new Error(data?.error || `Falha ao criar curso (${res.status})`)
     }
+
+    console.log('✅ Resposta da API bem-sucedida:', data)
 
     const course = data?.course || {}
     const slug = course.slug?.current || course.slug || course.id || course._id
@@ -117,33 +141,35 @@ export const generateCourse = async (payload) => {
         id: course._id || course.id,
         slug,
         url: `/curso/${slug}`,
-        provider: course.provider || cleanPayload.provider, // 👈 GARANTE provider NA RESPOSTA
+        provider: course.provider || cleanPayload.provider,
       },
     }
 
-    console.log('✅ Curso gerado com sucesso:', normalized)
+    console.log('✅ Curso normalizado com sucesso:', normalized)
     return normalized
+
   } catch (err) {
     console.error('⚠️ Erro em generateCourse():', err)
+    console.error('⚠️ Stack trace:', err.stack)
     throw err
   }
 }
 
 export const getStats = async (period = '30days') => {
   try {
-    const url = `${BASE_FETCH}/stats?period=${period}`;
+    const url = `${BASE_FETCH}/stats?period=${period}`
     
-    const response = await fetch(url);
+    const response = await fetch(url)
     
     if (!response.ok) {
-      throw new Error(`Erro HTTP ${response.status}`);
+      throw new Error(`Erro HTTP ${response.status}`)
     }
     
-    const data = await response.json();
+    const data = await response.json()
     
-    return data;
+    return data
   } catch (error) {
-    console.error('❌ Erro getStats:', error);
-    throw new Error('Serviço de estatísticas indisponível');
+    console.error('❌ Erro getStats:', error)
+    throw new Error('Serviço de estatísticas indisponível')
   }
-};
+}
