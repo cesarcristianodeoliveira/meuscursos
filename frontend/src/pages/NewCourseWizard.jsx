@@ -70,15 +70,15 @@ function NewCourseWizard() {
       }
     } catch (err) {
       console.error('❌ Erro ao carregar providers:', err)
-      setAvailableProviders(['openai']) // Fallback
+      setAvailableProviders(['openai'])
     } finally {
       setLoadingProviders(false)
     }
-  }, [provider]) // 👈 ADICIONADO provider COMO DEPENDÊNCIA
+  }, [provider])
 
   useEffect(() => {
     loadProviders()
-  }, [loadProviders]) // 👈 AGORA loadProviders É ESTÁVEL
+  }, [loadProviders])
 
   useEffect(() => {
     if (contentRef.current) {
@@ -123,11 +123,11 @@ function NewCourseWizard() {
     } finally {
       setLoadingTags(false)
     }
-  }, [subcategoryId]) // 👈 DEPENDÊNCIA EXPLÍCITA
+  }, [subcategoryId])
 
   useEffect(() => {
     loadTags()
-  }, [loadTags]) // 👈 AGORA loadTags É ESTÁVEL
+  }, [loadTags])
 
   const toggleTag = tagId => {
     setSelectedTags(prev =>
@@ -149,10 +149,12 @@ function NewCourseWizard() {
         return { status: 'unavailable', label: '❌ Indisponível', color: 'error' }
       case 'unconfigured':
         return { status: 'unconfigured', label: '⚙️ Não configurado', color: 'warning' }
+      case 'limit_reached':
+        return { status: 'limit_reached', label: '📊 Limite Atingido', color: 'error' }
       default:
         return { status: 'unknown', label: '❓ Desconhecido', color: 'default' }
     }
-  }, [providerDetails]) // 👈 DEPENDÊNCIA EXPLÍCITA
+  }, [providerDetails])
 
   const handleNext = () => {
     setError(null)
@@ -184,9 +186,9 @@ function NewCourseWizard() {
       const payload = { 
         categoryId, 
         subcategoryId, 
-        level, // 👈 OBRIGATÓRIO - sem valor padrão
+        level,
         tags: selectedTags,
-        provider // 👈 OBRIGATÓRIO - sem valor padrão
+        provider
       }
       
       // 👇 DEBUG CRÍTICO - Verifica se o payload está correto
@@ -408,6 +410,8 @@ function NewCourseWizard() {
                     .filter(option => availableProviders.includes(option.value))
                     .map((option) => {
                       const providerStatus = getProviderStatus(option.value)
+                      const usage = providerDetails[option.value]?.usage
+                      const limit = providerDetails[option.value]?.limit
                       
                       return (
                         <Box
@@ -446,6 +450,14 @@ function NewCourseWizard() {
                                 <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, mb: 1 }}>
                                   {option.description}
                                 </Typography>
+                                
+                                {/* 👇 INFO DE USO */}
+                                {usage && limit && (
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                    📊 Uso: {usage.dailyCount}/{limit} cursos hoje
+                                  </Typography>
+                                )}
+                                
                                 {level && level === 'advanced' && option.value === 'openai' && (
                                   <Typography variant="caption" color="success.main" sx={{ mt: 1, display: 'block' }}>
                                     ⭐ {option.recommendation}

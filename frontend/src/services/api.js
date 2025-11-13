@@ -90,7 +90,7 @@ export const checkProvidersAvailability = async () => {
       return { 
         available: ['openai'],
         detailed: {
-          openai: { status: 'available', model: 'gpt-4o-mini' },
+          openai: { status: 'available', model: 'gpt-4o-mini', usage: { dailyCount: 0 }, limit: 50 },
           gemini: { status: 'unavailable', model: 'N/A' }
         }
       }
@@ -99,6 +99,7 @@ export const checkProvidersAvailability = async () => {
     const data = await res.json()
     console.log('✅ Providers disponíveis:', data.available)
     console.log('🔍 Detalhes dos providers:', data.detailed)
+    console.log('📊 Uso atual:', data.usage)
     
     return data
     
@@ -108,7 +109,7 @@ export const checkProvidersAvailability = async () => {
     return { 
       available: ['openai'],
       detailed: {
-        openai: { status: 'available', model: 'gpt-4o-mini' },
+        openai: { status: 'available', model: 'gpt-4o-mini', usage: { dailyCount: 0 }, limit: 50 },
         gemini: { status: 'unavailable', model: 'N/A' }
       }
     }
@@ -141,9 +142,9 @@ export const generateCourse = async (payload) => {
     const cleanPayload = {
       categoryId: payload.categoryId || payload.category?._id,
       subcategoryId: payload.subcategoryId || payload.subcategory?._id,
-      level: payload.level, // 👈 OBRIGATÓRIO - sem valor padrão
+      level: payload.level,
       tags: payload.tags ? payload.tags.map((t) => t._id || t._ref || t) : [],
-      provider: payload.provider, // 👈 OBRIGATÓRIO - sem valor padrão
+      provider: payload.provider,
     }
 
     console.log('📤 Payload limpo sendo enviado:', cleanPayload)
@@ -207,8 +208,8 @@ export const generateCourse = async (payload) => {
         id: course._id || course.id,
         slug,
         url: `/curso/${slug}`,
-        provider: course.provider || cleanPayload.provider, // 👈 USA PROVIDER ORIGINAL
-        level: course.level || cleanPayload.level, // 👈 USA LEVEL ORIGINAL
+        provider: course.provider || cleanPayload.provider,
+        level: course.level || cleanPayload.level,
       },
     }
 
