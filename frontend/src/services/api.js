@@ -73,7 +73,7 @@ export const getTagsBySubcategory = async (subcategoryId) => {
 }
 
 // ============================================================
-// 🔹 NOVA FUNÇÃO: Verificar providers disponíveis
+// 🔹 FUNÇÃO: Verificar providers disponíveis
 // ============================================================
 export const checkProvidersAvailability = async () => {
   try {
@@ -86,12 +86,22 @@ export const checkProvidersAvailability = async () => {
     
     if (!res.ok) {
       console.warn('⚠️ Erro ao verificar providers, usando fallback...')
-      // Fallback seguro - assume que pelo menos OpenAI está disponível
+      // Fallback seguro
       return { 
-        available: ['openai'],
+        available: process.env.REACT_APP_OPENAI_API_KEY ? ['openai'] : [],
         detailed: {
-          openai: { status: 'available', model: 'gpt-4o-mini', usage: { dailyCount: 0 }, limit: 50 },
-          gemini: { status: 'unavailable', model: 'N/A' }
+          openai: { 
+            status: process.env.REACT_APP_OPENAI_API_KEY ? 'available' : 'unconfigured', 
+            model: 'gpt-4o-mini', 
+            usage: { dailyCount: 0 }, 
+            limit: process.env.REACT_APP_OPENAI_DAILY_LIMIT || 50 
+          },
+          gemini: { 
+            status: process.env.REACT_APP_GEMINI_API_KEY ? 'available' : 'unconfigured', 
+            model: 'gemini-1.5-flash',
+            usage: { dailyCount: 0 },
+            limit: process.env.REACT_APP_GEMINI_DAILY_LIMIT || 1000
+          }
         }
       }
     }
@@ -107,17 +117,27 @@ export const checkProvidersAvailability = async () => {
     console.error('❌ Erro ao verificar providers:', error)
     // Fallback seguro em caso de erro
     return { 
-      available: ['openai'],
+      available: process.env.REACT_APP_OPENAI_API_KEY ? ['openai'] : [],
       detailed: {
-        openai: { status: 'available', model: 'gpt-4o-mini', usage: { dailyCount: 0 }, limit: 50 },
-        gemini: { status: 'unavailable', model: 'N/A' }
+        openai: { 
+          status: process.env.REACT_APP_OPENAI_API_KEY ? 'available' : 'unconfigured', 
+          model: 'gpt-4o-mini', 
+          usage: { dailyCount: 0 }, 
+          limit: process.env.REACT_APP_OPENAI_DAILY_LIMIT || 50 
+        },
+        gemini: { 
+          status: process.env.REACT_APP_GEMINI_API_KEY ? 'available' : 'unconfigured', 
+          model: 'gemini-1.5-flash',
+          usage: { dailyCount: 0 },
+          limit: process.env.REACT_APP_GEMINI_DAILY_LIMIT || 1000
+        }
       }
     }
   }
 }
 
 // ============================================================
-// 🔹 Geração de curso (OpenAI + Sanity) - CORRIGIDO SEM VALORES PADRÃO
+// 🔹 Geração de curso - CORRIGIDO SEM VALORES PADRÃO
 // ============================================================
 export const generateCourse = async (payload) => {
   try {

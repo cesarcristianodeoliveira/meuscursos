@@ -19,16 +19,10 @@ const configureGemini = () => {
   return new GoogleGenerativeAI(apiKey);
 };
 
-// 👇 TRACKING DE USO PARA LIMITES
+// 👇 TRACKING DE USO PARA LIMITES (em memória - para produção use Redis)
 const usageTracker = {
   openai: { dailyCount: 0, lastReset: new Date() },
   gemini: { dailyCount: 0, lastReset: new Date() }
-};
-
-// 👇 LIMITES DIÁRIOS
-const DAILY_LIMITS = {
-  openai: 50,
-  gemini: 50
 };
 
 // 👇 VERIFICAR E ATUALIZAR USO
@@ -42,14 +36,23 @@ function checkAndUpdateUsage(provider) {
     tracker.lastReset = now;
   }
   
-  // Verificar limite
-  if (tracker.dailyCount >= DAILY_LIMITS[provider]) {
-    throw new Error(`Limite diário de ${DAILY_LIMITS[provider]} cursos atingido para ${provider}`);
+  // Verificar limite baseado no provider
+  let limit;
+  if (provider === 'openai') {
+    // OpenAI: verificar limite real da API (aproximação)
+    limit = process.env.OPENAI_DAILY_LIMIT || 50;
+  } else {
+    // Gemini: limite mais generoso
+    limit = process.env.GEMINI_DAILY_LIMIT || 1000;
+  }
+  
+  if (tracker.dailyCount >= limit) {
+    throw new Error(`Limite diário de ${limit} cursos atingido para ${provider}`);
   }
   
   // Incrementar uso
   tracker.dailyCount++;
-  console.log(`📊 Uso ${provider}: ${tracker.dailyCount}/${DAILY_LIMITS[provider]}`);
+  console.log(`📊 Uso ${provider}: ${tracker.dailyCount}/${limit}`);
 }
 
 // =======================================================
@@ -162,7 +165,7 @@ async function generateWithOpenAI(prompt, level = 'beginner', maxRetries = 2) {
   throw lastError;
 }
 
-// 👇 FUNÇÃO CORRIGIDA: Gerar curso com Gemini
+// 👇 FUNÇÃO CORRIGIDA: Gerar curso com Gemini (GEMINI 1.5 FLASH)
 async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
   let lastError;
   
@@ -174,13 +177,19 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
       
       const genAI = configureGemini();
       
-      // 👇 MODELOS DISPONÍVEIS PARA TESTAR
-      const availableModels = ['gemini-pro', 'models/gemini-pro'];
+      // 👇 MODELOS DISPONÍVEIS - GEMINI 1.5 FLASH
+      const availableModels = [
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-latest', 
+        'gemini-1.5-flash-001',
+        'models/gemini-1.5-flash'
+      ];
+      
       let geminiError = null;
       
       for (const modelName of availableModels) {
         try {
-          console.log(`🔍 Tentando modelo: ${modelName}`);
+          console.log(`🔍 Tentando modelo Gemini: ${modelName}`);
           const model = genAI.getGenerativeModel({ 
             model: modelName,
             generationConfig: {
@@ -193,6 +202,7 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
 
           const jsonPrompt = `${prompt}\n\nIMPORTANTE: Retorne APENAS o JSON válido, sem texto adicional, sem markdown, sem explicações.`;
           
+          console.log(`🔍 DEBUG - Enviando prompt para Gemini (${modelName})...`);
           const result = await model.generateContent(jsonPrompt);
           const response = await result.response;
           let rawResponse = response.text().trim();
@@ -201,6 +211,7 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
             throw new Error('Resposta vazia da Gemini.');
           }
 
+          console.log(`📝 Gemini - Resposta recebida do modelo ${modelName}`);
           console.log(`📝 Gemini - Resposta:`, rawResponse.substring(0, 200) + '...');
           console.log(`📊 Gemini - Tamanho: ${rawResponse.length} caracteres`);
 
@@ -221,7 +232,7 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
           }
 
           if (courseData && courseData.title && Array.isArray(courseData.modules)) {
-            console.log(`✅ Gemini - Curso gerado: ${courseData.modules.length} módulos, ${courseData.modules.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0)} aulas`);
+            console.log(`✅ Gemini - Curso gerado com ${modelName}: ${courseData.modules.length} módulos, ${courseData.modules.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0)} aulas`);
             return courseData;
           } else {
             throw new Error('Estrutura do curso incompleta');
@@ -251,9 +262,9 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
   throw lastError;
 }
 
-// 👇 FUNÇÃO: Build prompt
+// 👇 FUNÇÃO: Build prompt (SEM level padrão)
 function buildPrompt(payload) {
-  const { level = 'beginner', categoryId, subcategoryId, tags = [] } = payload;
+  const { level, categoryId, subcategoryId, tags = [] } = payload;
   
   const categoryName = 'Categoria';
   const subcategoryName = 'Subcategoria';
@@ -308,8 +319,8 @@ IMPORTANTE:
 `.trim();
 }
 
-// 👇 FUNÇÃO PRINCIPAL: Escolhe o provider
-async function generateCourseWithProvider(payload, provider = 'openai', level = 'beginner') {
+// 👇 FUNÇÃO PRINCIPAL: Escolhe o provider (SEM provider padrão)
+async function generateCourseWithProvider(payload, provider, level) {
   console.log(`🎯 Gerando curso ${level.toUpperCase()} com ${provider.toUpperCase()}...`);
   console.log(`🎯 Usando provider: ${provider.toUpperCase()}`);
   
@@ -554,6 +565,7 @@ router.post('/course', async (req, res) => {
     const { level, categoryId, subcategoryId, tags = [], provider } = req.body;
     console.log('🧾 Payload recebido:', req.body);
 
+    // 👇 VALIDAÇÕES OBRIGATÓRIAS - SEM VALORES PADRÃO
     if (!level) {
       return res.status(400).json({ error: 'level é obrigatório.' });
     }
@@ -747,7 +759,7 @@ IMPORTANTE:
   }
 });
 
-// 👇 ROTA: Verificar providers disponíveis
+// 👇 ROTA: Verificar providers disponíveis (CORRIGIDA)
 router.get('/providers', async (req, res) => {
   try {
     const providers = {
@@ -755,13 +767,13 @@ router.get('/providers', async (req, res) => {
         status: process.env.OPENAI_API_KEY ? 'available' : 'unconfigured',
         model: 'gpt-4o-mini',
         usage: usageTracker.openai,
-        limit: DAILY_LIMITS.openai
+        limit: process.env.OPENAI_DAILY_LIMIT || 50
       },
       gemini: {
         status: process.env.GEMINI_API_KEY ? 'available' : 'unconfigured',
-        model: 'gemini-pro',
+        model: 'gemini-1.5-flash',
         usage: usageTracker.gemini,
-        limit: DAILY_LIMITS.gemini
+        limit: process.env.GEMINI_DAILY_LIMIT || 1000
       }
     };
 
@@ -769,13 +781,27 @@ router.get('/providers', async (req, res) => {
     if (providers.gemini.status === 'available') {
       try {
         const genAI = configureGemini();
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        // Testa com Gemini 1.5 Flash
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         await model.generateContent("Test");
         providers.gemini.status = 'available';
+        console.log('✅ Gemini 1.5 Flash está disponível');
       } catch (geminiError) {
-        console.error('❌ Gemini API test failed:', geminiError.message);
-        providers.gemini.status = 'unavailable';
-        providers.gemini.error = geminiError.message;
+        console.error('❌ Gemini 1.5 Flash falhou:', geminiError.message);
+        
+        // Tenta fallback para gemini-pro
+        try {
+          const genAI = configureGemini();
+          const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+          await model.generateContent("Test");
+          providers.gemini.status = 'available';
+          providers.gemini.model = 'gemini-pro';
+          console.log('✅ Gemini Pro está disponível como fallback');
+        } catch (fallbackError) {
+          console.error('❌ Gemini Pro também falhou:', fallbackError.message);
+          providers.gemini.status = 'unavailable';
+          providers.gemini.error = `Gemini 1.5 Flash: ${geminiError.message}, Gemini Pro: ${fallbackError.message}`;
+        }
       }
     }
 
@@ -796,6 +822,8 @@ router.get('/providers', async (req, res) => {
     const availableProviders = Object.keys(providers).filter(
       provider => providers[provider].status === 'available'
     );
+
+    console.log('🔍 Providers disponíveis:', availableProviders);
 
     res.json({
       available: availableProviders,
