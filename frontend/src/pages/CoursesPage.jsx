@@ -17,6 +17,19 @@ const CoursesPage = () => {
   const { courses, loading } = useCourse()
   const navigate = useNavigate()
 
+  // 👈 LOGS PARA DEBUG
+  console.log('📊 CoursesPage - Dados recebidos:', {
+    totalCourses: courses?.length,
+    primeiroCurso: courses?.[0] ? {
+      title: courses[0].title,
+      provider: courses[0].provider,
+      tags: courses[0].tags,
+      totalLessons: courses[0].totalLessons,
+      totalExercises: courses[0].totalExercises,
+      hasModules: !!courses[0].modules
+    } : 'Nenhum curso'
+  })
+
   // ✅ Ordena cursos do mais novo para o mais antigo
   const sortedCourses = useMemo(() => {
     if (!courses || courses.length === 0) return []
@@ -59,22 +72,23 @@ const CoursesPage = () => {
     return `${mins} min`
   }
 
-  const countTotalLessons = (course) => {
-    if (!course.modules) return 0
-    return course.modules.reduce((total, module) => {
-      return total + (module.lessons?.length || 0)
-    }, 0)
-  }
+  // 👈 FUNÇÕES DE CONTAGEM REMOVIDAS - Agora usamos os campos da API
+  // const countTotalLessons = (course) => {
+  //   if (!course.modules) return 0
+  //   return course.modules.reduce((total, module) => {
+  //     return total + (module.lessons?.length || 0)
+  //   }, 0)
+  // }
 
-  const countTotalExercises = (course) => {
-    if (!course.modules) return 0
-    return course.modules.reduce((total, module) => {
-      const moduleExercises = module.lessons?.reduce((lessonTotal, lesson) => {
-        return lessonTotal + (lesson.exercises?.length || 0)
-      }, 0) || 0
-      return total + moduleExercises
-    }, 0)
-  }
+  // const countTotalExercises = (course) => {
+  //   if (!course.modules) return 0
+  //   return course.modules.reduce((total, module) => {
+  //     const moduleExercises = module.lessons?.reduce((lessonTotal, lesson) => {
+  //       return lessonTotal + (lesson.exercises?.length || 0)
+  //     }, 0) || 0
+  //     return total + moduleExercises
+  //   }, 0)
+  // }
 
   if (loading) {
     return (
@@ -99,7 +113,7 @@ const CoursesPage = () => {
       <Toolbar sx={{ px: [0], minHeight: '56px!important' }} />
       
       <Typography component="h2" variant="h6" sx={{ my: 1.5, lineHeight: 1 }}>
-        Cursos
+        Cursos ({sortedCourses.length})
       </Typography>
 
       {sortedCourses.length === 0 ? (
@@ -112,7 +126,7 @@ const CoursesPage = () => {
       ) : (
         <Grid container spacing={1}>
           {sortedCourses.map((course) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={course._id}>
+            <Grid item xs={12} sm={6} md={4} lg={3} key={course._id}> {/* 👈 CORRIGIDO: item */}
               <Card 
                 sx={{ 
                   height: '100%',
@@ -195,13 +209,13 @@ const CoursesPage = () => {
                       )}
                     </Box>
 
-                    {/* Estatísticas */}
+                    {/* 👈 ESTATÍSTICAS ATUALIZADAS - Usa campos da API */}
                     <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                       <Typography variant="caption" color="text.secondary">
-                        <strong>{countTotalLessons(course)}</strong> aulas
+                        <strong>{course.totalLessons || 0}</strong> aulas
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        <strong>{countTotalExercises(course)}</strong> exercícios
+                        <strong>{course.totalExercises || 0}</strong> exercícios
                       </Typography>
                     </Box>
 

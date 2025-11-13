@@ -23,7 +23,7 @@ router.get('/all', async (req, res) => {
         subcategory->{_id, title}
       }`),
 
-      // 👈 CURSO COM ESTRUTURA PARA CALCULAR CONTAGENS
+      // 👈 CURSO COM ESTRUTURA COMPLETA para cálculo manual
       client.fetch(`*[_type == "course"] | order(_updatedAt desc, _createdAt desc) {
         _id,
         _createdAt,
@@ -33,20 +33,22 @@ router.get('/all', async (req, res) => {
         description,
         level,
         duration,
+        provider,
         category->{_id, title, icon, "slug": slug.current},
         subcategory->{_id, title, icon, "slug": slug.current},
         tags[]->{_id, title, "slug": slug.current},
         status,
-        provider,
         modules[] {
           lessons[] {
-            exercises[]
+            exercises[] {
+              _key
+            }
           }
         }
       }`)
     ])
 
-    // 👈 CALCULA CONTAGENS MANUALMENTE - MÉTODO CONFIÁVEL
+    // 👈 CALCULA CONTAGENS MANUALMENTE - MÉTODO 100% CONFIÁVEL
     const coursesWithCounts = courses.map(course => {
       let totalLessons = 0
       let totalExercises = 0
@@ -65,18 +67,20 @@ router.get('/all', async (req, res) => {
         })
       }
 
-      // Remove os arrays completos para economizar banda
-      const { modules, ...courseWithoutModules } = course
-      
       return {
-        ...courseWithoutModules,
+        ...course,
         totalLessons,
         totalExercises
       }
     })
 
-    console.log(`📊 Cursos processados: ${coursesWithCounts.length}`)
-    console.log(`📊 Exemplo de contagens: ${coursesWithCounts[0]?.title} - ${coursesWithCounts[0]?.totalLessons} aulas, ${coursesWithCounts[0]?.totalExercises} exercícios`)
+    console.log('🔍 DEBUG /all - Primeiro curso:', {
+      title: coursesWithCounts[0]?.title,
+      provider: coursesWithCounts[0]?.provider,
+      tagsCount: coursesWithCounts[0]?.tags?.length,
+      totalLessons: coursesWithCounts[0]?.totalLessons,
+      totalExercises: coursesWithCounts[0]?.totalExercises
+    })
 
     res.json({ 
       categories, 
@@ -159,14 +163,16 @@ router.get('/courses', async (_, res) => {
       description,
       level,
       duration,
+      provider,
       category->{_id, title, icon, "slug": slug.current},
       subcategory->{_id, title, icon, "slug": slug.current},
       tags[]->{_id, title, "slug": slug.current},
       status,
-      provider,
       modules[] {
         lessons[] {
-          exercises[]
+          exercises[] {
+            _key
+          }
         }
       }
     }`)
@@ -190,11 +196,8 @@ router.get('/courses', async (_, res) => {
         })
       }
 
-      // Remove arrays completos
-      const { modules, ...courseWithoutModules } = course
-      
       return {
-        ...courseWithoutModules,
+        ...course,
         totalLessons,
         totalExercises
       }
@@ -222,6 +225,7 @@ router.get('/course/:id', async (req, res) => {
       description,
       level,
       duration,
+      provider,
       category->{_id, title, icon, "slug": slug.current},
       subcategory->{_id, title, icon, "slug": slug.current},
       tags[]->{_id, title, "slug": slug.current},
@@ -230,7 +234,6 @@ router.get('/course/:id', async (req, res) => {
       certificate,
       audioMasculino{asset->{url}},
       audioFeminino{asset->{url}},
-      provider,
       status,
       modules[] {
         _key,
@@ -295,6 +298,7 @@ router.get('/course/slug/:slug', async (req, res) => {
       description,
       level,
       duration,
+      provider,
       category->{_id, title, icon, "slug": slug.current},
       subcategory->{_id, title, icon, "slug": slug.current},
       tags[]->{_id, title, "slug": slug.current},
@@ -303,7 +307,6 @@ router.get('/course/slug/:slug', async (req, res) => {
       certificate,
       audioMasculino{asset->{url}},
       audioFeminino{asset->{url}},
-      provider,
       status,
       modules[] {
         _key,
@@ -366,7 +369,9 @@ router.get('/stats', async (req, res) => {
       *[_type == "course"] {
         modules[] {
           lessons[] {
-            exercises[]
+            exercises[] {
+              _key
+            }
           }
         }
       }
@@ -400,7 +405,9 @@ router.get('/stats', async (req, res) => {
         status,
         modules[] {
           lessons[] {
-            exercises[]
+            exercises[] {
+              _key
+            }
           }
         }
       }

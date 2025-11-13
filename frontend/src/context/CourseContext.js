@@ -12,6 +12,7 @@ export const CourseProvider = ({ children }) => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [progressVisible, setProgressVisible] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // 👈 NOVO: Forçar refresh
 
   const [level, setLevel] = useState('beginner');
   const [category, setCategory] = useState(null);
@@ -46,9 +47,15 @@ export const CourseProvider = ({ children }) => {
     try {
       await loadStatsSafely();
     } catch (error) {
-
+      // Silencia erro
     }
   }, [loadStatsSafely]);
+
+  // 👈 FUNÇÃO ATUALIZADA: Force refresh dos dados
+  const forceRefresh = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+    console.log('🔄 Forçando refresh dos dados...');
+  }, []);
 
   const loadAll = useCallback(async () => {
     try {
@@ -59,6 +66,19 @@ export const CourseProvider = ({ children }) => {
       
       setCategories(all.categories || []);
       setSubcategories(all.subcategories || []);
+      
+      // 👈 LOGS PARA DEBUG
+      console.log('📥 Dados carregados do backend:', {
+        totalCursos: all.courses?.length,
+        primeiroCurso: all.courses?.[0] ? {
+          title: all.courses[0].title,
+          provider: all.courses[0].provider,
+          tags: all.courses[0].tags,
+          totalLessons: all.courses[0].totalLessons,
+          totalExercises: all.courses[0].totalExercises
+        } : 'Nenhum curso'
+      });
+      
       setCourses(all.courses || []);
       
       const statsData = await loadStatsSafely();
@@ -91,19 +111,23 @@ export const CourseProvider = ({ children }) => {
     }
   };
 
-  const addCourse = (course) => {
-    if (!course) return;
+  // 👈 FUNÇÃO COMPLETAMENTE CORRIGIDA: addCourse
+  const addCourse = useCallback((course) => {
+    if (!course) {
+      console.warn('⚠️ Tentativa de adicionar curso vazio');
+      return;
+    }
 
-    const slug =
-      typeof course.slug === 'object'
-        ? course.slug.current
-        : course.slug || course.id || course._id;
+    const slug = typeof course.slug === 'object' 
+      ? course.slug.current 
+      : course.slug || course.id || course._id;
 
     if (!slug) {
       console.warn('⚠️ Curso sem slug válido:', course);
       return;
     }
 
+    // 👈 GARANTE TODOS OS CAMPOS NECESSÁRIOS
     const newCourse = {
       ...course,
       id: course.id || course._id,
@@ -111,19 +135,35 @@ export const CourseProvider = ({ children }) => {
       url: `/curso/${slug}`,
       _createdAt: course._createdAt || new Date().toISOString(),
       _updatedAt: course._updatedAt || new Date().toISOString(),
-      // 👈 Garante que tenha as contagens mesmo se vierem vazias
+      // 👈 CAMPOS CRÍTICOS - Garante que existam
       totalLessons: course.totalLessons || 0,
       totalExercises: course.totalExercises || 0,
+      provider: course.provider || 'openai',
+      tags: course.tags || [],
+      category: course.category || null,
+      subcategory: course.subcategory || null,
     };
+
+    console.log('🆕 Curso sendo adicionado ao contexto:', {
+      title: newCourse.title,
+      provider: newCourse.provider,
+      tags: newCourse.tags,
+      totalLessons: newCourse.totalLessons,
+      totalExercises: newCourse.totalExercises
+    });
 
     setCourses((prev) => {
       const exists = prev.some((c) => c.slug === newCourse.slug); 
-      if (exists) return prev;
+      if (exists) {
+        console.log('⚠️ Curso já existe no contexto, atualizando...');
+        return prev.map(c => c.slug === newCourse.slug ? newCourse : c);
+      }
+      console.log('✅ Adicionando novo curso ao contexto');
       return [newCourse, ...prev];
     });
 
     refreshStats();
-  };
+  }, [refreshStats]);
 
   const updateStats = useCallback(async () => {
     await refreshStats();
@@ -135,9 +175,10 @@ export const CourseProvider = ({ children }) => {
     setLevel('beginner');
   };
 
+  // 👈 EFFECT ATUALIZADO: Inclui refreshTrigger
   useEffect(() => {
     loadAll();
-  }, [loadAll]);
+  }, [loadAll, refreshTrigger]);
 
   return (
     <CourseContext.Provider
@@ -154,6 +195,7 @@ export const CourseProvider = ({ children }) => {
         refreshStats,
         updateStats,
         addCourse,
+        forceRefresh, // 👈 NOVO: Exporta forceRefresh
         level,
         setLevel,
         category,

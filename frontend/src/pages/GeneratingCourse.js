@@ -23,7 +23,7 @@ const MESSAGES = [
 function GeneratingCourse() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { addCourse, resetCourse } = useCourse()
+  const { addCourse, resetCourse, forceRefresh } = useCourse() // 👈 ADICIONADO forceRefresh
   const payload = location.state?.payload
 
   const createdRef = useRef(false)
@@ -50,7 +50,32 @@ function GeneratingCourse() {
     setMessageIndex(newIndex >= 0 ? newIndex : MESSAGES.length - 1)
   }, [progress]) // ✅ Só depende de progress agora
 
-  // Cria o curso e redireciona - CORRIGIDO
+  // 👈 FUNÇÃO CORRIGIDA: Normaliza o curso vindo da API
+  const normalizeCourse = (course) => {
+    if (!course) return null
+    
+    const slug = typeof course.slug === 'object' 
+      ? course.slug.current 
+      : course.slug
+
+    return {
+      ...course,
+      id: course.id || course._id,
+      slug,
+      url: course.url || `/curso/${slug}`,
+      // 👈 GARANTE TODOS OS CAMPOS CRÍTICOS
+      totalLessons: course.totalLessons || 0,
+      totalExercises: course.totalExercises || 0,
+      provider: course.provider || 'openai',
+      tags: course.tags || [],
+      category: course.category || null,
+      subcategory: course.subcategory || null,
+      _createdAt: course._createdAt || new Date().toISOString(),
+      _updatedAt: course._updatedAt || new Date().toISOString(),
+    }
+  }
+
+  // Cria o curso e redireciona - COMPLETAMENTE CORRIGIDO
   useEffect(() => {
     if (!payload || createdRef.current) return
     createdRef.current = true
@@ -64,14 +89,18 @@ function GeneratingCourse() {
         if (result?.success && result?.course) {
           console.log('✅ Curso gerado com sucesso:', result.course)
           
-          const normalizedCourse = {
-            ...result.course,
-            slug: typeof result.course.slug === 'object'
-              ? result.course.slug.current
-              : result.course.slug,
-          }
-
+          // 👈 NORMALIZA o curso
+          const normalizedCourse = normalizeCourse(result.course)
+          
+          // 👈 ADICIONA ao contexto
           addCourse(normalizedCourse)
+          
+          // 👈 FORÇA REFRESH dos dados após 3 segundos
+          setTimeout(() => {
+            forceRefresh()
+            console.log('🔄 Dados atualizados do servidor')
+          }, 3000)
+
           resetCourse()
           setGeneratedCourse(normalizedCourse)
 
@@ -79,13 +108,17 @@ function GeneratingCourse() {
           setProgress(100)
           setMessageIndex(MESSAGES.length - 1)
 
-          // 🔄 REDIRECIONAMENTO CORRIGIDO - Usa a URL completa do backend
-          const redirectUrl = result.course.url || 
-            (result.course.category?.slug && result.course.subcategory?.slug 
-              ? `/${result.course.category.slug}/${result.course.subcategory.slug}/${normalizedCourse.slug}`
-              : `/curso/${normalizedCourse.slug}`)
+          // 🔄 REDIRECIONAMENTO CORRIGIDO
+          const redirectUrl = normalizedCourse.url || `/curso/${normalizedCourse.slug}`
 
           console.log('📍 Redirecionando para:', redirectUrl)
+          console.log('📊 Dados do curso normalizado:', {
+            title: normalizedCourse.title,
+            provider: normalizedCourse.provider,
+            tags: normalizedCourse.tags,
+            totalLessons: normalizedCourse.totalLessons,
+            totalExercises: normalizedCourse.totalExercises
+          })
 
           // Redireciona após um breve delay para mostrar 100%
           setTimeout(() => {
@@ -109,7 +142,7 @@ function GeneratingCourse() {
     }, 1000)
 
     return () => clearTimeout(timeoutId)
-  }, [payload, navigate, addCourse, resetCourse]) // ✅ Sem MESSAGES.length
+  }, [payload, navigate, addCourse, resetCourse, forceRefresh]) // ✅ ADICIONADO forceRefresh
 
   const handleRetry = () => {
     createdRef.current = false
@@ -124,16 +157,17 @@ function GeneratingCourse() {
         try {
           const result = await generateCourse(payload)
           if (result?.success && result?.course) {
-            const normalizedCourse = {
-              ...result.course,
-              slug: typeof result.course.slug === 'object'
-                ? result.course.slug.current
-                : result.course.slug,
-            }
+            const normalizedCourse = normalizeCourse(result.course)
             addCourse(normalizedCourse)
+            
+            // 👈 FORÇA REFRESH também no retry
+            setTimeout(() => {
+              forceRefresh()
+            }, 3000)
+            
             resetCourse()
             
-            const redirectUrl = result.course.url || `/curso/${normalizedCourse.slug}`
+            const redirectUrl = normalizedCourse.url || `/curso/${normalizedCourse.slug}`
             navigate(redirectUrl)
           }
         } catch (err) {
@@ -272,10 +306,31 @@ function GeneratingCourse() {
       )}
 
       {/* Debug info (apenas desenvolvimento) */}
-      {process.env.NODE_ENV === 'development' && generatedCourse && (
-        <Typography variant="caption" color="text.secondary">
-          ID: {generatedCourse.id} | URL: {generatedCourse.url}
-        </Typography>
+      {process.env.NODE_ENV === 'development' && (
+        <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
+          <Typography variant="caption" color="text.secondary" display="block">
+            <strong>Debug Info:</strong>
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block">
+            Payload: {payload ? '✅' : '❌'}
+          </Typography>
+          {generatedCourse && (
+            <>
+              <Typography variant="caption" color="text.secondary" display="block">
+                ID: {generatedCourse.id}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Provider: {generatedCourse.provider}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Tags: {generatedCourse.tags?.length || 0}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Aulas: {generatedCourse.totalLessons} | Exercícios: {generatedCourse.totalExercises}
+              </Typography>
+            </>
+          )}
+        </Box>
       )}
     </Box>
   )
