@@ -126,7 +126,7 @@ const CoursesPage = () => {
       ) : (
         <Grid container spacing={1}>
           {sortedCourses.map((course) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={course._id}> {/* 👈 CORRIGIDO: item */}
+            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={course._id}>
               <Card 
                 sx={{ 
                   height: '100%',
