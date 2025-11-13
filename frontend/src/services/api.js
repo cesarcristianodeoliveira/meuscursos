@@ -77,13 +77,18 @@ export const getTagsBySubcategory = async (subcategoryId) => {
 // ============================================================
 export const generateCourse = async (payload) => {
   try {
+    console.log('📤 Payload original recebido:', payload); // 👈 DEBUG
+    
     const cleanPayload = {
       categoryId: payload.categoryId || payload.category?._id,
       subcategoryId: payload.subcategoryId || payload.subcategory?._id,
       level: payload.level || 'beginner',
       tags: payload.tags ? payload.tags.map((t) => t._id || t._ref || t) : [],
+      provider: payload.provider || 'openai', // 👈 CORREÇÃO CRÍTICA - ADICIONADO provider
     }
 
+    console.log('📤 Payload limpo sendo enviado:', cleanPayload); // 👈 DEBUG
+    
     if (!cleanPayload.categoryId) throw new Error('categoryId é obrigatório.')
     if (!cleanPayload.subcategoryId) throw new Error('subcategoryId é obrigatório.')
 
@@ -112,6 +117,7 @@ export const generateCourse = async (payload) => {
         id: course._id || course.id,
         slug,
         url: `/curso/${slug}`,
+        provider: course.provider || cleanPayload.provider, // 👈 GARANTE provider NA RESPOSTA
       },
     }
 
