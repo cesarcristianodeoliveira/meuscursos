@@ -56,6 +56,16 @@ function recoverJSONFromIncomplete(rawText) {
   return null;
 }
 
+// 👈 FUNÇÃO NOVA: max_tokens dinâmico por nível
+function getMaxTokensByLevel(level) {
+  const tokensConfig = {
+    beginner: 4000,    // ~3000 palavras - 3 módulos × 2 aulas
+    intermediate: 5000, // ~3750 palavras - 4 módulos × 3 aulas  
+    advanced: 7000      // ~5250 palavras - 5 módulos × 4 aulas
+  };
+  return tokensConfig[level] || 5000;
+}
+
 // 👈 FUNÇÃO CORRIGIDA: Adiciona _key recursivamente
 function addKeysRecursively(obj) {
   if (Array.isArray(obj)) {
@@ -208,6 +218,7 @@ const LEVEL_CONFIG = {
     tips: 1,
     exercises: 1,
     tone: 'explicativo e acessível, com linguagem simples e exemplos práticos',
+    maxTokens: 4000 // 👈 ADICIONADO maxTokens no config
   },
   intermediate: {
     modules: 4,
@@ -215,6 +226,7 @@ const LEVEL_CONFIG = {
     tips: 2,
     exercises: 2,
     tone: 'detalhado e aplicado, com exemplos reais e desafios práticos',
+    maxTokens: 5000 // 👈 ADICIONADO maxTokens no config
   },
   advanced: {
     modules: 5,
@@ -222,6 +234,7 @@ const LEVEL_CONFIG = {
     tips: 3,
     exercises: 3,
     tone: 'abrangente, técnico e aprofundado, voltado para profissionais experientes',
+    maxTokens: 7000 // 👈 ADICIONADO maxTokens no config
   },
 };
 
@@ -235,20 +248,24 @@ function validateCourseData(courseData) {
   return { valid: true };
 }
 
-// 👈 FUNÇÃO MELHORADA: Geração com fallback
-async function generateCourseWithFallback(prompt, maxRetries = 2) {
+// 👈 FUNÇÃO COMPLETAMENTE ATUALIZADA: Geração com max_tokens dinâmico
+async function generateCourseWithFallback(prompt, level = 'beginner', maxRetries = 2) {
   let lastError;
+  
+  // 👈 OBTÉM max_tokens baseado no nível
+  const cfg = LEVEL_CONFIG[level] || LEVEL_CONFIG.beginner;
+  const maxTokens = cfg.maxTokens || 5000;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`🔄 Tentativa ${attempt} de geração do curso...`);
+      console.log(`🔄 Tentativa ${attempt} de geração do curso (nível: ${level}, tokens: ${maxTokens})...`);
       
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.75,
         response_format: { type: 'json_object' },
-        max_tokens: 3500,
+        max_tokens: maxTokens, // 👈 USA max_tokens dinâmico
       });
 
       let rawResponse = completion.choices[0]?.message?.content?.trim();
@@ -257,6 +274,7 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
       }
 
       console.log(`📝 Resposta bruta (tentativa ${attempt}):`, rawResponse.substring(0, 200) + '...');
+      console.log(`📊 Tamanho da resposta: ${rawResponse.length} caracteres`); // 👈 NOVO LOG
 
       rawResponse = sanitizeJSON(rawResponse);
 
@@ -265,16 +283,20 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
         courseData = JSON.parse(rawResponse);
       } catch (parseError) {
         console.log(`❌ JSON inválido na tentativa ${attempt}, tentando recuperar...`);
+        console.log(`🔍 Últimos 200 caracteres: ${rawResponse.substring(rawResponse.length - 200)}`); // 👈 LOG MELHORADO
+        
         courseData = recoverJSONFromIncomplete(rawResponse);
         
         if (!courseData) {
-          throw new Error(`Falha ao interpretar o JSON (tentativa ${attempt})`);
+          throw new Error(`Falha ao interpretar o JSON (tentativa ${attempt}) - Resposta possivelmente truncada`);
         }
         
         console.log('✅ JSON recuperado com sucesso!');
       }
 
+      // Validação da estrutura
       if (courseData && courseData.title && Array.isArray(courseData.modules)) {
+        console.log(`✅ Curso gerado com sucesso: ${courseData.modules.length} módulos, ${courseData.modules.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0)} aulas`);
         return courseData;
       } else {
         throw new Error('Estrutura do curso incompleta após recuperação');
@@ -285,7 +307,8 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
       console.log(`❌ Tentativa ${attempt} falhou:`, error.message);
       
       if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log(`⏳ Aguardando 1.5 segundos antes da próxima tentativa...`);
+        await new Promise(resolve => setTimeout(resolve, 1500));
       }
     }
   }
@@ -294,7 +317,7 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
 }
 
 // =======================================================
-// 🧠 ROTA PRINCIPAL - GERAR CURSO (COMPLETAMENTE CORRIGIDA)
+// 🧠 ROTA PRINCIPAL - GERAR CURSO (ATUALIZADA)
 // =======================================================
 router.post('/course', async (req, res) => {
   try {
@@ -318,6 +341,7 @@ router.post('/course', async (req, res) => {
 
     const cfg = LEVEL_CONFIG[level] || LEVEL_CONFIG.beginner;
 
+    // 👈 PROMPT ATUALIZADO: Inclui informações de tokens para debug
     const prompt = `
 Crie um curso em JSON válido com estas especificações EXATAS:
 
@@ -328,6 +352,7 @@ MÓDULOS: ${cfg.modules}
 AULAS POR MÓDULO: ${cfg.lessonsPerModule}
 DICAS POR AULA: ${cfg.tips}
 EXERCÍCIOS POR AULA: ${cfg.exercises}
+TOKENS DISPONÍVEIS: ${cfg.maxTokens} (NÃO TRUNCAR RESPOSTA)
 
 ESTRUTURA EXATA DO JSON:
 {
@@ -363,9 +388,13 @@ IMPORTANTE:
 - NÃO use "A.", "B.", "C." nas opções - use apenas o texto da opção
 - A RESPOSTA deve ser o TEXTO COMPLETO da opção correta
 - Garanta que a resposta corresponda exatamente a uma das opções fornecidas
+- NÃO TRUNCAR A RESPOSTA - use todos os tokens disponíveis se necessário
 `.trim();
 
-    const courseData = await generateCourseWithFallback(prompt, 2);
+    console.log(`🎯 Gerando curso ${level.toUpperCase()} com ${cfg.maxTokens} tokens...`);
+
+    // 👈 PASSA O LEVEL para a função de geração
+    const courseData = await generateCourseWithFallback(prompt, level, 2);
     
     if (!courseData) {
       throw new Error('Não foi possível gerar o curso após todas as tentativas');
@@ -413,7 +442,7 @@ IMPORTANTE:
       });
     }
 
-    // 👈 CRIAÇÃO DO CURSO CORRIGIDA - Garante todos os campos
+    // CRIAÇÃO DO CURSO
     const newCourse = {
       _type: 'course',
       title,
@@ -440,13 +469,14 @@ IMPORTANTE:
       title: newCourse.title,
       provider: newCourse.provider,
       tagsCount: newCourse.tags?.length,
-      modulesCount: newCourse.modules?.length
+      modulesCount: newCourse.modules?.length,
+      level: newCourse.level
     });
 
     const created = await client.create(newCourse);
     console.log('✅ Curso criado com sucesso:', created._id);
 
-    // 👈 RESPOSTA COMPLETA com todos os campos necessários
+    // RESPOSTA COMPLETA
     res.json({
       success: true,
       message: 'Curso gerado com sucesso!',
@@ -460,7 +490,7 @@ IMPORTANTE:
         provider: 'openai',
         category,
         subcategory,
-        tags: validTags.map(tagId => ({ _id: tagId })), // 👈 Inclui tags na resposta
+        tags: validTags.map(tagId => ({ _id: tagId })),
         sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${created._id}`,
         url: courseUrl,
       },
