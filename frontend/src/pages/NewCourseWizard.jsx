@@ -2,14 +2,16 @@ import React, { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Box, Button, Typography,
   Alert,
-  Toolbar, List, ListItemButton, ListItemText, ListItemIcon, Checkbox
+  Toolbar, List, ListItemButton, ListItemText, ListItemIcon, Checkbox,
+  Radio, RadioGroup, FormControlLabel, FormControl // 👈 IMPORTAÇÕES ADICIONADAS
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { useCourse } from '../context/CourseContext'
 import { getTagsBySubcategory } from '../services/api'
 import IconResolver from '../components/IconResolver'
 
-const steps = ['Nível', 'Categoria', 'Subcategoria', 'Tags', 'Gerar Curso']
+// 👈 ATUALIZADO: Adicionado step "Provider"
+const steps = ['Nível', 'Categoria', 'Subcategoria', 'Tags', 'Provider', 'Gerar Curso']
 
 function NewCourseWizard() {
   const navigate = useNavigate()
@@ -23,6 +25,23 @@ function NewCourseWizard() {
   const [availableTags, setAvailableTags] = useState([])
   const [loadingTags, setLoadingTags] = useState(false)
   const [error, setError] = useState(null)
+  const [provider, setProvider] = useState('') // 👈 NOVO STATE - SEM VALOR PRÉ-DEFINIDO
+
+  // 👈 OPÇÕES DE PROVIDERS ATUALIZADAS
+  const providerOptions = [
+    { 
+      value: 'openai', 
+      label: 'OpenAI GPT-4', 
+      description: 'Qualidade superior, ideal para cursos complexos e avançados',
+      recommendation: 'Recomendado para cursos avançados'
+    },
+    { 
+      value: 'gemini', 
+      label: 'Google Gemini', 
+      description: 'Rápido e eficiente, ótimo para cursos introdutórios',
+      recommendation: 'Ideal para cursos básicos e intermediários'
+    }
+  ]
 
   // Ref para o container de conteúdo que faz scroll
   const contentRef = useRef(null)
@@ -58,7 +77,7 @@ function NewCourseWizard() {
     }
   }, [subcategoryId])
 
-  // --- buscar tags ao mudar de subcategoria (mantenha este)
+  // --- buscar tags ao mudar de subcategoria
   useEffect(() => {
     const loadTags = async () => {
       if (!subcategoryId) {
@@ -105,6 +124,11 @@ function NewCourseWizard() {
       setError('Selecione entre 1 e 3 tags antes de continuar.')
       return
     }
+    // 👈 NOVA VALIDAÇÃO: Provider obrigatório
+    if (activeStep === 4 && !provider) {
+      setError('Selecione um provider de IA antes de continuar.')
+      return
+    }
 
     // último passo → gerar curso
     if (activeStep === steps.length - 1) {
@@ -112,14 +136,14 @@ function NewCourseWizard() {
         categoryId, 
         subcategoryId, 
         level, 
-        tags: selectedTags 
+        tags: selectedTags,
+        provider // 👈 INCLUI PROVIDER NO PAYLOAD
       }
       
       // Navega para a página de geração com o payload
       navigate('/curso/gerando', { 
         state: { 
           payload,
-          // Inclui informações para construir a URL depois
           categoryId,
           subcategoryId
         } 
@@ -224,7 +248,6 @@ function NewCourseWizard() {
           </List>
         )
 
-      // --- passo: seleção de tags ---
       case 3:
         if (loadingTags)
           return <Typography sx={{ width: '100%', mt: 2, px: [1] }}>Carregando tags...</Typography>
@@ -290,17 +313,119 @@ function NewCourseWizard() {
                 )
               })}
             </List>
-            
-            {/* REMOVIDO: Alert de validação desnecessário */}
           </Box>
         )
 
+      // 👈 NOVO STEP: Seleção de Provider
       case 4:
         return (
           <Box sx={{ width: '100%', px: [1] }}>
-            <Typography variant="h6" sx={{ mt: 2 }}>
-              Pronto para gerar seu curso?
+            <Typography variant="h6" sx={{ mt: 2, mb: 3 }}>
+              Escolha o Provider de IA
             </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+              Selecione qual inteligência artificial irá gerar o conteúdo do seu curso
+            </Typography>
+            
+            <FormControl component="fieldset" sx={{ width: '100%' }}>
+              <RadioGroup
+                value={provider}
+                onChange={(e) => setProvider(e.target.value)}
+                sx={{ gap: 2 }}
+              >
+                {providerOptions.map((option) => (
+                  <Box
+                    key={option.value}
+                    sx={{
+                      border: provider === option.value ? '2px solid' : '1px solid',
+                      borderColor: provider === option.value ? 'primary.main' : 'divider',
+                      borderRadius: 2,
+                      p: 2,
+                      backgroundColor: provider === option.value ? 'action.selected' : 'background.paper',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        backgroundColor: 'action.hover'
+                      }
+                    }}
+                  >
+                    <FormControlLabel
+                      value={option.value}
+                      control={<Radio />}
+                      label={
+                        <Box sx={{ width: '100%' }}>
+                          <Typography variant="subtitle1" fontWeight="bold">
+                            {option.label}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+                            {option.description}
+                          </Typography>
+                          {/* 👈 RECOMENDAÇÃO BASEADA NO NÍVEL */}
+                          {level === 'advanced' && option.value === 'openai' && (
+                            <Typography variant="caption" color="success.main" sx={{ mt: 1, display: 'block' }}>
+                              ⭐ {option.recommendation}
+                            </Typography>
+                          )}
+                          {level === 'beginner' && option.value === 'gemini' && (
+                            <Typography variant="caption" color="info.main" sx={{ mt: 1, display: 'block' }}>
+                              💡 {option.recommendation}
+                            </Typography>
+                          )}
+                        </Box>
+                      }
+                      sx={{ 
+                        width: '100%',
+                        m: 0,
+                        '& .MuiFormControlLabel-label': {
+                          width: '100%'
+                        }
+                      }}
+                    />
+                  </Box>
+                ))}
+              </RadioGroup>
+            </FormControl>
+            
+            {/* 👈 DICA DINÂMICA BASEADA NO NÍVEL */}
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+              <Typography variant="body2" color="info.contrastText">
+                <strong>💡 Dica:</strong> {
+                  level === 'advanced' 
+                    ? 'Para cursos avançados recomendamos OpenAI GPT-4 para melhor qualidade e profundidade.'
+                    : level === 'intermediate'
+                    ? 'Para cursos intermediários ambos os providers funcionam bem. Gemini é mais rápido.'
+                    : 'Para cursos iniciantes o Google Gemini é uma ótima opção por ser rápido e eficiente.'
+                }
+              </Typography>
+            </Box>
+          </Box>
+        )
+
+      case 5:
+        return (
+          <Box sx={{ width: '100%', px: [1] }}>
+            <Typography variant="h6" sx={{ mt: 2, mb: 2 }}>
+              Resumo do Curso
+            </Typography>
+            
+            <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>Nível:</strong> {levelOptions.find(l => l.value === level)?.label}
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>Categoria:</strong> {categories.find(c => c._id === categoryId)?.title}
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>Subcategoria:</strong> {filteredSubs.find(s => s._id === subcategoryId)?.title}
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>Tags:</strong> {selectedTags.length} selecionadas
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>Provider:</strong> {providerOptions.find(p => p.value === provider)?.label}
+              </Typography>
+            </Box>
+            
             <Typography variant="body2" color="textSecondary">
               O conteúdo será gerado automaticamente com base nas opções selecionadas.
             </Typography>
@@ -319,8 +444,8 @@ function NewCourseWizard() {
           display: 'flex',
           flexDirection: 'column',
           width: '100%',
-          height: '100dvh', // Altura total da viewport
-          overflow: 'hidden', // Remove scroll geral
+          height: '100dvh',
+          overflow: 'hidden',
         }}
       >
         <Toolbar sx={{ px: 0, minHeight: '56px!important' }} />
@@ -331,7 +456,7 @@ function NewCourseWizard() {
             width: '100%',
             pt: 1,
             px: 1,
-            flexShrink: 0, // Não encolhe
+            flexShrink: 0,
           }}
         >
           <Typography variant="h6">
@@ -351,7 +476,7 @@ function NewCourseWizard() {
           </Box>
         )}
         
-        {/* Conteúdo com Scroll - ADICIONADO REF AQUI */}
+        {/* Conteúdo com Scroll */}
         <Box 
           ref={contentRef}
           sx={{ 
@@ -363,16 +488,16 @@ function NewCourseWizard() {
           {renderStepContent()}
         </Box>
         
-        {/* Botões Fixos no Bottom - CORRIGIDO: desabilitar quando não há tags selecionadas */}
+        {/* Botões Fixos no Bottom - ATUALIZADO COM NOVA VALIDAÇÃO */}
         <Box sx={{ 
-          flexShrink: 0, // Não encolhe
+          flexShrink: 0,
           display: 'flex', 
           width: '100%', 
           justifyContent: activeStep === 0 ? 'flex-end' : 'space-between', 
           p: 1,
           borderTop: '1px solid',
           borderColor: 'divider',
-          backgroundColor: 'background.paper' // Garante fundo sólido
+          backgroundColor: 'background.paper'
         }}>
           {activeStep === 0 ? (
             null
@@ -397,7 +522,8 @@ function NewCourseWizard() {
             disabled={
               (activeStep === 1 && !categoryId) ||
               (activeStep === 2 && !subcategoryId) ||
-              (activeStep === 3 && selectedTags.length === 0)
+              (activeStep === 3 && selectedTags.length === 0) ||
+              (activeStep === 4 && !provider) // 👈 NOVA VALIDAÇÃO
             }
             sx={{
               transition: 'none'
