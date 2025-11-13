@@ -73,101 +73,25 @@ export const getTagsBySubcategory = async (subcategoryId) => {
 }
 
 // ============================================================
-// 🔹 FUNÇÃO: Verificar providers disponíveis
-// ============================================================
-export const checkProvidersAvailability = async () => {
-  try {
-    console.log('🔍 Verificando providers disponíveis...')
-    
-    const apiUrl = `${BASE_GEN}/providers`
-    console.log('🔍 DEBUG - URL providers:', apiUrl)
-    
-    const res = await fetch(apiUrl)
-    
-    if (!res.ok) {
-      console.warn('⚠️ Erro ao verificar providers, usando fallback...')
-      // Fallback seguro
-      return { 
-        available: process.env.REACT_APP_OPENAI_API_KEY ? ['openai'] : [],
-        detailed: {
-          openai: { 
-            status: process.env.REACT_APP_OPENAI_API_KEY ? 'available' : 'unconfigured', 
-            model: 'gpt-4o-mini', 
-            usage: { dailyCount: 0 }, 
-            limit: process.env.REACT_APP_OPENAI_DAILY_LIMIT || 50 
-          },
-          gemini: { 
-            status: process.env.REACT_APP_GEMINI_API_KEY ? 'available' : 'unconfigured', 
-            model: 'gemini-1.5-flash',
-            usage: { dailyCount: 0 },
-            limit: process.env.REACT_APP_GEMINI_DAILY_LIMIT || 1000
-          }
-        }
-      }
-    }
-
-    const data = await res.json()
-    console.log('✅ Providers disponíveis:', data.available)
-    console.log('🔍 Detalhes dos providers:', data.detailed)
-    console.log('📊 Uso atual:', data.usage)
-    
-    return data
-    
-  } catch (error) {
-    console.error('❌ Erro ao verificar providers:', error)
-    // Fallback seguro em caso de erro
-    return { 
-      available: process.env.REACT_APP_OPENAI_API_KEY ? ['openai'] : [],
-      detailed: {
-        openai: { 
-          status: process.env.REACT_APP_OPENAI_API_KEY ? 'available' : 'unconfigured', 
-          model: 'gpt-4o-mini', 
-          usage: { dailyCount: 0 }, 
-          limit: process.env.REACT_APP_OPENAI_DAILY_LIMIT || 50 
-        },
-        gemini: { 
-          status: process.env.REACT_APP_GEMINI_API_KEY ? 'available' : 'unconfigured', 
-          model: 'gemini-1.5-flash',
-          usage: { dailyCount: 0 },
-          limit: process.env.REACT_APP_GEMINI_DAILY_LIMIT || 1000
-        }
-      }
-    }
-  }
-}
-
-// ============================================================
-// 🔹 Geração de curso - CORRIGIDO SEM VALORES PADRÃO
+// 🔹 Geração de curso (OpenAI + Sanity) - COM DEBUGS CRÍTICOS
 // ============================================================
 export const generateCourse = async (payload) => {
   try {
     console.log('🎯 DEBUG CRÍTICO - generateCourse() iniciado')
     console.log('📤 Payload original recebido:', payload)
     
-    // 👇 VALIDAÇÕES CRÍTICAS - SEM VALORES PADRÃO
-    if (!payload.level) {
-      throw new Error('level é obrigatório no payload')
-    }
-    if (!payload.provider) {
-      throw new Error('provider é obrigatório no payload')
-    }
-    if (!payload.categoryId && !payload.category?._id) {
-      throw new Error('categoryId é obrigatório no payload')
-    }
-    if (!payload.subcategoryId && !payload.subcategory?._id) {
-      throw new Error('subcategoryId é obrigatório no payload')
-    }
-
-    // 👇 PAYLOAD LIMPO - SEM VALORES PADRÃO
     const cleanPayload = {
       categoryId: payload.categoryId || payload.category?._id,
       subcategoryId: payload.subcategoryId || payload.subcategory?._id,
-      level: payload.level,
+      level: payload.level || 'beginner',
       tags: payload.tags ? payload.tags.map((t) => t._id || t._ref || t) : [],
-      provider: payload.provider,
+      provider: payload.provider || 'openai',
     }
 
     console.log('📤 Payload limpo sendo enviado:', cleanPayload)
+    
+    if (!cleanPayload.categoryId) throw new Error('categoryId é obrigatório.')
+    if (!cleanPayload.subcategoryId) throw new Error('subcategoryId é obrigatório.')
 
     // 👇 DEBUG CRÍTICO - URL e fetch
     const apiUrl = `${BASE_GEN}/course`
@@ -189,12 +113,7 @@ export const generateCourse = async (payload) => {
     let data
     try {
       data = await res.json()
-      console.log('🔍 DEBUG - JSON parseado com sucesso:', {
-        success: data.success,
-        provider: data.course?.provider,
-        level: data.course?.level,
-        courseId: data.course?.id
-      })
+      console.log('🔍 DEBUG - JSON parseado com sucesso:', data)
     } catch (parseError) {
       console.error('❌ Erro ao parsear JSON da resposta:', parseError)
       
@@ -210,17 +129,11 @@ export const generateCourse = async (payload) => {
       throw new Error(data?.error || `Falha ao criar curso (${res.status})`)
     }
 
-    console.log('✅ Resposta da API bem-sucedida:', {
-      success: data.success,
-      provider: data.course?.provider,
-      level: data.course?.level,
-      title: data.course?.title
-    })
+    console.log('✅ Resposta da API bem-sucedida:', data)
 
     const course = data?.course || {}
     const slug = course.slug?.current || course.slug || course.id || course._id
 
-    // 👇 NORMALIZAÇÃO CORRIGIDA - MANTÉM PROVIDER ORIGINAL
     const normalized = {
       ...data,
       course: {
@@ -229,17 +142,10 @@ export const generateCourse = async (payload) => {
         slug,
         url: `/curso/${slug}`,
         provider: course.provider || cleanPayload.provider,
-        level: course.level || cleanPayload.level,
       },
     }
 
-    console.log('✅ Curso normalizado com sucesso:', {
-      title: normalized.course.title,
-      provider: normalized.course.provider,
-      level: normalized.course.level,
-      slug: normalized.course.slug
-    })
-
+    console.log('✅ Curso normalizado com sucesso:', normalized)
     return normalized
 
   } catch (err) {
@@ -249,9 +155,6 @@ export const generateCourse = async (payload) => {
   }
 }
 
-// ============================================================
-// 🔹 Estatísticas
-// ============================================================
 export const getStats = async (period = '30days') => {
   try {
     const url = `${BASE_FETCH}/stats?period=${period}`
