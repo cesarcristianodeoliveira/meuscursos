@@ -10,7 +10,14 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// 👇 CONFIGURAÇÃO CORRIGIDA DO GEMINI - COM VERIFICAÇÃO
+const configureGemini = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY não configurada');
+  }
+  return new GoogleGenerativeAI(apiKey);
+};
 
 // =======================================================
 // 🔧 FUNÇÕES AUXILIARES
@@ -122,7 +129,7 @@ async function generateWithOpenAI(prompt, level = 'beginner', maxRetries = 2) {
   throw lastError;
 }
 
-// 👇 FUNÇÃO CORRIGIDA: Gerar curso com Gemini (COM DEBUGS E FALLBACK)
+// 👇 FUNÇÃO CORRIGIDA: Gerar curso com Gemini (MODELO ATUALIZADO)
 async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
   let lastError;
   
@@ -132,35 +139,31 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
     try {
       console.log(`🔄 Gemini - Tentativa ${attempt} (nível: ${level})...`);
       
-      // 👇 DEBUG: Verifica se a API Key está presente
-      console.log(`🔍 DEBUG - Gemini API Key presente: ${!!process.env.GEMINI_API_KEY}`);
-      console.log(`🔍 DEBUG - Gemini API Key (primeiros 10 chars): ${process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.substring(0, 10) + '...' : 'N/A'}`);
-      console.log(`🔍 DEBUG - Prompt length: ${prompt.length} caracteres`);
+      const genAI = configureGemini();
       
-      // 👇 MODELO CORRIGIDO: gemini-1.5-flash → gemini-pro
+      // 👇 MODELO CORRETO: gemini-1.5-flash (funciona melhor que gemini-pro)
       const model = genAI.getGenerativeModel({ 
-        model: "gemini-pro",
+        model: "gemini-1.5-flash",
         generationConfig: {
           temperature: 0.7,
           topK: 40,
           topP: 0.95,
-          maxOutputTokens: cfg.maxTokens || 5000,
+          maxOutputTokens: cfg.maxTokens || 4000,
         }
       });
 
+      console.log(`🔍 DEBUG - Modelo Gemini: gemini-1.5-flash`);
+      console.log(`🔍 DEBUG - Prompt length: ${prompt.length} caracteres`);
+      
       // 👇 PROMPT OTIMIZADO PARA GEMINI
       const jsonPrompt = `${prompt}\n\nIMPORTANTE: Retorne APENAS o JSON válido, sem texto adicional, sem markdown, sem explicações.`;
       
       console.log(`🔍 DEBUG - Chamando Gemini API...`);
       
       const result = await model.generateContent(jsonPrompt);
-      console.log(`🔍 DEBUG - Gemini respondeu, processando...`);
-      
       const response = await result.response;
       let rawResponse = response.text().trim();
 
-      console.log(`🔍 DEBUG - Response recebida!`);
-      
       if (!rawResponse) {
         throw new Error('Resposta vazia da Gemini.');
       }
@@ -194,7 +197,30 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
     } catch (error) {
       lastError = error;
       console.log(`❌ Gemini - Tentativa ${attempt} falhou:`, error.message);
-      console.log(`🔍 DEBUG - Error completo:`, error);
+      
+      // 👇 TENTA MODELO ALTERNATIVO SE O PRIMEIRO FALHAR
+      if (error.message.includes('not found') || error.message.includes('not supported')) {
+        console.log('🔄 Tentando modelo alternativo: gemini-1.5-flash-latest...');
+        try {
+          const genAI = configureGemini();
+          const model = genAI.getGenerativeModel({ 
+            model: "gemini-1.5-flash-latest",
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: cfg.maxTokens || 4000,
+            },
+          });
+          
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          const text = response.text();
+          console.log('✅ Gemini (modelo alternativo) - Sucesso!');
+          return text;
+        } catch (fallbackError) {
+          console.error('❌ Gemini (fallback) também falhou:', fallbackError);
+          // Continua para o próximo retry ou fallback final
+        }
+      }
       
       if (attempt < maxRetries) {
         console.log(`⏳ Esperando 1.5s antes da próxima tentativa...`);
@@ -206,21 +232,27 @@ async function generateWithGemini(prompt, level = 'beginner', maxRetries = 2) {
   throw lastError;
 }
 
-// 👇 FUNÇÃO PRINCIPAL ATUALIZADA: Escolhe o provider COM FALLBACK AUTOMÁTICO
+// 👇 FUNÇÃO PRINCIPAL ATUALIZADA: Escolhe o provider COM FALLBACK INTELIGENTE
 async function generateCourseWithProvider(prompt, provider = 'openai', level = 'beginner', maxRetries = 2) {
   console.log(`🎯 Usando provider: ${provider.toUpperCase()}`);
   
-  // 👇 SE FOR GEMINI, TENTA COM FALLBACK PARA OPENAI
+  // 👇 SE FOR GEMINI, TENTA COM FALLBACK PARA OPENAI SE FALHAR
   if (provider === 'gemini') {
     try {
       console.log('🔄 Tentando Gemini primeiro...');
-      const result = await generateWithGemini(prompt, level, 1); // Só 1 tentativa
+      const result = await generateWithGemini(prompt, level, 1); // Só 1 tentativa inicial
       console.log('✅ Gemini funcionou!');
       return result;
     } catch (error) {
       console.log('🔄 Gemini falhou, usando OpenAI como fallback...');
       console.log(`🔍 Erro do Gemini: ${error.message}`);
-      return await generateWithOpenAI(prompt, level, maxRetries);
+      
+      // 👇 VERIFICA SE OPENAI ESTÁ DISPONÍVEL PARA FALLBACK
+      if (process.env.OPENAI_API_KEY) {
+        return await generateWithOpenAI(prompt, level, maxRetries);
+      } else {
+        throw new Error('Gemini falhou e OpenAI não está configurado como fallback');
+      }
     }
   }
   
@@ -411,18 +443,31 @@ function validateCourseData(courseData) {
 }
 
 // =======================================================
-// 🧠 ROTA PRINCIPAL - GERAR CURSO
+// 🧠 ROTA PRINCIPAL - GERAR CURSO (ATUALIZADA)
 // =======================================================
 router.post('/course', async (req, res) => {
   try {
-    const { level = 'beginner', categoryId, subcategoryId, tags = [], provider = 'openai' } = req.body;
+    // 👇 NÃO TEM VALORES PADRÃO - USA O QUE VEM DO FRONTEND
+    const { level, categoryId, subcategoryId, tags = [], provider } = req.body;
     console.log('🧾 Payload recebido:', req.body);
 
-    if (!categoryId)
+    // 👇 VALIDAÇÕES OBRIGATÓRIAS
+    if (!level) {
+      return res.status(400).json({ error: 'level é obrigatório.' });
+    }
+    if (!categoryId) {
       return res.status(400).json({ error: 'categoryId é obrigatório.' });
+    }
+    if (!provider) {
+      return res.status(400).json({ error: 'provider é obrigatório.' });
+    }
 
     if (!['openai', 'gemini'].includes(provider)) {
       return res.status(400).json({ error: 'Provider deve ser "openai" ou "gemini".' });
+    }
+
+    if (!['beginner', 'intermediate', 'advanced'].includes(level)) {
+      return res.status(400).json({ error: 'Level deve ser "beginner", "intermediate" ou "advanced".' });
     }
 
     const validTags = validateTags(tags || []);
@@ -497,8 +542,9 @@ IMPORTANTE:
 
     const sanitizedData = sanitizeCourseData(courseData);
     const validation = validateCourseData(sanitizedData);
-    if (!validation.valid)
+    if (!validation.valid) {
       return res.status(400).json({ error: validation.message });
+    }
 
     const title = sanitizedData.title.trim();
     const slug = slugify(title);
@@ -545,7 +591,7 @@ IMPORTANTE:
       description,
       level,
       duration,
-      provider: provider,
+      provider: provider, // 👈 USA O PROVIDER QUE VEIO DO FRONTEND
       category: { _type: 'reference', _ref: categoryId },
       subcategory: subcategoryId
         ? { _type: 'reference', _ref: subcategoryId }
@@ -563,9 +609,9 @@ IMPORTANTE:
     console.log('📦 Criando curso com estrutura:', {
       title: newCourse.title,
       provider: newCourse.provider,
+      level: newCourse.level,
       tagsCount: newCourse.tags?.length,
-      modulesCount: newCourse.modules?.length,
-      level: newCourse.level
+      modulesCount: newCourse.modules?.length
     });
 
     const created = await client.create(newCourse);
@@ -582,7 +628,7 @@ IMPORTANTE:
         description: created.description,
         level: created.level,
         duration: created.duration,
-        provider: provider,
+        provider: provider, // 👈 MANTÉM O PROVIDER ORIGINAL
         category,
         subcategory,
         tags: validTags.map(tagId => ({ _id: tagId })),
@@ -595,6 +641,53 @@ IMPORTANTE:
     res.status(500).json({
       error: 'Falha ao gerar o curso.',
       details: err.message,
+    });
+  }
+});
+
+// 👇 NOVA ROTA: Verificar providers disponíveis
+router.get('/providers', async (req, res) => {
+  try {
+    const providers = {
+      openai: {
+        status: process.env.OPENAI_API_KEY ? 'available' : 'unconfigured',
+        model: 'gpt-4o-mini'
+      },
+      gemini: {
+        status: process.env.GEMINI_API_KEY ? 'available' : 'unconfigured',
+        model: 'gemini-1.5-flash'
+      }
+    };
+
+    // Testa conexão Gemini se disponível
+    if (providers.gemini.status === 'available') {
+      try {
+        const genAI = configureGemini();
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // Teste simples
+        await model.generateContent("Test");
+        providers.gemini.status = 'available';
+      } catch (geminiError) {
+        console.error('❌ Gemini API test failed:', geminiError.message);
+        providers.gemini.status = 'unavailable';
+        providers.gemini.error = geminiError.message;
+      }
+    }
+
+    const availableProviders = Object.keys(providers).filter(
+      provider => providers[provider].status === 'available'
+    );
+
+    res.json({
+      available: availableProviders,
+      detailed: providers
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro ao verificar providers:', error);
+    res.status(500).json({ 
+      available: process.env.OPENAI_API_KEY ? ['openai'] : [], // Fallback seguro
+      error: error.message 
     });
   }
 });

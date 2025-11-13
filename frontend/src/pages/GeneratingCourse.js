@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { 
   Box, 
   Typography, 
@@ -58,7 +58,7 @@ function GeneratingCourse() {
   }, [progress])
 
   // 👇 NORMALIZA CURSO
-  const normalizeCourse = (course) => {
+  const normalizeCourse = useCallback((course) => {
     if (!course) return null
     
     if (!course.slug && !course._id) {
@@ -84,93 +84,94 @@ function GeneratingCourse() {
       _createdAt: course._createdAt || new Date().toISOString(),
       _updatedAt: course._updatedAt || new Date().toISOString(),
     }
-  }
+  }, [])
 
-  // 👇 EFEITO PRINCIPAL COM TIMEOUT DE SEGURANÇA
+  // 👇 **FUNÇÃO PRINCIPAL DE CRIAÇÃO DO CURSO - CORRIGIDA COM useCallback**
+  const criarCurso = useCallback(async () => {
+    try {
+      console.log('🚀 Iniciando geração do curso com payload:', payload)
+      console.log('🔍 Provider selecionado:', payload.provider)
+      
+      const result = await generateCourse(payload)
+      console.log('🔍 DEBUG - Resultado da API:', result)
+
+      if (result?.success && result?.course) {
+        console.log('✅ Curso gerado com sucesso:', result.course)
+        
+        const normalizedCourse = normalizeCourse(result.course)
+        
+        if (!normalizedCourse) {
+          throw new Error('Falha ao normalizar o curso retornado')
+        }
+        
+        // 👇 **ATUALIZA ESTADOS DE UMA VEZ**
+        addCourse(normalizedCourse)
+        resetCourse()
+        setGeneratedCourse(normalizedCourse)
+        setProgress(100)
+        setMessageIndex(MESSAGES.length - 1)
+        setIsGenerating(false)
+
+        const redirectUrl = normalizedCourse.url || `/curso/${normalizedCourse.slug}`
+
+        console.log('📍 Redirecionando para:', redirectUrl)
+
+        setTimeout(() => {
+          navigate(redirectUrl)
+        }, 800)
+
+      } else {
+        throw new Error(result?.error || 'Estrutura de retorno inválida da API')
+      }
+    } catch (err) {
+      console.error('❌ Erro na criação do curso:', err)
+      setError(err.message || 'Erro ao gerar curso. Tente novamente.')
+      setProgress(100)
+      setMessageIndex(MESSAGES.length - 1)
+      setIsGenerating(false)
+      createdRef.current = false // 👈 PERMITE RETRY
+    }
+  }, [payload, normalizeCourse, addCourse, resetCourse, navigate])
+
+  // 👇 **EFFECT PRINCIPAL CORRIGIDO - COM TODAS AS DEPENDÊNCIAS**
   useEffect(() => {
     console.log('🔍 DEBUG - useEffect principal executando')
     console.log('🔍 DEBUG - Payload disponível?', !!payload)
     console.log('🔍 DEBUG - Já criado?', createdRef.current)
     console.log('🔍 DEBUG - Está gerando?', isGenerating)
     
+    // 👇 **CONDIÇÃO MAIS RESTRITIVA**
     if (!payload || createdRef.current || isGenerating) {
       console.log('🔍 DEBUG - Condições não atendidas, saindo...')
       return
     }
     
+    // 👇 **MARCA COMO INICIADO IMEDIATAMENTE**
     createdRef.current = true
     setIsGenerating(true)
     console.log('🔍 DEBUG - Iniciando geração do curso...')
 
-    // 👇 TIMEOUT DE SEGURANÇA (45 segundos)
+    // 👇 **TIMEOUT DE SEGURANÇA (45 segundos)**
     const safetyTimeout = setTimeout(() => {
-      if (!generatedCourse && !error) {
-        console.log('⏰ Timeout de segurança - API não respondeu em 45s')
-        setError('Tempo limite excedido. A geração está demorando mais que o normal. Tente novamente.')
-        setProgress(100)
-        setIsGenerating(false)
-      }
+      console.log('⏰ Timeout de segurança - API não respondeu em 45s')
+      setError('Tempo limite excedido. A geração está demorando mais que o normal. Tente novamente.')
+      setProgress(100)
+      setIsGenerating(false)
+      createdRef.current = false // 👈 PERMITE RETRY
     }, 45000)
 
-    const criarCurso = async () => {
-      try {
-        console.log('🚀 Iniciando geração do curso com payload:', payload)
-        console.log('🔍 Provider selecionado:', payload.provider)
-        
-        const result = await generateCourse(payload)
-        console.log('🔍 DEBUG - Resultado da API:', result)
-
-        if (result?.success && result?.course) {
-          console.log('✅ Curso gerado com sucesso:', result.course)
-          
-          const normalizedCourse = normalizeCourse(result.course)
-          
-          if (!normalizedCourse) {
-            throw new Error('Falha ao normalizar o curso retornado')
-          }
-          
-          addCourse(normalizedCourse)
-          resetCourse()
-          setGeneratedCourse(normalizedCourse)
-
-          setProgress(100)
-          setMessageIndex(MESSAGES.length - 1)
-          setIsGenerating(false)
-
-          const redirectUrl = normalizedCourse.url || `/curso/${normalizedCourse.slug}`
-
-          console.log('📍 Redirecionando para:', redirectUrl)
-
-          setTimeout(() => {
-            navigate(redirectUrl)
-          }, 800)
-
-        } else {
-          throw new Error(result?.error || 'Estrutura de retorno inválida da API')
-        }
-      } catch (err) {
-        console.error('❌ Erro na criação do curso:', err)
-        setError(err.message || 'Erro ao gerar curso. Tente novamente.')
-        setProgress(100)
-        setMessageIndex(MESSAGES.length - 1)
-        setIsGenerating(false)
-      } finally {
-        clearTimeout(safetyTimeout)
-      }
-    }
-
-    const timeoutId = setTimeout(() => {
-      criarCurso()
-    }, 1000)
+    // 👇 **EXECUTA DIRETAMENTE SEM setTimeout adicional**
+    criarCurso().finally(() => {
+      clearTimeout(safetyTimeout)
+    })
 
     return () => {
-      clearTimeout(timeoutId)
       clearTimeout(safetyTimeout)
     }
-  }, [payload, navigate, addCourse, resetCourse, generatedCourse, error, isGenerating])
+  }, [payload, isGenerating, criarCurso]) // 👈 **TODAS AS DEPENDÊNCIAS NECESSÁRIAS**
 
-  // 👇 TENTAR NOVAMENTE
-  const handleRetry = () => {
+  // 👇 TENTAR NOVAMENTE (CORRIGIDO COM useCallback)
+  const handleRetry = useCallback(async () => {
     createdRef.current = false
     setProgress(0)
     setMessageIndex(0)
@@ -178,39 +179,37 @@ function GeneratingCourse() {
     setGeneratedCourse(null)
     setIsGenerating(false)
     
-    setTimeout(() => {
-      const criarCurso = async () => {
-        try {
-          setIsGenerating(true)
-          const result = await generateCourse(payload)
-          if (result?.success && result?.course) {
-            const normalizedCourse = normalizeCourse(result.course)
-            if (normalizedCourse) {
-              addCourse(normalizedCourse)
-              resetCourse()
-              const redirectUrl = normalizedCourse.url || `/curso/${normalizedCourse.slug}`
-              navigate(redirectUrl)
-            }
-          }
-        } catch (err) {
-          setError(err.message || 'Erro ao gerar curso.')
-          setIsGenerating(false)
+    try {
+      setIsGenerating(true)
+      createdRef.current = true
+      
+      const result = await generateCourse(payload)
+      if (result?.success && result?.course) {
+        const normalizedCourse = normalizeCourse(result.course)
+        if (normalizedCourse) {
+          addCourse(normalizedCourse)
+          resetCourse()
+          const redirectUrl = normalizedCourse.url || `/curso/${normalizedCourse.slug}`
+          navigate(redirectUrl)
         }
       }
-      criarCurso()
-    }, 500)
-  }
+    } catch (err) {
+      setError(err.message || 'Erro ao gerar curso.')
+      setIsGenerating(false)
+      createdRef.current = false
+    }
+  }, [payload, normalizeCourse, addCourse, resetCourse, navigate])
 
-  const handleGoHome = () => {
+  const handleGoHome = useCallback(() => {
     navigate('/')
-  }
+  }, [navigate])
 
-  const handleViewCourse = () => {
+  const handleViewCourse = useCallback(() => {
     if (generatedCourse) {
       const redirectUrl = generatedCourse.url || `/curso/${generatedCourse.slug}`
       navigate(redirectUrl)
     }
-  }
+  }, [generatedCourse, navigate])
 
   return (
     <Box

@@ -73,25 +73,80 @@ export const getTagsBySubcategory = async (subcategoryId) => {
 }
 
 // ============================================================
-// 🔹 Geração de curso (OpenAI + Sanity) - COM DEBUGS CRÍTICOS
+// 🔹 NOVA FUNÇÃO: Verificar providers disponíveis
+// ============================================================
+export const checkProvidersAvailability = async () => {
+  try {
+    console.log('🔍 Verificando providers disponíveis...')
+    
+    const apiUrl = `${BASE_GEN}/providers`
+    console.log('🔍 DEBUG - URL providers:', apiUrl)
+    
+    const res = await fetch(apiUrl)
+    
+    if (!res.ok) {
+      console.warn('⚠️ Erro ao verificar providers, usando fallback...')
+      // Fallback seguro - assume que pelo menos OpenAI está disponível
+      return { 
+        available: ['openai'],
+        detailed: {
+          openai: { status: 'available', model: 'gpt-4o-mini' },
+          gemini: { status: 'unavailable', model: 'N/A' }
+        }
+      }
+    }
+
+    const data = await res.json()
+    console.log('✅ Providers disponíveis:', data.available)
+    console.log('🔍 Detalhes dos providers:', data.detailed)
+    
+    return data
+    
+  } catch (error) {
+    console.error('❌ Erro ao verificar providers:', error)
+    // Fallback seguro em caso de erro
+    return { 
+      available: ['openai'],
+      detailed: {
+        openai: { status: 'available', model: 'gpt-4o-mini' },
+        gemini: { status: 'unavailable', model: 'N/A' }
+      }
+    }
+  }
+}
+
+// ============================================================
+// 🔹 Geração de curso (OpenAI + Sanity) - CORRIGIDO SEM VALORES PADRÃO
 // ============================================================
 export const generateCourse = async (payload) => {
   try {
     console.log('🎯 DEBUG CRÍTICO - generateCourse() iniciado')
     console.log('📤 Payload original recebido:', payload)
     
+    // 👇 VALIDAÇÕES CRÍTICAS - SEM VALORES PADRÃO
+    if (!payload.level) {
+      throw new Error('level é obrigatório no payload')
+    }
+    if (!payload.provider) {
+      throw new Error('provider é obrigatório no payload')
+    }
+    if (!payload.categoryId && !payload.category?._id) {
+      throw new Error('categoryId é obrigatório no payload')
+    }
+    if (!payload.subcategoryId && !payload.subcategory?._id) {
+      throw new Error('subcategoryId é obrigatório no payload')
+    }
+
+    // 👇 PAYLOAD LIMPO - SEM VALORES PADRÃO
     const cleanPayload = {
       categoryId: payload.categoryId || payload.category?._id,
       subcategoryId: payload.subcategoryId || payload.subcategory?._id,
-      level: payload.level || 'beginner',
+      level: payload.level, // 👈 OBRIGATÓRIO - sem valor padrão
       tags: payload.tags ? payload.tags.map((t) => t._id || t._ref || t) : [],
-      provider: payload.provider || 'openai',
+      provider: payload.provider, // 👈 OBRIGATÓRIO - sem valor padrão
     }
 
     console.log('📤 Payload limpo sendo enviado:', cleanPayload)
-    
-    if (!cleanPayload.categoryId) throw new Error('categoryId é obrigatório.')
-    if (!cleanPayload.subcategoryId) throw new Error('subcategoryId é obrigatório.')
 
     // 👇 DEBUG CRÍTICO - URL e fetch
     const apiUrl = `${BASE_GEN}/course`
@@ -113,7 +168,12 @@ export const generateCourse = async (payload) => {
     let data
     try {
       data = await res.json()
-      console.log('🔍 DEBUG - JSON parseado com sucesso:', data)
+      console.log('🔍 DEBUG - JSON parseado com sucesso:', {
+        success: data.success,
+        provider: data.course?.provider,
+        level: data.course?.level,
+        courseId: data.course?.id
+      })
     } catch (parseError) {
       console.error('❌ Erro ao parsear JSON da resposta:', parseError)
       
@@ -129,11 +189,17 @@ export const generateCourse = async (payload) => {
       throw new Error(data?.error || `Falha ao criar curso (${res.status})`)
     }
 
-    console.log('✅ Resposta da API bem-sucedida:', data)
+    console.log('✅ Resposta da API bem-sucedida:', {
+      success: data.success,
+      provider: data.course?.provider,
+      level: data.course?.level,
+      title: data.course?.title
+    })
 
     const course = data?.course || {}
     const slug = course.slug?.current || course.slug || course.id || course._id
 
+    // 👇 NORMALIZAÇÃO CORRIGIDA - MANTÉM PROVIDER ORIGINAL
     const normalized = {
       ...data,
       course: {
@@ -141,11 +207,18 @@ export const generateCourse = async (payload) => {
         id: course._id || course.id,
         slug,
         url: `/curso/${slug}`,
-        provider: course.provider || cleanPayload.provider,
+        provider: course.provider || cleanPayload.provider, // 👈 USA PROVIDER ORIGINAL
+        level: course.level || cleanPayload.level, // 👈 USA LEVEL ORIGINAL
       },
     }
 
-    console.log('✅ Curso normalizado com sucesso:', normalized)
+    console.log('✅ Curso normalizado com sucesso:', {
+      title: normalized.course.title,
+      provider: normalized.course.provider,
+      level: normalized.course.level,
+      slug: normalized.course.slug
+    })
+
     return normalized
 
   } catch (err) {
@@ -155,6 +228,9 @@ export const generateCourse = async (payload) => {
   }
 }
 
+// ============================================================
+// 🔹 Estatísticas
+// ============================================================
 export const getStats = async (period = '30days') => {
   try {
     const url = `${BASE_FETCH}/stats?period=${period}`
