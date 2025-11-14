@@ -12,6 +12,7 @@ import {
 } from '@mui/material'
 import { useCourse } from '../context/CourseContext'
 import { useNavigate } from 'react-router-dom'
+import ScrollTopButton from '../components/ScrollTopButton'
 
 const CoursesPage = () => {
   const { courses, loading } = useCourse()
@@ -278,6 +279,7 @@ const CoursesPage = () => {
           ))}
         </Grid>
       )}
+      <ScrollTopButton />
     </Box>
   )
 }

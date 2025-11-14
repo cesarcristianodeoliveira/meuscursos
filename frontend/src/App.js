@@ -12,6 +12,7 @@ import CoursePage from './pages/CoursePage'
 import NewCourseWizard from './pages/NewCourseWizard'
 import GeneratingCourse from './pages/GeneratingCourse'
 import SearchPage from './pages/SearchPage'
+import ScrollToTop from './components/ScrollToTop'
 
 const App = () => {
   return (
@@ -20,6 +21,7 @@ const App = () => {
         <ThemeContext>
           <BrowserRouter>
             {/* <TopProgress /> */}
+            <ScrollToTop />
             <Sidebar />
             <Box component="main" sx={{ flexGrow: 1 }}>
               <Routes>

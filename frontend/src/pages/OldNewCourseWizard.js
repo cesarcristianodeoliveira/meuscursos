@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react'
+// src/pages/NewCourseWizard.jsx
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Box, Button, Typography,
-  Alert,
-  Toolbar, List, ListItemButton, ListItemText, ListItemIcon, Checkbox
+  Alert, Toolbar, List, ListItemButton, ListItemText, ListItemIcon, Checkbox
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { useCourse } from '../context/CourseContext'
@@ -24,6 +24,25 @@ function NewCourseWizard() {
   const [loadingTags, setLoadingTags] = useState(false)
   const [error, setError] = useState(null)
 
+  // ref do container scrollável
+  const contentRef = useRef(null)
+
+  // ref imutável para evitar warnings do eslint e capturar seleção
+  const selectedStateRef = useRef({
+    level: 'beginner',
+    categoryId: '',
+    subcategoryId: ''
+  })
+
+  // Map de categorias por id (útil para pegar ícone de categoria)
+  const categoriesById = useMemo(() => {
+    const map = {}
+    ;(categories || []).forEach(c => {
+      if (c && c._id) map[c._id] = c
+    })
+    return map
+  }, [categories])
+
   // --- subcategorias filtradas pela categoria escolhida
   const filteredSubs = useMemo(
     () => (subcategories || []).filter(
@@ -38,13 +57,18 @@ function NewCourseWizard() {
       setSubcategoryId('')
       setSelectedTags([])
       setAvailableTags([])
+      // atualizar ref
+      selectedStateRef.current.categoryId = categoryId
+      selectedStateRef.current.subcategoryId = ''
     }
   }, [categoryId])
 
-  // --- Limpar tags quando subcategoria mudar  
+  // --- Limpar tags quando subcategoria mudar
   useEffect(() => {
     if (subcategoryId) {
       setSelectedTags([])
+      // atualizar ref
+      selectedStateRef.current.subcategoryId = subcategoryId
     }
   }, [subcategoryId])
 
@@ -98,21 +122,21 @@ function NewCourseWizard() {
 
     // último passo → gerar curso
     if (activeStep === steps.length - 1) {
-      const payload = { 
-        categoryId, 
-        subcategoryId, 
-        level, 
-        tags: selectedTags 
+      const payload = {
+        categoryId,
+        subcategoryId,
+        level,
+        tags: selectedTags
       }
-      
+
       // Navega para a página de geração com o payload
-      navigate('/curso/gerando', { 
-        state: { 
+      navigate('/curso/gerando', {
+        state: {
           payload,
           // Inclui informações para construir a URL depois
           categoryId,
           subcategoryId
-        } 
+        }
       })
       return
     }
@@ -131,6 +155,25 @@ function NewCourseWizard() {
     { value: 'advanced', label: 'Avançado' }
   ]
 
+  // atualiza o ref quando o usuário escolhe nível/categoria/subcategoria (evita dependências no useEffect)
+  const onSelectLevel = (value) => {
+    setLevel(value)
+    selectedStateRef.current.level = value
+  }
+
+  const onSelectCategory = (id) => {
+    setCategoryId(id)
+    // limpa subcategoria quando muda categoria
+    setSubcategoryId('')
+    selectedStateRef.current.categoryId = id
+    selectedStateRef.current.subcategoryId = ''
+  }
+
+  const onSelectSubcategory = (id) => {
+    setSubcategoryId(id)
+    selectedStateRef.current.subcategoryId = id
+  }
+
   // --- renderizar conteúdo de cada passo
   const renderStepContent = () => {
     switch (activeStep) {
@@ -140,13 +183,14 @@ function NewCourseWizard() {
             {levelOptions.map(option => (
               <ListItemButton
                 key={option.value}
+                data-level={option.value}
                 selected={level === option.value}
-                onClick={() => setLevel(option.value)}
+                onClick={() => onSelectLevel(option.value)}
                 sx={{
                   px: [1]
                 }}
               >
-                <ListItemText 
+                <ListItemText
                   primary={option.label}
                 />
               </ListItemButton>
@@ -158,26 +202,22 @@ function NewCourseWizard() {
         return Array.isArray(categories) && categories.length ? (
           <List sx={{ width: '100%' }}>
             {categories.map(cat => (
-                <ListItemButton
-                    key={cat._id}
-                    selected={categoryId === cat._id}
-                    onClick={() => {
-                        setCategoryId(cat._id)
-                        setSubcategoryId('')
-                        setSelectedTags([])
-                        setAvailableTags([])
-                    }}
-                    sx={{
-                        px: [1]
-                    }}
-                >
-                    <ListItemIcon sx={{ minWidth: 0, mr: 1 }}>
-                        <IconResolver iconName={cat.icon} />
-                    </ListItemIcon>
-                    <ListItemText 
-                        primary={cat.title}
-                    />
-                </ListItemButton>
+              <ListItemButton
+                key={cat._id}
+                data-cat={cat._id}
+                selected={categoryId === cat._id}
+                onClick={() => onSelectCategory(cat._id)}
+                sx={{
+                  px: [1]
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 0, mr: 1 }}>
+                  <IconResolver iconName={cat.icon} />
+                </ListItemIcon>
+                <ListItemText
+                  primary={cat.title}
+                />
+              </ListItemButton>
             ))}
           </List>
         ) : (
@@ -191,23 +231,35 @@ function NewCourseWizard() {
           <Typography color='textSecondary' fontSize='small' sx={{ mt: 2, px: [1] }}>Nenhuma subcategoria disponível</Typography>
         ) : (
           <List sx={{ width: '100%' }}>
-            {filteredSubs.map(sub => (
-              <ListItemButton
-                key={sub._id}
-                selected={subcategoryId === sub._id}
-                onClick={() => {
-                  setSubcategoryId(sub._id)
-                  setSelectedTags([])
-                }}
-                sx={{
-                  px: [1]
-                }}
-              >
-                <ListItemText 
-                  primary={sub.title}
-                />
-              </ListItemButton>
-            ))}
+            {filteredSubs.map(sub => {
+              // tenta usar icone da própria sub, se não houver, usa o ícone da categoria pai (se tiver)
+              const subIcon = sub.icon || (sub.category?._ref ? categoriesById[sub.category._ref]?.icon : (sub.category?._id ? categoriesById[sub.category._id]?.icon : null))
+              return (
+                <ListItemButton
+                  key={sub._id}
+                  data-sub={sub._id}
+                  selected={subcategoryId === sub._id}
+                  onClick={() => onSelectSubcategory(sub._id)}
+                  sx={{
+                    px: [1]
+                  }}
+                >
+                  <ListItemIcon
+                    sx={{
+                      '&.MuiListItemIcon-root': {
+                        minWidth: 'auto',
+                      },
+                      mr: 1
+                    }}
+                  >
+                    <IconResolver iconName={subIcon} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={sub.title}
+                  />
+                </ListItemButton>
+              )
+            })}
           </List>
         )
 
@@ -269,15 +321,15 @@ function NewCourseWizard() {
                         inputProps={{ 'aria-labelledby': labelId }}
                       />
                     </ListItemIcon>
-                    <ListItemText 
-                      id={labelId} 
+                    <ListItemText
+                      id={labelId}
                       primary={tag.title}
                     />
                   </ListItemButton>
                 )
               })}
             </List>
-            
+
             {/* Mensagem de validação */}
             {selectedTags.length === 0 && (
               <Alert severity="warning" sx={{ mt: 2, mx: 1 }}>
@@ -304,6 +356,60 @@ function NewCourseWizard() {
     }
   }
 
+  // --- scroll inteligente ao trocar de step ---
+  useEffect(() => {
+    if (!contentRef.current) return
+    const container = contentRef.current
+
+    // Step de tags: sempre topo
+    if (activeStep === 3) {
+      container.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
+    // Nivel (step 0)
+    if (activeStep === 0) {
+      const lev = selectedStateRef.current.level
+      if (lev) {
+        const el = container.querySelector(`[data-level="${lev}"]`)
+        if (el) {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+          return
+        }
+      }
+      container.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
+    // Categoria (step 1)
+    if (activeStep === 1) {
+      const catId = selectedStateRef.current.categoryId
+      if (catId) {
+        const el = container.querySelector(`[data-cat="${catId}"]`)
+        if (el) {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+          return
+        }
+      }
+      container.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
+    // Subcategoria (step 2)
+    if (activeStep === 2) {
+      const subId = selectedStateRef.current.subcategoryId
+      if (subId) {
+        const el = container.querySelector(`[data-sub="${subId}"]`)
+        if (el) {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+          return
+        }
+      }
+      container.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStep]) // deliberadamente só depende de activeStep (refs carregam o estado selecionado)
+
   return (
     <>
       <Box
@@ -316,7 +422,7 @@ function NewCourseWizard() {
         }}
       >
         <Toolbar sx={{ px: 0, minHeight: '56px!important' }} />
-        
+
         {/* Cabeçalho */}
         <Box
           sx={{
@@ -333,7 +439,7 @@ function NewCourseWizard() {
             Siga o passo a passo para configurar seu curso
           </Typography>
         </Box>
-        
+
         {/* Área de Alertas */}
         {error && (
           <Box sx={{ flexShrink: 0, width: '100%', px: 1 }}>
@@ -342,22 +448,25 @@ function NewCourseWizard() {
             </Alert>
           </Box>
         )}
-        
+
         {/* Conteúdo com Scroll */}
-        <Box sx={{ 
-          flex: 1, 
-          overflow: 'auto',
-          width: '100%',
-        }}>
+        <Box
+          ref={contentRef}
+          sx={{
+            flex: 1,
+            overflow: 'auto',
+            width: '100%',
+          }}
+        >
           {renderStepContent()}
         </Box>
-        
+
         {/* Botões Fixos no Bottom */}
-        <Box sx={{ 
+        <Box sx={{
           flexShrink: 0, // Não encolhe
-          display: 'flex', 
-          width: '100%', 
-          justifyContent: activeStep === 0 ? 'flex-end' : 'space-between', 
+          display: 'flex',
+          width: '100%',
+          justifyContent: activeStep === 0 ? 'flex-end' : 'space-between',
           p: 1,
           borderTop: '1px solid',
           borderColor: 'divider',
@@ -366,9 +475,9 @@ function NewCourseWizard() {
           {activeStep === 0 ? (
             null
           ) : (
-            <Button 
-              disabled={activeStep === 0} 
-              onClick={handleBack} 
+            <Button
+              disabled={activeStep === 0}
+              onClick={handleBack}
               variant="outlined"
               disableElevation
               sx={{
@@ -378,7 +487,7 @@ function NewCourseWizard() {
               Voltar
             </Button>
           )}
-          
+
           <Button
             variant="contained"
             onClick={handleNext}

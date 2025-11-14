@@ -21,6 +21,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { getCourseBySlug } from '../services/api'
+import CourseSpeedDial from '../components/CourseSpeedDial'
 
 const CoursePage = () => {
   const { slug } = useParams()
@@ -91,177 +92,186 @@ const CoursePage = () => {
 
   return (
     <>
-      <Toolbar sx={{ px: [0], minHeight: '56px!important' }} />
-      <Box sx={{ p: [1] }}>
+      <Box 
+        sx={{ 
+          width: '100%',
+          minHeight: '100dvh',
+          bgcolor: 'background.default',
+        }}
+      >
+        <Toolbar sx={{ px: [0], minHeight: '56px!important' }} />
+        <Box sx={{ p: [1] }}>
 
-        {/* Título */}
-        <Typography variant="h5" sx={{ mb: 1, fontWeight: 700 }}>
-          {course.title}
-        </Typography>
+          {/* Título */}
+          <Typography variant="h5" sx={{ mb: 1, fontWeight: 700 }}>
+            {course.title}
+          </Typography>
 
-        {/* Subtítulo */}
-        <Typography variant="subtitle1" sx={{ color: 'text.secondary', mb: 1 }}>
-          {`${course.category?.title || 'Sem categoria'} • ${course.level || 'Nível não definido'}${
-            course.duration ? ` • ${course.duration}h` : ''
-          }`}
-        </Typography>
+          {/* Subtítulo */}
+          <Typography variant="subtitle1" sx={{ color: 'text.secondary', mb: 1 }}>
+            {`${course.category?.title || 'Sem categoria'} • ${course.level || 'Nível não definido'}${
+              course.duration ? ` • ${course.duration}h` : ''
+            }`}
+          </Typography>
 
-        {/* Tags */}
-        {course.tags?.length > 0 && (
-          <Box>
-            {course.tags.map(tag => (
-              <Chip
-                key={tag._id || tag.title}
-                label={tag.title || 'Tag'}
-                sx={{ mr: 1 }}
-                color="primary"
-                variant="outlined"
-              />
-            ))}
-          </Box>
-        )}
-      </Box>
+          {/* Tags */}
+          {course.tags?.length > 0 && (
+            <Box>
+              {course.tags.map(tag => (
+                <Chip
+                  key={tag._id || tag.title}
+                  label={tag.title || 'Tag'}
+                  sx={{ mr: 1 }}
+                  color="primary"
+                  variant="outlined"
+                />
+              ))}
+            </Box>
+          )}
+        </Box>
 
-      <Divider />
-      <Box sx={{ px: [1], pt: [1] }}>
+        <Divider />
+        <Box sx={{ px: [1], pt: [1] }}>
 
-        {/* Descrição */}
-        <Typography 
-          variant="body1" 
-          sx={{ mb: [1], lineHeight: 1.8, whiteSpace: 'pre-line' }}
-        >
-          {course.description || 'Este curso ainda não possui descrição.'}
-        </Typography>
+          {/* Descrição */}
+          <Typography 
+            variant="body1" 
+            sx={{ mb: [1], lineHeight: 1.8, whiteSpace: 'pre-line' }}
+          >
+            {course.description || 'Este curso ainda não possui descrição.'}
+          </Typography>
 
-      </Box>
-      <Box>
+        </Box>
+        <Box>
 
-        {/* Módulos */}
-        {course.modules?.length ? (
-          course.modules.map(module => (
-            <Accordion key={module._key}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}
-                sx={{
-                  '&.MuiAccordionDetails-root': {
-                    px: [1],
-                    boxShadow: 'none'
-                  },
-                  '&.MuiAccordionSummary-root': {
-                    p: '0 8px'
-                  }
-                }}
-              >
-                <Typography variant="h6">
-                  {module.title}
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails
-                sx={{
-                  p: [1],
-                  '.MuiPaper-root-MuiAccordion-root': {
-                    boxShadow: 'none!important'
-                  }
-                }}
-              >
-                <Typography variant="body2">
-                  {module.description}
-                </Typography>
+          {/* Módulos */}
+          {course.modules?.length ? (
+            course.modules.map(module => (
+              <Accordion key={module._key}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}
+                  sx={{
+                    '&.MuiAccordionDetails-root': {
+                      px: [1],
+                      boxShadow: 'none'
+                    },
+                    '&.MuiAccordionSummary-root': {
+                      p: '0 8px'
+                    }
+                  }}
+                >
+                  <Typography variant="h6">
+                    {module.title}
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails
+                  sx={{
+                    p: [1],
+                    '.MuiPaper-root-MuiAccordion-root': {
+                      boxShadow: 'none!important'
+                    }
+                  }}
+                >
+                  <Typography variant="body2">
+                    {module.description}
+                  </Typography>
 
-                {module.lessons?.map(lesson => (
-                  <Box key={lesson._key}>
-                      {/* Título da lição */}
-                      <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-                        {lesson.title}
-                      </Typography>
-                      
-                      {/* Conteúdo */}
-                      <Typography 
-                        variant="body2" 
-                        sx={{ whiteSpace: 'pre-line', mb: 2 }}
-                      >
-                        {lesson.content}
-                      </Typography>
+                  {module.lessons?.map(lesson => (
+                    <Box key={lesson._key}>
+                        {/* Título da lição */}
+                        <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
+                          {lesson.title}
+                        </Typography>
+                        
+                        {/* Conteúdo */}
+                        <Typography 
+                          variant="body2" 
+                          sx={{ whiteSpace: 'pre-line', mb: 2 }}
+                        >
+                          {lesson.content}
+                        </Typography>
 
-                      {/* Dicas */}
-                      {lesson.tips?.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                            💡 Dicas:
-                          </Typography>
-                          <List dense>
-                            {lesson.tips.map((tip, i) => (
-                              <ListItem key={i} sx={{ pl: 0 }}>
-                                <ListItemText primary={tip} />
-                              </ListItem>
-                            ))}
-                          </List>
-                        </Box>
-                      )}
+                        {/* Dicas */}
+                        {lesson.tips?.length > 0 && (
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                              💡 Dicas:
+                            </Typography>
+                            <List dense>
+                              {lesson.tips.map((tip, i) => (
+                                <ListItem key={i} sx={{ pl: 0 }}>
+                                  <ListItemText primary={tip} />
+                                </ListItem>
+                              ))}
+                            </List>
+                          </Box>
+                        )}
 
-                      {/* Exercícios */}
-                      {lesson.exercises?.length > 0 && (
-                        <Box sx={{ mt: 2 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                            🧩 Exercícios:
-                          </Typography>
-                          {lesson.exercises.map(ex => {
-                            const key = `${lesson._key}-${ex._key}`
-                            const userAnswer = answers[key]
-                            const isCorrect = userAnswer === ex.answer
+                        {/* Exercícios */}
+                        {lesson.exercises?.length > 0 && (
+                          <Box sx={{ mt: 2 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                              🧩 Exercícios:
+                            </Typography>
+                            {lesson.exercises.map(ex => {
+                              const key = `${lesson._key}-${ex._key}`
+                              const userAnswer = answers[key]
+                              const isCorrect = userAnswer === ex.answer
 
-                            return (
-                              <Box
-                                key={ex._key}
-                              >
-                                <Typography variant="body1" sx={{ mb: 1 }}>
-                                  {ex.question}
-                                </Typography>
-                                <RadioGroup
-                                  value={userAnswer || ''}
-                                  onChange={e => handleAnswer(lesson._key, ex._key, e.target.value)}
+                              return (
+                                <Box
+                                  key={ex._key}
                                 >
-                                  {ex.options.map(opt => (
-                                    <FormControlLabel
-                                      key={opt}
-                                      value={opt}
-                                      control={<Radio />}
-                                      label={opt}
-                                    />
-                                  ))}
-                                </RadioGroup>
-                                {userAnswer && (
-                                  <Typography
-                                    sx={{
-                                      mt: 1,
-                                      color: isCorrect ? 'success.main' : 'error.main',
-                                      fontWeight: 600,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                    }}
-                                  >
-                                    {isCorrect ? (
-                                      <>
-                                        <CheckCircleIcon sx={{ mr: 1, fontSize: 20 }} />
-                                        Correto!
-                                      </>
-                                    ) : (
-                                      '❌ Resposta incorreta'
-                                    )}
+                                  <Typography variant="body1" sx={{ mb: 1 }}>
+                                    {ex.question}
                                   </Typography>
-                                )}
-                              </Box>
-                            )
-                          })}
-                        </Box>
-                      )}
-                  </Box>
-                ))}
-              </AccordionDetails>
-            </Accordion>
-          ))
-        ) : (
-          <Alert severity="info">Este curso ainda não possui módulos.</Alert>
-        )}
+                                  <RadioGroup
+                                    value={userAnswer || ''}
+                                    onChange={e => handleAnswer(lesson._key, ex._key, e.target.value)}
+                                  >
+                                    {ex.options.map(opt => (
+                                      <FormControlLabel
+                                        key={opt}
+                                        value={opt}
+                                        control={<Radio />}
+                                        label={opt}
+                                      />
+                                    ))}
+                                  </RadioGroup>
+                                  {userAnswer && (
+                                    <Typography
+                                      sx={{
+                                        mt: 1,
+                                        color: isCorrect ? 'success.main' : 'error.main',
+                                        fontWeight: 600,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                      }}
+                                    >
+                                      {isCorrect ? (
+                                        <>
+                                          <CheckCircleIcon sx={{ mr: 1, fontSize: 20 }} />
+                                          Correto!
+                                        </>
+                                      ) : (
+                                        '❌ Resposta incorreta'
+                                      )}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              )
+                            })}
+                          </Box>
+                        )}
+                    </Box>
+                  ))}
+                </AccordionDetails>
+              </Accordion>
+            ))
+          ) : (
+            <Alert severity="info">Este curso ainda não possui módulos.</Alert>
+          )}
+        </Box>
+        <CourseSpeedDial />
       </Box>
     </>
   )
