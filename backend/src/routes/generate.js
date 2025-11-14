@@ -5,14 +5,16 @@ const client = require('../config/sanityClient');
 const OpenAI = require('openai');
 const { v4: uuidv4 } = require('uuid');
 
+// Inicializa OpenAI client (precisa de env OPENAI_API_KEY)
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// =======================================================
-// 🔧 FUNÇÕES AUXILIARES
-// =======================================================
+// -----------------------------
+// UTILITIES (slugify, sanitize, recover, etc.)
+// -----------------------------
 function slugify(text) {
+  if (!text) return '';
   return text
     .toLowerCase()
     .normalize('NFD')
@@ -38,30 +40,24 @@ function sanitizeJSON(raw) {
     .trim();
 }
 
-// Recupera JSON de resposta incompleta
 function recoverJSONFromIncomplete(rawText) {
   if (!rawText) return null;
-
   try {
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       let jsonStr = jsonMatch[0];
 
-      // Tenta fechar arrays abertos
+      // tenta fechar arrays/objectos abertos
       jsonStr = jsonStr.replace(/(\[[\s\S]*?)(?=\])/g, '$1]');
-
-      // Tenta fechar objetos abertos
       jsonStr = jsonStr.replace(/(\{[\s\S]*?)(?=\})/g, '$1}');
-
-      // Remove vírgulas soltas no final
+      // remove vírgulas soltas no final
       jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
 
       return JSON.parse(jsonStr);
     }
-  } catch (error) {
-    console.log('❌ Não foi possível recuperar JSON incompleto');
+  } catch (err) {
+    console.log('❌ recoverJSONFromIncomplete falhou:', err?.message || err);
   }
-
   return null;
 }
 
@@ -79,7 +75,6 @@ function addKeysRecursively(obj) {
   return obj;
 }
 
-// Remove "A.", "B.", "C." das opções e respostas
 function sanitizeCourseData(courseData) {
   if (!courseData || !Array.isArray(courseData.modules)) return courseData;
 
@@ -115,80 +110,6 @@ function sanitizeCourseData(courseData) {
   return courseData;
 }
 
-// Estima duração com base em todo o conteúdo
-function estimateCourseDuration(courseData, categoryName, subcategoryName, tags = []) {
-  if (!courseData) return 30;
-
-  let totalCharacters = 0;
-
-  totalCharacters += (courseData.title || '').length;
-  totalCharacters += (courseData.description || '').length;
-  totalCharacters += (categoryName || '').length;
-  totalCharacters += (subcategoryName || '').length;
-
-  if (Array.isArray(tags)) {
-    tags.forEach(tag => {
-      if (tag && typeof tag === 'string') totalCharacters += tag.length;
-    });
-  }
-
-  if (Array.isArray(courseData.modules)) {
-    courseData.modules.forEach(module => {
-      totalCharacters += (module.title || '').length;
-      totalCharacters += (module.description || '').length;
-
-      if (Array.isArray(module.lessons)) {
-        module.lessons.forEach(lesson => {
-          totalCharacters += (lesson.title || '').length;
-          totalCharacters += (lesson.content || '').length;
-
-          if (Array.isArray(lesson.tips)) {
-            lesson.tips.forEach(tip => {
-              totalCharacters += (tip || '').length;
-            });
-          }
-
-          if (Array.isArray(lesson.exercises)) {
-            lesson.exercises.forEach(exercise => {
-              totalCharacters += (exercise.question || '').length;
-              if (Array.isArray(exercise.options)) {
-                exercise.options.forEach(option => {
-                  totalCharacters += (option || '').length;
-                });
-              }
-              totalCharacters += (exercise.answer || '').length;
-            });
-          }
-        });
-      }
-    });
-  }
-
-  console.log(`📊 Total de caracteres do curso: ${totalCharacters}`);
-
-  const palavrasPorMinuto = 200;
-  const caracteresPorPalavra = 5.5;
-  const palavrasTotais = totalCharacters / caracteresPorPalavra;
-
-  let minutosLeitura = Math.round(palavrasTotais / palavrasPorMinuto);
-
-  const totalExercicios = courseData.modules?.reduce((total, modulo) => {
-    return total + (modulo.lessons?.reduce((subtotal, aula) => {
-      return subtotal + (aula.exercises?.length || 0);
-    }, 0) || 0);
-  }, 0) || 0;
-
-  minutosLeitura += totalExercicios * 2;
-
-  minutosLeitura = Math.max(15, minutosLeitura);
-  minutosLeitura = Math.min(180, minutosLeitura);
-
-  console.log(`⏱️ Duração estimada: ${minutosLeitura} minutos`);
-
-  return minutosLeitura;
-}
-
-// Tags opcionais e deduplicadas (até 3)
 function validateTags(tags) {
   if (!Array.isArray(tags)) return [];
   const unique = [...new Set(tags.filter(Boolean))];
@@ -196,7 +117,9 @@ function validateTags(tags) {
   return unique;
 }
 
-// Config por nível
+// -----------------------------
+// LEVEL CONFIG / VALIDATORS
+// -----------------------------
 const LEVEL_CONFIG = {
   beginner: {
     modules: 3,
@@ -231,117 +154,80 @@ function validateCourseData(courseData) {
   return { valid: true };
 }
 
-// =======================================================
-// 🧠 Função de geração com fallback (usa OpenAI por enquanto)
-// =======================================================
-async function generateCourseWithFallback(prompt, maxRetries = 2) {
-  let lastError;
+// -----------------------------
+// ESTIMATOR (melhorado)
+// -----------------------------
+function estimateCourseDuration(courseData, categoryName, subcategoryName, tags = []) {
+  if (!courseData) return 30;
+  let totalCharacters = 0;
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`🔄 Tentativa ${attempt} de geração do curso...`);
+  totalCharacters += (courseData.title || '').length;
+  totalCharacters += (courseData.description || '').length;
+  totalCharacters += (categoryName || '').length;
+  totalCharacters += (subcategoryName || '').length;
 
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.75,
-        response_format: { type: 'json_object' },
-        max_tokens: 3500,
-      });
-
-      let rawResponse = completion.choices[0]?.message?.content?.trim();
-      if (!rawResponse) {
-        throw new Error('Resposta vazia da OpenAI.');
-      }
-
-      console.log(`📝 Resposta bruta (tentativa ${attempt}):`, rawResponse.substring(0, 200) + '...');
-
-      rawResponse = sanitizeJSON(rawResponse);
-
-      let courseData;
-      try {
-        courseData = JSON.parse(rawResponse);
-      } catch (parseError) {
-        console.log(`❌ JSON inválido na tentativa ${attempt}, tentando recuperar...`);
-
-        courseData = recoverJSONFromIncomplete(rawResponse);
-
-        if (!courseData) {
-          throw new Error(`Falha ao interpretar o JSON (tentativa ${attempt})`);
-        }
-
-        console.log('✅ JSON recuperado com sucesso!');
-      }
-
-      if (courseData && courseData.title && Array.isArray(courseData.modules)) {
-        return courseData;
-      } else {
-        throw new Error('Estrutura do curso incompleta após recuperação');
-      }
-    } catch (error) {
-      lastError = error;
-      console.log(`❌ Tentativa ${attempt} falhou:`, error.message);
-      if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
+  if (Array.isArray(tags)) {
+    tags.forEach((tag) => {
+      if (tag && typeof tag === 'string') totalCharacters += tag.length;
+    });
   }
 
-  throw lastError;
+  if (Array.isArray(courseData.modules)) {
+    courseData.modules.forEach((module) => {
+      totalCharacters += (module.title || '').length;
+      totalCharacters += (module.description || '').length;
+      if (Array.isArray(module.lessons)) {
+        module.lessons.forEach((lesson) => {
+          totalCharacters += (lesson.title || '').length;
+          totalCharacters += (lesson.content || '').length;
+          if (Array.isArray(lesson.tips)) {
+            lesson.tips.forEach((tip) => {
+              totalCharacters += (tip || '').length;
+            });
+          }
+          if (Array.isArray(lesson.exercises)) {
+            lesson.exercises.forEach((exercise) => {
+              totalCharacters += (exercise.question || '').length;
+              if (Array.isArray(exercise.options)) {
+                exercise.options.forEach((option) => {
+                  totalCharacters += (option || '').length;
+                });
+              }
+              totalCharacters += (exercise.answer || '').length;
+            });
+          }
+        });
+      }
+    });
+  }
+
+  const palavrasPorMinuto = 200;
+  const caracteresPorPalavra = 5.5;
+  const palavrasTotais = totalCharacters / caracteresPorPalavra;
+  let minutosLeitura = Math.round(palavrasTotais / palavrasPorMinuto);
+
+  const totalExercicios =
+    courseData.modules?.reduce((total, modulo) => {
+      return (
+        total +
+        (modulo.lessons?.reduce((subtotal, aula) => {
+          return subtotal + (aula.exercises?.length || 0);
+        }, 0) || 0)
+      );
+    }, 0) || 0;
+
+  minutosLeitura += totalExercicios * 2;
+  minutosLeitura = Math.max(15, minutosLeitura);
+  minutosLeitura = Math.min(180, minutosLeitura);
+
+  return minutosLeitura;
 }
 
-// =======================================================
-// 🧠 ROTA PRINCIPAL - GERAR CURSO (LEVEL e PROVIDER obrigatórios)
-// =======================================================
-router.post('/course', async (req, res) => {
-  try {
-    // Agora level e provider são obrigatórios (sem defaults)
-    const { level, provider, categoryId, subcategoryId, tags = [] } = req.body;
-    console.log('🧾 Payload recebido:', req.body);
-
-    // Validações obrigatórias
-    if (!provider) {
-      return res.status(400).json({ error: 'provider é obrigatório (ex: "openai").' });
-    }
-
-    // Por enquanto só aceitamos 'openai' — feedback claro para outros
-    if (provider !== 'openai') {
-      return res.status(400).json({ error: `Provider "${provider}" ainda não está implementado.` });
-    }
-
-    if (!level) {
-      return res.status(400).json({ error: 'level é obrigatório (beginner | intermediate | advanced).' });
-    }
-
-    if (!LEVEL_CONFIG[level]) {
-      return res.status(400).json({
-        error: `level inválido: ${level}. Valores permitidos: ${Object.keys(LEVEL_CONFIG).join(', ')}`
-      });
-    }
-
-    if (!categoryId) {
-      return res.status(400).json({ error: 'categoryId é obrigatório.' });
-    }
-
-    // Tags opcionais e deduplicadas
-    const validTags = validateTags(tags || []);
-
-    // Busca categoria e subcategoria (inclui icon e slug)
-    const [category, subcategory] = await Promise.all([
-      client.fetch(`*[_id == $categoryId][0]{_id, title, icon, "slug": slug.current}`, { categoryId }),
-      subcategoryId
-        ? client.fetch(`*[_id == $subcategoryId][0]{_id, title, icon, "slug": slug.current}`, { subcategoryId })
-        : null,
-    ]);
-
-    const categoryName = category?.title || 'Categoria Desconhecida';
-    const subcategoryName = subcategory?.title || '';
-
-    // Usa cfg baseado no level validado
-    const cfg = LEVEL_CONFIG[level];
-
-    // Monta prompt (garante orientações para o modelo)
-    const prompt = `
+// -----------------------------
+// PROMPT BUILDER
+// -----------------------------
+function buildPrompt(categoryName, subcategoryName, level, cfg) {
+  return `
 Crie um curso em JSON válido com estas especificações EXATAS:
 
 CATEGORIA: ${categoryName}
@@ -378,43 +264,198 @@ ESTRUTURA EXATA DO JSON:
   ]
 }
 
-IMPORTANTE: 
+IMPORTANTE:
 - Conteúdo em português do Brasil
-- Tono: ${cfg.tone}
-- Foco em aplicação prática
-- Exercícios com 3 opções
-- NÃO use "A.", "B.", "C." nas opções - use apenas o texto da opção
-- A RESPOSTA deve ser o TEXTO COMPLETO da opção correta
-- Garanta que a resposta corresponda exatamente a uma das opções fornecidas
+- Tom: ${cfg.tone}
+- Linguagem natural, fluida
+- Exercícios com 3 opções SEM prefixos "A." "B." "C."
+- A resposta deve ser exatamente o texto de uma das opções
 `.trim();
+}
 
-    // Gera o curso via provider (atualmente openai)
-    const courseData = await generateCourseWithFallback(prompt, 2);
+// -----------------------------
+// PROVIDER LAYER (OpenAI + Gemini REST)
+// -----------------------------
+const PROVIDER_MAP = {
+  openai: { id: 'openai', name: 'OpenAI' },
+  gemini: { id: 'gemini', name: 'Google Gemini' },
+};
 
-    if (!courseData) {
-      throw new Error('Não foi possível gerar o curso após todas as tentativas');
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-1-5';
+const GEMINI_ENDPOINT = (model) =>
+  `https://generative.googleapis.com/v1beta2/models/${encodeURIComponent(model)}:generateText`;
+
+// gera texto bruto do provider (string)
+async function generateWithProvider(provider, prompt) {
+  if (!provider) throw new Error('Provider não informado.');
+
+  if (provider === 'openai') {
+    if (!openai) throw new Error('Client OpenAI não configurado.');
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.75,
+      response_format: { type: 'json_object' },
+      max_tokens: 3500,
+    });
+
+    const raw = completion.choices?.[0]?.message?.content;
+    if (!raw) throw new Error('Resposta vazia da OpenAI.');
+    return String(raw);
+  } else if (provider === 'gemini') {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('GEMINI_API_KEY não configurada no .env');
+
+    // corpo simples — caso sua conta exija outro shape, ajuste aqui
+    const body = {
+      prompt: {
+        text: prompt,
+      },
+      // Você pode ajustar parâmetros como temperature/maxOutputTokens aqui:
+      // temperature: 0.7,
+      // maxOutputTokens: 3500,
+    };
+
+    const url = GEMINI_ENDPOINT(GEMINI_MODEL);
+
+    // Node 18+ tem fetch nativo; se usar node antigo, instale node-fetch
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      // tenta parse do corpo do erro
+      let errBody = text;
+      try {
+        const parsed = JSON.parse(text);
+        errBody = JSON.stringify(parsed).slice(0, 800);
+      } catch (e) {
+        errBody = text.slice(0, 800);
+      }
+      throw new Error(`Gemini API erro (${res.status}): ${errBody}`);
     }
 
-    // Sanitiza e valida
+    return String(text);
+  } else {
+    throw new Error(`Provider "${provider}" não suportado.`);
+  }
+}
+
+// tenta gerar e recuperar JSON válido (retries e heurísticas)
+async function generateCourseUsingProvider(provider, prompt, maxRetries = 2) {
+  let lastErr;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 [${provider}] tentativa ${attempt} → gerando...`);
+      let raw = await generateWithProvider(provider, prompt);
+      if (!raw) throw new Error('Resposta vazia do provider.');
+
+      console.log(`🔍 [${provider}] resposta (preview): ${raw.slice(0, 300)}`);
+
+      // limpa ruídos comuns
+      raw = sanitizeJSON(raw);
+
+      // tenta parse direto
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.title && Array.isArray(parsed.modules)) {
+          return parsed;
+        }
+        console.log(`⚠️ [${provider}] parseou JSON mas estrutura inválida — tentando heurística`);
+      } catch (err) {
+        console.log(`⚠️ [${provider}] JSON direto inválido — tentando heurística`);
+      }
+
+      // tenta recuperar JSON dentro do texto
+      const recovered = recoverJSONFromIncomplete(raw);
+      if (recovered && recovered.title && Array.isArray(recovered.modules)) {
+        console.log(`✅ [${provider}] JSON recuperado por heurística`);
+        return recovered;
+      }
+
+      // busca qualquer bloco JSON e tenta
+      const block = raw.match(/\{[\s\S]*\}/);
+      if (block) {
+        try {
+          const parsed2 = JSON.parse(block[0]);
+          if (parsed2 && parsed2.title && Array.isArray(parsed2.modules)) {
+            return parsed2;
+          }
+        } catch (_) {}
+      }
+
+      throw new Error('Não foi possível extrair JSON válido do provider.');
+    } catch (err) {
+      lastErr = err;
+      console.log(`❌ [${provider}] tentativa ${attempt} falhou:`, err.message);
+      if (attempt < maxRetries) await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+  throw lastErr;
+}
+
+// -----------------------------
+// ROTA: POST /api/generate/course
+// -----------------------------
+router.post('/course', async (req, res) => {
+  try {
+    // NÃO definir defaults aqui — level e provider devem ser enviados pelo frontend
+    const { level, provider, categoryId, subcategoryId, tags = [] } = req.body;
+    console.log('🧾 Payload recebido (generate):', { level, provider, categoryId, subcategoryId, tags });
+
+    // Validações obrigatórias (sem defaults)
+    if (!provider) return res.status(400).json({ error: 'provider é obrigatório (ex: "openai" ou "gemini").' });
+    if (!PROVIDER_MAP[provider]) return res.status(400).json({ error: `Provider "${provider}" não reconhecido.` });
+
+    if (!level) return res.status(400).json({ error: 'level é obrigatório (beginner | intermediate | advanced).' });
+    if (!LEVEL_CONFIG[level]) {
+      return res.status(400).json({ error: `level inválido: ${level}. Valores permitidos: ${Object.keys(LEVEL_CONFIG).join(', ')}` });
+    }
+
+    if (!categoryId) return res.status(400).json({ error: 'categoryId é obrigatório.' });
+
+    // valida tags
+    const validTags = validateTags(tags || []);
+
+    // busca categoria e subcategoria no Sanity
+    const [category, subcategory] = await Promise.all([
+      client.fetch(`*[_id == $categoryId][0]{_id, title, icon, "slug": slug.current}`, { categoryId }),
+      subcategoryId ? client.fetch(`*[_id == $subcategoryId][0]{_id, title, icon, "slug": slug.current}`, { subcategoryId }) : null,
+    ]);
+
+    const categoryName = category?.title || 'Categoria Desconhecida';
+    const subcategoryName = subcategory?.title || '';
+
+    const cfg = LEVEL_CONFIG[level];
+
+    const prompt = buildPrompt(categoryName, subcategoryName, level, cfg);
+
+    // Gera via provider selecionado
+    const courseData = await generateCourseUsingProvider(provider, prompt, 2);
+
+    if (!courseData) throw new Error('Não foi possível gerar o curso após todas as tentativas.');
+
+    // sanitize + validate
     const sanitizedData = sanitizeCourseData(courseData);
     const validation = validateCourseData(sanitizedData);
-    if (!validation.valid) {
-      return res.status(400).json({ error: validation.message });
-    }
+    if (!validation.valid) return res.status(400).json({ error: validation.message });
 
     const title = sanitizedData.title.trim();
     const slug = slugify(title);
-    const description = sanitizedData.description.trim();
-
+    const description = sanitizedData.description ? sanitizedData.description.trim() : '';
     const duration = estimateCourseDuration(sanitizedData, categoryName, subcategoryName, validTags);
 
-    // Verifica duplicados
-    const existing = await client.fetch(
-      `*[_type == "course" && slug.current == $slug][0]{_id}`,
-      { slug }
-    );
+    // check duplicate
+    const existing = await client.fetch(`*[_type == "course" && slug.current == $slug][0]{_id}`, { slug });
 
-    // Monta URL com categoria e subcategoria (ajuste local)
+    // monta curso url local (ajuste conforme ambiente)
     const categorySlug = category?.slug || 'categoria';
     const subcategorySlug = subcategory?.slug || 'subcategoria';
     const courseUrl = `http://localhost:3000/${categorySlug}/${subcategorySlug}/${slug}`;
@@ -439,7 +480,7 @@ IMPORTANTE:
       });
     }
 
-    // Prepara objeto para criar no Sanity (usa provider vindo do request)
+    // cria objeto para Sanity — provider salvo exatamente como recebido
     const newCourse = {
       _type: 'course',
       title,
@@ -447,7 +488,7 @@ IMPORTANTE:
       description,
       level,
       duration,
-      provider: provider, // usa provider do frontend (ex: 'openai')
+      provider: provider,
       category: { _type: 'reference', _ref: categoryId },
       subcategory: subcategoryId ? { _type: 'reference', _ref: subcategoryId } : undefined,
       tags: (validTags || []).map((t) => ({
@@ -463,7 +504,7 @@ IMPORTANTE:
     const created = await client.create(newCourse);
     console.log('✅ Curso criado com sucesso:', created._id);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Curso gerado com sucesso!',
       course: {
@@ -480,10 +521,10 @@ IMPORTANTE:
       },
     });
   } catch (err) {
-    console.error('🚨 Erro ao gerar curso:', err);
-    res.status(500).json({
+    console.error('🚨 Erro na rota /generate/course:', err);
+    return res.status(500).json({
       error: 'Falha ao gerar o curso.',
-      details: err.message,
+      details: err?.message || String(err),
     });
   }
 });
