@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { useCourse } from '../context/CourseContext'
 import { getTagsBySubcategory } from '../services/api'
 import IconResolver from '../components/IconResolver'
+import GeneratingCourseDialog from '../components/GeneratingCourseDialog'
 
 const steps = ['Nível', 'Categoria', 'Subcategoria', 'Tags', 'Gerar Curso']
 
@@ -23,6 +24,9 @@ function NewCourseWizard() {
   const [availableTags, setAvailableTags] = useState([])
   const [loadingTags, setLoadingTags] = useState(false)
   const [error, setError] = useState(null)
+
+  const [openGenerating, setOpenGenerating] = useState(false)
+  const [generationPayload, setGenerationPayload] = useState(null)
 
   // ref do container scrollável
   const contentRef = useRef(null)
@@ -129,15 +133,8 @@ function NewCourseWizard() {
         tags: selectedTags
       }
 
-      // Navega para a página de geração com o payload
-      navigate('/curso/gerando', {
-        state: {
-          payload,
-          // Inclui informações para construir a URL depois
-          categoryId,
-          subcategoryId
-        }
-      })
+      setGenerationPayload(payload)
+      setOpenGenerating(true)
       return
     }
 
@@ -504,6 +501,16 @@ function NewCourseWizard() {
           </Button>
         </Box>
       </Box>
+
+      <GeneratingCourseDialog
+        open={openGenerating}
+        payload={generationPayload}
+        onFinished={(slug) => {
+          setOpenGenerating(false)
+          navigate(`/curso/${slug}`)
+        }}
+      />
+
     </>
   )
 }

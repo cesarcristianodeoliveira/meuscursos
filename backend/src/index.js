@@ -8,24 +8,6 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-app.get('/api/test', async (req, res) => {
-  try {
-    const client = require('./config/sanityClient');
-    const test = await client.fetch('count(*[_type == "course"])');
-    res.json({ 
-      success: true, 
-      courseCount: test,
-      message: 'Conexão com Sanity OK'
-    });
-  } catch (error) {
-    console.error('❌ Erro teste Sanity:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
-});
-
 // Importar rotas
 const fetchRoutes = require('./routes/fetch');
 const generateRoutes = require('./routes/generate');

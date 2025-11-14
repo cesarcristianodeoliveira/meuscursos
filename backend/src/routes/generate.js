@@ -1,3 +1,4 @@
+// src/routes/generate.js
 const express = require('express');
 const router = express.Router();
 const client = require('../config/sanityClient');
@@ -37,31 +38,30 @@ function sanitizeJSON(raw) {
     .trim();
 }
 
-// 👈 NOVA FUNÇÃO: Recupera JSON de resposta incompleta
+// Recupera JSON de resposta incompleta
 function recoverJSONFromIncomplete(rawText) {
   if (!rawText) return null;
-  
+
   try {
-    // Tenta encontrar JSON completo ou parcial
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       let jsonStr = jsonMatch[0];
-      
+
       // Tenta fechar arrays abertos
       jsonStr = jsonStr.replace(/(\[[\s\S]*?)(?=\])/g, '$1]');
-      
-      // Tenta fechar objetos abertos  
+
+      // Tenta fechar objetos abertos
       jsonStr = jsonStr.replace(/(\{[\s\S]*?)(?=\})/g, '$1}');
-      
+
       // Remove vírgulas soltas no final
       jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
-      
+
       return JSON.parse(jsonStr);
     }
   } catch (error) {
     console.log('❌ Não foi possível recuperar JSON incompleto');
   }
-  
+
   return null;
 }
 
@@ -79,7 +79,7 @@ function addKeysRecursively(obj) {
   return obj;
 }
 
-// 👈 FUNÇÃO CORRIGIDA: Remove "A.", "B.", "C." das opções e respostas
+// Remove "A.", "B.", "C." das opções e respostas
 function sanitizeCourseData(courseData) {
   if (!courseData || !Array.isArray(courseData.modules)) return courseData;
 
@@ -91,21 +91,18 @@ function sanitizeCourseData(courseData) {
         typeof tip === 'string' ? tip : Object.values(tip).join('')
       ),
       exercises: (lesson.exercises || []).map((ex) => {
-        // Remove "A.", "B.", "C." das opções
         const cleanOptions = (ex.options || []).map((opt) => {
           if (typeof opt === 'string') {
-            // Remove "A. ", "B. ", "C. " do início das opções
             return opt.replace(/^[A-Z]\.\s*/, '');
           }
           return Object.values(opt).join('');
         });
 
-        // Remove "A.", "B.", "C." da resposta
         let cleanAnswer = ex.answer;
         if (typeof cleanAnswer === 'string') {
           cleanAnswer = cleanAnswer.replace(/^[A-Z]\.\s*/, '');
         }
-        
+
         return {
           ...ex,
           answer: cleanAnswer,
@@ -118,70 +115,47 @@ function sanitizeCourseData(courseData) {
   return courseData;
 }
 
-// 👈 FUNÇÃO MELHORADA: Calcula duração considerando TODO o conteúdo do curso
+// Estima duração com base em todo o conteúdo
 function estimateCourseDuration(courseData, categoryName, subcategoryName, tags = []) {
   if (!courseData) return 30;
-  
+
   let totalCharacters = 0;
-  
-  // 1. Título do curso
+
   totalCharacters += (courseData.title || '').length;
-  
-  // 2. Descrição do curso
   totalCharacters += (courseData.description || '').length;
-  
-  // 3. Nome da categoria e subcategoria
   totalCharacters += (categoryName || '').length;
   totalCharacters += (subcategoryName || '').length;
-  
-  // 4. Tags (se houver)
+
   if (Array.isArray(tags)) {
     tags.forEach(tag => {
-      if (tag && typeof tag === 'string') {
-        totalCharacters += tag.length;
-      }
+      if (tag && typeof tag === 'string') totalCharacters += tag.length;
     });
   }
-  
-  // 5. Módulos e lições
+
   if (Array.isArray(courseData.modules)) {
     courseData.modules.forEach(module => {
-      // Título do módulo
       totalCharacters += (module.title || '').length;
-      
-      // Descrição do módulo
       totalCharacters += (module.description || '').length;
-      
-      // Lições
+
       if (Array.isArray(module.lessons)) {
         module.lessons.forEach(lesson => {
-          // Título da lição
           totalCharacters += (lesson.title || '').length;
-          
-          // Conteúdo da lição
           totalCharacters += (lesson.content || '').length;
-          
-          // Dicas
+
           if (Array.isArray(lesson.tips)) {
             lesson.tips.forEach(tip => {
               totalCharacters += (tip || '').length;
             });
           }
-          
-          // Exercícios
+
           if (Array.isArray(lesson.exercises)) {
             lesson.exercises.forEach(exercise => {
-              // Pergunta
               totalCharacters += (exercise.question || '').length;
-              
-              // Opções
               if (Array.isArray(exercise.options)) {
                 exercise.options.forEach(option => {
                   totalCharacters += (option || '').length;
                 });
               }
-              
-              // Resposta
               totalCharacters += (exercise.answer || '').length;
             });
           }
@@ -189,39 +163,32 @@ function estimateCourseDuration(courseData, categoryName, subcategoryName, tags 
       }
     });
   }
-  
+
   console.log(`📊 Total de caracteres do curso: ${totalCharacters}`);
-  
-  // Cálculo baseado em velocidade de leitura e complexidade
-  // Velocidade média de leitura: 200-250 palavras por minuto
-  // Considerando que palavras em português têm em média 5-6 caracteres
-  const palavrasPorMinuto = 200; // Velocidade conservadora
-  const caracteresPorPalavra = 5.5; // Média para português
+
+  const palavrasPorMinuto = 200;
+  const caracteresPorPalavra = 5.5;
   const palavrasTotais = totalCharacters / caracteresPorPalavra;
-  
-  // Tempo base de leitura
+
   let minutosLeitura = Math.round(palavrasTotais / palavrasPorMinuto);
-  
-  // Adiciona tempo para exercícios e reflexão
+
   const totalExercicios = courseData.modules?.reduce((total, modulo) => {
     return total + (modulo.lessons?.reduce((subtotal, aula) => {
       return subtotal + (aula.exercises?.length || 0);
     }, 0) || 0);
   }, 0) || 0;
-  
-  // Adiciona 2 minutos por exercício para resolução
+
   minutosLeitura += totalExercicios * 2;
-  
-  // Garante mínimo e máximo razoáveis
-  minutosLeitura = Math.max(15, minutosLeitura); // Mínimo 15 minutos
-  minutosLeitura = Math.min(180, minutosLeitura); // Máximo 3 horas
-  
+
+  minutosLeitura = Math.max(15, minutosLeitura);
+  minutosLeitura = Math.min(180, minutosLeitura);
+
   console.log(`⏱️ Duração estimada: ${minutosLeitura} minutos`);
-  
+
   return minutosLeitura;
 }
 
-// ⚙️ Tags opcionais e deduplicadas
+// Tags opcionais e deduplicadas (até 3)
 function validateTags(tags) {
   if (!Array.isArray(tags)) return [];
   const unique = [...new Set(tags.filter(Boolean))];
@@ -229,6 +196,7 @@ function validateTags(tags) {
   return unique;
 }
 
+// Config por nível
 const LEVEL_CONFIG = {
   beginner: {
     modules: 3,
@@ -263,14 +231,16 @@ function validateCourseData(courseData) {
   return { valid: true };
 }
 
-// 👈 NOVA FUNÇÃO: Geração com fallback
+// =======================================================
+// 🧠 Função de geração com fallback (usa OpenAI por enquanto)
+// =======================================================
 async function generateCourseWithFallback(prompt, maxRetries = 2) {
   let lastError;
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`🔄 Tentativa ${attempt} de geração do curso...`);
-      
+
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
@@ -293,53 +263,70 @@ async function generateCourseWithFallback(prompt, maxRetries = 2) {
         courseData = JSON.parse(rawResponse);
       } catch (parseError) {
         console.log(`❌ JSON inválido na tentativa ${attempt}, tentando recuperar...`);
-        
-        // Tenta recuperar JSON incompleto
+
         courseData = recoverJSONFromIncomplete(rawResponse);
-        
+
         if (!courseData) {
           throw new Error(`Falha ao interpretar o JSON (tentativa ${attempt})`);
         }
-        
+
         console.log('✅ JSON recuperado com sucesso!');
       }
 
-      // Validação básica
       if (courseData && courseData.title && Array.isArray(courseData.modules)) {
         return courseData;
       } else {
         throw new Error('Estrutura do curso incompleta após recuperação');
       }
-      
     } catch (error) {
       lastError = error;
       console.log(`❌ Tentativa ${attempt} falhou:`, error.message);
-      
       if (attempt < maxRetries) {
-        // Espera um pouco antes da próxima tentativa
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
   }
-  
+
   throw lastError;
 }
 
 // =======================================================
-// 🧠 ROTA PRINCIPAL - GERAR CURSO (CORRIGIDA COM OPÇÕES LIMPAS)
+// 🧠 ROTA PRINCIPAL - GERAR CURSO (LEVEL e PROVIDER obrigatórios)
 // =======================================================
 router.post('/course', async (req, res) => {
   try {
-    const { level = 'beginner', categoryId, subcategoryId, tags = [] } = req.body;
+    // Agora level e provider são obrigatórios (sem defaults)
+    const { level, provider, categoryId, subcategoryId, tags = [] } = req.body;
     console.log('🧾 Payload recebido:', req.body);
 
-    if (!categoryId)
-      return res.status(400).json({ error: 'categoryId é obrigatório.' });
+    // Validações obrigatórias
+    if (!provider) {
+      return res.status(400).json({ error: 'provider é obrigatório (ex: "openai").' });
+    }
 
-    // ✅ Tags opcionais
+    // Por enquanto só aceitamos 'openai' — feedback claro para outros
+    if (provider !== 'openai') {
+      return res.status(400).json({ error: `Provider "${provider}" ainda não está implementado.` });
+    }
+
+    if (!level) {
+      return res.status(400).json({ error: 'level é obrigatório (beginner | intermediate | advanced).' });
+    }
+
+    if (!LEVEL_CONFIG[level]) {
+      return res.status(400).json({
+        error: `level inválido: ${level}. Valores permitidos: ${Object.keys(LEVEL_CONFIG).join(', ')}`
+      });
+    }
+
+    if (!categoryId) {
+      return res.status(400).json({ error: 'categoryId é obrigatório.' });
+    }
+
+    // Tags opcionais e deduplicadas
     const validTags = validateTags(tags || []);
 
-    // 🔄 CORREÇÃO: Busca categoria e subcategoria COM ICONS
+    // Busca categoria e subcategoria (inclui icon e slug)
     const [category, subcategory] = await Promise.all([
       client.fetch(`*[_id == $categoryId][0]{_id, title, icon, "slug": slug.current}`, { categoryId }),
       subcategoryId
@@ -350,9 +337,10 @@ router.post('/course', async (req, res) => {
     const categoryName = category?.title || 'Categoria Desconhecida';
     const subcategoryName = subcategory?.title || '';
 
-    const cfg = LEVEL_CONFIG[level] || LEVEL_CONFIG.beginner;
+    // Usa cfg baseado no level validado
+    const cfg = LEVEL_CONFIG[level];
 
-    // 👈 PROMPT CORRIGIDO: Agora especifica que NÃO deve usar "A.", "B.", "C."
+    // Monta prompt (garante orientações para o modelo)
     const prompt = `
 Crie um curso em JSON válido com estas especificações EXATAS:
 
@@ -400,32 +388,33 @@ IMPORTANTE:
 - Garanta que a resposta corresponda exatamente a uma das opções fornecidas
 `.trim();
 
-    // 🧠 Geração COM FALLBACK
+    // Gera o curso via provider (atualmente openai)
     const courseData = await generateCourseWithFallback(prompt, 2);
-    
+
     if (!courseData) {
       throw new Error('Não foi possível gerar o curso após todas as tentativas');
     }
 
+    // Sanitiza e valida
     const sanitizedData = sanitizeCourseData(courseData);
     const validation = validateCourseData(sanitizedData);
-    if (!validation.valid)
+    if (!validation.valid) {
       return res.status(400).json({ error: validation.message });
+    }
 
     const title = sanitizedData.title.trim();
     const slug = slugify(title);
     const description = sanitizedData.description.trim();
 
-    // 🕐 CALCULA DURAÇÃO MELHORADA: Considera TODO o conteúdo do curso
     const duration = estimateCourseDuration(sanitizedData, categoryName, subcategoryName, validTags);
 
-    // ⚠️ Antes de criar, verifica duplicados
+    // Verifica duplicados
     const existing = await client.fetch(
       `*[_type == "course" && slug.current == $slug][0]{_id}`,
       { slug }
     );
 
-    // 🔄 Constrói URL com categoria e subcategoria
+    // Monta URL com categoria e subcategoria (ajuste local)
     const categorySlug = category?.slug || 'categoria';
     const subcategorySlug = subcategory?.slug || 'subcategoria';
     const courseUrl = `http://localhost:3000/${categorySlug}/${subcategorySlug}/${slug}`;
@@ -450,7 +439,7 @@ IMPORTANTE:
       });
     }
 
-    // 🆕 Cria novo curso
+    // Prepara objeto para criar no Sanity (usa provider vindo do request)
     const newCourse = {
       _type: 'course',
       title,
@@ -458,11 +447,9 @@ IMPORTANTE:
       description,
       level,
       duration,
-      provider: 'openai',
+      provider: provider, // usa provider do frontend (ex: 'openai')
       category: { _type: 'reference', _ref: categoryId },
-      subcategory: subcategoryId
-        ? { _type: 'reference', _ref: subcategoryId }
-        : undefined,
+      subcategory: subcategoryId ? { _type: 'reference', _ref: subcategoryId } : undefined,
       tags: (validTags || []).map((t) => ({
         _key: uuidv4(),
         _type: 'reference',

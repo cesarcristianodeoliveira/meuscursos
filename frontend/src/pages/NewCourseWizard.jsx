@@ -8,15 +8,16 @@ import { useNavigate } from 'react-router-dom'
 import { useCourse } from '../context/CourseContext'
 import { getTagsBySubcategory } from '../services/api'
 import IconResolver from '../components/IconResolver'
+import GeneratingCourseDialog from '../components/GeneratingCourseDialog'
 
-const steps = ['Nível', 'Categoria', 'Subcategoria', 'Tags', 'Gerar Curso']
+const steps = ['Nível', 'Categoria', 'Subcategoria', 'Tags', 'Provider', 'Gerar Curso']
 
 function NewCourseWizard() {
   const navigate = useNavigate()
   const { categories, subcategories, loading } = useCourse()
 
   const [activeStep, setActiveStep] = useState(0)
-  const [level, setLevel] = useState('beginner')
+  const [level, setLevel] = useState('') // **sem valor pré-definido** — obrigatório
   const [categoryId, setCategoryId] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
   const [selectedTags, setSelectedTags] = useState([])
@@ -24,14 +25,20 @@ function NewCourseWizard() {
   const [loadingTags, setLoadingTags] = useState(false)
   const [error, setError] = useState(null)
 
+  const [selectedProvider, setSelectedProvider] = useState('') // provider obrigatório no passo correspondente
+
+  const [openGenerating, setOpenGenerating] = useState(false)
+  const [generationPayload, setGenerationPayload] = useState(null)
+
   // ref do container scrollável
   const contentRef = useRef(null)
 
   // ref imutável para evitar warnings do eslint e capturar seleção
   const selectedStateRef = useRef({
-    level: 'beginner',
+    level: '',
     categoryId: '',
-    subcategoryId: ''
+    subcategoryId: '',
+    provider: ''
   })
 
   // Map de categorias por id (útil para pegar ícone de categoria)
@@ -43,6 +50,12 @@ function NewCourseWizard() {
     return map
   }, [categories])
 
+  // Providers atuais (v0.0.1 — apenas OpenAI/ChatGPT por enquanto)
+  // NOTE: usamos id 'openai' para alinhar com o backend atual.
+  const providerOptions = [
+    { id: 'openai', name: 'ChatGPT (OpenAI)', icon: 'openai' }
+  ]
+
   // --- subcategorias filtradas pela categoria escolhida
   const filteredSubs = useMemo(
     () => (subcategories || []).filter(
@@ -51,15 +64,17 @@ function NewCourseWizard() {
     [subcategories, categoryId]
   )
 
-  // --- Limpar tags quando categoria mudar
+  // --- Limpar tags (e provider) quando categoria mudar
   useEffect(() => {
     if (categoryId) {
       setSubcategoryId('')
       setSelectedTags([])
       setAvailableTags([])
-      // atualizar ref
+      // limpar provider quando muda a categoria para evitar contexto inválido
+      setSelectedProvider('')
       selectedStateRef.current.categoryId = categoryId
       selectedStateRef.current.subcategoryId = ''
+      selectedStateRef.current.provider = ''
     }
   }, [categoryId])
 
@@ -67,7 +82,6 @@ function NewCourseWizard() {
   useEffect(() => {
     if (subcategoryId) {
       setSelectedTags([])
-      // atualizar ref
       selectedStateRef.current.subcategoryId = subcategoryId
     }
   }, [subcategoryId])
@@ -107,6 +121,10 @@ function NewCourseWizard() {
     setError(null)
 
     // validações básicas
+    if (activeStep === 0 && !level) {
+      setError('Selecione um nível antes de continuar.')
+      return
+    }
     if (activeStep === 1 && !categoryId) {
       setError('Selecione uma categoria antes de continuar.')
       return
@@ -119,6 +137,11 @@ function NewCourseWizard() {
       setError('Selecione entre 1 e 3 tags antes de continuar.')
       return
     }
+    // validação do provider (novo step index 4)
+    if (activeStep === 4 && !selectedProvider) {
+      setError('Selecione um provider antes de continuar.')
+      return
+    }
 
     // último passo → gerar curso
     if (activeStep === steps.length - 1) {
@@ -126,18 +149,12 @@ function NewCourseWizard() {
         categoryId,
         subcategoryId,
         level,
-        tags: selectedTags
+        tags: selectedTags,
+        provider: selectedProvider // inclui o provider no payload
       }
 
-      // Navega para a página de geração com o payload
-      navigate('/curso/gerando', {
-        state: {
-          payload,
-          // Inclui informações para construir a URL depois
-          categoryId,
-          subcategoryId
-        }
-      })
+      setGenerationPayload(payload)
+      setOpenGenerating(true)
       return
     }
 
@@ -146,7 +163,10 @@ function NewCourseWizard() {
   }
 
   // --- voltar etapa
-  const handleBack = () => setActiveStep(prev => prev - 1)
+  const handleBack = () => {
+    setError(null)
+    setActiveStep(prev => Math.max(0, prev - 1))
+  }
 
   // --- Opções para cada passo
   const levelOptions = [
@@ -155,7 +175,7 @@ function NewCourseWizard() {
     { value: 'advanced', label: 'Avançado' }
   ]
 
-  // atualiza o ref quando o usuário escolhe nível/categoria/subcategoria (evita dependências no useEffect)
+  // atualiza o ref quando o usuário escolhe nível/categoria/subcategoria/provider (evita dependências no useEffect)
   const onSelectLevel = (value) => {
     setLevel(value)
     selectedStateRef.current.level = value
@@ -165,13 +185,21 @@ function NewCourseWizard() {
     setCategoryId(id)
     // limpa subcategoria quando muda categoria
     setSubcategoryId('')
+    // também limpamos provider para evitar contexto inválido
+    setSelectedProvider('')
     selectedStateRef.current.categoryId = id
     selectedStateRef.current.subcategoryId = ''
+    selectedStateRef.current.provider = ''
   }
 
   const onSelectSubcategory = (id) => {
     setSubcategoryId(id)
     selectedStateRef.current.subcategoryId = id
+  }
+
+  const onSelectProvider = (id) => {
+    setSelectedProvider(id)
+    selectedStateRef.current.provider = id
   }
 
   // --- renderizar conteúdo de cada passo
@@ -339,7 +367,33 @@ function NewCourseWizard() {
           </Box>
         )
 
+      // --- passo: Provider (novo) ---
       case 4:
+        return (
+          <List sx={{ width: '100%' }}>
+            {providerOptions.map(p => (
+              <ListItemButton
+                key={p.id}
+                data-provider={p.id}
+                selected={selectedProvider === p.id}
+                onClick={() => onSelectProvider(p.id)}
+                sx={{
+                  px: [1]
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 0, mr: 1 }}>
+                  <IconResolver iconName={p.icon} />
+                </ListItemIcon>
+                <ListItemText
+                  primary={p.name}
+                />
+              </ListItemButton>
+            ))}
+          </List>
+        )
+
+      // --- passo: confirmação final (Gerar Curso) ---
+      case 5:
         return (
           <Box sx={{ width: '100%', px: [1] }}>
             <Typography variant="h6" sx={{ mt: 2 }}>
@@ -400,6 +454,20 @@ function NewCourseWizard() {
       const subId = selectedStateRef.current.subcategoryId
       if (subId) {
         const el = container.querySelector(`[data-sub="${subId}"]`)
+        if (el) {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+          return
+        }
+      }
+      container.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
+    // Provider (step 4)
+    if (activeStep === 4) {
+      const prov = selectedStateRef.current.provider
+      if (prov) {
+        const el = container.querySelector(`[data-provider="${prov}"]`)
         if (el) {
           el.scrollIntoView({ block: 'center', behavior: 'smooth' })
           return
@@ -494,7 +562,8 @@ function NewCourseWizard() {
             disableElevation
             disabled={
               (activeStep === 1 && !categoryId) ||
-              (activeStep === 2 && !subcategoryId)
+              (activeStep === 2 && !subcategoryId) ||
+              (activeStep === 4 && !selectedProvider) // bloqueia avançar no provider se nada selecionado
             }
             sx={{
               transition: 'none'
@@ -504,6 +573,30 @@ function NewCourseWizard() {
           </Button>
         </Box>
       </Box>
+
+      <GeneratingCourseDialog
+        open={openGenerating}
+        payload={generationPayload}
+        onFinished={(slug) => {
+          // limpa estado do wizard após gerar (provider, level, categoria, subcategoria, tags)
+          setOpenGenerating(false)
+          setSelectedProvider('')
+          setLevel('')
+          setCategoryId('')
+          setSubcategoryId('')
+          setSelectedTags([])
+          setAvailableTags([])
+          selectedStateRef.current = {
+            level: '',
+            categoryId: '',
+            subcategoryId: '',
+            provider: ''
+          }
+          // navega para curso
+          navigate(`/curso/${slug}`)
+        }}
+      />
+
     </>
   )
 }
