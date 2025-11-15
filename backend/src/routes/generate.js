@@ -45,14 +45,9 @@ function sanitizeJSON(raw) {
 function recoverJSONFromIncomplete(rawText) {
   if (!rawText) return null;
   try {
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      let jsonStr = jsonMatch[0];
-      jsonStr = jsonStr.replace(/(\[[\s\S]*?)(?=\])/g, '$1]');
-      jsonStr = jsonStr.replace(/(\{[\s\S]*?)(?=\})/g, '$1}');
-      jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
-      return JSON.parse(jsonStr);
-    }
+    const lastBracket = rawText.lastIndexOf('}');
+    if (lastBracket !== -1) rawText = rawText.slice(0, lastBracket + 1);
+    return JSON.parse(rawText);
   } catch (err) {
     console.log('❌ recoverJSONFromIncomplete falhou:', err?.message || err);
   }
@@ -213,15 +208,17 @@ IMPORTANTE:
 const PROVIDER_MAP = { openai: { id: 'openai', name: 'OpenAI' }, gemini: { id: 'gemini', name: 'Google Gemini' } };
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
-async function generateWithProvider(provider, prompt) {
+async function generateWithProvider(provider, prompt, level) {
   if (!provider) throw new Error('Provider não informado.');
+
+  const maxTokens = level === 'advanced' ? 4000 : 2500;
+
   if (provider === 'openai') {
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.75,
-      response_format: { type: 'json_object' },
-      max_tokens: 3500,
+      max_tokens: maxTokens,
     });
     const raw = completion.choices?.[0]?.message?.content;
     if (!raw) throw new Error('Resposta vazia da OpenAI.');
@@ -231,7 +228,7 @@ async function generateWithProvider(provider, prompt) {
       model: GEMINI_MODEL,
       contents: prompt,
       temperature: 0.7,
-      maxOutputTokens: 3500,
+      maxOutputTokens: maxTokens,
     });
     if (!response || !response.text) throw new Error('Resposta vazia da Gemini.');
     return String(response.text);
@@ -243,35 +240,24 @@ async function generateWithProvider(provider, prompt) {
 // -----------------------------
 // GERAÇÃO COM HEURÍSTICAS
 // -----------------------------
-async function generateCourseUsingProvider(provider, prompt, maxRetries = 3) {
+async function generateCourseUsingProvider(provider, prompt, level, maxRetries = 3) {
   let lastErr;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`🔄 [${provider}] tentativa ${attempt} → gerando...`);
-      let raw = await generateWithProvider(provider, prompt);
+      let raw = await generateWithProvider(provider, prompt, level);
       if (!raw) throw new Error('Resposta vazia do provider.');
       console.log(`🔍 [${provider}] resposta (preview): ${raw.slice(0, 300)}`);
 
       raw = sanitizeJSON(raw).trim();
 
-      // parse direto
       try {
         const parsed = JSON.parse(raw);
         if (parsed && parsed.title && Array.isArray(parsed.modules)) return parsed;
       } catch (_) {}
 
-      // heurística
       const recovered = recoverJSONFromIncomplete(raw);
       if (recovered && recovered.title && Array.isArray(recovered.modules)) return recovered;
-
-      // fallback bloco
-      const block = raw.match(/\{[\s\S]*\}/);
-      if (block) {
-        try {
-          const parsed2 = JSON.parse(block[0]);
-          if (parsed2 && parsed2.title && Array.isArray(parsed2.modules)) return parsed2;
-        } catch (_) {}
-      }
 
       throw new Error('Não foi possível extrair JSON válido do provider.');
     } catch (err) {
@@ -291,10 +277,8 @@ router.post('/course', async (req, res) => {
     const { level, provider, categoryId, subcategoryId, tags = [] } = req.body;
     console.log('🧾 Payload recebido (generate):', { level, provider, categoryId, subcategoryId, tags });
 
-    if (!provider) return res.status(400).json({ error: 'provider é obrigatório.' });
-    if (!PROVIDER_MAP[provider]) return res.status(400).json({ error: `Provider "${provider}" não reconhecido.` });
-    if (!level) return res.status(400).json({ error: 'level é obrigatório.' });
-    if (!LEVEL_CONFIG[level]) return res.status(400).json({ error: `level inválido: ${level}` });
+    if (!provider || !PROVIDER_MAP[provider]) return res.status(400).json({ error: 'Provider inválido.' });
+    if (!level || !LEVEL_CONFIG[level]) return res.status(400).json({ error: 'Level inválido.' });
     if (!categoryId) return res.status(400).json({ error: 'categoryId é obrigatório.' });
 
     const validTags = validateTags(tags);
@@ -309,7 +293,7 @@ router.post('/course', async (req, res) => {
     const cfg = LEVEL_CONFIG[level];
     const prompt = buildPrompt(categoryName, subcategoryName, level, cfg);
 
-    const courseData = await generateCourseUsingProvider(provider, prompt, 2);
+    const courseData = await generateCourseUsingProvider(provider, prompt, level, 3);
     if (!courseData) throw new Error('Não foi possível gerar o curso.');
 
     const sanitizedData = sanitizeCourseData(courseData);
@@ -331,21 +315,7 @@ router.post('/course', async (req, res) => {
       return res.json({
         success: true,
         message: 'Curso já existia. Retornado existente.',
-        course: {
-          id: existing._id,
-          title,
-          slug,
-          description,
-          level,
-          duration,
-          category,
-          subcategory,
-          tags: validTags.map((t) => ({ title: t })),
-          totalLessons: (sanitizedData.modules || []).reduce((sum, m) => sum + (m.lessons?.length || 0), 0),
-          totalExercises: (sanitizedData.modules || []).reduce((sumM, m) => sumM + (m.lessons?.reduce((sumL, l) => sumL + (l.exercises?.length || 0), 0), 0), 0),
-          sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${existing._id}`,
-          url: courseUrl,
-        },
+        course: { id: existing._id, title, slug, description, level, duration, category, subcategory, tags: validTags.map((t) => ({ title: t })), url: courseUrl },
       });
     }
 
@@ -368,30 +338,13 @@ router.post('/course', async (req, res) => {
     const created = await client.create(newCourse);
     console.log('✅ Curso criado com sucesso:', created._id);
 
-    const totalLessons = (sanitizedData.modules || []).reduce((totalModules, module) => totalModules + (module.lessons?.length || 0), 0);
-    const totalExercises = (sanitizedData.modules || []).reduce((totalModules, module) => {
-      const moduleExercises = (module.lessons || []).reduce((totalLessons, lesson) => totalLessons + (lesson.exercises?.length || 0), 0);
-      return totalModules + moduleExercises;
-    }, 0);
+    const totalLessons = (sanitizedData.modules || []).reduce((sumM, m) => sumM + (m.lessons?.length || 0), 0);
+    const totalExercises = (sanitizedData.modules || []).reduce((sumM, m) => sumM + (m.lessons?.reduce((sumL, l) => sumL + (l.exercises?.length || 0), 0) || 0), 0);
 
     return res.json({
       success: true,
       message: 'Curso gerado com sucesso!',
-      course: {
-        id: created._id,
-        title: created.title,
-        slug: created.slug?.current,
-        description: created.description,
-        level: created.level,
-        duration: created.duration,
-        totalLessons,
-        totalExercises,
-        category,
-        subcategory,
-        tags: validTags.map((t) => ({ title: t })),
-        sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${created._id}`,
-        url: courseUrl,
-      },
+      course: { id: created._id, title, slug: created.slug.current, description, level, duration, totalLessons, totalExercises, category, subcategory, tags: validTags.map((t) => ({ title: t })), url: courseUrl },
     });
   } catch (err) {
     console.error('🚨 Erro na rota /generate/course:', err);

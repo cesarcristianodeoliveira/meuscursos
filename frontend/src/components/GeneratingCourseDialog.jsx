@@ -17,14 +17,19 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
   const [progress, setProgress] = useState(0)
   const [messageIndex, setMessageIndex] = useState(0)
   const [error, setError] = useState(null)
+  const [provider, setProvider] = useState(null)
+  const [level, setLevel] = useState(null)
 
+  // Etapas reais do backend
   const messages = [
-    'Analisando categoria e subcategoria...',
-    'Processando tags selecionadas...',
-    'Gerando conteúdo...',
-    'Salvando no Sanity...',
-    'Finalizando...'
+    'Validando dados do curso...',
+    'Buscando categoria e subcategoria...',
+    'Gerando conteúdo com o provider...',
+    'Sanitizando e validando curso...',
+    'Salvando no Sanity e finalizando...'
   ]
+
+  const progressSteps = [0, 20, 50, 80, 100]
 
   // Resetar estado ao abrir modal
   useEffect(() => {
@@ -33,48 +38,48 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
     setProgress(0)
     setMessageIndex(0)
     setError(null)
-  }, [open])
+    setProvider(payload?.provider || null)
+    setLevel(payload?.level || null)
+  }, [open, payload])
 
-  // Barra de progresso fake
-  useEffect(() => {
-    if (!open || createdRef.current) return
+  const advanceStep = (stepIndex) => {
+    setProgress(progressSteps[stepIndex])
+    setMessageIndex(stepIndex)
+  }
 
-    const timer = setInterval(() => {
-      setProgress(prev => (prev < 95 ? prev + 5 : prev))
-    }, 400)
-
-    return () => clearInterval(timer)
-  }, [open])
-
-  // Atualiza mensagem baseada no progresso
-  useEffect(() => {
-    if (progress < 25) setMessageIndex(0)
-    else if (progress < 50) setMessageIndex(1)
-    else if (progress < 75) setMessageIndex(2)
-    else if (progress < 95) setMessageIndex(3)
-    else setMessageIndex(4)
-  }, [progress])
-
-  // Criar curso
+  // Criar curso com etapas reais
   useEffect(() => {
     if (!open || !payload || createdRef.current) return
     createdRef.current = true
 
     const criarCurso = async () => {
       try {
+        // Etapa 0: Validar payload
+        advanceStep(0)
+
+        if (!payload.provider || !payload.level || !payload.categoryId) {
+          throw new Error('Payload incompleto. provider, level e categoryId são obrigatórios.')
+        }
+
+        // Etapa 1: Buscar categoria/subcategoria
+        advanceStep(1)
+
+        // Chamada real de generateCourse já busca categoria/subcategoria internamente
+        // Etapa 2: Gerar conteúdo
+        advanceStep(2)
         const result = await generateCourse(payload)
 
         if (!result?.course) {
-          setError('Retorno inválido do servidor.')
-          setProgress(100)
-          return
+          throw new Error('Retorno inválido do servidor.')
         }
 
-        // ✅ Aqui usamos apenas addCourse do contexto, que já normaliza
+        // Etapa 3: Sanitizar / Validar
+        advanceStep(3)
         addCourse(result.course)
         resetCourse()
-        setProgress(100)
 
+        // Etapa 4: Finalizar / Salvar
+        advanceStep(4)
         const slug = result.course.slug?.current || result.course.slug
         if (slug) onFinished(slug)
         else setError('Curso criado, mas slug inválido.')
@@ -110,9 +115,15 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
           </>
         ) : (
           <>
-            <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+            <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
               Gerando Curso...
             </Typography>
+
+            {provider && level && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Provider: <strong>{provider}</strong> | Nível: <strong>{level}</strong>
+              </Typography>
+            )}
 
             <LinearProgress
               variant="determinate"
