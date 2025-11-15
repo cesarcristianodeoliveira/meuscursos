@@ -6,8 +6,8 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-
 import { fetchAll, getCourses } from '../services/api';
+import { v4 as uuidv4 } from 'uuid';
 
 const CourseContext = createContext();
 export const useCourse = () => useContext(CourseContext);
@@ -23,7 +23,6 @@ export const CourseProvider = ({ children }) => {
 
   const [loading, setLoading] = useState(false);
   const [progressVisible, setProgressVisible] = useState(false);
-
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Wizard
@@ -34,20 +33,58 @@ export const CourseProvider = ({ children }) => {
   const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
   // ===============================================
-  // 2. CARREGAR ESTATÍSTICAS (SEGURO)
+  // 2. NORMALIZAÇÃO DE CURSO (usado internamente)
+  // ===============================================
+  const normalizeCourse = useCallback((course) => {
+    if (!course) return null;
+
+    const slug = course.slug?.current || course.slug || course.id || course._id;
+    const totalLessons =
+      course.totalLessons ??
+      (course.modules?.reduce((sumM, m) => sumM + (m.lessons?.length || 0), 0) || 0);
+    const totalExercises =
+      course.totalExercises ??
+      (course.modules?.reduce(
+        (sumM, m) =>
+          sumM +
+          (m.lessons?.reduce((sumL, l) => sumL + (l.exercises?.length || 0), 0) || 0),
+        0
+      ) || 0);
+
+    const modules = (course.modules || []).map((m) => ({
+      ...m,
+      _key: m._key || uuidv4(),
+      lessons: (m.lessons || []).map((l) => ({
+        ...l,
+        _key: l._key || uuidv4(),
+        exercises: (l.exercises || []).map((e) => ({ ...e, _key: e._key || uuidv4() })),
+      })),
+    }));
+
+    return {
+      ...course,
+      id: course.id || course._id,
+      slug,
+      url: `/curso/${slug}`,
+      totalLessons,
+      totalExercises,
+      provider: course.provider || 'openai',
+      tags: Array.isArray(course.tags) ? course.tags : [],
+      modules,
+      _createdAt: course._createdAt || new Date().toISOString(),
+      _updatedAt: course._updatedAt || new Date().toISOString(),
+    };
+  }, []);
+
+  // ===============================================
+  // 3. CARREGAR ESTATÍSTICAS (SEGURO)
   // ===============================================
   const loadStatsSafely = useCallback(async () => {
     try {
       const response = await fetch(`${BASE_URL}/api/fetch/stats`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
       const contentType = response.headers.get('content-type');
-      if (!contentType?.includes('application/json')) {
-        const txt = await response.text();
-        console.error('❌ Resposta não JSON:', txt.slice(0, 200));
-        throw new Error('Resposta inválida');
-      }
-
+      if (!contentType?.includes('application/json')) throw new Error('Resposta inválida');
       const data = await response.json();
       setStats(data);
       return data;
@@ -64,7 +101,7 @@ export const CourseProvider = ({ children }) => {
   }, [loadStatsSafely]);
 
   // ===============================================
-  // 3. FORÇAR RELOAD COMPLETO
+  // 4. FORÇAR RELOAD COMPLETO
   // ===============================================
   const forceRefresh = useCallback(() => {
     setRefreshTrigger((prev) => prev + 1);
@@ -72,7 +109,7 @@ export const CourseProvider = ({ children }) => {
   }, []);
 
   // ===============================================
-  // 4. CARREGAR TUDO (CATEGORIAS, SUBCATEGORIAS, CURSOS E STATS)
+  // 5. CARREGAR TUDO (CATEGORIAS, SUBCATEGORIAS, CURSOS E STATS)
   // ===============================================
   const loadAll = useCallback(async () => {
     try {
@@ -83,7 +120,7 @@ export const CourseProvider = ({ children }) => {
 
       setCategories(all.categories || []);
       setSubcategories(all.subcategories || []);
-      setCourses(all.courses || []);
+      setCourses((all.courses || []).map(normalizeCourse));
 
       await loadStatsSafely();
     } catch (err) {
@@ -92,87 +129,51 @@ export const CourseProvider = ({ children }) => {
       setLoading(false);
       setProgressVisible(false);
     }
-  }, [loadStatsSafely]);
+  }, [loadStatsSafely, normalizeCourse]);
 
   // ===============================================
-  // 5. RECARREGAR APENAS CURSOS
+  // 6. RECARREGAR APENAS CURSOS
   // ===============================================
   const reloadCourses = useCallback(async () => {
     try {
       setLoading(true);
       const cs = await getCourses();
-      setCourses(cs || []);
+      setCourses((cs || []).map(normalizeCourse));
       await refreshStats();
     } catch (err) {
       console.error('❌ Erro ao recarregar cursos:', err);
     } finally {
       setLoading(false);
     }
-  }, [refreshStats]);
+  }, [refreshStats, normalizeCourse]);
 
   // ===============================================
-  // 6. ADICIONAR CURSO (SINCRONIZADO COM generate.js)
+  // 7. ADICIONAR CURSO (SINCRONIZADO COM generate.js)
   // ===============================================
   const addCourse = useCallback(
     (course) => {
-      if (!course) return console.warn('⚠️ Curso vazio recebido');
-
-      const slug =
-        typeof course.slug === 'object'
-          ? course.slug.current
-          : course.slug || course.id || course._id;
-
-      if (!slug) {
-        console.warn('⚠️ Curso sem slug válido:', course);
-        return;
-      }
-
-      // 🔹 Usa totalLessons/totalExercises diretamente se vierem do generate
-      const newCourse = {
-        ...course,
-        id: course.id || course._id,
-        slug,
-        url: `/curso/${slug}`,
-
-        provider: course.provider || 'openai',
-        level: course.level || 'beginner',          // ✅ pega o level do payload
-        totalLessons: course.totalLessons || 0,     // ✅ não recalcula
-        totalExercises: course.totalExercises || 0, // ✅ não recalcula
-
-        modules: course.modules || [],
-        tags: Array.isArray(course.tags) ? course.tags : [],
-
-        category: course.category || null,
-        subcategory: course.subcategory || null,
-
-        _createdAt: course._createdAt || new Date().toISOString(),
-        _updatedAt: course._updatedAt || new Date().toISOString(),
-      };
-
+      const normalized = normalizeCourse(course);
+      if (!normalized) return console.warn('⚠️ Curso inválido recebido');
       setCourses((prev) => {
-        const exists = prev.some((c) => c.slug === newCourse.slug);
-        if (exists) {
-          return prev.map((c) => (c.slug === newCourse.slug ? newCourse : c));
-        }
-        return [newCourse, ...prev];
+        const exists = prev.some((c) => c.slug === normalized.slug);
+        if (exists) return prev.map((c) => (c.slug === normalized.slug ? normalized : c));
+        return [normalized, ...prev];
       });
-
       refreshStats();
     },
-    [refreshStats]
+    [normalizeCourse, refreshStats]
   );
 
   // ===============================================
-  // 7. SUBCATEGORIAS POR CATEGORIA
+  // 8. SUBCATEGORIAS POR CATEGORIA
   // ===============================================
   const getSubcategoriesByCategory = useCallback(
-    (categoryId) =>
-      subcategories.filter((s) => s.categoryId === categoryId),
+    (categoryId) => subcategories.filter((s) => s.categoryId === categoryId),
     [subcategories]
   );
 
   // ===============================================
-  // 8. RESET DO WIZARD
+  // 9. RESET DO WIZARD
   // ===============================================
   const resetCourse = useCallback(() => {
     setCategory(null);
@@ -181,14 +182,14 @@ export const CourseProvider = ({ children }) => {
   }, []);
 
   // ===============================================
-  // 9. EFEITO: CARREGAMENTO INICIAL
+  // 10. EFEITO: CARREGAMENTO INICIAL
   // ===============================================
   useEffect(() => {
     loadAll();
   }, [loadAll, refreshTrigger]);
 
   // ===============================================
-  // 10. MEMO FINAL (SEM RE-RENDERS DESNECESSÁRIOS)
+  // 11. MEMO FINAL
   // ===============================================
   const value = useMemo(
     () => ({

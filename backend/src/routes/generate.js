@@ -6,18 +6,14 @@ const OpenAI = require('openai');
 const { v4: uuidv4 } = require('uuid');
 const { GoogleGenAI } = require('@google/genai'); // ✅ Gemini SDK
 
-// Inicializa OpenAI client (precisa de env OPENAI_API_KEY)
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Inicializa OpenAI client
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Inicializa Gemini client (pega API_KEY do .env)
-const geminiAI = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
+// Inicializa Gemini client
+const geminiAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // -----------------------------
-// UTILITIES (slugify, sanitize, recover, etc.)
+// UTILITIES
 // -----------------------------
 function slugify(text) {
   if (!text) return '';
@@ -104,11 +100,11 @@ function sanitizeCourseData(courseData) {
 function validateTags(tags) {
   if (!Array.isArray(tags)) return [];
   const unique = [...new Set(tags.filter(Boolean))];
-  return unique.length > 3 ? unique.slice(0, 3) : unique;
+  return unique;
 }
 
 // -----------------------------
-// LEVEL CONFIG / VALIDATORS
+// LEVEL CONFIG
 // -----------------------------
 const LEVEL_CONFIG = {
   beginner: { modules: 3, lessonsPerModule: 2, tips: 2, exercises: 1, tone: 'explicativo e acessível, com linguagem simples e exemplos práticos' },
@@ -129,10 +125,9 @@ function validateCourseData(courseData) {
 function estimateCourseDuration(courseData, categoryName, subcategoryName, tags = []) {
   if (!courseData) return 30;
   let totalCharacters = 0;
-
   totalCharacters += (courseData.title || '').length + (courseData.description || '').length;
   totalCharacters += (categoryName || '').length + (subcategoryName || '').length;
-  if (Array.isArray(tags)) tags.forEach((tag) => { if (tag) totalCharacters += tag.length; });
+  if (Array.isArray(tags)) tags.forEach((tag) => { if (tag) totalCharacters += tag.title || tag.length || 0; });
 
   if (Array.isArray(courseData.modules)) {
     courseData.modules.forEach((module) => {
@@ -170,7 +165,7 @@ function buildPrompt(categoryName, subcategoryName, level, cfg) {
 Crie um curso em JSON válido com estas especificações EXATAS:
 
 CATEGORIA: ${categoryName}
-SUBCATEGORIA: ${subcategoryName || 'Geral'}  
+SUBCATEGORIA: ${subcategoryName || 'Geral'}
 NÍVEL: ${level.toUpperCase()}
 MÓDULOS: ${cfg.modules}
 AULAS POR MÓDULO: ${cfg.lessonsPerModule}
@@ -213,16 +208,14 @@ IMPORTANTE:
 }
 
 // -----------------------------
-// PROVIDER LAYER (OpenAI + Gemini SDK)
+// PROVIDER LAYER
 // -----------------------------
 const PROVIDER_MAP = { openai: { id: 'openai', name: 'OpenAI' }, gemini: { id: 'gemini', name: 'Google Gemini' } };
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 async function generateWithProvider(provider, prompt) {
   if (!provider) throw new Error('Provider não informado.');
-
   if (provider === 'openai') {
-    if (!openai) throw new Error('Client OpenAI não configurado.');
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
@@ -233,20 +226,15 @@ async function generateWithProvider(provider, prompt) {
     const raw = completion.choices?.[0]?.message?.content;
     if (!raw) throw new Error('Resposta vazia da OpenAI.');
     return String(raw);
-
   } else if (provider === 'gemini') {
-    if (!geminiAI) throw new Error('Client Gemini não configurado.');
-
     const response = await geminiAI.models.generateContent({
       model: GEMINI_MODEL,
       contents: prompt,
       temperature: 0.7,
       maxOutputTokens: 3500,
     });
-
     if (!response || !response.text) throw new Error('Resposta vazia da Gemini.');
     return String(response.text);
-
   } else {
     throw new Error(`Provider "${provider}" não suportado.`);
   }
@@ -257,65 +245,41 @@ async function generateWithProvider(provider, prompt) {
 // -----------------------------
 async function generateCourseUsingProvider(provider, prompt, maxRetries = 3) {
   let lastErr;
-
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`🔄 [${provider}] tentativa ${attempt} → gerando...`);
-
-      // 🔹 Gera o conteúdo bruto do provider
       let raw = await generateWithProvider(provider, prompt);
       if (!raw) throw new Error('Resposta vazia do provider.');
       console.log(`🔍 [${provider}] resposta (preview): ${raw.slice(0, 300)}`);
 
-      // 🔹 Sanitiza caracteres problemáticos comuns
-      raw = sanitizeJSON(raw)
-        .replace(/“|”/g, '"')
-        .replace(/‘|’/g, "'")
-        .replace(/\r/g, '')
-        .replace(/\t/g, ' ')
-        .replace(/\\(?=[^"\\/bfnrtu])/g, '') // remove \ inválidas
-        .trim();
+      raw = sanitizeJSON(raw).trim();
 
-      // 🔹 Tentativa de parse direto
+      // parse direto
       try {
         const parsed = JSON.parse(raw);
         if (parsed && parsed.title && Array.isArray(parsed.modules)) return parsed;
-        console.log(`⚠️ [${provider}] JSON parseado, mas estrutura inválida`);
-      } catch (_) {
-        console.log(`⚠️ [${provider}] JSON direto inválido`);
-      }
+      } catch (_) {}
 
-      // 🔹 Tentativa de heurística (recupera JSON incompleto)
+      // heurística
       const recovered = recoverJSONFromIncomplete(raw);
-      if (recovered && recovered.title && Array.isArray(recovered.modules)) {
-        console.log(`✅ [${provider}] JSON recuperado por heurística`);
-        return recovered;
-      }
+      if (recovered && recovered.title && Array.isArray(recovered.modules)) return recovered;
 
-      // 🔹 Fallback: tenta extrair qualquer bloco JSON dentro do texto
+      // fallback bloco
       const block = raw.match(/\{[\s\S]*\}/);
       if (block) {
         try {
           const parsed2 = JSON.parse(block[0]);
           if (parsed2 && parsed2.title && Array.isArray(parsed2.modules)) return parsed2;
-        } catch (_) {
-          console.log(`⚠️ [${provider}] fallback de bloco JSON falhou`);
-        }
+        } catch (_) {}
       }
 
-      // 🔹 Se nada funcionou, lança erro
       throw new Error('Não foi possível extrair JSON válido do provider.');
-
     } catch (err) {
       lastErr = err;
       console.log(`❌ [${provider}] tentativa ${attempt} falhou:`, err.message);
-
-      // 🔹 Espera 1 segundo antes da próxima tentativa
       if (attempt < maxRetries) await new Promise((r) => setTimeout(r, 1000));
     }
   }
-
-  // 🔹 Após todas as tentativas, lança o último erro
   throw lastErr;
 }
 
@@ -333,7 +297,7 @@ router.post('/course', async (req, res) => {
     if (!LEVEL_CONFIG[level]) return res.status(400).json({ error: `level inválido: ${level}` });
     if (!categoryId) return res.status(400).json({ error: 'categoryId é obrigatório.' });
 
-    const validTags = validateTags(tags || []);
+    const validTags = validateTags(tags);
 
     const [category, subcategory] = await Promise.all([
       client.fetch(`*[_id == $categoryId][0]{_id, title, icon, "slug": slug.current}`, { categoryId }),
@@ -358,7 +322,6 @@ router.post('/course', async (req, res) => {
     const duration = estimateCourseDuration(sanitizedData, categoryName, subcategoryName, validTags);
 
     const existing = await client.fetch(`*[_type == "course" && slug.current == $slug][0]{_id}`, { slug });
-
     const categorySlug = category?.slug || 'categoria';
     const subcategorySlug = subcategory?.slug || 'subcategoria';
     const courseUrl = `http://localhost:3000/${categorySlug}/${subcategorySlug}/${slug}`;
@@ -368,7 +331,21 @@ router.post('/course', async (req, res) => {
       return res.json({
         success: true,
         message: 'Curso já existia. Retornado existente.',
-        course: { id: existing._id, title, slug, description, level, duration, category, subcategory, sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${existing._id}`, url: courseUrl },
+        course: {
+          id: existing._id,
+          title,
+          slug,
+          description,
+          level,
+          duration,
+          category,
+          subcategory,
+          tags: validTags.map((t) => ({ title: t })),
+          totalLessons: (sanitizedData.modules || []).reduce((sum, m) => sum + (m.lessons?.length || 0), 0),
+          totalExercises: (sanitizedData.modules || []).reduce((sumM, m) => sumM + (m.lessons?.reduce((sumL, l) => sumL + (l.exercises?.length || 0), 0), 0), 0),
+          sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${existing._id}`,
+          url: courseUrl,
+        },
       });
     }
 
@@ -388,23 +365,15 @@ router.post('/course', async (req, res) => {
       status: 'published',
     };
 
-    // Cria curso no Sanity
     const created = await client.create(newCourse);
     console.log('✅ Curso criado com sucesso:', created._id);
 
-    // 🔹 Calcula total de aulas e exercícios
-    const totalLessons = (sanitizedData.modules || []).reduce((totalModules, module) => {
-      return totalModules + (module.lessons?.length || 0);
-    }, 0);
-
+    const totalLessons = (sanitizedData.modules || []).reduce((totalModules, module) => totalModules + (module.lessons?.length || 0), 0);
     const totalExercises = (sanitizedData.modules || []).reduce((totalModules, module) => {
-      const moduleExercises = (module.lessons || []).reduce((totalLessons, lesson) => {
-        return totalLessons + (lesson.exercises?.length || 0);
-      }, 0);
+      const moduleExercises = (module.lessons || []).reduce((totalLessons, lesson) => totalLessons + (lesson.exercises?.length || 0), 0);
       return totalModules + moduleExercises;
     }, 0);
 
-    // Retorna curso com totais
     return res.json({
       success: true,
       message: 'Curso gerado com sucesso!',
@@ -419,6 +388,7 @@ router.post('/course', async (req, res) => {
         totalExercises,
         category,
         subcategory,
+        tags: validTags.map((t) => ({ title: t })),
         sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${created._id}`,
         url: courseUrl,
       },

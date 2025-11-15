@@ -70,47 +70,12 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
           return
         }
 
-        const courseData = result.course
-        const slug =
-          typeof courseData.slug === 'object'
-            ? courseData.slug?.current
-            : courseData.slug
-
-        // Calcular totalLessons e totalExercises se não vier do backend
-        const totalLessons =
-          Number(courseData.totalLessons) ||
-          (courseData.modules?.reduce((sumM, m) => sumM + (m.lessons?.length || 0), 0) || 0)
-
-        const totalExercises =
-          Number(courseData.totalExercises) ||
-          (courseData.modules?.reduce(
-            (sumM, m) =>
-              sumM +
-              (m.lessons?.reduce((sumL, l) => sumL + (l.exercises?.length || 0), 0) || 0),
-            0
-          ) || 0)
-
-        const normalized = {
-          ...courseData,
-          id: courseData._id || courseData.id,
-          slug,
-          url: `/curso/${slug}`,
-          modules: courseData.modules || [],
-          tags: Array.isArray(courseData.tags) ? courseData.tags : [],
-          level: courseData.level || payload.level || 'beginner',
-          totalLessons,
-          totalExercises,
-          category: courseData.category || null,
-          subcategory: courseData.subcategory || null,
-          provider: courseData.provider || payload.provider || 'openai',
-          _createdAt: courseData._createdAt || new Date().toISOString(),
-          _updatedAt: courseData._updatedAt || new Date().toISOString(),
-        }
-
-        addCourse(normalized)
+        // ✅ Aqui usamos apenas addCourse do contexto, que já normaliza
+        addCourse(result.course)
         resetCourse()
         setProgress(100)
 
+        const slug = result.course.slug?.current || result.course.slug
         if (slug) onFinished(slug)
         else setError('Curso criado, mas slug inválido.')
 
