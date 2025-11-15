@@ -31,7 +31,6 @@ export const CourseProvider = ({ children }) => {
   const [category, setCategory] = useState(null);
   const [subcategory, setSubcategory] = useState(null);
 
-  // BASE URL com fallback seguro
   const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
   // ===============================================
@@ -128,18 +127,32 @@ export const CourseProvider = ({ children }) => {
         return;
       }
 
+      // 🔹 Calcula totalLessons e totalExercises se não vier
+      const totalLessons =
+        Number(course.totalLessons) ||
+        (course.modules?.reduce((sumM, m) => sumM + (m.lessons?.length || 0), 0) || 0);
+
+      const totalExercises =
+        Number(course.totalExercises) ||
+        (course.modules?.reduce(
+          (sumM, m) =>
+            sumM +
+            (m.lessons?.reduce((sumL, l) => sumL + (l.exercises?.length || 0), 0) || 0),
+          0
+        ) || 0);
+
       const newCourse = {
         ...course,
         id: course.id || course._id,
         slug,
         url: `/curso/${slug}`,
 
-        // Campos priorizados pelo backend (generate.js corrige)
         provider: course.provider || 'openai',
 
-        totalLessons: Number(course.totalLessons) || 0,
-        totalExercises: Number(course.totalExercises) || 0,
+        totalLessons,
+        totalExercises,
 
+        modules: course.modules || [],
         tags: Array.isArray(course.tags) ? course.tags : [],
 
         category: course.category || null,
@@ -192,7 +205,6 @@ export const CourseProvider = ({ children }) => {
   // ===============================================
   const value = useMemo(
     () => ({
-      // dados
       courses,
       categories,
       subcategories,
@@ -200,7 +212,6 @@ export const CourseProvider = ({ children }) => {
       loading,
       progressVisible,
 
-      // funções
       loadAll,
       reloadCourses,
       loadStats: loadStatsSafely,
@@ -209,7 +220,6 @@ export const CourseProvider = ({ children }) => {
       forceRefresh,
       getSubcategoriesByCategory,
 
-      // wizard
       level,
       setLevel,
       category,
@@ -235,13 +245,9 @@ export const CourseProvider = ({ children }) => {
       level,
       category,
       subcategory,
-      resetCourse
+      resetCourse,
     ]
   );
 
-  return (
-    <CourseContext.Provider value={value}>
-      {children}
-    </CourseContext.Provider>
-  );
+  return <CourseContext.Provider value={value}>{children}</CourseContext.Provider>;
 };

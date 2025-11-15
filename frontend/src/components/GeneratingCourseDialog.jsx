@@ -26,19 +26,27 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
     'Finalizando...'
   ]
 
-  // Progress bar fake animation
+  // Resetar estado ao abrir modal
   useEffect(() => {
     if (!open) return
-
+    createdRef.current = false
     setProgress(0)
+    setMessageIndex(0)
+    setError(null)
+  }, [open])
+
+  // Barra de progresso fake
+  useEffect(() => {
+    if (!open || createdRef.current) return
+
     const timer = setInterval(() => {
-      setProgress(prev => (prev < 100 ? prev + 5 : 100))
+      setProgress(prev => (prev < 95 ? prev + 5 : prev))
     }, 400)
 
     return () => clearInterval(timer)
   }, [open])
 
-  // Troca de mensagem
+  // Atualiza mensagem baseada no progresso
   useEffect(() => {
     if (progress < 25) setMessageIndex(0)
     else if (progress < 50) setMessageIndex(1)
@@ -58,10 +66,10 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
 
         if (!result?.course) {
           setError('Retorno inválido do servidor.')
+          setProgress(100)
           return
         }
 
-        // Normalização do slug
         const slug =
           typeof result.course.slug === 'object'
             ? result.course.slug?.current
@@ -70,20 +78,22 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
         const normalized = {
           ...result.course,
           id: result.course._id || result.course.id,
-          slug
+          slug,
+          url: `/curso/${slug}`,
+          modules: result.course.modules || [],
+          tags: Array.isArray(result.course.tags) ? result.course.tags : []
         }
 
         addCourse(normalized)
         resetCourse()
+        setProgress(100)
 
-        if (slug) {
-          onFinished(slug)
-        } else {
-          setError('Curso criado, mas slug inválido.')
-        }
+        if (slug) onFinished(slug)
+        else setError('Curso criado, mas slug inválido.')
 
       } catch (err) {
         setError(err.message || 'Erro ao gerar curso.')
+        setProgress(100)
       }
     }
 
@@ -97,20 +107,17 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
       maxWidth="xs"
       disableEscapeKeyDown
       onClose={(e, reason) => {
-        // Impedir fechar clicando fora
         if (reason === 'backdropClick') return
       }}
     >
       <DialogContent sx={{ p: 2, textAlign: 'center' }}>
-        
         {error ? (
           <>
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
             </Alert>
-
             <Typography sx={{ mt: 2 }}>
-              Feche o app e tente de novo.
+              Feche o app e tente novamente.
             </Typography>
           </>
         ) : (
@@ -139,7 +146,6 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
             </Typography>
           </>
         )}
-
       </DialogContent>
     </Dialog>
   )
