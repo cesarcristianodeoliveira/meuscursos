@@ -367,13 +367,40 @@ router.post('/course', async (req, res) => {
       status: 'published',
     };
 
+    // Cria curso no Sanity
     const created = await client.create(newCourse);
     console.log('✅ Curso criado com sucesso:', created._id);
 
+    // 🔹 Calcula total de aulas e exercícios
+    const totalLessons = (sanitizedData.modules || []).reduce((totalModules, module) => {
+      return totalModules + (module.lessons?.length || 0);
+    }, 0);
+
+    const totalExercises = (sanitizedData.modules || []).reduce((totalModules, module) => {
+      const moduleExercises = (module.lessons || []).reduce((totalLessons, lesson) => {
+        return totalLessons + (lesson.exercises?.length || 0);
+      }, 0);
+      return totalModules + moduleExercises;
+    }, 0);
+
+    // Retorna curso com totais
     return res.json({
       success: true,
       message: 'Curso gerado com sucesso!',
-      course: { id: created._id, title: created.title, slug: created.slug?.current, description: created.description, level: created.level, duration: created.duration, category, subcategory, sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${created._id}`, url: courseUrl },
+      course: {
+        id: created._id,
+        title: created.title,
+        slug: created.slug?.current,
+        description: created.description,
+        level: created.level,
+        duration: created.duration,
+        totalLessons,
+        totalExercises,
+        category,
+        subcategory,
+        sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${created._id}`,
+        url: courseUrl,
+      },
     });
   } catch (err) {
     console.error('🚨 Erro na rota /generate/course:', err);
