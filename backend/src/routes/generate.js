@@ -255,46 +255,67 @@ async function generateWithProvider(provider, prompt) {
 // -----------------------------
 // GERAÇÃO COM HEURÍSTICAS
 // -----------------------------
-async function generateCourseUsingProvider(provider, prompt, maxRetries = 2) {
+async function generateCourseUsingProvider(provider, prompt, maxRetries = 3) {
   let lastErr;
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`🔄 [${provider}] tentativa ${attempt} → gerando...`);
+
+      // 🔹 Gera o conteúdo bruto do provider
       let raw = await generateWithProvider(provider, prompt);
       if (!raw) throw new Error('Resposta vazia do provider.');
       console.log(`🔍 [${provider}] resposta (preview): ${raw.slice(0, 300)}`);
 
-      raw = sanitizeJSON(raw);
+      // 🔹 Sanitiza caracteres problemáticos comuns
+      raw = sanitizeJSON(raw)
+        .replace(/“|”/g, '"')
+        .replace(/‘|’/g, "'")
+        .replace(/\r/g, '')
+        .replace(/\t/g, ' ')
+        .replace(/\\(?=[^"\\/bfnrtu])/g, '') // remove \ inválidas
+        .trim();
 
+      // 🔹 Tentativa de parse direto
       try {
         const parsed = JSON.parse(raw);
         if (parsed && parsed.title && Array.isArray(parsed.modules)) return parsed;
-        console.log(`⚠️ [${provider}] parseou JSON mas estrutura inválida`);
-      } catch (err) {
+        console.log(`⚠️ [${provider}] JSON parseado, mas estrutura inválida`);
+      } catch (_) {
         console.log(`⚠️ [${provider}] JSON direto inválido`);
       }
 
+      // 🔹 Tentativa de heurística (recupera JSON incompleto)
       const recovered = recoverJSONFromIncomplete(raw);
       if (recovered && recovered.title && Array.isArray(recovered.modules)) {
         console.log(`✅ [${provider}] JSON recuperado por heurística`);
         return recovered;
       }
 
+      // 🔹 Fallback: tenta extrair qualquer bloco JSON dentro do texto
       const block = raw.match(/\{[\s\S]*\}/);
       if (block) {
         try {
           const parsed2 = JSON.parse(block[0]);
           if (parsed2 && parsed2.title && Array.isArray(parsed2.modules)) return parsed2;
-        } catch (_) {}
+        } catch (_) {
+          console.log(`⚠️ [${provider}] fallback de bloco JSON falhou`);
+        }
       }
 
+      // 🔹 Se nada funcionou, lança erro
       throw new Error('Não foi possível extrair JSON válido do provider.');
+
     } catch (err) {
       lastErr = err;
       console.log(`❌ [${provider}] tentativa ${attempt} falhou:`, err.message);
+
+      // 🔹 Espera 1 segundo antes da próxima tentativa
       if (attempt < maxRetries) await new Promise((r) => setTimeout(r, 1000));
     }
   }
+
+  // 🔹 Após todas as tentativas, lança o último erro
   throw lastErr;
 }
 
