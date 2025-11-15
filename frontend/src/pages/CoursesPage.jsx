@@ -18,7 +18,7 @@ const CoursesPage = () => {
   const { courses, loading } = useCourse()
   const navigate = useNavigate()
 
-  // 👈 LOGS PARA DEBUG
+  // Logs de debug
   console.log('📊 CoursesPage - Dados recebidos:', {
     totalCourses: courses?.length,
     primeiroCurso: courses?.[0] ? {
@@ -31,14 +31,10 @@ const CoursesPage = () => {
     } : 'Nenhum curso'
   })
 
-  // ✅ Ordena cursos do mais novo para o mais antigo
+  // Ordena do mais novo para o mais antigo
   const sortedCourses = useMemo(() => {
     if (!courses || courses.length === 0) return []
-    return [...courses].sort((a, b) => {
-      const dateA = new Date(a._createdAt || 0)
-      const dateB = new Date(b._createdAt || 0)
-      return dateB - dateA // Descendente (mais novo primeiro)
-    })
+    return [...courses].sort((a, b) => new Date(b._createdAt || 0) - new Date(a._createdAt || 0))
   }, [courses])
 
   const handleCourseClick = (course) => {
@@ -59,7 +55,7 @@ const CoursesPage = () => {
       case 'beginner': return 'Iniciante'
       case 'intermediate': return 'Intermediário'
       case 'advanced': return 'Avançado'
-      default: return level
+      default: return level || 'Iniciante'
     }
   }
 
@@ -73,24 +69,6 @@ const CoursesPage = () => {
     return `${mins} min`
   }
 
-  // 👈 FUNÇÕES DE CONTAGEM REMOVIDAS - Agora usamos os campos da API
-  // const countTotalLessons = (course) => {
-  //   if (!course.modules) return 0
-  //   return course.modules.reduce((total, module) => {
-  //     return total + (module.lessons?.length || 0)
-  //   }, 0)
-  // }
-
-  // const countTotalExercises = (course) => {
-  //   if (!course.modules) return 0
-  //   return course.modules.reduce((total, module) => {
-  //     const moduleExercises = module.lessons?.reduce((lessonTotal, lesson) => {
-  //       return lessonTotal + (lesson.exercises?.length || 0)
-  //     }, 0) || 0
-  //     return total + moduleExercises
-  //   }, 0)
-  // }
-
   if (loading) {
     return (
       <Box sx={{ width: '100%', px: [1] }}>
@@ -103,14 +81,7 @@ const CoursesPage = () => {
   }
 
   return (
-    <Box 
-      sx={{ 
-        width: '100%',
-        px: [1],
-        minHeight: '100dvh',
-        bgcolor: 'background.default'
-      }}
-    >
+    <Box sx={{ width: '100%', px: [1], minHeight: '100dvh', bgcolor: 'background.default' }}>
       <Toolbar sx={{ px: [0], minHeight: '56px!important' }} />
       
       <Typography component="h2" variant="h6" sx={{ my: 1.5, lineHeight: 1 }}>
@@ -118,99 +89,34 @@ const CoursesPage = () => {
       </Typography>
 
       {sortedCourses.length === 0 ? (
-        <Typography 
-          color='text.secondary'
-          sx={{ fontSize: '0.875rem' }}
-        >
+        <Typography color='text.secondary' sx={{ fontSize: '0.875rem' }}>
           Nenhum curso no momento
         </Typography>
       ) : (
         <Grid container spacing={1}>
           {sortedCourses.map((course) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={course._id}>
-              <Card 
-                sx={{ 
-                  height: '100%',
-                  transition: 'none',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  display: 'flex',
-                  flexDirection: 'column',
-                }}
-              >
-                <CardActionArea 
-                  onClick={() => handleCourseClick(course)}
-                  sx={{ 
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    p: 1,
-                    height: '100%',
-                    flex: 1
-                  }}
-                >
-                  <CardContent 
-                    sx={{ 
-                      p: 0, 
-                      width: '100%', 
-                      flex: 1, 
-                      display: 'flex', 
-                      flexDirection: 'column' 
-                    }}
-                  >
+            <Grid item xs={12} sm={6} md={4} lg={3} key={course.id}>
+              <Card sx={{ height: '100%', transition: 'none', border: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column' }}>
+                <CardActionArea onClick={() => handleCourseClick(course)} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', p: 1, height: '100%', flex: 1 }}>
+                  <CardContent sx={{ p: 0, width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    
                     {/* Título */}
-                    <Typography 
-                      variant="h6" 
-                      component="h2" 
-                      gutterBottom
-                      sx={{
-                        fontWeight: 600,
-                        lineHeight: 1.3,
-                        minHeight: '3.9em',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden'
-                      }}
-                    >
+                    <Typography variant="h6" component="h2" gutterBottom sx={{ fontWeight: 600, lineHeight: 1.3, minHeight: '3.9em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                       {course.title}
                     </Typography>
                     
                     {/* Descrição */}
-                    <Typography 
-                      variant="body2" 
-                      color="text.secondary" 
-                      sx={{ 
-                        mb: 2,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        minHeight: '4.5em',
-                        flex: 1
-                      }}
-                    >
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '4.5em', flex: 1 }}>
                       {course.description || 'Sem descrição disponível.'}
                     </Typography>
 
                     {/* Chips de nível e duração */}
                     <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      <Chip 
-                        label={getLevelText(course.level)} 
-                        size="small" 
-                        color={getLevelColor(course.level)}
-                        variant="filled"
-                      />
-                      {course.duration && (
-                        <Chip 
-                          label={formatDuration(course.duration)} 
-                          size="small" 
-                          variant="outlined"
-                        />
-                      )}
+                      <Chip label={getLevelText(course.level)} size="small" color={getLevelColor(course.level)} variant="filled" />
+                      {course.duration && <Chip label={formatDuration(course.duration)} size="small" variant="outlined" />}
                     </Box>
 
-                    {/* 👈 ESTATÍSTICAS ATUALIZADAS - Usa campos da API */}
+                    {/* Estatísticas */}
                     <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                       <Typography variant="caption" color="text.secondary">
                         <strong>{course.totalLessons || 0}</strong> aulas
@@ -225,12 +131,12 @@ const CoursesPage = () => {
                       <Box sx={{ mb: 2 }}>
                         {course.category && (
                           <Typography variant="caption" display="block" color="text.secondary" gutterBottom>
-                            <strong>Categoria:</strong> {course.category.title}
+                            <strong>Categoria:</strong> {course.category?.title || course.category}
                           </Typography>
                         )}
                         {course.subcategory && (
                           <Typography variant="caption" display="block" color="text.secondary">
-                            <strong>Subcategoria:</strong> {course.subcategory.title}
+                            <strong>Subcategoria:</strong> {course.subcategory?.title || course.subcategory}
                           </Typography>
                         )}
                       </Box>
@@ -243,22 +149,11 @@ const CoursesPage = () => {
                           <strong>Tags:</strong>
                         </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {course.tags.slice(0, 3).map((tag) => (
-                            <Chip
-                              key={tag._id}
-                              label={tag.title}
-                              size="small"
-                              variant="outlined"
-                              sx={{ fontSize: '0.7rem', height: 24 }}
-                            />
+                          {course.tags.slice(0, 3).map((tag, index) => (
+                            <Chip key={tag._id || tag || index} label={tag.title || tag} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 24 }} />
                           ))}
                           {course.tags.length > 3 && (
-                            <Chip
-                              label={`+${course.tags.length - 3}`}
-                              size="small"
-                              variant="outlined"
-                              sx={{ fontSize: '0.7rem', height: 24 }}
-                            />
+                            <Chip label={`+${course.tags.length - 3}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 24 }} />
                           )}
                         </Box>
                       </Box>
@@ -272,6 +167,7 @@ const CoursesPage = () => {
                         </Typography>
                       </Box>
                     )}
+
                   </CardContent>
                 </CardActionArea>
               </Card>

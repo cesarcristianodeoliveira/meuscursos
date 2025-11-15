@@ -10,7 +10,7 @@ import { getTagsBySubcategory } from '../services/api'
 import IconResolver from '../components/IconResolver'
 import GeneratingCourseDialog from '../components/GeneratingCourseDialog'
 
-const steps = ['Nível', 'Categoria', 'Subcategoria', 'Tags', 'Provider', 'Gerar Curso']
+const steps = ['Nível', 'Categoria', 'Subcategoria', 'Tags', 'Provedor', 'Gerar Curso']
 
 function NewCourseWizard() {
   const navigate = useNavigate()
