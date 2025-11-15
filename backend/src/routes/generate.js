@@ -4,10 +4,16 @@ const router = express.Router();
 const client = require('../config/sanityClient');
 const OpenAI = require('openai');
 const { v4: uuidv4 } = require('uuid');
+const { TextServiceClient } = require('@google/generative-ai'); // <- Gemini
 
 // Inicializa OpenAI client (precisa de env OPENAI_API_KEY)
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Inicializa Gemini client
+const geminiClient = new TextServiceClient({
+  apiKey: process.env.GEMINI_API_KEY, // usar GEMINI_API_KEY no .env
 });
 
 // -----------------------------
@@ -46,13 +52,9 @@ function recoverJSONFromIncomplete(rawText) {
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       let jsonStr = jsonMatch[0];
-
-      // tenta fechar arrays/objectos abertos
       jsonStr = jsonStr.replace(/(\[[\s\S]*?)(?=\])/g, '$1]');
       jsonStr = jsonStr.replace(/(\{[\s\S]*?)(?=\})/g, '$1}');
-      // remove vírgulas soltas no final
       jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
-
       return JSON.parse(jsonStr);
     }
   } catch (err) {
@@ -62,9 +64,8 @@ function recoverJSONFromIncomplete(rawText) {
 }
 
 function addKeysRecursively(obj) {
-  if (Array.isArray(obj)) {
-    return obj.map((item) => addKeysRecursively(item));
-  } else if (typeof obj === 'object' && obj !== null) {
+  if (Array.isArray(obj)) return obj.map((item) => addKeysRecursively(item));
+  if (typeof obj === 'object' && obj !== null) {
     const newObj = {};
     for (const [key, value] of Object.entries(obj)) {
       newObj[key] = addKeysRecursively(value);
@@ -87,9 +88,7 @@ function sanitizeCourseData(courseData) {
       ),
       exercises: (lesson.exercises || []).map((ex) => {
         const cleanOptions = (ex.options || []).map((opt) => {
-          if (typeof opt === 'string') {
-            return opt.replace(/^[A-Z]\.\s*/, '');
-          }
+          if (typeof opt === 'string') return opt.replace(/^[A-Z]\.\s*/, '');
           return Object.values(opt).join('');
         });
 
@@ -274,16 +273,12 @@ IMPORTANTE:
 }
 
 // -----------------------------
-// PROVIDER LAYER (OpenAI + Gemini REST)
+// PROVIDER LAYER (OpenAI + Gemini)
 // -----------------------------
 const PROVIDER_MAP = {
   openai: { id: 'openai', name: 'OpenAI' },
   gemini: { id: 'gemini', name: 'Google Gemini' },
 };
-
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-1-5';
-const GEMINI_ENDPOINT = (model) =>
-  `https://generative.googleapis.com/v1beta2/models/${encodeURIComponent(model)}:generateText`;
 
 // gera texto bruto do provider (string)
 async function generateWithProvider(provider, prompt) {
@@ -303,52 +298,24 @@ async function generateWithProvider(provider, prompt) {
     if (!raw) throw new Error('Resposta vazia da OpenAI.');
     return String(raw);
   } else if (provider === 'gemini') {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('GEMINI_API_KEY não configurada no .env');
-
-    // corpo simples — caso sua conta exija outro shape, ajuste aqui
-    const body = {
-      prompt: {
-        text: prompt,
-      },
-      // Você pode ajustar parâmetros como temperature/maxOutputTokens aqui:
-      // temperature: 0.7,
-      // maxOutputTokens: 3500,
-    };
-
-    const url = GEMINI_ENDPOINT(GEMINI_MODEL);
-
-    // Node 18+ tem fetch nativo; se usar node antigo, instale node-fetch
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'x-goog-api-key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+    if (!geminiClient) throw new Error('Client Gemini não configurado.');
+    const response = await geminiClient.generateText({
+      model: process.env.GEMINI_MODEL || 'gemini-flash-1.5',
+      prompt,
+      temperature: 0.75,
+      maxOutputTokens: 3500,
     });
-
-    const text = await res.text();
-
-    if (!res.ok) {
-      // tenta parse do corpo do erro
-      let errBody = text;
-      try {
-        const parsed = JSON.parse(text);
-        errBody = JSON.stringify(parsed).slice(0, 800);
-      } catch (e) {
-        errBody = text.slice(0, 800);
-      }
-      throw new Error(`Gemini API erro (${res.status}): ${errBody}`);
-    }
-
-    return String(text);
+    // O retorno da lib é em response.candidates[0].output
+    if (!response?.candidates?.[0]?.output) throw new Error('Resposta vazia do Gemini.');
+    return String(response.candidates[0].output);
   } else {
     throw new Error(`Provider "${provider}" não suportado.`);
   }
 }
 
-// tenta gerar e recuperar JSON válido (retries e heurísticas)
+// -----------------------------
+// gera curso com retries
+// -----------------------------
 async function generateCourseUsingProvider(provider, prompt, maxRetries = 2) {
   let lastErr;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -359,35 +326,24 @@ async function generateCourseUsingProvider(provider, prompt, maxRetries = 2) {
 
       console.log(`🔍 [${provider}] resposta (preview): ${raw.slice(0, 300)}`);
 
-      // limpa ruídos comuns
       raw = sanitizeJSON(raw);
 
-      // tenta parse direto
       try {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.title && Array.isArray(parsed.modules)) {
-          return parsed;
-        }
-        console.log(`⚠️ [${provider}] parseou JSON mas estrutura inválida — tentando heurística`);
+        if (parsed && parsed.title && Array.isArray(parsed.modules)) return parsed;
+        console.log(`⚠️ [${provider}] parseou JSON mas estrutura inválida`);
       } catch (err) {
         console.log(`⚠️ [${provider}] JSON direto inválido — tentando heurística`);
       }
 
-      // tenta recuperar JSON dentro do texto
       const recovered = recoverJSONFromIncomplete(raw);
-      if (recovered && recovered.title && Array.isArray(recovered.modules)) {
-        console.log(`✅ [${provider}] JSON recuperado por heurística`);
-        return recovered;
-      }
+      if (recovered && recovered.title && Array.isArray(recovered.modules)) return recovered;
 
-      // busca qualquer bloco JSON e tenta
       const block = raw.match(/\{[\s\S]*\}/);
       if (block) {
         try {
           const parsed2 = JSON.parse(block[0]);
-          if (parsed2 && parsed2.title && Array.isArray(parsed2.modules)) {
-            return parsed2;
-          }
+          if (parsed2 && parsed2.title && Array.isArray(parsed2.modules)) return parsed2;
         } catch (_) {}
       }
 
@@ -406,25 +362,16 @@ async function generateCourseUsingProvider(provider, prompt, maxRetries = 2) {
 // -----------------------------
 router.post('/course', async (req, res) => {
   try {
-    // NÃO definir defaults aqui — level e provider devem ser enviados pelo frontend
     const { level, provider, categoryId, subcategoryId, tags = [] } = req.body;
-    console.log('🧾 Payload recebido (generate):', { level, provider, categoryId, subcategoryId, tags });
 
-    // Validações obrigatórias (sem defaults)
-    if (!provider) return res.status(400).json({ error: 'provider é obrigatório (ex: "openai" ou "gemini").' });
+    if (!provider) return res.status(400).json({ error: 'provider é obrigatório.' });
     if (!PROVIDER_MAP[provider]) return res.status(400).json({ error: `Provider "${provider}" não reconhecido.` });
-
-    if (!level) return res.status(400).json({ error: 'level é obrigatório (beginner | intermediate | advanced).' });
-    if (!LEVEL_CONFIG[level]) {
-      return res.status(400).json({ error: `level inválido: ${level}. Valores permitidos: ${Object.keys(LEVEL_CONFIG).join(', ')}` });
-    }
-
+    if (!level) return res.status(400).json({ error: 'level é obrigatório.' });
+    if (!LEVEL_CONFIG[level]) return res.status(400).json({ error: `level inválido: ${level}` });
     if (!categoryId) return res.status(400).json({ error: 'categoryId é obrigatório.' });
 
-    // valida tags
     const validTags = validateTags(tags || []);
 
-    // busca categoria e subcategoria no Sanity
     const [category, subcategory] = await Promise.all([
       client.fetch(`*[_id == $categoryId][0]{_id, title, icon, "slug": slug.current}`, { categoryId }),
       subcategoryId ? client.fetch(`*[_id == $subcategoryId][0]{_id, title, icon, "slug": slug.current}`, { subcategoryId }) : null,
@@ -434,34 +381,26 @@ router.post('/course', async (req, res) => {
     const subcategoryName = subcategory?.title || '';
 
     const cfg = LEVEL_CONFIG[level];
-
     const prompt = buildPrompt(categoryName, subcategoryName, level, cfg);
 
-    // Gera via provider selecionado
     const courseData = await generateCourseUsingProvider(provider, prompt, 2);
+    if (!courseData) throw new Error('Não foi possível gerar o curso.');
 
-    if (!courseData) throw new Error('Não foi possível gerar o curso após todas as tentativas.');
-
-    // sanitize + validate
     const sanitizedData = sanitizeCourseData(courseData);
     const validation = validateCourseData(sanitizedData);
     if (!validation.valid) return res.status(400).json({ error: validation.message });
 
     const title = sanitizedData.title.trim();
     const slug = slugify(title);
-    const description = sanitizedData.description ? sanitizedData.description.trim() : '';
+    const description = sanitizedData.description?.trim() || '';
     const duration = estimateCourseDuration(sanitizedData, categoryName, subcategoryName, validTags);
 
-    // check duplicate
     const existing = await client.fetch(`*[_type == "course" && slug.current == $slug][0]{_id}`, { slug });
-
-    // monta curso url local (ajuste conforme ambiente)
     const categorySlug = category?.slug || 'categoria';
     const subcategorySlug = subcategory?.slug || 'subcategoria';
     const courseUrl = `http://localhost:3000/${categorySlug}/${subcategorySlug}/${slug}`;
 
     if (existing?._id) {
-      console.log('⚠️ Curso já existente:', existing._id);
       return res.json({
         success: true,
         message: 'Curso já existia. Retornado existente.',
@@ -480,7 +419,6 @@ router.post('/course', async (req, res) => {
       });
     }
 
-    // cria objeto para Sanity — provider salvo exatamente como recebido
     const newCourse = {
       _type: 'course',
       title,
@@ -488,21 +426,16 @@ router.post('/course', async (req, res) => {
       description,
       level,
       duration,
-      provider: provider,
+      provider,
       category: { _type: 'reference', _ref: categoryId },
       subcategory: subcategoryId ? { _type: 'reference', _ref: subcategoryId } : undefined,
-      tags: (validTags || []).map((t) => ({
-        _key: uuidv4(),
-        _type: 'reference',
-        _ref: t,
-      })),
+      tags: (validTags || []).map((t) => ({ _key: uuidv4(), _type: 'reference', _ref: t })),
       modules: addKeysRecursively(sanitizedData.modules || []),
       certificate: '',
       status: 'published',
     };
 
     const created = await client.create(newCourse);
-    console.log('✅ Curso criado com sucesso:', created._id);
 
     return res.json({
       success: true,
@@ -522,10 +455,7 @@ router.post('/course', async (req, res) => {
     });
   } catch (err) {
     console.error('🚨 Erro na rota /generate/course:', err);
-    return res.status(500).json({
-      error: 'Falha ao gerar o curso.',
-      details: err?.message || String(err),
-    });
+    return res.status(500).json({ error: 'Falha ao gerar o curso.', details: err?.message || String(err) });
   }
 });
 
