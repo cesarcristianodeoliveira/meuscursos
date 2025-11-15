@@ -127,20 +127,7 @@ export const CourseProvider = ({ children }) => {
         return;
       }
 
-      // 🔹 Calcula totalLessons e totalExercises se não vier
-      const totalLessons =
-        Number(course.totalLessons) ||
-        (course.modules?.reduce((sumM, m) => sumM + (m.lessons?.length || 0), 0) || 0);
-
-      const totalExercises =
-        Number(course.totalExercises) ||
-        (course.modules?.reduce(
-          (sumM, m) =>
-            sumM +
-            (m.lessons?.reduce((sumL, l) => sumL + (l.exercises?.length || 0), 0) || 0),
-          0
-        ) || 0);
-
+      // 🔹 Usa totalLessons/totalExercises diretamente se vierem do generate
       const newCourse = {
         ...course,
         id: course.id || course._id,
@@ -148,9 +135,9 @@ export const CourseProvider = ({ children }) => {
         url: `/curso/${slug}`,
 
         provider: course.provider || 'openai',
-
-        totalLessons,
-        totalExercises,
+        level: course.level || 'beginner',          // ✅ pega o level do payload
+        totalLessons: course.totalLessons || 0,     // ✅ não recalcula
+        totalExercises: course.totalExercises || 0, // ✅ não recalcula
 
         modules: course.modules || [],
         tags: Array.isArray(course.tags) ? course.tags : [],

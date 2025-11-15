@@ -95,7 +95,7 @@ const CoursesPage = () => {
       ) : (
         <Grid container spacing={1}>
           {sortedCourses.map((course) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={course.id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={course._id}>
               <Card sx={{ height: '100%', transition: 'none', border: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column' }}>
                 <CardActionArea onClick={() => handleCourseClick(course)} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', p: 1, height: '100%', flex: 1 }}>
                   <CardContent sx={{ p: 0, width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
