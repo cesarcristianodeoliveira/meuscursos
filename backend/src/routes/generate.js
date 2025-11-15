@@ -4,16 +4,14 @@ const router = express.Router();
 const client = require('../config/sanityClient');
 const OpenAI = require('openai');
 const { v4: uuidv4 } = require('uuid');
-
-// Import Gemini oficial
-const { GoogleGenAI } = require('@google/genai');
+const { GoogleGenAI } = require('@google/genai'); // ✅ Gemini SDK
 
 // Inicializa OpenAI client (precisa de env OPENAI_API_KEY)
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Inicializa Gemini client
+// Inicializa Gemini client (pega API_KEY do .env)
 const geminiAI = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
@@ -66,9 +64,8 @@ function recoverJSONFromIncomplete(rawText) {
 }
 
 function addKeysRecursively(obj) {
-  if (Array.isArray(obj)) {
-    return obj.map((item) => addKeysRecursively(item));
-  } else if (typeof obj === 'object' && obj !== null) {
+  if (Array.isArray(obj)) return obj.map((item) => addKeysRecursively(item));
+  if (typeof obj === 'object' && obj !== null) {
     const newObj = {};
     for (const [key, value] of Object.entries(obj)) {
       newObj[key] = addKeysRecursively(value);
@@ -91,22 +88,12 @@ function sanitizeCourseData(courseData) {
       ),
       exercises: (lesson.exercises || []).map((ex) => {
         const cleanOptions = (ex.options || []).map((opt) => {
-          if (typeof opt === 'string') {
-            return opt.replace(/^[A-Z]\.\s*/, '');
-          }
+          if (typeof opt === 'string') return opt.replace(/^[A-Z]\.\s*/, '');
           return Object.values(opt).join('');
         });
-
         let cleanAnswer = ex.answer;
-        if (typeof cleanAnswer === 'string') {
-          cleanAnswer = cleanAnswer.replace(/^[A-Z]\.\s*/, '');
-        }
-
-        return {
-          ...ex,
-          answer: cleanAnswer,
-          options: cleanOptions,
-        };
+        if (typeof cleanAnswer === 'string') cleanAnswer = cleanAnswer.replace(/^[A-Z]\.\s*/, '');
+        return { ...ex, answer: cleanAnswer, options: cleanOptions };
       }),
     })),
   }));
@@ -117,87 +104,47 @@ function sanitizeCourseData(courseData) {
 function validateTags(tags) {
   if (!Array.isArray(tags)) return [];
   const unique = [...new Set(tags.filter(Boolean))];
-  if (unique.length > 3) return unique.slice(0, 3);
-  return unique;
+  return unique.length > 3 ? unique.slice(0, 3) : unique;
 }
 
 // -----------------------------
 // LEVEL CONFIG / VALIDATORS
 // -----------------------------
 const LEVEL_CONFIG = {
-  beginner: {
-    modules: 3,
-    lessonsPerModule: 2,
-    tips: 2,
-    exercises: 1,
-    tone: 'explicativo e acessível, com linguagem simples e exemplos práticos',
-  },
-  intermediate: {
-    modules: 4,
-    lessonsPerModule: 3,
-    tips: 3,
-    exercises: 2,
-    tone: 'detalhado e aplicado, com exemplos reais e desafios práticos',
-  },
-  advanced: {
-    modules: 5,
-    lessonsPerModule: 4,
-    tips: 4,
-    exercises: 3,
-    tone: 'abrangente, técnico e aprofundado, voltado para profissionais experientes',
-  },
+  beginner: { modules: 3, lessonsPerModule: 2, tips: 2, exercises: 1, tone: 'explicativo e acessível, com linguagem simples e exemplos práticos' },
+  intermediate: { modules: 4, lessonsPerModule: 3, tips: 3, exercises: 2, tone: 'detalhado e aplicado, com exemplos reais e desafios práticos' },
+  advanced: { modules: 5, lessonsPerModule: 4, tips: 4, exercises: 3, tone: 'abrangente, técnico e aprofundado, voltado para profissionais experientes' },
 };
 
 function validateCourseData(courseData) {
-  if (!courseData?.title || courseData.title.trim().length < 3)
-    return { valid: false, message: 'Título inválido.' };
-  if (!courseData?.description || courseData.description.trim().length < 20)
-    return { valid: false, message: 'Descrição muito curta.' };
-  if (!Array.isArray(courseData.modules) || courseData.modules.length === 0)
-    return { valid: false, message: 'O curso precisa ter pelo menos um módulo.' };
+  if (!courseData?.title || courseData.title.trim().length < 3) return { valid: false, message: 'Título inválido.' };
+  if (!courseData?.description || courseData.description.trim().length < 20) return { valid: false, message: 'Descrição muito curta.' };
+  if (!Array.isArray(courseData.modules) || courseData.modules.length === 0) return { valid: false, message: 'O curso precisa ter pelo menos um módulo.' };
   return { valid: true };
 }
 
 // -----------------------------
-// ESTIMATOR (melhorado)
+// ESTIMATOR
 // -----------------------------
 function estimateCourseDuration(courseData, categoryName, subcategoryName, tags = []) {
   if (!courseData) return 30;
   let totalCharacters = 0;
 
-  totalCharacters += (courseData.title || '').length;
-  totalCharacters += (courseData.description || '').length;
-  totalCharacters += (categoryName || '').length;
-  totalCharacters += (subcategoryName || '').length;
-
-  if (Array.isArray(tags)) {
-    tags.forEach((tag) => {
-      if (tag && typeof tag === 'string') totalCharacters += tag.length;
-    });
-  }
+  totalCharacters += (courseData.title || '').length + (courseData.description || '').length;
+  totalCharacters += (categoryName || '').length + (subcategoryName || '').length;
+  if (Array.isArray(tags)) tags.forEach((tag) => { if (tag) totalCharacters += tag.length; });
 
   if (Array.isArray(courseData.modules)) {
     courseData.modules.forEach((module) => {
-      totalCharacters += (module.title || '').length;
-      totalCharacters += (module.description || '').length;
+      totalCharacters += (module.title || '').length + (module.description || '').length;
       if (Array.isArray(module.lessons)) {
         module.lessons.forEach((lesson) => {
-          totalCharacters += (lesson.title || '').length;
-          totalCharacters += (lesson.content || '').length;
-          if (Array.isArray(lesson.tips)) {
-            lesson.tips.forEach((tip) => {
-              totalCharacters += (tip || '').length;
-            });
-          }
+          totalCharacters += (lesson.title || '').length + (lesson.content || '').length;
+          if (Array.isArray(lesson.tips)) lesson.tips.forEach((tip) => { totalCharacters += (tip || '').length; });
           if (Array.isArray(lesson.exercises)) {
             lesson.exercises.forEach((exercise) => {
-              totalCharacters += (exercise.question || '').length;
-              if (Array.isArray(exercise.options)) {
-                exercise.options.forEach((option) => {
-                  totalCharacters += (option || '').length;
-                });
-              }
-              totalCharacters += (exercise.answer || '').length;
+              totalCharacters += (exercise.question || '').length + (exercise.answer || '').length;
+              if (Array.isArray(exercise.options)) exercise.options.forEach((opt) => { totalCharacters += (opt || '').length; });
             });
           }
         });
@@ -210,21 +157,9 @@ function estimateCourseDuration(courseData, categoryName, subcategoryName, tags 
   const palavrasTotais = totalCharacters / caracteresPorPalavra;
   let minutosLeitura = Math.round(palavrasTotais / palavrasPorMinuto);
 
-  const totalExercicios =
-    courseData.modules?.reduce((total, modulo) => {
-      return (
-        total +
-        (modulo.lessons?.reduce((subtotal, aula) => {
-          return subtotal + (aula.exercises?.length || 0);
-        }, 0) || 0)
-      );
-    }, 0) || 0;
-
+  const totalExercicios = courseData.modules?.reduce((t, m) => t + (m.lessons?.reduce((s, l) => s + (l.exercises?.length || 0), 0) || 0), 0) || 0;
   minutosLeitura += totalExercicios * 2;
-  minutosLeitura = Math.max(15, minutosLeitura);
-  minutosLeitura = Math.min(180, minutosLeitura);
-
-  return minutosLeitura;
+  return Math.max(15, Math.min(180, minutosLeitura));
 }
 
 // -----------------------------
@@ -278,14 +213,11 @@ IMPORTANTE:
 }
 
 // -----------------------------
-// PROVIDER LAYER (OpenAI + Gemini oficial)
+// PROVIDER LAYER (OpenAI + Gemini SDK)
 // -----------------------------
-const PROVIDER_MAP = {
-  openai: { id: 'openai', name: 'OpenAI' },
-  gemini: { id: 'gemini', name: 'Google Gemini' },
-};
+const PROVIDER_MAP = { openai: { id: 'openai', name: 'OpenAI' }, gemini: { id: 'gemini', name: 'Google Gemini' } };
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
-// gera texto bruto do provider (string)
 async function generateWithProvider(provider, prompt) {
   if (!provider) throw new Error('Provider não informado.');
 
@@ -298,32 +230,30 @@ async function generateWithProvider(provider, prompt) {
       response_format: { type: 'json_object' },
       max_tokens: 3500,
     });
-
     const raw = completion.choices?.[0]?.message?.content;
     if (!raw) throw new Error('Resposta vazia da OpenAI.');
     return String(raw);
+
   } else if (provider === 'gemini') {
     if (!geminiAI) throw new Error('Client Gemini não configurado.');
+
     const response = await geminiAI.models.generateContent({
-      model: process.env.GEMINI_MODEL || 'gemini-flash-1-5',
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: prompt }],
-        },
-      ],
+      model: GEMINI_MODEL,
+      contents: prompt,
+      temperature: 0.7,
+      maxOutputTokens: 3500,
     });
 
-    const text = response?.text || response?.contents?.[0]?.text;
-    if (!text) throw new Error('Resposta vazia do Gemini.');
-    return String(text);
+    if (!response || !response.text) throw new Error('Resposta vazia da Gemini.');
+    return String(response.text);
+
   } else {
     throw new Error(`Provider "${provider}" não suportado.`);
   }
 }
 
 // -----------------------------
-// tenta gerar e recuperar JSON válido (retries e heurísticas)
+// GERAÇÃO COM HEURÍSTICAS
 // -----------------------------
 async function generateCourseUsingProvider(provider, prompt, maxRetries = 2) {
   let lastErr;
@@ -332,7 +262,6 @@ async function generateCourseUsingProvider(provider, prompt, maxRetries = 2) {
       console.log(`🔄 [${provider}] tentativa ${attempt} → gerando...`);
       let raw = await generateWithProvider(provider, prompt);
       if (!raw) throw new Error('Resposta vazia do provider.');
-
       console.log(`🔍 [${provider}] resposta (preview): ${raw.slice(0, 300)}`);
 
       raw = sanitizeJSON(raw);
@@ -340,10 +269,16 @@ async function generateCourseUsingProvider(provider, prompt, maxRetries = 2) {
       try {
         const parsed = JSON.parse(raw);
         if (parsed && parsed.title && Array.isArray(parsed.modules)) return parsed;
-      } catch (err) {}
+        console.log(`⚠️ [${provider}] parseou JSON mas estrutura inválida`);
+      } catch (err) {
+        console.log(`⚠️ [${provider}] JSON direto inválido`);
+      }
 
       const recovered = recoverJSONFromIncomplete(raw);
-      if (recovered && recovered.title && Array.isArray(recovered.modules)) return recovered;
+      if (recovered && recovered.title && Array.isArray(recovered.modules)) {
+        console.log(`✅ [${provider}] JSON recuperado por heurística`);
+        return recovered;
+      }
 
       const block = raw.match(/\{[\s\S]*\}/);
       if (block) {
@@ -371,14 +306,10 @@ router.post('/course', async (req, res) => {
     const { level, provider, categoryId, subcategoryId, tags = [] } = req.body;
     console.log('🧾 Payload recebido (generate):', { level, provider, categoryId, subcategoryId, tags });
 
-    if (!provider) return res.status(400).json({ error: 'provider é obrigatório (ex: "openai" ou "gemini").' });
+    if (!provider) return res.status(400).json({ error: 'provider é obrigatório.' });
     if (!PROVIDER_MAP[provider]) return res.status(400).json({ error: `Provider "${provider}" não reconhecido.` });
-
-    if (!level) return res.status(400).json({ error: 'level é obrigatório (beginner | intermediate | advanced).' });
-    if (!LEVEL_CONFIG[level]) {
-      return res.status(400).json({ error: `level inválido: ${level}. Valores permitidos: ${Object.keys(LEVEL_CONFIG).join(', ')}` });
-    }
-
+    if (!level) return res.status(400).json({ error: 'level é obrigatório.' });
+    if (!LEVEL_CONFIG[level]) return res.status(400).json({ error: `level inválido: ${level}` });
     if (!categoryId) return res.status(400).json({ error: 'categoryId é obrigatório.' });
 
     const validTags = validateTags(tags || []);
@@ -390,13 +321,11 @@ router.post('/course', async (req, res) => {
 
     const categoryName = category?.title || 'Categoria Desconhecida';
     const subcategoryName = subcategory?.title || '';
-
     const cfg = LEVEL_CONFIG[level];
     const prompt = buildPrompt(categoryName, subcategoryName, level, cfg);
 
     const courseData = await generateCourseUsingProvider(provider, prompt, 2);
-
-    if (!courseData) throw new Error('Não foi possível gerar o curso após todas as tentativas.');
+    if (!courseData) throw new Error('Não foi possível gerar o curso.');
 
     const sanitizedData = sanitizeCourseData(courseData);
     const validation = validateCourseData(sanitizedData);
@@ -404,7 +333,7 @@ router.post('/course', async (req, res) => {
 
     const title = sanitizedData.title.trim();
     const slug = slugify(title);
-    const description = sanitizedData.description ? sanitizedData.description.trim() : '';
+    const description = sanitizedData.description?.trim() || '';
     const duration = estimateCourseDuration(sanitizedData, categoryName, subcategoryName, validTags);
 
     const existing = await client.fetch(`*[_type == "course" && slug.current == $slug][0]{_id}`, { slug });
@@ -414,21 +343,11 @@ router.post('/course', async (req, res) => {
     const courseUrl = `http://localhost:3000/${categorySlug}/${subcategorySlug}/${slug}`;
 
     if (existing?._id) {
+      console.log('⚠️ Curso já existente:', existing._id);
       return res.json({
         success: true,
         message: 'Curso já existia. Retornado existente.',
-        course: {
-          id: existing._id,
-          title,
-          slug,
-          description,
-          level,
-          duration,
-          category,
-          subcategory,
-          sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${existing._id}`,
-          url: courseUrl,
-        },
+        course: { id: existing._id, title, slug, description, level, duration, category, subcategory, sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${existing._id}`, url: courseUrl },
       });
     }
 
@@ -439,43 +358,26 @@ router.post('/course', async (req, res) => {
       description,
       level,
       duration,
-      provider: provider,
+      provider,
       category: { _type: 'reference', _ref: categoryId },
       subcategory: subcategoryId ? { _type: 'reference', _ref: subcategoryId } : undefined,
-      tags: (validTags || []).map((t) => ({
-        _key: uuidv4(),
-        _type: 'reference',
-        _ref: t,
-      })),
+      tags: (validTags || []).map((t) => ({ _key: uuidv4(), _type: 'reference', _ref: t })),
       modules: addKeysRecursively(sanitizedData.modules || []),
       certificate: '',
       status: 'published',
     };
 
     const created = await client.create(newCourse);
+    console.log('✅ Curso criado com sucesso:', created._id);
 
     return res.json({
       success: true,
       message: 'Curso gerado com sucesso!',
-      course: {
-        id: created._id,
-        title: created.title,
-        slug: created.slug?.current,
-        description: created.description,
-        level: created.level,
-        duration: created.duration,
-        category,
-        subcategory,
-        sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${created._id}`,
-        url: courseUrl,
-      },
+      course: { id: created._id, title: created.title, slug: created.slug?.current, description: created.description, level: created.level, duration: created.duration, category, subcategory, sanityUrl: `https://${process.env.SANITY_PROJECT_ID}.sanity.studio/desk/course;${created._id}`, url: courseUrl },
     });
   } catch (err) {
     console.error('🚨 Erro na rota /generate/course:', err);
-    return res.status(500).json({
-      error: 'Falha ao gerar o curso.',
-      details: err?.message || String(err),
-    });
+    return res.status(500).json({ error: 'Falha ao gerar o curso.', details: err?.message || String(err) });
   }
 });
 
