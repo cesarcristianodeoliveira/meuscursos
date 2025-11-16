@@ -354,9 +354,9 @@ function NewCourseWizard() {
                 onClick={() => onSelectProvider(p.id)}
                 sx={{ px: [1] }}
               >
-                <ListItemIcon sx={{ minWidth: 0, mr: 1 }}>
+                {/* <ListItemIcon sx={{ minWidth: 0, mr: 1 }}>
                   <IconResolver iconName={p.icon} />
-                </ListItemIcon>
+                </ListItemIcon> */}
                 <ListItemText primary={p.name} />
               </ListItemButton>
             ))}
