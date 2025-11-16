@@ -1,5 +1,5 @@
 // src/components/GeneratingCourseDialog.jsx
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import {
   Typography,
   LinearProgress,
@@ -31,6 +31,12 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
 
   const progressSteps = [0, 20, 50, 80, 100]
 
+  // Mover advanceStep para useCallback para evitar recriações desnecessárias
+  const advanceStep = useCallback((stepIndex) => {
+    setProgress(progressSteps[stepIndex])
+    setMessageIndex(stepIndex)
+  }, [progressSteps])
+
   // Resetar estado ao abrir modal
   useEffect(() => {
     if (!open) return
@@ -41,11 +47,6 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
     setProvider(payload?.provider || null)
     setLevel(payload?.level || null)
   }, [open, payload])
-
-  const advanceStep = (stepIndex) => {
-    setProgress(progressSteps[stepIndex])
-    setMessageIndex(stepIndex)
-  }
 
   // Criar curso com etapas reais
   useEffect(() => {
@@ -91,7 +92,7 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
     }
 
     criarCurso()
-  }, [open, payload, addCourse, resetCourse, onFinished])
+  }, [open, payload, addCourse, resetCourse, onFinished, advanceStep])
 
   return (
     <Dialog
