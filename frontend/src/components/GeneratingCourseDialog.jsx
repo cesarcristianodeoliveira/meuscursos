@@ -1,5 +1,5 @@
 // src/components/GeneratingCourseDialog.jsx
-import React, { useEffect, useState, useRef, useCallback } from 'react'
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import {
   Typography,
   LinearProgress,
@@ -21,21 +21,22 @@ export default function GeneratingCourseDialog({ open, payload, onFinished }) {
   const [level, setLevel] = useState(null)
 
   // Etapas reais do backend
-  const messages = [
+  const messages = useMemo(() => [
     'Validando dados do curso...',
     'Buscando categoria e subcategoria...',
     'Gerando conteúdo com o provider...',
     'Sanitizando e validando curso...',
     'Salvando no Sanity e finalizando...'
-  ]
+  ], [])
 
-  const progressSteps = [0, 20, 50, 80, 100]
+  // Usar useMemo para progressSteps
+  const progressSteps = useMemo(() => [0, 20, 50, 80, 100], [])
 
-  // Mover advanceStep para useCallback para evitar recriações desnecessárias
+  // Mover advanceStep para useCallback
   const advanceStep = useCallback((stepIndex) => {
     setProgress(progressSteps[stepIndex])
     setMessageIndex(stepIndex)
-  }, [progressSteps])
+  }, [progressSteps]) // Agora progressSteps é estável graças ao useMemo
 
   // Resetar estado ao abrir modal
   useEffect(() => {
