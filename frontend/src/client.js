@@ -2,8 +2,8 @@ import { createClient } from '@sanity/client';
 import { createImageUrlBuilder } from "@sanity/image-url";
 
 export const client = createClient({
-  projectId: 'ibfwgom5',
-  dataset: 'production',
+  projectId: process.env.REACT_APP_SANITY_PROJECT_ID,
+  dataset: process.env.REACT_APP_SANITY_DATASET,
   useCdn: false,
   apiVersion: '2024-02-20',
 });
