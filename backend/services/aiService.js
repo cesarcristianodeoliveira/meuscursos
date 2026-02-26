@@ -8,21 +8,21 @@ const generateCourseContent = async (topic) => {
     messages: [
       {
         role: 'system',
-        content: `Você é um Engenheiro de Currículos Educacionais Sênior. Sua função é criar materiais didáticos exaustivos, técnicos e visualmente organizados.
+        content: `Você é um Engenheiro de Currículos Educacionais Sênior. Sua função é criar materiais didáticos exaustivos e técnicos sobre qualquer tema solicitado.
 
-        REGRAS DE OURO:
-        1. IDIOMA: Português (Brasil). Proibido estrangeirismos.
-        2. TÍTULO: Autoritário e original. Proibido: "Guia", "Curso", "Masterclass", "Arte de", "Básico", "Mestre".
-        3. CATEGORIZAÇÃO: 'site_category' em português, 'pixabay_category' da lista oficial.
-        4. BUSCA VISUAL: Apenas 2 palavras em inglês (objetos físicos).
+        REGRAS DE OURO (IDENTIDADE):
+        1. IDIOMA: Português (Brasil).
+        2. TÍTULO: Autoritário e técnico. Proibido: "Guia", "Curso", "Masterclass", "Arte de", "Básico", "Mestre".
+        3. CATEGORIZAÇÃO: 'site_category' (nicho em PT-BR) e 'pixabay_category' (escolha a que melhor se encaixa na lista oficial do Pixabay).
+        4. BUSCA VISUAL (searchQuery): Escreva obrigatoriamente 2 substantivos concretos em INGLÊS que definam o objeto físico principal do tema. NUNCA use adjetivos ou frases.
 
-        REGRAS DE DENSIDADE E MARKDOWN (ESTRITO):
-        - Cada módulo deve ter pelo menos 3 parágrafos explicativos antes de usar elementos visuais.
-        - Use ## para seções e ### para sub-tópicos detalhados.
-        - TABELAS: Use para comparar vantagens/desvantagens, tipos ou métricas.
-        - CITAÇÕES (>): Use para destacar "A Visão do Especialista" ou "Ponto de Atenção".
-        - CÓDIGO (\`\`\b): Use para listar checklists, scripts, fórmulas ou processos numerados.
-        - PROIBIDO: Módulos com apenas 1 ou 2 frases. Desenvolva o raciocínio técnico.
+        REGRAS DE MARKDOWN (ESTRUTURAÇÃO RÍGIDA):
+        - Módulos densos: Mínimo 3 parágrafos explicativos por módulo.
+        - Hierarquia: Use ## para títulos e ### para subtópicos internos.
+        - QUEBRAS DE LINHA: Use obrigatoriamente duas quebras de linha (\\n\\n) para separar parágrafos, tabelas e blocos de código.
+        - TABELAS: Devem conter cabeçalho, linha separadora (| --- |) e dados alinhados. Cada linha deve ser uma nova linha real.
+        - CITAÇÕES (>): Use para destacar conceitos teóricos ou avisos importantes.
+        - BLOCOS DE CÓDIGO ( \`\`\` ): Use para listar processos passo-a-passo ou checklists numerados.
 
         ESTRUTURA JSON:
         {
@@ -35,15 +35,15 @@ const generateCourseContent = async (topic) => {
             { "title": "string", "content": "string" }
           ]
         }
-        Responda apenas o JSON puro.`
+        Responda apenas o JSON puro, sem textos introdutórios ou conclusivos.`
       },
       { 
         role: 'user', 
-        content: `Gere uma especialização técnica exaustiva, com conteúdo denso e detalhado sobre: "${topic}".` 
+        content: `Gere uma especialização técnica exaustiva, com conteúdo denso e detalhado sobre o tema: "${topic}".` 
       }
     ],
     model: 'llama-3.3-70b-versatile',
-    temperature: 0.65, // Reduzi um pouco para manter a IA focada e menos "vaga"
+    temperature: 0.6,
     max_tokens: 4000,
     response_format: { type: "json_object" }
   });
