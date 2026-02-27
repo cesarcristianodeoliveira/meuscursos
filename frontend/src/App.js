@@ -7,8 +7,8 @@ import Course from './pages/Course';
 function App() {
   return (
     <Router>
-      <Box sx={{ flexGrow: 1, bgcolor: '#f0f2f5', minHeight: '100vh' }}>
-        <AppBar position="sticky" elevation={0} sx={{ bgcolor: '#1976d2' }}>
+      <Box sx={{ flexGrow: 1, bgcolor: '#f5f5f5', minHeight: '100vh' }}>
+        <AppBar position="sticky" elevation={0}>
           <Toolbar>
             <Typography 
               variant="h6" 

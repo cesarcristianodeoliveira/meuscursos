@@ -14,7 +14,8 @@ import {
   Divider,
   Container
 } from '@mui/material';
-import { ExpandMore, ArrowBack, MenuBook } from '@mui/icons-material';
+import { ArrowBack, MenuBook } from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 function Course() {
   const { slug } = useParams();
@@ -94,6 +95,7 @@ function Course() {
         <Accordion 
           key={module._key || index} 
           elevation={0}
+          
           sx={{ 
             mb: 2, 
             border: '1px solid #e0e0e0',
@@ -103,7 +105,7 @@ function Course() {
             '&.Mui-expanded': { boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }
           }}
         >
-          <AccordionSummary expandMoreIcon={<ExpandMore color="primary" />}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Typography sx={{ fontWeight: 700, py: 1 }}>
               {index + 1}. {module.title}
             </Typography>
