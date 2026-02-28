@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { Box, AppBar, Toolbar, Typography, IconButton } from '@mui/material';
 import { Brightness4, Brightness7 } from '@mui/icons-material'; // Ícones de Lua e Sol
 import { ThemeProviderWrapper, useAppTheme } from './contexts/ThemeContext';
+import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
 import Course from './pages/Course';
 
@@ -12,6 +13,7 @@ const AppContent = () => {
 
   return (
     <Router>
+      <ScrollToTop />
       {/* O minHeight garante que o fundo cubra a tela toda */}
       <Box sx={{ flexGrow: 1, minHeight: '100vh' }}>
         <AppBar color="primary" position="sticky" elevation={0}>
