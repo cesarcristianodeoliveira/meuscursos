@@ -33,7 +33,7 @@ export const ThemeProviderWrapper = ({ children }) => {
 
   return (
     <ThemeContext.Provider value={{ mode, toggleTheme, resolvedMode }}>
-      <ThemeProvider theme={theme}>
+      <ThemeProvider theme={theme} disableTransitionOnChange>
         <CssBaseline />
         {children}
       </ThemeProvider>
