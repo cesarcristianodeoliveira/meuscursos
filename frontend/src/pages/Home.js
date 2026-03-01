@@ -87,7 +87,7 @@ const Home = () => {
           disabled={loading}
         />
         <Button variant="contained" type="submit" size="large" disabled={loading || !topic} sx={{ px: 4, fontWeight: 'bold' }}>
-          {loading ? 'Gerando' : 'Gera'}
+          {loading ? 'Gerando' : 'Gerar'}
         </Button>
       </Box>
 

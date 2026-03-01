@@ -66,7 +66,7 @@ const Navbar = forwardRef((props, ref) => {
         <SearchContainer>
           <SearchIconWrapper><SearchIcon /></SearchIconWrapper>
           <StyledInputBase
-            placeholder="Pesquisar cursos..."
+            placeholder="Pesquisar"
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             onKeyDown={handleSearch}
