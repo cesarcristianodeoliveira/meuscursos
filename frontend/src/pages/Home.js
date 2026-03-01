@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import { RocketLaunch } from '@mui/icons-material';
 
-const COURSES_PER_PAGE = 5;
+const COURSES_PER_PAGE = 10;
 
 const Home = () => {
   const [topic, setTopic] = useState('');
@@ -112,7 +112,7 @@ const Home = () => {
       <Box component="form" onSubmit={handleGenerate} sx={{ display: 'flex', gap: 2, mb: 4 }}>
         <TextField
           fullWidth
-          label="O que você deseja aprender agora?"
+          label="O que você deseja aprender?"
           variant="outlined"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}

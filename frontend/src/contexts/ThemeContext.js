@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useMemo } from 'react';
-import { createTheme, ThemeProvider, CssBaseline } from '@mui/material';
+import { createTheme, ThemeProvider, CssBaseline, responsiveFontSizes } from '@mui/material';
 
 const ThemeContext = createContext();
 
@@ -25,15 +25,41 @@ export const ThemeProviderWrapper = ({ children }) => {
   };
 
   // 4. Configuração do Objeto de Tema
-  const theme = useMemo(() => createTheme({
-    palette: {
-      mode: resolvedMode,
-    },
-  }), [resolvedMode]);
+  const theme = useMemo(() => {
+    let baseTheme = createTheme({
+      palette: {
+        mode: resolvedMode,
+      },
+      // Adicionamos aqui ajustes globais de tipografia
+      typography: {
+        h3: {
+          fontWeight: 900,
+        },
+        h5: {
+          fontWeight: 800,
+        },
+      },
+      // Garantimos que o texto não "vaze" do container no mobile
+      components: {
+        MuiTypography: {
+          styleOverrides: {
+            root: {
+              wordBreak: 'break-word',
+              overflowWrap: 'break-word',
+            },
+          },
+        },
+      },
+    });
+
+    // A mágica acontece aqui: 
+    // Esta função envolve o tema e torna todas as fontes responsivas
+    return responsiveFontSizes(baseTheme);
+  }, [resolvedMode]);
 
   return (
     <ThemeContext.Provider value={{ mode, toggleTheme, resolvedMode }}>
-      <ThemeProvider theme={theme} disableTransitionOnChange>
+      <ThemeProvider theme={theme}>
         <CssBaseline />
         {children}
       </ThemeProvider>
