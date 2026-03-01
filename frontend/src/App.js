@@ -1,37 +1,32 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { 
   Box, 
-  AppBar, 
   Toolbar, 
-  Typography, 
-  IconButton, 
   useScrollTrigger, 
   Slide, 
   Fade, 
   Fab 
 } from '@mui/material';
-import { 
-  Brightness4, 
-  Brightness7, 
-  KeyboardArrowUp 
-} from '@mui/icons-material'; 
-import { ThemeProviderWrapper, useAppTheme } from './contexts/ThemeContext';
+import { KeyboardArrowUp } from '@mui/icons-material'; 
+import { ThemeProviderWrapper } from './contexts/ThemeContext';
 import ScrollToTop from './components/ScrollToTop';
+import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Course from './pages/Course';
+import Search from './pages/Search';
 
-// 1. Componente para Esconder a AppBar ao rolar
 function HideOnScroll({ children }) {
   const trigger = useScrollTrigger();
+  // cloneElement passa as props de transição (style, ref, etc) 
+  // do Slide diretamente para o componente Navbar
   return (
     <Slide appear={false} direction="down" in={!trigger}>
-      {children}
+      {React.cloneElement(children)}
     </Slide>
   );
 }
 
-// 2. Componente do Botão Voltar ao Topo
 function ScrollTop() {
   const trigger = useScrollTrigger({
     disableHysteresis: true,
@@ -63,49 +58,30 @@ function ScrollTop() {
 }
 
 const AppContent = () => {
-  const { resolvedMode, toggleTheme } = useAppTheme();
-
   return (
     <Router>
       <ScrollToTop />
       
-      {/* Ponto de ancoragem para o scroll retornar aqui */}
       <div id="back-to-top-anchor" />
 
-      <Box sx={{ flexGrow: 1, minHeight: '100vh' }}>
+      <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
         
-        {/* Envolvendo a AppBar com a lógica de esconder */}
         <HideOnScroll>
-          <AppBar color="primary" position="sticky" elevation={0}>
-            <Toolbar>
-              <Typography 
-                variant="h6" 
-                component={Link} 
-                to="/" 
-                sx={{ fontWeight: 'bold', color: 'inherit', textDecoration: 'none' }}
-              >
-                Meus Cursos
-              </Typography>
-              <Box flexGrow={1} />
-              
-              <IconButton onClick={toggleTheme} color="inherit">
-                {resolvedMode === 'dark' ? <Brightness7 /> : <Brightness4 />}
-              </IconButton>
-            </Toolbar>
-          </AppBar>
+          {/* O componente agora é passado diretamente para o Slide via cloneElement */}
+          <Navbar />
         </HideOnScroll>
+        
+        <Toolbar />
 
-        {/* Conteúdo Principal */}
-        <Box component="main" sx={{ pb: 4 }}>
+        <Box component="main" sx={{ pb: 8 }}>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/search" element={<Search />} />
             <Route path="/curso/:slug" element={<Course />} />
           </Routes>
         </Box>
 
-        {/* Botão flutuante para voltar ao topo */}
         <ScrollTop />
-        
       </Box>
     </Router>
   );

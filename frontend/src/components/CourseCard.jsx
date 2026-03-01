@@ -29,7 +29,7 @@ const CourseCard = ({ course }) => {
               // Largura total no mobile, largura fixa no desktop
               width: { xs: '100%', sm: 256 },
               // Altura fixa no mobile para não ficar gigante, 100% no desktop
-              height: { xs: 180, sm: 'auto' },
+              height: { xs: 128, sm: 'auto' },
               minWidth: { xs: '100%', sm: 256 }, 
               objectFit: 'cover',
             }}
