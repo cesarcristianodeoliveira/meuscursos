@@ -93,7 +93,7 @@ const Home = () => {
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
-          <Typography variant="h5" fontWeight="800">Cursos Recentes</Typography>
+          <Typography variant="h6" fontWeight={600}>Cursos Recentes</Typography>
           {!fetching && (
             <Typography variant="body2" color="text.secondary">
               {totalCourses === 1 ? `${totalCourses} curso disponível` : `${totalCourses} cursos disponíveis`}
