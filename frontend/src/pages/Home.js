@@ -120,8 +120,8 @@ const Home = () => {
           <>
             {courses.map((course) => <CourseCard key={course._id} course={course} />)}
             {courses.length === 0 && (
-              <Box sx={{ textAlign: 'center', py: 8, border: '1px dashed', borderColor: 'divider', borderRadius: 4 }}>
-                <RocketLaunch sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
+              <Box sx={{ textAlign: 'center', py: 4, border: '1px dashed', borderColor: 'divider', borderRadius: 4 }}>
+                <RocketLaunch sx={{ fontSize: 56, color: 'text.disabled', mb: 1 }} />
                 <Typography color="text.secondary">Nenhum curso encontrado.</Typography>
               </Box>
             )}
