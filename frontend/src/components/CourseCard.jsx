@@ -48,7 +48,7 @@ const CourseCard = ({ course }) => {
               justifyContent: 'center'
             }}
           >
-            <RocketLaunch sx={{ fontSize: 40, color: 'text.disabled' }} />
+            <RocketLaunch sx={{ fontSize: 32, color: 'text.disabled' }} />
           </Box>
         )}
 

@@ -15,7 +15,7 @@ app.use(express.json());
 app.post('/generate-course', generateCourse);
 
 // Servidor
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Motor de Cursos Master rodando em modo modularizado na porta ${PORT}`);
 });
