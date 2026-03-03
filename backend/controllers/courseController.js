@@ -4,70 +4,72 @@ const { fetchAndUploadImage } = require('../services/imageService');
 const { generateCourseContent } = require('../services/aiService');
 
 const generateCourse = async (req, res) => {
-  // Aumenta o tempo de resposta aceitável para o cliente
-  req.setTimeout(600000); // 10 minutos (previne timeout no Vercel/Node)
+  // Define um timeout longo para aguentar o tempo de resposta da IA (60s+)
+  req.setTimeout(600000); 
 
   const { topic } = req.body;
   if (!topic) return res.status(400).json({ error: 'O tema é obrigatório' });
 
   try {
-    console.log(`🚀 Iniciando geração exaustiva para: ${topic}...`);
-    
-    // Chama a IA com o novo prompt de alta densidade
-    const data = await generateCourseContent(topic);
+    console.log(`🚀 Gerando curso exaustivo sobre: ${topic}`);
+    const courseData = await generateCourseContent(topic);
 
-    if (!data.modules || data.modules.length === 0) {
-      throw new Error("A IA retornou um curso sem módulos.");
+    const rawModules = courseData.modules || [];
+    if (rawModules.length === 0) {
+      return res.status(500).json({ error: 'A IA não retornou módulos válidos.' });
     }
 
-    // 1. Tratamento de Título e Slug Inteligente
-    let finalTitle = data.title || topic;
+    // 1. Definição de Título e Slug
+    let finalTitle = courseData.title || topic;
     let slugCandidate = formatSlug(finalTitle);
     
-    // Verifica se já existe um curso com esse slug para evitar erro no Sanity
-    const existing = await client.fetch(`*[_type == "course" && slug.current == $slugCandidate][0]`, { slugCandidate });
+    // Verifica duplicidade de slug
+    const existing = await client.fetch(
+      `*[_type == "course" && slug.current == $slugCandidate][0]`, 
+      { slugCandidate }
+    );
     if (existing) {
       slugCandidate = `${slugCandidate}-${Math.floor(Math.random() * 1000)}`;
     }
 
-    // 2. Upload da Imagem (Paralelo ao processamento se desejar, mas mantido sequencial para segurança)
+    // 2. Upload da Imagem
     const imageAsset = await fetchAndUploadImage(
-      data.searchQuery || topic, 
-      data.pixabay_category || "education"
+      courseData.searchQuery || topic, 
+      courseData.pixabay_category || "education" 
     );
 
-    // 3. Montagem do Documento com Sanitização
+    // 3. Montagem do Documento (Sincronizado com o novo Schema)
     const doc = {
       _type: 'course',
       title: finalTitle,
       slug: { _type: 'slug', current: slugCandidate },
-      description: data.description,
-      estimatedTime: Number(data.estimatedTime) || 5,
-      rating: Number(data.rating) || 4.9,
-      aiProvider: data.aiProvider,
-      aiModel: data.aiModel,
+      description: courseData.description,
+      estimatedTime: Number(courseData.estimatedTime) || 4,
+      rating: Number(courseData.rating) || 5,
+      aiProvider: courseData.aiProvider,
+      aiModel: courseData.aiModel,
       
+      // Ajuste para o objeto Categoria do seu Schema
       category: {
-        name: data.categoryName || "Geral",
-        slug: { _type: 'slug', current: formatSlug(data.categoryName || "Geral") }
+        name: courseData.categoryName || "Geral",
+        slug: { _type: 'slug', current: formatSlug(courseData.categoryName || "geral") }
       },
 
-      // Mapeamento de Módulos
-      modules: data.modules.map(mod => ({
+      // Mapeamento de Módulos + Exercícios (O segredo do aprendizado ativo)
+      modules: rawModules.map(mod => ({
         _key: Math.random().toString(36).substring(2, 11),
-        title: mod.title,
-        content: mod.content,
+        title: mod.title || "Unidade Técnica",
+        content: mod.content || "",
         exercises: (mod.exercises || []).map(ex => ({
           _key: Math.random().toString(36).substring(2, 11),
           question: ex.question,
           options: ex.options,
-          // Garante que a resposta correta não tenha espaços vazios nas pontas
-          correctAnswer: String(ex.correctAnswer).trim()
+          correctAnswer: String(ex.correctAnswer).trim() // Limpa espaços extras
         }))
       })),
 
-      // Prova Final (15 questões esperadas)
-      finalExam: (data.finalExam || []).map(exam => ({
+      // Mapeamento da Prova Final (15 questões conforme instrução)
+      finalExam: (courseData.finalExam || []).map(exam => ({
         _key: Math.random().toString(36).substring(2, 11),
         question: exam.question,
         options: exam.options,
@@ -75,27 +77,24 @@ const generateCourse = async (req, res) => {
       }))
     };
 
-    if (imageAsset) doc.thumbnail = imageAsset;
+    if (imageAsset) {
+      doc.thumbnail = imageAsset;
+    }
 
-    console.log(`📦 Enviando curso (${doc.modules.length} módulos) para o Sanity...`);
+    console.log(`📦 Enviando curso denso para o Sanity...`);
     const result = await client.create(doc);
     
     res.status(200).json({ 
-      message: 'Curso Profissional Gerado com Sucesso!', 
+      message: 'Curso gerado com sucesso!', 
       courseId: result._id,
-      slug: doc.slug.current,
-      stats: {
-        modules: doc.modules.length,
-        examQuestions: doc.finalExam.length,
-        time: doc.estimatedTime
-      }
+      slug: doc.slug.current 
     });
 
   } catch (error) {
-    console.error("❌ Erro Crítico no Controller:", error.message);
+    console.error("❌ Erro no Controller:", error);
     res.status(500).json({ 
-      error: 'Falha ao processar conteúdo denso.',
-      details: error.message 
+      error: 'Falha técnica ao processar curso.',
+      message: error.message 
     });
   }
 };
