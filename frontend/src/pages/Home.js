@@ -80,7 +80,7 @@ const Home = () => {
       <Box component="form" onSubmit={handleGenerate} sx={{ display: 'flex', gap: 2, mb: 6 }}>
         <TextField
           fullWidth
-          label="O que você deseja aprender hoje?"
+          label="O que você deseja aprender?"
           variant="outlined"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
@@ -91,7 +91,7 @@ const Home = () => {
         </Button>
       </Box>
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Stack direction='row' spacing={2} sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
           <Typography variant="h6" fontWeight={600}>Cursos Recentes</Typography>
           {!fetching && (

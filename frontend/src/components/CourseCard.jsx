@@ -40,7 +40,7 @@ const CourseCard = ({ course }) => {
           <Box
             sx={{
               width: { xs: '100%', sm: 256 },
-              height: { xs: 150, sm: '100%' },
+              height: { xs: 160, sm: '100%' },
               minWidth: { xs: '100%', sm: 256 },
               bgcolor: 'action.hover',
               display: 'flex',
@@ -62,7 +62,7 @@ const CourseCard = ({ course }) => {
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
             <Chip 
-              label={course.category || "Geral"} 
+              label={course.category.name || "Geral"} 
               size="small"
               variant="outlined"
               sx={{ 
@@ -84,7 +84,7 @@ const CourseCard = ({ course }) => {
             sx={{ 
               fontWeight: 600,
               mb: 1,
-              lineHeight: 1.2,
+              lineHeight: 1.3,
               display: '-webkit-box',
               WebkitLineClamp: { xs: 2, sm: 1 }, // Permite 2 linhas no mobile
               WebkitBoxOrient: 'vertical',

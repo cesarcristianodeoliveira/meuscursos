@@ -135,7 +135,7 @@ function Course() {
             <Box component="img" src={urlFor(course.thumbnail).width(1200).url()} sx={{ width: '100%', height: { xs: 200, md: 350 }, objectFit: 'cover' }} />
           )}
           <Box sx={{ p: { xs: 2, md: 4 } }}>
-            <Typography variant="overline" color="primary" sx={{ fontWeight: 900 }}>{course.category}</Typography>
+            <Typography variant="overline" color="primary" sx={{ fontWeight: 900 }}>{course.category.name}</Typography>
             {/* Título Responsivo automático via ThemeContext */}
             <Typography variant="h3" sx={{ mb: 1 }}>
               {course.title}
@@ -198,7 +198,7 @@ function Course() {
             <Box component="img" src={urlFor(course.thumbnail).width(1200).url()} sx={{ width: '100%', height: 350, objectFit: 'cover', display: 'block' }} />
           )}
           <Box sx={{ p: 5 }}>
-            <Typography sx={{ color: '#1976d2 !important', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.9rem', mb: 1 }}>{course.category}</Typography>
+            <Typography sx={{ color: '#1976d2 !important', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.9rem', mb: 1 }}>{course.category.name}</Typography>
             <Typography sx={{ color: '#000 !important', fontWeight: 900, fontSize: '2.5rem', lineHeight: 1.2 }}>{course.title}</Typography>
             <Typography sx={{ color: '#444 !important', mt: 2, fontSize: '1.2rem', lineHeight: 1.6 }}>{course.description}</Typography>
           </Box>
