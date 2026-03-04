@@ -6,20 +6,55 @@ import {
   useScrollTrigger, 
   Slide, 
   Fade, 
-  Fab 
+  Fab,
+  LinearProgress,
+  Typography
 } from '@mui/material';
 import { KeyboardArrowUp } from '@mui/icons-material'; 
 import { ThemeProviderWrapper } from './contexts/ThemeContext';
+import { CourseProvider, useCourse } from './contexts/CourseContext'; // Importando o novo contexto
 import ScrollToTop from './components/ScrollToTop';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Course from './pages/Course';
 import Search from './pages/Search';
 
+// Componente para mostrar o progresso global de geração
+const GlobalGenerationProgress = () => {
+  const { isGenerating, progress, statusMessage } = useCourse();
+
+  if (!isGenerating) return null;
+
+  return (
+    <Box sx={{ 
+      position: 'fixed', 
+      top: 64, // Logo abaixo da Toolbar padrão
+      left: 0, 
+      right: 0, 
+      zIndex: 1099, // Um pouco abaixo da Navbar
+      bgcolor: 'background.paper',
+      boxShadow: 2,
+      p: 1.5,
+      borderBottom: '1px solid',
+      borderColor: 'divider'
+    }}>
+      <Box sx={{ maxWidth: 'xl', margin: '0 auto', px: 2 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+          <Typography variant="caption" fontWeight="bold" color="primary">
+            {statusMessage}
+          </Typography>
+          <Typography variant="caption" fontWeight="bold">
+            {Math.round(progress)}%
+          </Typography>
+        </Stack>
+        <LinearProgress variant="determinate" value={progress} sx={{ height: 6, borderRadius: 3 }} />
+      </Box>
+    </Box>
+  );
+};
+
 function HideOnScroll({ children }) {
   const trigger = useScrollTrigger();
-  // cloneElement passa as props de transição (style, ref, etc) 
-  // do Slide diretamente para o componente Navbar
   return (
     <Slide appear={false} direction="down" in={!trigger}>
       {React.cloneElement(children)}
@@ -34,9 +69,7 @@ function ScrollTop() {
   });
 
   const handleClick = (event) => {
-    const anchor = (event.target.ownerDocument || document).querySelector(
-      '#back-to-top-anchor',
-    );
+    const anchor = (event.target.ownerDocument || document).querySelector('#back-to-top-anchor');
     if (anchor) {
       anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
@@ -61,17 +94,18 @@ const AppContent = () => {
   return (
     <Router>
       <ScrollToTop />
-      
       <div id="back-to-top-anchor" />
 
       <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
         
         <HideOnScroll>
-          {/* O componente agora é passado diretamente para o Slide via cloneElement */}
           <Navbar />
         </HideOnScroll>
         
         <Toolbar />
+
+        {/* Barra de Progresso que aparece em qualquer página durante a geração */}
+        <GlobalGenerationProgress />
 
         <Box component="main" sx={{ pb: 8 }}>
           <Routes>
@@ -90,7 +124,9 @@ const AppContent = () => {
 function App() {
   return (
     <ThemeProviderWrapper>
-      <AppContent />
+      <CourseProvider> {/* Provider adicionado aqui para envolver toda a lógica */}
+        <AppContent />
+      </CourseProvider>
     </ThemeProviderWrapper>
   );
 }

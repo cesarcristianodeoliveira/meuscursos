@@ -1,19 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import { client } from '../client';
 import CourseCard from '../components/CourseCard';
 import CourseCardSkeleton from '../components/CourseCardSkeleton';
+import { useCourse } from '../contexts/CourseContext'; // Importando o hook global
 import { 
   Container, TextField, Button, Box, Typography, 
   Pagination, Stack, MenuItem
 } from '@mui/material';
 import { RocketLaunch } from '@mui/icons-material';
 
-const COURSES_PER_PAGE = 10;
+const COURSES_PER_PAGE = 5;
 
 const Home = () => {
   const [topic, setTopic] = useState('');
-  const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [courses, setCourses] = useState([]);
   const [totalCourses, setTotalCourses] = useState(0);
@@ -21,11 +20,12 @@ const Home = () => {
   const [categoryFilter, setCategoryFilter] = useState('Todos');
   const [categories, setCategories] = useState([]);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+  // Puxando o estado global do contexto
+  const { isGenerating, generateCourse } = useCourse();
 
   const fetchCategories = async () => {
     try {
-      const data = await client.fetch('*[_type == "course" && defined(category)].category');
+      const data = await client.fetch('*[_type == "course" && defined(category)].category.name');
       const unique = ['Todos', ...new Set(data)];
       setCategories(unique);
     } catch (err) { console.error("Erro categorias:", err); }
@@ -36,7 +36,7 @@ const Home = () => {
     try {
       let conditions = ['_type == "course"'];
       if (categoryFilter !== 'Todos') {
-        conditions.push(`category == "${categoryFilter}"`);
+        conditions.push(`category.name == "${categoryFilter}"`);
       }
       const filter = `*[${conditions.join(' && ')}]`;
       const total = await client.fetch(`count(${filter})`);
@@ -55,19 +55,19 @@ const Home = () => {
   useEffect(() => { fetchCategories(); }, []);
   useEffect(() => { fetchCourses(); }, [fetchCourses]);
 
+  // Função disparada ao clicar em Gerar
   const handleGenerate = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    try {
-      await axios.post(`${API_BASE_URL}/generate-course`, { topic });
+    
+    // Chama a função global do contexto
+    await generateCourse(topic, () => {
+      // Este callback só roda quando o curso termina de ser criado
       setTopic('');
       setPage(1); 
       setCategoryFilter('Todos');
-      await fetchCourses(); 
-      await fetchCategories();
-    } catch (error) {
-      alert('Erro ao gerar curso.');
-    } finally { setLoading(false); }
+      fetchCourses(); 
+      fetchCategories();
+    });
   };
 
   const handlePageChange = (event, value) => {
@@ -77,6 +77,7 @@ const Home = () => {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, pb: 4 }}>
+      {/* Formulário de Geração */}
       <Box component="form" onSubmit={handleGenerate} sx={{ display: 'flex', gap: 2, mb: 6 }}>
         <TextField
           fullWidth
@@ -84,13 +85,21 @@ const Home = () => {
           variant="outlined"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
-          disabled={loading}
+          disabled={isGenerating} // Desabilita se estiver gerando (globalmente)
+          placeholder="Ex: Marketing Digital avançado, Culinária Vegana..."
         />
-        <Button variant="contained" type="submit" size="large" disabled={loading || !topic} sx={{ px: 4, fontWeight: 'bold' }}>
-          {loading ? 'Gerando' : 'Gerar'}
+        <Button 
+          variant="contained" 
+          type="submit" 
+          size="large" 
+          disabled={isGenerating || !topic} 
+          sx={{ px: 4, fontWeight: 'bold', minWidth: 120 }}
+        >
+          {isGenerating ? 'Gerando...' : 'Gerar'}
         </Button>
       </Box>
 
+      {/* Cabeçalho da Listagem */}
       <Stack direction='row' spacing={2} sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
           <Typography variant="h6" fontWeight={600}>Cursos Recentes</Typography>
@@ -113,14 +122,15 @@ const Home = () => {
         </TextField>
       </Stack>
 
+      {/* Grid de Cursos ou Skeletons */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {(fetching || loading) ? (
+        {fetching ? (
           [...Array(3)].map((_, i) => <CourseCardSkeleton key={i} />)
         ) : (
           <>
             {courses.map((course) => <CourseCard key={course._id} course={course} />)}
             {courses.length === 0 && (
-              <Box sx={{ textAlign: 'center', py: 4, border: '1px dashed', borderColor: 'divider', borderRadius: 4 }}>
+              <Box sx={{ textAlign: 'center', py: 8, border: '1px dashed', borderColor: 'divider', borderRadius: 4 }}>
                 <RocketLaunch sx={{ fontSize: 56, color: 'text.disabled', mb: 1 }} />
                 <Typography color="text.secondary">Nenhum curso encontrado.</Typography>
               </Box>
@@ -129,9 +139,15 @@ const Home = () => {
         )}
       </Box>
 
+      {/* Paginação */}
       {!fetching && totalCourses > COURSES_PER_PAGE && (
         <Stack sx={{ mt: 6, alignItems: 'center' }}>
-          <Pagination count={Math.ceil(totalCourses / COURSES_PER_PAGE)} page={page} onChange={handlePageChange} color="primary" />
+          <Pagination 
+            count={Math.ceil(totalCourses / COURSES_PER_PAGE)} 
+            page={page} 
+            onChange={handlePageChange} 
+            color="primary" 
+          />
         </Stack>
       )}
     </Container>
