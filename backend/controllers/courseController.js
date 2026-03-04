@@ -19,21 +19,26 @@ const generateCourse = async (req, res) => {
       return res.status(500).json({ error: 'A IA falhou ao estruturar os módulos.' });
     }
 
-    // --- 1. LÓGICA DE TEMPO ESTIMADO (10 caracteres = 5 segundos) ---
-    // Somamos a descrição e todo o conteúdo dos módulos
-    const totalText = courseData.description + rawModules.reduce((acc, mod) => acc + (mod.content || ""), "");
-    const totalCharacters = totalText.length;
+    // --- 1. LÓGICA DE TEMPO ESTIMADO (Regra Padrão: 200 Palavras por Minuto) ---
+    // Somamos todo o texto legível para calcular o tempo de estudo
+    const allText = courseData.description + rawModules.reduce((acc, mod) => acc + (mod.content || ""), "");
     
-    // Cálculo: (Caracteres / 10) * 5 segundos = Total em segundos
-    // Total em segundos / 60 = Total em minutos
-    const totalMinutes = (totalCharacters / 10) * 5 / 60;
+    // Divide o texto por espaços para contar palavras
+    const wordCount = allText.split(/\s+/).filter(word => word.length > 0).length;
     
-    // Convertemos para horas com uma casa decimal (ex: 4.5h)
-    // Garantimos um mínimo de 1 hora para cursos muito curtos
+    // Cálculo: palavras / 200 = minutos de leitura
+    const readingMinutes = wordCount / 200;
+
+    // Adicionamos um "tempo de estudo" (exercícios + prova final) 
+    // Média de 2 min por exercício (3 por módulo) + 1 min por questão da prova final
+    const exerciseMinutes = (rawModules.length * 3 * 2) + (courseData.finalExam?.length || 10);
+    
+    const totalMinutes = readingMinutes + exerciseMinutes;
+
+    // Convertemos para horas com uma casa decimal (ex: 1.5h) e garantimos mínimo de 1h
     const finalEstimatedTime = Math.max(1, parseFloat((totalMinutes / 60).toFixed(1)));
 
     // --- 2. LÓGICA DE RATING (Arredondamento para múltiplos de 0.5) ---
-    // Ex: 3.7 vira 3.5 | 3.8 vira 4.0 | 4.2 vira 4.0 | 4.3 vira 4.5
     const rawRating = Number(courseData.rating) || 4.5;
     const finalRating = Math.round(rawRating * 2) / 2;
 
@@ -71,7 +76,6 @@ const generateCourse = async (req, res) => {
         slug: { _type: 'slug', current: formatSlug(courseData.categoryName || "geral") }
       },
 
-      // Mapeamento de Módulos (Limitando a 3 exercícios por módulo por segurança)
       modules: rawModules.map(mod => ({
         _key: Math.random().toString(36).substring(2, 11),
         title: mod.title || "Módulo",
@@ -84,7 +88,6 @@ const generateCourse = async (req, res) => {
         }))
       })),
 
-      // Mapeamento da Prova Final (IA gera entre 10 e 20)
       finalExam: (courseData.finalExam || []).map(exam => ({
         _key: Math.random().toString(36).substring(2, 11),
         question: exam.question,
@@ -95,14 +98,14 @@ const generateCourse = async (req, res) => {
 
     if (imageAsset) doc.thumbnail = imageAsset;
 
-    console.log(`📦 Salvando no Sanity: ${finalTitle} (${finalEstimatedTime}h, Rating: ${finalRating})`);
+    console.log(`📦 Salvando no Sanity: ${finalTitle} (${finalEstimatedTime}h, ${wordCount} palavras)`);
     const result = await client.create(doc);
     
     res.status(200).json({ 
       message: 'Curso gerado com sucesso!', 
       courseId: result._id,
       slug: doc.slug.current,
-      debug: { time: finalEstimatedTime, rating: finalRating }
+      debug: { time: finalEstimatedTime, words: wordCount, rating: finalRating }
     });
 
   } catch (error) {
