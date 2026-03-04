@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import { 
   ArrowBack, MenuBook, ContentCopy, PictureAsPdf, 
-  Check, Assignment, QueryBuilder, AutoAwesome, EmojiEvents,
+  Check, Assignment, QueryBuilder, EmojiEvents,
   CheckCircleOutline,
   RadioButtonUnchecked
 } from '@mui/icons-material';
