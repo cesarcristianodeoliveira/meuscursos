@@ -8,7 +8,8 @@ import {
   Fade, 
   Fab,
   LinearProgress,
-  Typography
+  Typography,
+  Stack
 } from '@mui/material';
 import { KeyboardArrowUp } from '@mui/icons-material'; 
 import { ThemeProviderWrapper } from './contexts/ThemeContext';
