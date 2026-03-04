@@ -178,7 +178,7 @@ function Course() {
   if (!course) return <Box sx={{ p: 5, textAlign: 'center' }}><Typography>Curso não encontrado.</Typography></Box>;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
       {/* HEADER ACTIONS */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
         <Button startIcon={<ArrowBack />} onClick={() => navigate('/')} sx={{ fontWeight: 'bold' }}>Voltar</Button>
