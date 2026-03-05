@@ -8,56 +8,88 @@ import {
   Typography, Box, Paper, Accordion, AccordionSummary, 
   AccordionDetails, Button, CircularProgress, 
   Container, Table, TableCell, 
-  TableContainer, IconButton, Tooltip, Divider,
+  TableContainer, IconButton, Tooltip,
   Radio, RadioGroup, FormControlLabel, FormControl, Alert, Stack, Chip,
   LinearProgress
 } from '@mui/material';
 import { 
-  ArrowBack, MenuBook, ContentCopy, PictureAsPdf, 
+  ArrowBack, ContentCopy, PictureAsPdf, 
   Check, Assignment, EmojiEvents,
   CheckCircleOutline, RadioButtonUnchecked, Lock as LockIcon
 } from '@mui/icons-material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CertificateDialog from '../components/CertificateDialog';
 
-// --- HELPER: EMBARALHAR ARRAY ---
 const shuffleArray = (array) => [...array].sort(() => Math.random() - 0.5);
 
-// --- COMPONENTE: QUIZ COM PERSISTÊNCIA E RETRY ---
+// --- COMPONENTE QUIZ CORRIGIDO ---
 const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise", onComplete, isCompleted, scrollToTop }) => {
   const storageKey = `quiz-${courseId}-${moduleKey}`;
   
+  // Carrega respostas do cache
   const [answers, setAnswers] = useState(() => {
     const saved = localStorage.getItem(storageKey);
     return saved ? JSON.parse(saved) : {};
   });
-  const [showResult, setShowResult] = useState(isCompleted);
+
+  // Estado de exibição do resultado: true se já completou ou se respondeu tudo anteriormente
+  const [showResult, setShowResult] = useState(() => {
+    if (isCompleted) return true;
+    const saved = localStorage.getItem(storageKey);
+    const savedAnswers = saved ? JSON.parse(saved) : {};
+    return questions.length > 0 && Object.keys(savedAnswers).length === questions.length;
+  });
+
   const [score, setScore] = useState(0);
 
+  // Embaralha uma vez
   const shuffledQuestions = useMemo(() => {
-    return questions.map(q => ({ ...q, options: shuffleArray(q.options || []) }));
+    return shuffleArray(questions.map(q => ({
+      ...q,
+      options: shuffleArray(q.options || [])
+    })));
   }, [questions]);
 
-  const handleSubmit = () => {
-    let correct = 0;
-    shuffledQuestions.forEach((q, idx) => {
-      if (answers[idx] === q.correctAnswer) correct++;
+  // Calcula o score sempre que carregar ou mudar respostas
+  useEffect(() => {
+    let hits = 0;
+    shuffledQuestions.forEach((q) => {
+      if (answers[q.question] === q.correctAnswer) hits++;
     });
-    setScore(correct);
-    setShowResult(true);
-    
-    if ((correct / questions.length) >= 0.5) {
-      localStorage.setItem(storageKey, JSON.stringify(answers));
-      if (onComplete) onComplete();
+    setScore(hits);
+  }, [answers, shuffledQuestions]);
+
+  // Efeito para validar automaticamente com pequeno delay
+  useEffect(() => {
+    const total = shuffledQuestions.length;
+    const answeredCount = Object.keys(answers).length;
+
+    if (total > 0 && answeredCount === total && !showResult) {
+      const timer = setTimeout(() => {
+        setShowResult(true);
+        // Sempre salva as respostas no localStorage ao finalizar
+        localStorage.setItem(storageKey, JSON.stringify(answers));
+        
+        // Só chama a conclusão do módulo se acertar >= 50%
+        let hits = 0;
+        shuffledQuestions.forEach((q) => {
+          if (answers[q.question] === q.correctAnswer) hits++;
+        });
+
+        if ((hits / total) >= 0.5) {
+          if (onComplete) onComplete();
+        }
+      }, 600);
+      return () => clearTimeout(timer);
     }
-  };
+  }, [answers, shuffledQuestions, showResult, onComplete, storageKey]);
 
   const handleRetry = () => {
-    setAnswers({}); 
+    setAnswers({});
     setShowResult(false);
     setScore(0);
     localStorage.removeItem(storageKey);
-    if (scrollToTop) scrollToTop(); 
+    if (scrollToTop) scrollToTop();
   };
 
   if (!questions || questions.length === 0) return null;
@@ -65,7 +97,7 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
   return (
     <Box sx={{ 
       mt: 4, p: 3, borderRadius: 3, bgcolor: 'action.hover', border: '1px dashed', 
-      borderColor: showResult ? (score >= questions.length / 2 ? 'success.main' : 'error.main') : 'primary.main' 
+      borderColor: showResult ? (score >= shuffledQuestions.length / 2 ? 'success.main' : 'error.main') : 'primary.main' 
     }}>
       <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', fontWeight: 700 }}>
         {type === "exam" ? <EmojiEvents sx={{ mr: 1, color: '#FFD700' }} /> : <Assignment sx={{ mr: 1, color: 'primary.main' }} />}
@@ -77,30 +109,31 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>{qIdx + 1}. {q.question}</Typography>
           <FormControl component="fieldset">
             <RadioGroup 
-              value={answers[qIdx] || ''} 
-              onChange={(e) => setAnswers(prev => ({ ...prev, [qIdx]: e.target.value }))}
+              value={answers[q.question] || ''} 
+              onChange={(e) => setAnswers(prev => ({ ...prev, [q.question]: e.target.value }))}
             >
               {q.options.map((opt, oIdx) => (
-                <FormControlLabel key={oIdx} value={opt} control={<Radio size="small" />} label={<Typography variant="body2">{opt}</Typography>} disabled={showResult} />
+                <FormControlLabel 
+                  key={oIdx} 
+                  value={opt} 
+                  control={<Radio size="small" />} 
+                  label={<Typography variant="body2">{opt}</Typography>} 
+                  disabled={showResult} 
+                />
               ))}
             </RadioGroup>
           </FormControl>
         </Box>
       ))}
 
-      {!showResult ? (
-        <Button variant="contained" onClick={handleSubmit} disabled={Object.keys(answers).length < questions.length}>
-          Finalizar {type === "exam" ? "Prova Final" : "Exercícios"}
-        </Button>
-      ) : (
-        <Stack spacing={2}>
-          <Alert severity={score >= (questions.length / 2) || isCompleted ? "success" : "error"}>
-            {isCompleted || score >= (questions.length / 2) 
-              ? `Parabéns! Você acertou ${score} de ${questions.length}.` 
-              : `Poxa, você acertou apenas ${score}. É necessário 50% de acertos para avançar.`}
+      {showResult && (
+        <Stack spacing={2} sx={{ mt: 2 }}>
+          <Alert severity={score >= (shuffledQuestions.length / 2) || isCompleted ? "success" : "error"}>
+            {isCompleted || score >= (shuffledQuestions.length / 2) 
+              ? `Parabéns! Você acertou ${score} de ${shuffledQuestions.length}.` 
+              : `Você acertou ${score} de ${shuffledQuestions.length}. Tente revisar o conteúdo.`}
           </Alert>
-          
-          {(score < (questions.length / 2) && !isCompleted) && (
+          {(score < (shuffledQuestions.length / 2) && !isCompleted) && (
             <Button variant="outlined" color="error" onClick={handleRetry} sx={{ alignSelf: 'flex-start' }}>
               Tentar Novamente
             </Button>
@@ -111,7 +144,6 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
   );
 };
 
-// --- COMPONENTE: BLOCO DE CÓDIGO ---
 const CodeBlock = ({ children }) => {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
@@ -178,7 +210,6 @@ function Course() {
         setExpanded(prev => ({ ...prev, [nextKey]: true }));
         setTimeout(() => scrollToAccordion(nextKey), 300);
       }
-      
       if (key === 'final-exam') setOpenCert(true);
     }
   };
@@ -189,25 +220,19 @@ function Course() {
 
   const handleAccordionChange = (key) => (event, isExpanded) => {
     setExpanded(prev => ({ ...prev, [key]: isExpanded }));
-    if (isExpanded) {
-      setTimeout(() => scrollToAccordion(key), 100);
-    }
+    if (isExpanded) setTimeout(() => scrollToAccordion(key), 100);
   };
 
   const handleDownloadPDF = () => {
     const element = document.getElementById('pdf-export-area');
     const opt = {
-      margin: [10, 5, 10, 5],
-      filename: `Curso-${course?.title}.pdf`,
+      margin: 10, filename: `Curso-${course?.title}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'], before: '.page-break' }
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
     element.style.display = 'block';
-    html2pdf().set(opt).from(element).save().then(() => {
-      element.style.display = 'none';
-    });
+    html2pdf().set(opt).from(element).save().then(() => element.style.display = 'none');
   };
 
   const progressPercentage = useMemo(() => {
@@ -234,41 +259,31 @@ function Course() {
 
   return (
     <Box>
-      {/* HEADER PROGRESSO FIXO */}
-      <Box sx={{ position: 'sticky', top: 0, zIndex: 1100, bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider' }}>
+      <Box sx={{ position: 'sticky', top: 0, zIndex: 1100, bgcolor: 'background.paper', borderBottom: '1px solid divider' }}>
         <LinearProgress variant="determinate" value={progressPercentage} sx={{ height: 6 }} />
         <Container maxWidth="xl" sx={{ py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Button startIcon={<ArrowBack />} onClick={() => navigate('/')} size="small">Voltar</Button>
+          <Button startIcon={<ArrowBack />} onClick={() => navigate('/')}>Voltar</Button>
           <Stack direction="row" spacing={2} alignItems="center">
             <Typography variant="caption" fontWeight="bold" color="primary">{progressPercentage}% CONCLUÍDO</Typography>
-            <Button size="small" variant="contained" startIcon={<PictureAsPdf />} onClick={handleDownloadPDF} sx={{ borderRadius: 2, fontSize: '0.7rem' }}>PDF</Button>
+            <Button size="small" variant="contained" startIcon={<PictureAsPdf />} onClick={handleDownloadPDF}>PDF</Button>
           </Stack>
         </Container>
       </Box>
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        {/* CAPA */}
-        <Paper elevation={0} sx={{ mb: 4, borderRadius: 4, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+        <Paper elevation={0} sx={{ mb: 4, borderRadius: 4, border: '1px solid divider', overflow: 'hidden' }}>
           {course.thumbnail && (
             <Box component="img" src={urlFor(course.thumbnail).width(1200).url()} sx={{ width: '100%', height: { xs: 200, md: 350 }, objectFit: 'cover' }} />
           )}
           <Box sx={{ p: 4 }}>
             <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
               <Chip label={course.category?.name || "Geral"} color="primary" size="small" sx={{ fontWeight: 800 }} />
-              <Chip 
-                icon={progressPercentage === 100 ? <Check /> : <CircularProgress size={14} thickness={5} value={progressPercentage} variant="determinate" />} 
-                label={progressPercentage === 100 ? "Concluído" : `${progressPercentage}% em andamento`} 
-                variant="outlined" size="small" color={progressPercentage === 100 ? "success" : "primary"} 
-              />
+              <Chip label={progressPercentage === 100 ? "Concluído" : `${progressPercentage}%`} variant="outlined" size="small" color="primary" />
             </Stack>
-            <Typography variant="h3" sx={{ fontWeight: 800, mb: 2, fontSize: { xs: '1.8rem', md: '3rem' } }}>{course.title}</Typography>
+            <Typography variant="h3" sx={{ fontWeight: 800, mb: 2 }}>{course.title}</Typography>
             <Typography variant="body1" color="text.secondary">{course.description}</Typography>
           </Box>
         </Paper>
-
-        <Typography variant="h5" sx={{ mb: 3, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <MenuBook color="primary" /> Grade Curricular
-        </Typography>
 
         {course.modules?.map((module, index) => {
           const isCompleted = completedSteps.includes(module._key);
@@ -281,9 +296,9 @@ function Course() {
               expanded={!!expanded[module._key]}
               onChange={handleAccordionChange(module._key)}
               ref={el => accordionRefs.current[module._key] = el}
-              sx={{ mb: 2, borderRadius: '16px !important', border: '1px solid', borderColor: isCompleted ? 'success.light' : 'divider', scrollMarginTop: '100px' }}
+              sx={{ mb: 2, borderRadius: '16px !important', border: '1px solid', borderColor: isCompleted ? 'success.light' : 'divider' }}
             >
-              <AccordionSummary expandIcon={isLocked ? <LockIcon fontSize="small" /> : <ExpandMoreIcon />}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   {isCompleted ? <CheckCircleOutline color="success" /> : isLocked ? <LockIcon color="disabled" /> : <RadioButtonUnchecked color="disabled" />}
                   <Typography sx={{ fontWeight: 700 }}>{index + 1}. {module.title}</Typography>
@@ -291,14 +306,10 @@ function Course() {
               </AccordionSummary>
               <AccordionDetails sx={{ px: { xs: 2, md: 4 } }}>
                 <ReactMarkdown components={muiComponents} remarkPlugins={[remarkGfm]}>{module.content}</ReactMarkdown>
-                <Divider sx={{ my: 4 }} />
                 <QuizSection 
-                  courseId={course._id}
-                  moduleKey={module._key}
-                  title="Exercícios de Fixação" 
-                  questions={module.exercises} 
-                  isCompleted={isCompleted} 
-                  onComplete={() => handleStepComplete(module._key)} 
+                  courseId={course._id} moduleKey={module._key}
+                  title="Exercícios" questions={module.exercises} 
+                  isCompleted={isCompleted} onComplete={() => handleStepComplete(module._key)} 
                   scrollToTop={() => scrollToAccordion(module._key)}
                 />
               </AccordionDetails>
@@ -306,35 +317,26 @@ function Course() {
           );
         })}
 
-        {/* PROVA FINAL */}
         {course.modules?.every(m => completedSteps.includes(m._key)) && course.finalExam && (
-          <Box sx={{ mt: 5, mb: 8 }}>
-            <Typography variant="h5" sx={{ mb: 3, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <EmojiEvents sx={{ color: '#FFD700' }} /> Avaliação Final
-            </Typography>
+          <Box sx={{ mt: 5 }}>
             <QuizSection 
-              courseId={course._id}
-              moduleKey="final-exam"
-              title="Exame de Certificação" 
-              questions={course.finalExam} 
-              type="exam" 
-              isCompleted={completedSteps.includes('final-exam')} 
+              courseId={course._id} moduleKey="final-exam"
+              title="Avaliação Final" questions={course.finalExam} 
+              type="exam" isCompleted={completedSteps.includes('final-exam')} 
               onComplete={() => handleStepComplete('final-exam')} 
-              scrollToTop={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
+              scrollToTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             />
           </Box>
         )}
 
-        {/* ÁREA INVISÍVEL PARA PDF */}
-        <Box id="pdf-export-area" sx={{ display: 'none', p: 4 }}>
-          <Typography variant="h2">{course.title}</Typography>
-          <Divider sx={{ my: 4 }} />
-          {course.modules?.map((m, i) => (
-            <Box key={i} className="page-break" sx={{ mb: 4 }}>
-              <Typography variant="h4">{i+1}. {m.title}</Typography>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
-            </Box>
-          ))}
+        <Box id="pdf-export-area" sx={{ display: 'none' }}>
+           <Typography variant="h2">{course.title}</Typography>
+           {course.modules?.map((m, i) => (
+             <Box key={i} sx={{ mb: 4 }}>
+               <Typography variant="h4">{m.title}</Typography>
+               <ReactMarkdown>{m.content}</ReactMarkdown>
+             </Box>
+           ))}
         </Box>
       </Container>
       <CertificateDialog open={openCert} onClose={() => setOpenCert(false)} courseTitle={course.title} />

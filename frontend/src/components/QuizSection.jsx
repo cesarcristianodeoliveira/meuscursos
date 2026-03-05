@@ -5,10 +5,16 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
     const saved = localStorage.getItem(storageKey);
     return saved ? JSON.parse(saved) : {};
   });
-  const [showResult, setShowResult] = useState(isCompleted);
+
+  // O showResult deve ser true se já estiver completado OU se todas as questões foram respondidas
+  const [showResult, setShowResult] = useState(() => {
+    const saved = localStorage.getItem(storageKey);
+    const savedAnswers = saved ? JSON.parse(saved) : {};
+    return isCompleted || (questions.length > 0 && Object.keys(savedAnswers).length === questions.length);
+  });
+
   const [score, setScore] = useState(0);
 
-  // Embaralha QUESTÕES e OPÇÕES uma única vez quando o componente monta
   const shuffledQuestions = useMemo(() => {
     return shuffleArray(questions.map(q => ({
       ...q,
@@ -16,24 +22,37 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
     })));
   }, [questions]);
 
-  // Efeito para validar automaticamente quando todas forem respondidas
+  // Efeito para calcular o score e manter a interface atualizada
   useEffect(() => {
-    const totalQuestions = shuffledQuestions.length;
+    let hits = 0;
+    shuffledQuestions.forEach((q) => {
+      if (answers[q.question] === q.correctAnswer) hits++;
+    });
+    setScore(hits);
+  }, [answers, shuffledQuestions]);
+
+  // Validação Automática com Delay para salvar o progresso
+  useEffect(() => {
+    const total = shuffledQuestions.length;
     const answeredCount = Object.keys(answers).length;
 
-    if (totalQuestions > 0 && answeredCount === totalQuestions && !showResult) {
-      let correct = 0;
-      shuffledQuestions.forEach((q) => {
-        if (answers[q.question] === q.correctAnswer) correct++;
-      });
-
-      setScore(correct);
-      setShowResult(true);
-      
-      if ((correct / totalQuestions) >= 0.5) {
+    if (total > 0 && answeredCount === total && !showResult) {
+      const timer = setTimeout(() => {
+        setShowResult(true);
+        // SALVA SEMPRE: Para que ao voltar as respostas estejam aqui
         localStorage.setItem(storageKey, JSON.stringify(answers));
-        if (onComplete) onComplete();
-      }
+        
+        let hits = 0;
+        shuffledQuestions.forEach((q) => {
+          if (answers[q.question] === q.correctAnswer) hits++;
+        });
+
+        // Só libera o próximo módulo se atingir a média
+        if ((hits / total) >= 0.5 && onComplete) {
+          onComplete();
+        }
+      }, 600);
+      return () => clearTimeout(timer);
     }
   }, [answers, shuffledQuestions, showResult, onComplete, storageKey]);
 
@@ -69,8 +88,7 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
             >
               {q.options.map((opt, oIdx) => (
                 <FormControlLabel 
-                  key={oIdx} 
-                  value={opt} 
+                  key={oIdx} value={opt} 
                   control={<Radio size="small" />} 
                   label={<Typography variant="body2">{opt}</Typography>} 
                   disabled={showResult} 
@@ -88,7 +106,6 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
               ? `Excelente! Você acertou ${score} de ${shuffledQuestions.length}.` 
               : `Você acertou ${score} de ${shuffledQuestions.length}. Tente revisar o conteúdo acima.`}
           </Alert>
-          
           {(score < (shuffledQuestions.length / 2) && !isCompleted) && (
             <Button variant="outlined" color="error" onClick={handleRetry} sx={{ alignSelf: 'flex-start' }}>
               Tentar Novamente
