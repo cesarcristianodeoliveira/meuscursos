@@ -6,11 +6,11 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
     return saved ? JSON.parse(saved) : {};
   });
 
-  // O showResult deve ser true se já estiver completado OU se todas as questões foram respondidas
   const [showResult, setShowResult] = useState(() => {
+    if (isCompleted) return true;
     const saved = localStorage.getItem(storageKey);
     const savedAnswers = saved ? JSON.parse(saved) : {};
-    return isCompleted || (questions.length > 0 && Object.keys(savedAnswers).length === questions.length);
+    return questions.length > 0 && Object.keys(savedAnswers).length === questions.length;
   });
 
   const [score, setScore] = useState(0);
@@ -22,7 +22,6 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
     })));
   }, [questions]);
 
-  // Efeito para calcular o score e manter a interface atualizada
   useEffect(() => {
     let hits = 0;
     shuffledQuestions.forEach((q) => {
@@ -31,7 +30,6 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
     setScore(hits);
   }, [answers, shuffledQuestions]);
 
-  // Validação Automática com Delay para salvar o progresso
   useEffect(() => {
     const total = shuffledQuestions.length;
     const answeredCount = Object.keys(answers).length;
@@ -39,7 +37,6 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
     if (total > 0 && answeredCount === total && !showResult) {
       const timer = setTimeout(() => {
         setShowResult(true);
-        // SALVA SEMPRE: Para que ao voltar as respostas estejam aqui
         localStorage.setItem(storageKey, JSON.stringify(answers));
         
         let hits = 0;
@@ -47,7 +44,6 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
           if (answers[q.question] === q.correctAnswer) hits++;
         });
 
-        // Só libera o próximo módulo se atingir a média
         if ((hits / total) >= 0.5 && onComplete) {
           onComplete();
         }
@@ -81,19 +77,42 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
             {qIdx + 1}. {q.question}
           </Typography>
-          <FormControl component="fieldset">
+          <FormControl component="fieldset" sx={{ width: '100%' }}>
             <RadioGroup 
               value={answers[q.question] || ''} 
               onChange={(e) => setAnswers(prev => ({ ...prev, [q.question]: e.target.value }))}
             >
-              {q.options.map((opt, oIdx) => (
-                <FormControlLabel 
-                  key={oIdx} value={opt} 
-                  control={<Radio size="small" />} 
-                  label={<Typography variant="body2">{opt}</Typography>} 
-                  disabled={showResult} 
-                />
-              ))}
+              {q.options.map((opt, oIdx) => {
+                const isSelected = answers[q.question] === opt;
+                const isCorrect = opt === q.correctAnswer;
+                
+                // Lógica de cores após o resultado
+                let color = 'inherit';
+                let fontWeight = 400;
+                if (showResult) {
+                  if (isCorrect) {
+                    color = 'success.main'; // Sempre destaca a correta em verde
+                    fontWeight = 700;
+                  } else if (isSelected && !isCorrect) {
+                    color = 'error.main'; // Se o usuário marcou esta e está errada, fica vermelho
+                  }
+                }
+
+                return (
+                  <FormControlLabel 
+                    key={oIdx} 
+                    value={opt} 
+                    disabled={showResult}
+                    control={<Radio size="small" sx={{ color: showResult && isCorrect ? 'success.main' : '' }} />} 
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', color: color, fontWeight: fontWeight }}>
+                        <Typography variant="body2">{opt}</Typography>
+                        {showResult && isCorrect && <Check fontSize="small" sx={{ ml: 1 }} />}
+                      </Box>
+                    } 
+                  />
+                );
+              })}
             </RadioGroup>
           </FormControl>
         </Box>
@@ -104,7 +123,7 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
           <Alert severity={score >= (shuffledQuestions.length / 2) || isCompleted ? "success" : "error"}>
             {isCompleted || score >= (shuffledQuestions.length / 2) 
               ? `Excelente! Você acertou ${score} de ${shuffledQuestions.length}.` 
-              : `Você acertou ${score} de ${shuffledQuestions.length}. Tente revisar o conteúdo acima.`}
+              : `Você acertou ${score} de ${shuffledQuestions.length}. Confira as respostas corretas em verde e tente novamente.`}
           </Alert>
           {(score < (shuffledQuestions.length / 2) && !isCompleted) && (
             <Button variant="outlined" color="error" onClick={handleRetry} sx={{ alignSelf: 'flex-start' }}>
