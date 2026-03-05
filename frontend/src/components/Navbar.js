@@ -1,10 +1,11 @@
 import React, { useState, forwardRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  AppBar, Toolbar, Typography, IconButton, Box, InputBase, alpha, styled 
+  AppBar, Toolbar, Typography, IconButton, Box, InputBase, alpha, styled, LinearProgress 
 } from '@mui/material';
 import { Brightness4, Brightness7, Search as SearchIcon } from '@mui/icons-material';
 import { useAppTheme } from '../contexts/ThemeContext';
+import { useCourse } from '../contexts/CourseContext'; // Importando o contexto de curso
 
 const SearchContainer = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -38,9 +39,9 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   },
 }));
 
-// Usamos forwardRef para que o Slide consiga animar a AppBar
 const Navbar = forwardRef((props, ref) => {
   const { resolvedMode, toggleTheme } = useAppTheme();
+  const { isGenerating, progress } = useCourse(); // Pegando o estado global
   const [searchValue, setSearchValue] = useState('');
   const navigate = useNavigate();
 
@@ -53,6 +54,26 @@ const Navbar = forwardRef((props, ref) => {
 
   return (
     <AppBar ref={ref} {...props} color="primary" position="fixed" elevation={0}>
+      {/* Barra de Progresso Estilo YouTube */}
+      {isGenerating && (
+        <LinearProgress 
+          variant="determinate" 
+          value={progress} 
+          sx={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            height: 3, // Bem fininha
+            zIndex: 1500,
+            backgroundColor: 'transparent',
+            '& .MuiLinearProgress-bar': {
+              backgroundColor: resolvedMode === 'dark' ? '#90caf9' : '#fff', // Branco no tema azul, azul claro no dark
+            }
+          }} 
+        />
+      )}
+
       <Toolbar>
         <Typography 
           variant="h6" 

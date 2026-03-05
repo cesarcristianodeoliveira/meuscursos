@@ -30,16 +30,6 @@ export const ThemeProviderWrapper = ({ children }) => {
       palette: {
         mode: resolvedMode,
       },
-      // Adicionamos aqui ajustes globais de tipografia
-      typography: {
-        h3: {
-          fontWeight: 900,
-        },
-        h5: {
-          fontWeight: 800,
-        },
-      },
-      // Garantimos que o texto não "vaze" do container no mobile
       components: {
         MuiTypography: {
           styleOverrides: {
@@ -59,7 +49,7 @@ export const ThemeProviderWrapper = ({ children }) => {
 
   return (
     <ThemeContext.Provider value={{ mode, toggleTheme, resolvedMode }}>
-      <ThemeProvider theme={theme} disableTransitionOnChange>
+      <ThemeProvider theme={theme} >
         <CssBaseline />
         {children}
       </ThemeProvider>
