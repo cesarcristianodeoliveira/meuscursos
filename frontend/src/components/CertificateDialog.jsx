@@ -1,55 +1,70 @@
 import React from 'react';
-import { Dialog, DialogContent, Typography, Box, Button, Stack } from '@mui/material';
+import { Typography, Box, Button, Stack, Paper } from '@mui/material';
 import { EmojiEvents, Download } from '@mui/icons-material';
 
-const CertificateDialog = ({ open, onClose, courseTitle }) => {
+const CertificateDialog = ({ courseTitle }) => {
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      maxWidth="sm" 
-      fullWidth 
-      PaperProps={{ sx: { borderRadius: 4, textAlign: 'center', p: 4 } }}
-    >
-      <DialogContent>
-        <EmojiEvents sx={{ fontSize: 80, color: '#FFD700', mb: 2 }} />
-        <Typography variant="h4" fontWeight={800} gutterBottom>
-          Parabéns!
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-          Você concluiu com excelência o curso: <br />
-          <strong>{courseTitle}</strong>
+    <Box sx={{ width: '100%' }}>
+      <Paper 
+        elevation={0}
+        sx={{ 
+          p: { xs: 3, md: 6 }, 
+          border: '10px double', 
+          borderColor: 'primary.main', 
+          mb: 4, 
+          borderRadius: 2,
+          position: 'relative',
+          overflow: 'hidden',
+          mx: 'auto',
+          maxWidth: '640px'
+        }}
+      >
+        {/* Marca d'água discreta de troféu ao fundo */}
+        <EmojiEvents sx={{ 
+          position: 'absolute', 
+          right: -20, 
+          bottom: -20, 
+          fontSize: 200, 
+          opacity: 0.05, 
+          transform: 'rotate(-15deg)' 
+        }} />
+
+        <Typography variant="h5" sx={{ fontStyle: 'italic', mb: 2, fontWeight: 700 }}>
+          Certificado de Conclusão
         </Typography>
         
-        <Box sx={{ 
-          p: 3, 
-          border: '6px double', 
-          borderColor: 'primary.main', 
-          mb: 3, 
-          borderRadius: 2,
-          bgcolor: 'action.hover'
-        }}>
-          <Typography variant="h6" sx={{ fontStyle: 'italic', mb: 1 }}>
-            Certificado de Conclusão
-          </Typography>
-          <Typography variant="caption" display="block">
-            Este certificado comprova a realização de todos os módulos e aprovação nas avaliações.
-          </Typography>
-          <Typography variant="caption" fontWeight="bold" sx={{ mt: 1, display: 'block' }}>
-            Meus Cursos AI - {new Date().toLocaleDateString()}
-          </Typography>
-        </Box>
+        <Typography variant="body1" sx={{ mb: 4 }}>
+          Certificamos que o aluno concluiu com sucesso todas as etapas, exercícios e avaliações do curso livre de 
+          <strong> {courseTitle}</strong>.
+        </Typography>
 
-        <Stack direction="row" spacing={2} justifyContent="center">
-          <Button variant="contained" startIcon={<Download />} onClick={() => window.print()}>
-            Imprimir / Salvar PDF
-          </Button>
-          <Button variant="outlined" onClick={onClose}>
-            Fechar
-          </Button>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 4 }}>
+          <Box sx={{ textAlign: 'left' }}>
+            <Typography variant="caption" display="block" lineHeight={1}>
+              Data de Emissão: {new Date().toLocaleDateString()}
+            </Typography>
+          </Box>
+          <Box sx={{ textAlign: 'right' }}>
+            <Typography variant="h6" sx={{ fontFamily: 'serif', fontWeight: 'bold' }}>
+              Meus Cursos
+            </Typography>
+            <Typography variant="caption" display="block">
+              meuscursos.netlify.app
+            </Typography>
+          </Box>
         </Stack>
-      </DialogContent>
-    </Dialog>
+      </Paper>
+
+      <Button 
+        variant="contained" 
+        size="large"
+        startIcon={<Download />} 
+        onClick={() => window.print()}
+        sx={{ borderRadius: 8, px: 4 }}
+      >
+        Imprimir ou Salvar como PDF
+      </Button>
+    </Box>
   );
 };
 

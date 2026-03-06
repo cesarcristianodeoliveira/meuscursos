@@ -76,9 +76,9 @@ const Home = () => {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, pb: 4 }}>
+    <Container maxWidth="xl" sx={{ mt: 2, pb: 4 }}>
       {/* Formulário de Geração */}
-      <Box component="form" onSubmit={handleGenerate} sx={{ display: 'flex', gap: 2, mb: 6 }}>
+      <Box component="form" onSubmit={handleGenerate} sx={{ display: 'flex', gap: 2, mb: 4 }}>
         <TextField
           fullWidth
           label="O que você deseja aprender?"
@@ -102,10 +102,14 @@ const Home = () => {
       {/* Cabeçalho da Listagem */}
       <Stack direction='row' spacing={2} sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
-          <Typography variant="h6" fontWeight={600}>Cursos Recentes</Typography>
-          {!fetching && (
+          <Typography variant="h6" fontWeight={600}>Recentes</Typography>
+          {!fetching ? (
             <Typography variant="body2" color="text.secondary">
               {totalCourses === 1 ? `${totalCourses} curso disponível` : `${totalCourses} cursos disponíveis`}
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              Carregando
             </Typography>
           )}
         </Box>
@@ -116,7 +120,7 @@ const Home = () => {
           size="small"
           value={categoryFilter}
           onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-          sx={{ minWidth: 200 }}
+          sx={{ minWidth: 128 }}
         >
           {categories.map((cat) => <MenuItem key={cat} value={cat}>{cat}</MenuItem>)}
         </TextField>

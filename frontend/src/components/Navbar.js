@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   AppBar, Toolbar, Typography, IconButton, Box, InputBase, alpha, styled, LinearProgress 
 } from '@mui/material';
-import { Brightness4, Brightness7, Search as SearchIcon } from '@mui/icons-material';
+import { Brightness4, Brightness7, RocketLaunch, Search as SearchIcon } from '@mui/icons-material';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { useCourse } from '../contexts/CourseContext'; // Importando o contexto de curso
 
@@ -15,7 +15,7 @@ const SearchContainer = styled('div')(({ theme }) => ({
   marginRight: theme.spacing(2),
   marginLeft: theme.spacing(2),
   width: '100%',
-  [theme.breakpoints.up('sm')]: { marginLeft: theme.spacing(3), width: 'auto' },
+  [theme.breakpoints.up('sm')]: { marginLeft: theme.spacing(2), width: 'auto' },
 }));
 
 const SearchIconWrapper = styled('div')(({ theme }) => ({
@@ -53,7 +53,7 @@ const Navbar = forwardRef((props, ref) => {
   };
 
   return (
-    <AppBar ref={ref} {...props} color="primary" position="fixed" elevation={0}>
+    <AppBar ref={ref} {...props} color="inherit" position="fixed" elevation={0}>
       {/* Barra de Progresso Estilo YouTube */}
       {isGenerating && (
         <LinearProgress 
@@ -75,14 +75,35 @@ const Navbar = forwardRef((props, ref) => {
       )}
 
       <Toolbar>
-        <Typography 
-          variant="h6" 
+        <Box
           component={Link} 
           to="/" 
-          sx={{ fontWeight: 'bold', color: 'inherit', textDecoration: 'none', display: { xs: 'none', sm: 'block' } }}
+          sx={{
+            alignItems: 'center',
+            display: 'flex',
+            color: 'inherit',
+            textDecoration: 'none'
+          }}
         >
-          Meus Cursos
-        </Typography>
+          <RocketLaunch
+            color='primary'
+            sx={{
+              mr: { xs: 0, sm: 1 }
+            }}
+          />
+          <Typography 
+            color='primary'
+            variant="h6" 
+            lineHeight={1}
+            sx={{ 
+              fontWeight: 600,
+              display: { xs: 'none', sm: 'inherit' }
+            }}
+          >
+            Meus Cursos
+          </Typography>
+        </Box>
+        
 
         <SearchContainer>
           <SearchIconWrapper><SearchIcon /></SearchIconWrapper>

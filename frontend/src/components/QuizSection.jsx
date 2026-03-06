@@ -1,6 +1,16 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Typography, Box, Button, Radio, RadioGroup, 
+  FormControlLabel, FormControl, Alert, Stack 
+} from '@mui/material';
+import { Assignment, EmojiEvents, Check } from '@mui/icons-material';
+
+const shuffleArray = (array) => [...array].sort(() => Math.random() - 0.5);
+
 const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise", onComplete, isCompleted, scrollToTop }) => {
   const storageKey = `quiz-${courseId}-${moduleKey}`;
-  
+  const [shuffleTicket, setShuffleTicket] = useState(0);
+
   const [answers, setAnswers] = useState(() => {
     const saved = localStorage.getItem(storageKey);
     return saved ? JSON.parse(saved) : {};
@@ -20,7 +30,8 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
       ...q,
       options: shuffleArray(q.options || [])
     })));
-  }, [questions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions, shuffleTicket]); 
 
   useEffect(() => {
     let hits = 0;
@@ -39,15 +50,10 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
         setShowResult(true);
         localStorage.setItem(storageKey, JSON.stringify(answers));
         
-        let hits = 0;
-        shuffledQuestions.forEach((q) => {
-          if (answers[q.question] === q.correctAnswer) hits++;
-        });
-
-        if ((hits / total) >= 0.5 && onComplete) {
+        if (onComplete) {
           onComplete();
         }
-      }, 600);
+      }, 300); // Mantido seus 300ms
       return () => clearTimeout(timer);
     }
   }, [answers, shuffledQuestions, showResult, onComplete, storageKey]);
@@ -57,6 +63,7 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
     setShowResult(false);
     setScore(0);
     localStorage.removeItem(storageKey);
+    setShuffleTicket(prev => prev + 1);
     if (scrollToTop) scrollToTop();
   };
 
@@ -64,7 +71,7 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
 
   return (
     <Box sx={{ 
-      mt: 4, p: 3, borderRadius: 3, bgcolor: 'action.hover', border: '1px dashed', 
+      mt: 2, p: 2, borderRadius: 3, bgcolor: 'action.hover', border: '1px dashed', 
       borderColor: showResult ? (score >= shuffledQuestions.length / 2 ? 'success.main' : 'error.main') : 'primary.main' 
     }}>
       <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', fontWeight: 700 }}>
@@ -73,10 +80,8 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
       </Typography>
       
       {shuffledQuestions.map((q, qIdx) => (
-        <Box key={qIdx} sx={{ mb: 3 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-            {qIdx + 1}. {q.question}
-          </Typography>
+        <Box key={qIdx} sx={{ mb: 2, ':last-of-type': { mb: 0 } }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>{qIdx + 1}. {q.question}</Typography>
           <FormControl component="fieldset" sx={{ width: '100%' }}>
             <RadioGroup 
               value={answers[q.question] || ''} 
@@ -85,24 +90,17 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
               {q.options.map((opt, oIdx) => {
                 const isSelected = answers[q.question] === opt;
                 const isCorrect = opt === q.correctAnswer;
-                
-                // Lógica de cores após o resultado
                 let color = 'inherit';
                 let fontWeight = 400;
+
                 if (showResult) {
-                  if (isCorrect) {
-                    color = 'success.main'; // Sempre destaca a correta em verde
-                    fontWeight = 700;
-                  } else if (isSelected && !isCorrect) {
-                    color = 'error.main'; // Se o usuário marcou esta e está errada, fica vermelho
-                  }
+                  if (isCorrect) { color = 'success.main'; fontWeight = 700; }
+                  else if (isSelected && !isCorrect) { color = 'error.main'; }
                 }
 
                 return (
                   <FormControlLabel 
-                    key={oIdx} 
-                    value={opt} 
-                    disabled={showResult}
+                    key={oIdx} value={opt} disabled={showResult}
                     control={<Radio size="small" sx={{ color: showResult && isCorrect ? 'success.main' : '' }} />} 
                     label={
                       <Box sx={{ display: 'flex', alignItems: 'center', color: color, fontWeight: fontWeight }}>
@@ -119,19 +117,19 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
       ))}
 
       {showResult && (
-        <Stack spacing={2} sx={{ mt: 2 }}>
+        <Stack spacing={2}>
           <Alert severity={score >= (shuffledQuestions.length / 2) || isCompleted ? "success" : "error"}>
             {isCompleted || score >= (shuffledQuestions.length / 2) 
               ? `Excelente! Você acertou ${score} de ${shuffledQuestions.length}.` 
-              : `Você acertou ${score} de ${shuffledQuestions.length}. Confira as respostas corretas em verde e tente novamente.`}
+              : `Você acertou ${score} de ${shuffledQuestions.length}. O progresso foi liberado, mas você pode revisar as respostas acima.`}
           </Alert>
-          {(score < (shuffledQuestions.length / 2) && !isCompleted) && (
-            <Button variant="outlined" color="error" onClick={handleRetry} sx={{ alignSelf: 'flex-start' }}>
-              Tentar Novamente
-            </Button>
-          )}
+          <Button variant="outlined" color="primary" onClick={handleRetry} sx={{ alignSelf: 'flex-start' }}>
+            Refazer
+          </Button>
         </Stack>
       )}
     </Box>
   );
 };
+
+export default QuizSection;
