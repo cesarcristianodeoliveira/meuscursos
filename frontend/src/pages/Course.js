@@ -9,7 +9,8 @@ import {
   AccordionDetails, CircularProgress, 
   Container, Table, TableCell, 
   TableContainer, IconButton, Tooltip,
-  Stack, Chip, LinearProgress
+  Stack, Chip, LinearProgress,
+  Toolbar
 } from '@mui/material';
 import { 
   ArrowBack, ContentCopy, PictureAsPdf, 
@@ -132,11 +133,12 @@ function Course() {
       : <CodeBlock>{children}</CodeBlock>,
   };
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', flexDirection: 'column', alignItems: 'center', minHeight: '100vh' }}><Toolbar /><CircularProgress /></Box>;
   if (!course) return <Typography sx={{ p: 5, textAlign: 'center' }}>Curso não encontrado.</Typography>;
 
   return (
     <Box>
+      <Toolbar />
       <Box sx={{ position: 'sticky', top: 0, zIndex: 1100, minHeight: '64px', bgcolor: 'background.paper', borderBottom: '1px solid divider' }}>
         <LinearProgress variant="determinate" value={progressPercentage} sx={{ height: 6 }} />
         <Container maxWidth="xl" sx={{ py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

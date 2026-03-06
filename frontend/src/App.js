@@ -2,7 +2,6 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { 
   Box, 
-  Toolbar, 
   useScrollTrigger, 
   Slide, 
   Fade, 
@@ -66,9 +65,7 @@ const AppContent = () => {
           <Navbar />
         </HideOnScroll>
         
-        <Toolbar />
-
-        <Box component="main" sx={{ pb: 8 }}>
+        <Box component="main">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/search" element={<Search />} />
