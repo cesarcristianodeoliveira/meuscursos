@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { client } from '../client';
 import CourseCard from '../components/CourseCard';
 import CourseCardSkeleton from '../components/CourseCardSkeleton';
-import { useCourse } from '../contexts/CourseContext'; // Importando o hook global
+import { useCourse } from '../contexts/CourseContext'; 
 import { 
   Container, TextField, Button, Box, Typography, 
   Pagination, Stack, MenuItem,

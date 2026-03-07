@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useAppTheme } from '../contexts/ThemeContext';
+import { useParams } from 'react-router-dom';
 import { client, urlFor } from '../client';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -9,18 +10,27 @@ import {
   AccordionDetails, CircularProgress, 
   Container, Table, TableCell, 
   TableContainer, IconButton, Tooltip,
-  Stack, Chip, LinearProgress,
-  Toolbar
+  Chip, LinearProgress,
+  Toolbar,
+  Grid,
+  Card,
+  Rating
 } from '@mui/material';
 import { 
-  ArrowBack, ContentCopy, PictureAsPdf, 
-  Check
+  ContentCopy, PictureAsPdf, 
+  Check,
+  AccessTime,
+  TimerOutlined,
+  AutoStoriesOutlined,
 } from '@mui/icons-material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import StarIcon from '@mui/icons-material/Star';
 
 // Importando seus componentes
 import QuizSection from '../components/QuizSection';
 import CertificateDialog from '../components/CertificateDialog';
+import { grey } from '@mui/material/colors';
+import timeAgo from '../utils/timeAgo';
 
 const CodeBlock = ({ children }) => {
   const [copied, setCopied] = useState(false);
@@ -45,9 +55,8 @@ const CodeBlock = ({ children }) => {
 
 function Course() {
   const { slug } = useParams();
-  const navigate = useNavigate();
   const accordionRefs = useRef({});
-  
+  const { resolvedMode } = useAppTheme();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [completedSteps, setCompletedSteps] = useState([]);
@@ -85,7 +94,7 @@ function Course() {
       if (currentIndex < course.modules.length - 1) {
         const nextKey = course.modules[currentIndex + 1]._key;
         setExpanded(prev => ({ ...prev, [nextKey]: true }));
-        setTimeout(() => scrollToAccordion(nextKey), 300);
+        // setTimeout(() => scrollToAccordion(nextKey), 300);
       }
     }
   };
@@ -96,13 +105,13 @@ function Course() {
 
   const handleAccordionChange = (key) => (event, isExpanded) => {
     setExpanded(prev => ({ ...prev, [key]: isExpanded }));
-    if (isExpanded) setTimeout(() => scrollToAccordion(key), 100);
+    // if (isExpanded) setTimeout(() => scrollToAccordion(key), 100);
   };
 
   const handleDownloadPDF = () => {
     const element = document.getElementById('pdf-export-area');
     const opt = {
-      margin: 10, filename: `Curso-${course?.title}.pdf`,
+      margin: 10, filename: `${course?.title}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -120,16 +129,16 @@ function Course() {
   const isFinalExamCompleted = completedSteps.includes('final-exam');
 
   const muiComponents = {
-    h2: ({ children }) => <Typography variant="h5" sx={{ mb: 2, fontWeight: 800, borderLeft: '5px solid #1976d2', pl: 2, color: 'primary.main' }}>{children}</Typography>,
-    h3: ({ children }) => <Typography variant="h5" sx={{ mb: 2, fontWeight: 800, borderLeft: '5px solid #1976d2', pl: 2, color: 'primary.main' }}>{children}</Typography>,
+    h2: ({ children }) => <Typography variant="h5" sx={{ mb: 2, borderLeft: '3px solid #1976d2', pl: 2, color: 'primary.main' }}>{children}</Typography>,
+    h3: ({ children }) => <Typography variant="h5" sx={{ mb: 2, borderLeft: '3px solid #1976d2', pl: 2, color: 'primary.main' }}>{children}</Typography>,
     p: ({ children }) => <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.8, textAlign: 'justify', color: 'text.secondary' }}>{children}</Typography>,
     table: ({ children }) => (
       <TableContainer component={Paper} variant="outlined" sx={{ my: 3 }}><Table size="small">{children}</Table></TableContainer>
     ),
-    th: ({ children }) => <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.main', color: '#fff' }}>{children}</TableCell>,
+    th: ({ children }) => <TableCell sx={{ bgcolor: 'primary.main', color: '#fff' }}>{children}</TableCell>,
     td: ({ children }) => <TableCell>{children}</TableCell>,
     code: ({ inline, children }) => inline 
-      ? <Box component="code" sx={{ bgcolor: 'action.selected', px: 0.8, borderRadius: 1, fontWeight: 'bold' }}>{children}</Box>
+      ? <Box component="code" sx={{ bgcolor: 'action.selected', px: 0.8, borderRadius: 1 }}>{children}</Box>
       : <CodeBlock>{children}</CodeBlock>,
   };
 
@@ -138,51 +147,134 @@ function Course() {
 
   return (
     <Box>
-      <Toolbar />
-      <Box sx={{ position: 'sticky', top: 0, zIndex: 1100, minHeight: '64px', bgcolor: 'background.paper', borderBottom: '1px solid divider' }}>
-        <LinearProgress variant="determinate" value={progressPercentage} sx={{ height: 6 }} />
-        <Container maxWidth="xl" sx={{ py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <IconButton color='primary' onClick={() => navigate('/')}><ArrowBack /></IconButton>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Typography variant="caption" fontWeight="bold" color="primary" lineHeight={1}>{progressPercentage}% CONCLUÍDO</Typography>
-            <IconButton color='primary' onClick={handleDownloadPDF}><PictureAsPdf /></IconButton>
-          </Stack>
+      
+      
+      {progressPercentage === 0 ? null : (
+        <>
+          <Box sx={{ position: 'fixed', top: 0, zIndex: 1100, width: '100%' }}>
+            <LinearProgress 
+              variant="determinate" 
+              value={progressPercentage} 
+              sx={{ height: 3 }} 
+            />
+          </Box>
+        </>
+      )}
+
+      <Box 
+        sx={{ 
+          bgcolor: resolvedMode === 'light' ? grey[100] : grey[900], 
+          mb: 2 
+        }}
+      >
+        <Toolbar />
+        <Container maxWidth="xl" sx={{ py: 2 }}>
+          <Grid
+            alignItems="center"
+            container
+            spacing={2}
+          >
+            <Grid
+              size={{ xs: 12, sm: 12, md: 12, lg: 8 }}
+            >
+              <Typography variant="h3" gutterBottom>{course.title}</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Chip 
+                  label={course.category.name || "Geral"} 
+                  size="small"
+                  variant="outlined"
+                />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <AccessTime sx={{ fontSize: 14, color: 'text.secondary' }} />
+                  <Typography variant="caption" color="text.secondary" lineHeight={1}>
+                    {timeAgo(course._createdAt)}
+                  </Typography>
+                </Box>
+              </Box>
+              <Typography variant="body1" sx={{ mb: 2 }}>{course.description}</Typography>
+              <Box
+                sx={{
+                  alignItems: 'center',
+                  display: 'flex',
+                  gap: 1
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <AutoStoriesOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
+                  <Typography variant="caption" color="text.secondary" lineHeight={1}>
+                    {course.modules?.length || 0} aulas
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <TimerOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
+                  <Typography variant="caption" color="text.secondary" lineHeight={1}>
+                    {course.estimatedTime}h
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+            <Grid
+              size={{ xs: 12, sm: 12, md: 12, lg: 4 }}
+            >
+              {course.thumbnail && (
+                <Card elevation={0} component="img" src={urlFor(course.thumbnail).url()} sx={{ width: '100%', height: { xs: 128, md: 256 }, objectFit: 'cover' }} />
+              )}
+              <Box
+                sx={{
+                  alignItems: 'center',
+                  display: 'flex',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <Box
+                  sx={{
+                    alignItems: 'center',
+                    display: 'flex',
+                    gap: 1,
+                  }}
+                >
+                  <Rating 
+                    size="small" 
+                    name="half-rating-read" 
+                    defaultValue={course.rating} precision={0.5} readOnly 
+                    emptyIcon={<StarIcon style={{ opacity: 0.55 }} fontSize="inherit" />}
+                  />
+                  <Typography variant='caption' lineHeight={1} sx={{ mt: .12 }}>{course.rating}</Typography>
+                </Box>
+                <Box
+                  gap={1}
+                  sx={{
+                    alignItems: 'center',
+                    display: 'flex',
+                    justifyContent: 'end'
+                  }}
+                >
+                  <Typography variant="caption" lineHeight={1}>{progressPercentage}%</Typography>
+                  <IconButton color='inherit' onClick={handleDownloadPDF}><PictureAsPdf /></IconButton>
+                </Box>
+              </Box>
+            </Grid>
+          </Grid>
         </Container>
       </Box>
-
-      {course.thumbnail && (
-        <Box component="img" src={urlFor(course.thumbnail).url()} sx={{ width: '100%', height: { xs: 128, md: 256 }, objectFit: 'cover' }} />
-      )}
-      <Paper elevation={0} sx={{ mb: 2, overflow: 'hidden' }}>
-        <Container maxWidth="xl">
-          <Box sx={{ p: 2 }}>
-            <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-              <Chip label={course.category?.name || "Geral"} variant="outlined" color="primary" size="small" sx={{ fontWeight: 800 }} />
-              <Chip label={progressPercentage === 100 ? "Concluído" : `${progressPercentage}%`} variant={progressPercentage === 100 ? "filled" : "outlined"} size="small" color={progressPercentage === 100 ? "success" : "primary"} />
-            </Stack>
-            <Typography variant="h3" sx={{ fontWeight: 800, mb: 2 }}>{course.title}</Typography>
-            <Typography variant="body1" color="text.secondary">{course.description}</Typography>
-          </Box>
-        </Container>
-      </Paper>
-
       <Container maxWidth="xl">
         {course.modules?.map((module, index) => {
           const isCompleted = completedSteps.includes(module._key);
-          const isLocked = index > 0 && !completedSteps.includes(course.modules[index - 1]._key);
+          // const isLocked = index > 0 && !completedSteps.includes(course.modules[index - 1]._key);
 
           return (
             <Accordion 
               key={module._key} 
-              disabled={isLocked}
+              // disabled={isLocked}
               expanded={!!expanded[module._key]}
               onChange={handleAccordionChange(module._key)}
               ref={el => accordionRefs.current[module._key] = el}
-              sx={{ mb: 2, ':last-of-type': { mb: 0 }, borderRadius: '16px !important', border: '1px solid', borderColor: isCompleted ? 'success.light' : 'divider' }}
+              // sx={{ mb: 2, ':last-of-type': { mb: 0 }, borderColor: isCompleted ? 'success.light' : 'divider', transition: 'none' }}
+              
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography sx={{ fontWeight: 700 }}>{index + 1}. {module.title}</Typography>
+                  <Typography>{index + 1}. {module.title}</Typography>
                 </Box>
               </AccordionSummary>
               <AccordionDetails >
@@ -199,7 +291,7 @@ function Course() {
         })}
 
         {course.modules?.every(m => completedSteps.includes(m._key)) && course.finalExam && (
-          <Box sx={{ mt: 5 }}>
+          <Box sx={{ mt: 2 }}>
             <QuizSection 
               courseId={course._id} moduleKey="final-exam"
               title="Avaliação Final" questions={course.finalExam} 
@@ -215,7 +307,7 @@ function Course() {
             elevation={0} 
             sx={{ 
               textAlign: 'center',
-              mt: 4, mb: 4
+              my: 2
             }}
           >
             <Box sx={{ display: 'flex', justifyContent: 'center' }}>

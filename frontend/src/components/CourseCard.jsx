@@ -5,7 +5,7 @@ import timeAgo from '../utils/timeAgo';
 import { 
   Card, Box, CardMedia, CardActionArea, Typography, Chip 
 } from '@mui/material';
-import { RocketLaunch, AccessTime } from '@mui/icons-material';
+import { RocketLaunch, AccessTime, AutoStoriesOutlined, TimerOutlined } from '@mui/icons-material';
 
 const CourseCard = ({ course }) => {
   return (
@@ -65,10 +65,6 @@ const CourseCard = ({ course }) => {
               label={course.category.name || "Geral"} 
               size="small"
               variant="outlined"
-              sx={{ 
-                borderRadius: 1,
-                fontSize: '0.7rem',
-              }}
             />
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <AccessTime sx={{ fontSize: 14, color: 'text.secondary' }} />
@@ -109,9 +105,26 @@ const CourseCard = ({ course }) => {
           </Typography>
 
           <Box sx={{ display: 'flex', alignItems: 'center', mt: 'auto' }}>
-            <Typography variant="caption" color="primary.main" fontWeight={600}>
-              {course.modules?.length || 0} aulas
-            </Typography>
+              <Box
+                sx={{
+                  alignItems: 'center',
+                  display: 'flex',
+                  gap: 1
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <AutoStoriesOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
+                  <Typography variant="caption" color="text.secondary" lineHeight={1}>
+                    {course.modules?.length || 0} aulas
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <TimerOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
+                  <Typography variant="caption" color="text.secondary" lineHeight={1}>
+                    {course.estimatedTime}h
+                  </Typography>
+                </Box>
+              </Box>
           </Box>
         </Box>
       </CardActionArea>

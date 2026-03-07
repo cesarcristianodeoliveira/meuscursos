@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useState, useMemo } from 'react';
 import { createTheme, ThemeProvider, CssBaseline, responsiveFontSizes } from '@mui/material';
+import '@fontsource/roboto/300.css';
+import '@fontsource/roboto/400.css';
+import '@fontsource/roboto/500.css';
+import '@fontsource/roboto/600.css';
+import '@fontsource/roboto/700.css';
 
 const ThemeContext = createContext();
 
@@ -30,6 +35,9 @@ export const ThemeProviderWrapper = ({ children }) => {
       palette: {
         mode: resolvedMode,
       },
+      typography: {
+        fontFamily: "Roboto, sans-serif"
+      },
       components: {
         MuiTypography: {
           styleOverrides: {
@@ -49,7 +57,7 @@ export const ThemeProviderWrapper = ({ children }) => {
 
   return (
     <ThemeContext.Provider value={{ mode, toggleTheme, resolvedMode }}>
-      <ThemeProvider theme={theme} >
+      <ThemeProvider theme={theme} disableTransitionOnChange>
         <CssBaseline />
         {children}
       </ThemeProvider>

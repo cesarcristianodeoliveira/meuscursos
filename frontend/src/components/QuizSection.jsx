@@ -74,14 +74,14 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
       mt: 2, p: 2, borderRadius: 3, bgcolor: 'action.hover', border: '1px dashed', 
       borderColor: showResult ? (score >= shuffledQuestions.length / 2 ? 'success.main' : 'error.main') : 'primary.main' 
     }}>
-      <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', fontWeight: 700 }}>
+      <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
         {type === "exam" ? <EmojiEvents sx={{ mr: 1, color: '#FFD700' }} /> : <Assignment sx={{ mr: 1, color: 'primary.main' }} />}
         {title}
       </Typography>
       
       {shuffledQuestions.map((q, qIdx) => (
         <Box key={qIdx} sx={{ mb: 2, ':last-of-type': { mb: 0 } }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>{qIdx + 1}. {q.question}</Typography>
+          <Typography variant="subtitle1" sx={{ mb: 1 }}>{qIdx + 1}. {q.question}</Typography>
           <FormControl component="fieldset" sx={{ width: '100%' }}>
             <RadioGroup 
               value={answers[q.question] || ''} 
@@ -91,10 +91,9 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
                 const isSelected = answers[q.question] === opt;
                 const isCorrect = opt === q.correctAnswer;
                 let color = 'inherit';
-                let fontWeight = 400;
 
                 if (showResult) {
-                  if (isCorrect) { color = 'success.main'; fontWeight = 700; }
+                  if (isCorrect) { color = 'success.main'; }
                   else if (isSelected && !isCorrect) { color = 'error.main'; }
                 }
 
@@ -103,7 +102,7 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
                     key={oIdx} value={opt} disabled={showResult}
                     control={<Radio size="small" sx={{ color: showResult && isCorrect ? 'success.main' : '' }} />} 
                     label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', color: color, fontWeight: fontWeight }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', color: color }}>
                         <Typography variant="body2">{opt}</Typography>
                         {showResult && isCorrect && <Check fontSize="small" sx={{ ml: 1 }} />}
                       </Box>
