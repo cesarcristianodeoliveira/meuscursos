@@ -71,17 +71,27 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
 
   return (
     <Box sx={{ 
-      mt: 2, p: 2, borderRadius: 3, bgcolor: 'action.hover', border: '1px dashed', 
+      mt: 2, p: 2, 
+      borderRadius: 2, bgcolor: 'action.hover', border: '1px dashed', 
       borderColor: showResult ? (score >= shuffledQuestions.length / 2 ? 'success.main' : 'error.main') : 'primary.main' 
     }}>
-      <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
-        {type === "exam" ? <EmojiEvents sx={{ mr: 1, color: '#FFD700' }} /> : <Assignment sx={{ mr: 1, color: 'primary.main' }} />}
+      <Typography sx={{ display: 'flex', alignItems: 'center' }} lineHeight={1}>
         {title}
       </Typography>
       
       {shuffledQuestions.map((q, qIdx) => (
-        <Box key={qIdx} sx={{ mb: 2, ':last-of-type': { mb: 0 } }}>
-          <Typography variant="subtitle1" sx={{ mb: 1 }}>{qIdx + 1}. {q.question}</Typography>
+        <Box key={qIdx} sx={{ mt: 2 }}>
+          <Box
+            sx={{
+              alignItems: 'center',
+              display: 'flex',
+              gap: .5,
+              mb: 1
+            }}
+          >
+            <Typography variant="subtitle2" color='text.secondary' lineHeight={1}>{qIdx + 1}.</Typography>
+            <Typography variant="subtitle2" lineHeight={1}>{q.question}</Typography>
+          </Box>
           <FormControl component="fieldset" sx={{ width: '100%' }}>
             <RadioGroup 
               value={answers[q.question] || ''} 
@@ -103,7 +113,7 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
                     control={<Radio size="small" sx={{ color: showResult && isCorrect ? 'success.main' : '' }} />} 
                     label={
                       <Box sx={{ display: 'flex', alignItems: 'center', color: color }}>
-                        <Typography variant="body2">{opt}</Typography>
+                        <Typography variant="body2" sx={{ mt: .4 }}>{opt}</Typography>
                         {showResult && isCorrect && <Check fontSize="small" sx={{ ml: 1 }} />}
                       </Box>
                     } 
@@ -116,8 +126,8 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
       ))}
 
       {showResult && (
-        <Stack spacing={2}>
-          <Alert severity={score >= (shuffledQuestions.length / 2) || isCompleted ? "success" : "error"}>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Alert icon={false} severity={score >= (shuffledQuestions.length / 2) || isCompleted ? "success" : "error"}>
             {isCompleted || score >= (shuffledQuestions.length / 2) 
               ? `Excelente! Você acertou ${score} de ${shuffledQuestions.length}.` 
               : `Você acertou ${score} de ${shuffledQuestions.length}. O progresso foi liberado, mas você pode revisar as respostas acima.`}

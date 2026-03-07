@@ -17,10 +17,12 @@ import {
   Rating
 } from '@mui/material';
 import { 
-  ContentCopy, PictureAsPdf, 
+  ContentCopy, 
+  PictureAsPdf, 
   Check,
   AccessTime,
   TimerOutlined,
+  Percent,
   AutoStoriesOutlined,
 } from '@mui/icons-material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -129,8 +131,8 @@ function Course() {
   const isFinalExamCompleted = completedSteps.includes('final-exam');
 
   const muiComponents = {
-    h2: ({ children }) => <Typography variant="h5" sx={{ mb: 2, borderLeft: '3px solid #1976d2', pl: 2, color: 'primary.main' }}>{children}</Typography>,
-    h3: ({ children }) => <Typography variant="h5" sx={{ mb: 2, borderLeft: '3px solid #1976d2', pl: 2, color: 'primary.main' }}>{children}</Typography>,
+    h2: ({ children }) => <Typography lineHeight={1} sx={{ mb: 2 }}>{children}</Typography>,
+    h3: ({ children }) => <Typography lineHeight={1} sx={{ mb: 2 }}>{children}</Typography>,
     p: ({ children }) => <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.8, textAlign: 'justify', color: 'text.secondary' }}>{children}</Typography>,
     table: ({ children }) => (
       <TableContainer component={Paper} variant="outlined" sx={{ my: 3 }}><Table size="small">{children}</Table></TableContainer>
@@ -163,8 +165,7 @@ function Course() {
 
       <Box 
         sx={{ 
-          bgcolor: resolvedMode === 'light' ? grey[100] : grey[900], 
-          mb: 2 
+          bgcolor: resolvedMode === 'light' ? grey[200] : grey[900], 
         }}
       >
         <Toolbar />
@@ -177,7 +178,7 @@ function Course() {
             <Grid
               size={{ xs: 12, sm: 12, md: 12, lg: 8 }}
             >
-              <Typography variant="h3" gutterBottom>{course.title}</Typography>
+              <Typography variant="h4" gutterBottom>{course.title}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <Chip 
                   label={course.category.name || "Geral"} 
@@ -192,33 +193,7 @@ function Course() {
                 </Box>
               </Box>
               <Typography variant="body1" sx={{ mb: 2 }}>{course.description}</Typography>
-              <Box
-                sx={{
-                  alignItems: 'center',
-                  display: 'flex',
-                  gap: 1
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <AutoStoriesOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
-                  <Typography variant="caption" color="text.secondary" lineHeight={1}>
-                    {course.modules?.length || 0} aulas
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <TimerOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
-                  <Typography variant="caption" color="text.secondary" lineHeight={1}>
-                    {course.estimatedTime}h
-                  </Typography>
-                </Box>
-              </Box>
-            </Grid>
-            <Grid
-              size={{ xs: 12, sm: 12, md: 12, lg: 4 }}
-            >
-              {course.thumbnail && (
-                <Card elevation={0} component="img" src={urlFor(course.thumbnail).url()} sx={{ width: '100%', height: { xs: 128, md: 256 }, objectFit: 'cover' }} />
-              )}
+              
               <Box
                 sx={{
                   alignItems: 'center',
@@ -230,7 +205,7 @@ function Course() {
                   sx={{
                     alignItems: 'center',
                     display: 'flex',
-                    gap: 1,
+                    gap: .5,
                   }}
                 >
                   <Rating 
@@ -239,93 +214,127 @@ function Course() {
                     defaultValue={course.rating} precision={0.5} readOnly 
                     emptyIcon={<StarIcon style={{ opacity: 0.55 }} fontSize="inherit" />}
                   />
-                  <Typography variant='caption' lineHeight={1} sx={{ mt: .12 }}>{course.rating}</Typography>
+                  <Typography variant='caption' color="text.secondary" lineHeight={1} sx={{ mt: .12 }}>{course.rating}</Typography>
                 </Box>
+
                 <Box
-                  gap={1}
                   sx={{
                     alignItems: 'center',
                     display: 'flex',
-                    justifyContent: 'end'
+                    gap: 1
                   }}
                 >
-                  <Typography variant="caption" lineHeight={1}>{progressPercentage}%</Typography>
-                  <IconButton color='inherit' onClick={handleDownloadPDF}><PictureAsPdf /></IconButton>
+                  {/* <IconButton color='inherit' onClick={handleDownloadPDF}><PictureAsPdf /></IconButton> */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <AutoStoriesOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
+                    <Typography variant="caption" color="text.secondary" lineHeight={1}>
+                      {course.modules?.length || 0} aulas
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <TimerOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
+                    <Typography variant="caption" color="text.secondary" lineHeight={1}>
+                      {course.estimatedTime}h
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Percent sx={{ fontSize: 14, color: 'text.secondary' }} />
+                    <Typography variant="caption" color="text.secondary" lineHeight={1}>
+                      {progressPercentage}
+                    </Typography>
+                  </Box>
                 </Box>
               </Box>
+            </Grid>
+            <Grid
+              size={{ xs: 12, sm: 12, md: 12, lg: 4 }}
+            >
+              {course.thumbnail && (
+                <Card elevation={0} component="img" src={urlFor(course.thumbnail).url()} sx={{ width: '100%', height: { xs: 128, md: 256 }, objectFit: 'cover' }} />
+              )}
             </Grid>
           </Grid>
         </Container>
       </Box>
-      <Container maxWidth="xl">
-        {course.modules?.map((module, index) => {
-          const isCompleted = completedSteps.includes(module._key);
-          // const isLocked = index > 0 && !completedSteps.includes(course.modules[index - 1]._key);
+      <>
+        <Box
+          sx={{
+            pb: 8
+          }}
+        >
+          {course.modules?.map((module, index) => {
+            const isCompleted = completedSteps.includes(module._key);
+            // const isLocked = index > 0 && !completedSteps.includes(course.modules[index - 1]._key);
 
-          return (
-            <Accordion 
-              key={module._key} 
-              // disabled={isLocked}
-              expanded={!!expanded[module._key]}
-              onChange={handleAccordionChange(module._key)}
-              ref={el => accordionRefs.current[module._key] = el}
-              // sx={{ mb: 2, ':last-of-type': { mb: 0 }, borderColor: isCompleted ? 'success.light' : 'divider', transition: 'none' }}
-              
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography>{index + 1}. {module.title}</Typography>
-                </Box>
-              </AccordionSummary>
-              <AccordionDetails >
-                <ReactMarkdown components={muiComponents} remarkPlugins={[remarkGfm]}>{module.content}</ReactMarkdown>
-                <QuizSection 
-                  courseId={course._id} moduleKey={module._key}
-                  title="Exercícios" questions={module.exercises} 
-                  isCompleted={isCompleted} onComplete={() => handleStepComplete(module._key)} 
-                  scrollToTop={() => scrollToAccordion(module._key)}
-                />
-              </AccordionDetails>
-            </Accordion>
-          );
-        })}
+            return (
+              <Accordion 
+                key={module._key} 
+                // disabled={isLocked}
+                expanded={!!expanded[module._key]}
+                onChange={handleAccordionChange(module._key)}
+                ref={el => accordionRefs.current[module._key] = el}
+                elevation={0}
+                disableGutters
+                variant='elevation'
+                // sx={{ mb: 2, ':last-of-type': { mb: 0 }, borderColor: isCompleted ? 'success.light' : 'divider', transition: 'none' }}
+                
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: .5 }}>
+                    <Typography variant='subtitle2' color='text.secondary' lineHeight={1}>{index + 1}.</Typography>
+                    <Typography variant='subtitle2' lineHeight={1}>{module.title}</Typography>
+                  </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <ReactMarkdown components={muiComponents} remarkPlugins={[remarkGfm]}>{module.content}</ReactMarkdown>
+                  <QuizSection 
+                    courseId={course._id} moduleKey={module._key}
+                    title="Exercícios" questions={module.exercises} 
+                    isCompleted={isCompleted} onComplete={() => handleStepComplete(module._key)} 
+                    scrollToTop={() => scrollToAccordion(module._key)}
+                  />
+                </AccordionDetails>
+              </Accordion>
+            );
+          })}
 
-        {course.modules?.every(m => completedSteps.includes(m._key)) && course.finalExam && (
-          <Box sx={{ mt: 2 }}>
-            <QuizSection 
-              courseId={course._id} moduleKey="final-exam"
-              title="Avaliação Final" questions={course.finalExam} 
-              type="exam" isCompleted={isFinalExamCompleted} 
-              onComplete={() => handleStepComplete('final-exam')} 
-              scrollToTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            />
-          </Box>
-        )}
-
-        {isFinalExamCompleted && (
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              textAlign: 'center',
-              my: 2
-            }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-              <CertificateDialog courseTitle={course.title} />
+          {course.modules?.every(m => completedSteps.includes(m._key)) && course.finalExam && (
+            <Box sx={{ mt: 2 }}>
+              <QuizSection 
+                courseId={course._id} moduleKey="final-exam"
+                title="Avaliação Final" questions={course.finalExam} 
+                type="exam" isCompleted={isFinalExamCompleted} 
+                onComplete={() => handleStepComplete('final-exam')} 
+                scrollToTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              />
             </Box>
-          </Paper>
-        )}
+          )}
 
-        <Box id="pdf-export-area" sx={{ display: 'none' }}>
-            <Typography variant="h2">{course.title}</Typography>
-            {course.modules?.map((m, i) => (
-              <Box key={i} sx={{ mb: 4 }}>
-                <Typography variant="h4">{m.title}</Typography>
-                <ReactMarkdown>{m.content}</ReactMarkdown>
+          {isFinalExamCompleted && (
+            <Paper 
+              elevation={0} 
+              sx={{ 
+                textAlign: 'center',
+                my: 2
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <CertificateDialog courseTitle={course.title} />
               </Box>
-            ))}
+            </Paper>
+          )}
+
+          <Box id="pdf-export-area" sx={{ display: 'none' }}>
+              <Typography variant="h2">{course.title}</Typography>
+              {course.modules?.map((m, i) => (
+                <Box key={i} sx={{ mb: 4 }}>
+                  <Typography variant="h4">{m.title}</Typography>
+                  <ReactMarkdown>{m.content}</ReactMarkdown>
+                </Box>
+              ))}
+          </Box>
         </Box>
-      </Container>
+      </>
     </Box>
   );
 }
