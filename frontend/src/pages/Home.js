@@ -96,7 +96,7 @@ const Home = () => {
             type="submit" 
             size="large" 
             disabled={isGenerating || !topic} 
-            sx={{ px: 4, fontWeight: 'bold', minWidth: 120 }}
+            sx={{ px: 4, minWidth: 120 }}
           >
             {isGenerating ? 'Gerando...' : 'Gerar'}
           </Button>
@@ -105,7 +105,7 @@ const Home = () => {
         {/* Cabeçalho da Listagem */}
         <Stack direction='row' spacing={2} sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
           <Box>
-            <Typography variant="h6" fontWeight={600}>Recentes</Typography>
+            <Typography variant="h6">Recentes</Typography>
             {!fetching ? (
               <Typography variant="body2" color="text.secondary">
                 {totalCourses === 1 ? `${totalCourses} curso disponível` : `${totalCourses} cursos disponíveis`}
