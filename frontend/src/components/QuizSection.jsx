@@ -129,7 +129,7 @@ const QuizSection = ({ courseId, moduleKey, title, questions, type = "exercise",
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Alert icon={false} severity={score >= (shuffledQuestions.length / 2) || isCompleted ? "success" : "error"}>
             {isCompleted || score >= (shuffledQuestions.length / 2) 
-              ? `Excelente! Você acertou ${score} de ${shuffledQuestions.length}.` 
+              ? `Você acertou ${score} de ${shuffledQuestions.length}.` 
               : `Você acertou ${score} de ${shuffledQuestions.length}. O progresso foi liberado, mas você pode revisar as respostas acima.`}
           </Alert>
           <Button variant="outlined" color="primary" onClick={handleRetry} sx={{ alignSelf: 'flex-start' }}>
