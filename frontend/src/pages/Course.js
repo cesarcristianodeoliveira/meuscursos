@@ -133,6 +133,7 @@ function Course() {
   const muiComponents = {
     h2: ({ children }) => <Typography lineHeight={1} sx={{ mb: 2 }}>{children}</Typography>,
     h3: ({ children }) => <Typography lineHeight={1} sx={{ mb: 2 }}>{children}</Typography>,
+    h4: ({ children }) => <Typography lineHeight={1} sx={{ mb: 2 }}>{children}</Typography>,
     p: ({ children }) => <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.8, textAlign: 'justify', color: 'text.secondary' }}>{children}</Typography>,
     table: ({ children }) => (
       <TableContainer component={Paper} variant="outlined" sx={{ my: 3 }}><Table size="small">{children}</Table></TableContainer>
@@ -149,8 +150,6 @@ function Course() {
 
   return (
     <Box>
-      
-      
       {progressPercentage === 0 ? null : (
         <>
           <Box sx={{ position: 'fixed', top: 0, zIndex: 1100, width: '100%' }}>
@@ -165,7 +164,7 @@ function Course() {
 
       <Box 
         sx={{ 
-          bgcolor: resolvedMode === 'light' ? grey[200] : grey[900], 
+          bgcolor: resolvedMode === 'light' ? grey[100] : grey[900], 
         }}
       >
         <Toolbar />
@@ -178,7 +177,7 @@ function Course() {
             <Grid
               size={{ xs: 12, sm: 12, md: 12, lg: 8 }}
             >
-              <Typography variant="h4" gutterBottom>{course.title}</Typography>
+              <Typography variant="h6" gutterBottom>{course.title}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <Chip 
                   label={course.category.name || "Geral"} 
@@ -193,7 +192,6 @@ function Course() {
                 </Box>
               </Box>
               <Typography variant="body1" sx={{ mb: 2 }}>{course.description}</Typography>
-              
               <Box
                 sx={{
                   alignItems: 'center',
@@ -212,9 +210,9 @@ function Course() {
                     size="small" 
                     name="half-rating-read" 
                     defaultValue={course.rating} precision={0.5} readOnly 
-                    emptyIcon={<StarIcon style={{ opacity: 0.55 }} fontSize="inherit" />}
+                    emptyIcon={<StarIcon style={{ opacity: 0.75 }} fontSize="inherit" />}
                   />
-                  <Typography variant='caption' color="text.secondary" lineHeight={1} sx={{ mt: .12 }}>{course.rating}</Typography>
+                  <Typography variant='caption' color="text.secondary" lineHeight={1}>{course.rating}</Typography>
                 </Box>
 
                 <Box
@@ -259,7 +257,7 @@ function Course() {
       <>
         <Box
           sx={{
-            pb: 8
+            pb: 10
           }}
         >
           {course.modules?.map((module, index) => {

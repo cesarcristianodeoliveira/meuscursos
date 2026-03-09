@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { urlFor } from '../client';
 import timeAgo from '../utils/timeAgo';
 import { 
-  Card, Box, CardMedia, CardActionArea, Typography, Chip 
+  Card, Box, CardMedia, CardActionArea, Typography, Chip, 
+  Rating
 } from '@mui/material';
 import { RocketLaunch, AccessTime, AutoStoriesOutlined, TimerOutlined } from '@mui/icons-material';
+import StarIcon from '@mui/icons-material/Star';
 
 const CourseCard = ({ course }) => {
   return (
@@ -17,7 +19,7 @@ const CourseCard = ({ course }) => {
           display: 'flex', 
           // 'column' no mobile (xs), 'row' a partir do sm
           flexDirection: { xs: 'column', sm: 'row' }, 
-          alignItems: 'stretch',
+          alignItems: 'center',
           justifyContent: 'flex-start'
         }}
       >
@@ -29,7 +31,7 @@ const CourseCard = ({ course }) => {
               // Largura total no mobile, largura fixa no desktop
               width: { xs: '100%', sm: 256 },
               // Altura fixa no mobile para não ficar gigante, 100% no desktop
-              height: { xs: 128, sm: 'auto' },
+              height: { xs: 128, sm: '100%' },
               minWidth: { xs: '100%', sm: 256 }, 
               objectFit: 'cover',
             }}
@@ -78,7 +80,6 @@ const CourseCard = ({ course }) => {
             component="h2" 
             variant="h6" 
             sx={{ 
-              fontWeight: 600,
               mb: 1,
               lineHeight: 1.3,
               display: '-webkit-box',
@@ -104,28 +105,58 @@ const CourseCard = ({ course }) => {
             {course.description}
           </Typography>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', mt: 'auto' }}>
-              <Box
-                sx={{
-                  alignItems: 'center',
-                  display: 'flex',
-                  gap: 1
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <AutoStoriesOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
-                  <Typography variant="caption" color="text.secondary" lineHeight={1}>
-                    {course.modules?.length || 0} aulas
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <TimerOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
-                  <Typography variant="caption" color="text.secondary" lineHeight={1}>
-                    {course.estimatedTime}h
-                  </Typography>
-                </Box>
+          <Box
+            sx={{
+              alignItems: 'center',
+              display: 'flex',
+              justifyContent: 'space-between'
+            }}
+          >
+            <Box
+              sx={{
+                alignItems: 'center',
+                display: 'flex',
+                gap: .5,
+              }}
+            >
+              <Rating 
+                size="small" 
+                name="half-rating-read" 
+                defaultValue={course.rating} precision={0.5} readOnly 
+                emptyIcon={<StarIcon style={{ opacity: 0.75 }} fontSize="inherit" />}
+              />
+              <Typography variant='caption' color="text.secondary" lineHeight={1}>{course.rating}</Typography>
+            </Box>
+
+            <Box
+              sx={{
+                alignItems: 'center',
+                display: 'flex',
+                gap: 1
+              }}
+            >
+              {/* <IconButton color='inherit' onClick={handleDownloadPDF}><PictureAsPdf /></IconButton> */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <AutoStoriesOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary" lineHeight={1}>
+                  {course.modules?.length || 0} aulas
+                </Typography>
               </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <TimerOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary" lineHeight={1}>
+                  {course.estimatedTime}h
+                </Typography>
+              </Box>
+              {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Percent sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary" lineHeight={1}>
+                  {progressPercentage}
+                </Typography>
+              </Box> */}
+            </Box>
           </Box>
+
         </Box>
       </CardActionArea>
     </Card>

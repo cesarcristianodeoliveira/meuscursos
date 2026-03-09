@@ -79,7 +79,7 @@ const Home = () => {
   return (
     <>
       <Toolbar />
-      <Container maxWidth="xl" sx={{ mt: 2, pb: 4 }}>
+      <Container maxWidth="xl" sx={{ mt: 2, pb: 10 }}>
         {/* Formulário de Geração */}
         <Box component="form" onSubmit={handleGenerate} sx={{ display: 'flex', gap: 2, mb: 4 }}>
           <TextField

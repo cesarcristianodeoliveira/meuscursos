@@ -53,7 +53,17 @@ const Navbar = forwardRef((props, ref) => {
   };
 
   return (
-    <AppBar ref={ref} {...props} color="inherit" position="fixed" elevation={0}>
+    <AppBar 
+      ref={ref} 
+      {...props} 
+      color="inherit" 
+      position="fixed" 
+      elevation={0}
+      sx={{
+        bgcolor: resolvedMode === 'light' ? 'rgba(255,255,255, 0.75)' : 'hsla(210, 14%, 7%, 0.75)',
+        backdropFilter: 'blur(24px)'
+      }}
+    >
       {/* Barra de Progresso Estilo YouTube */}
       {isGenerating && (
         <LinearProgress 
