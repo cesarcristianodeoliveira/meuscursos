@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { client, urlFor } from '../client';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import html2pdf from 'html2pdf.js/dist/html2pdf.min.js';
+// import html2pdf from 'html2pdf.js/dist/html2pdf.min.js';
 import { 
   Typography, Box, Paper, Accordion, AccordionSummary, 
   AccordionDetails, CircularProgress, 
@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import { 
   ContentCopy, 
-  PictureAsPdf, 
+  // PictureAsPdf, 
   Check,
   AccessTime,
   TimerOutlined,
@@ -110,17 +110,17 @@ function Course() {
     // if (isExpanded) setTimeout(() => scrollToAccordion(key), 100);
   };
 
-  const handleDownloadPDF = () => {
-    const element = document.getElementById('pdf-export-area');
-    const opt = {
-      margin: 10, filename: `${course?.title}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    element.style.display = 'block';
-    html2pdf().set(opt).from(element).save().then(() => element.style.display = 'none');
-  };
+  // const handleDownloadPDF = () => {
+  //   const element = document.getElementById('pdf-export-area');
+  //   const opt = {
+  //     margin: 10, filename: `${course?.title}.pdf`,
+  //     image: { type: 'jpeg', quality: 0.98 },
+  //     html2canvas: { scale: 2, useCORS: true },
+  //     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  //   };
+  //   element.style.display = 'block';
+  //   html2pdf().set(opt).from(element).save().then(() => element.style.display = 'none');
+  // };
 
   const progressPercentage = useMemo(() => {
     if (!course) return 0;

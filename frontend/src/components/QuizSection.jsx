@@ -3,7 +3,7 @@ import {
   Typography, Box, Button, Radio, RadioGroup, 
   FormControlLabel, FormControl, Alert, Stack 
 } from '@mui/material';
-import { Assignment, EmojiEvents, Check } from '@mui/icons-material';
+import { Check } from '@mui/icons-material';
 
 const shuffleArray = (array) => [...array].sort(() => Math.random() - 0.5);
 
