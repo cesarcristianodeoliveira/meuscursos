@@ -3,7 +3,13 @@ import { Card, Box, Skeleton } from '@mui/material';
 
 const CourseCardSkeleton = () => {
   return (
-    <Card sx={{ display: 'flex', overflow: 'hidden', mb: 2 }}>
+    <Card 
+      elevation={0}
+      sx={{ 
+        borderRadius: 0,
+        display: 'flex', overflow: 'hidden' 
+      }}
+    >
       <Box sx={{ 
         display: 'flex', 
         flexDirection: { xs: 'column', sm: 'row' }, 
@@ -17,7 +23,7 @@ const CourseCardSkeleton = () => {
           animation="wave"
           sx={{ 
             width: { xs: '100%', sm: 256 },
-            height: { xs: 180, sm: 160 }, // Fixamos 160 no desktop para casar com o conteúdo
+            height: { xs: 128, sm: '100%' }, // Fixamos 160 no desktop para casar com o conteúdo
             minWidth: { xs: '100%', sm: 256 },
           }} 
         />

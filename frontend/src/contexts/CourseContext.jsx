@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useCallback } from 'react';
 import axios from 'axios';
 
 const CourseContext = createContext();
@@ -10,6 +10,19 @@ export const CourseProvider = ({ children }) => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
+  const getCourseProgress = useCallback((course) => {
+    if (!course) return 0;
+    
+    const saved = localStorage.getItem(`progress-${course._id}`);
+    const completedSteps = saved ? JSON.parse(saved) : [];
+    
+    const totalSteps = (course.modules?.length || 0) + (course.finalExam ? 1 : 0);
+    
+    if (totalSteps === 0) return 0;
+    
+    return Math.round((completedSteps.length / totalSteps) * 100);
+  }, []);
+
   const generateCourse = async (topic, callback) => {
     if (isGenerating) return;
 
@@ -17,7 +30,6 @@ export const CourseProvider = ({ children }) => {
     setProgress(0);
     setStatusMessage('Iniciando conexão com a IA...');
 
-    // Simulador de progresso (Barra "falsa" mas inteligente)
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev < 30) {
@@ -41,13 +53,12 @@ export const CourseProvider = ({ children }) => {
       setProgress(100);
       setStatusMessage('Curso pronto!');
       
-      if (callback) callback(); // Executa o refresh da lista na Home
+      if (callback) callback(); 
     } catch (error) {
       console.error("Erro ao gerar curso:", error);
       alert('Houve um erro técnico ao gerar o curso.');
     } finally {
       clearInterval(interval);
-      // Pequeno delay para o usuário ver o 100%
       setTimeout(() => {
         setIsGenerating(false);
         setProgress(0);
@@ -57,7 +68,13 @@ export const CourseProvider = ({ children }) => {
   };
 
   return (
-    <CourseContext.Provider value={{ isGenerating, progress, statusMessage, generateCourse }}>
+    <CourseContext.Provider value={{ 
+      isGenerating, 
+      progress, 
+      statusMessage, 
+      generateCourse,
+      getCourseProgress 
+    }}>
       {children}
     </CourseContext.Provider>
   );

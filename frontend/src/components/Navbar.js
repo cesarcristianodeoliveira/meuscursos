@@ -60,8 +60,8 @@ const Navbar = forwardRef((props, ref) => {
       position="fixed" 
       elevation={0}
       sx={{
-        bgcolor: resolvedMode === 'light' ? 'rgba(255,255,255, 0.75)' : 'hsla(210, 14%, 7%, 0.75)',
-        backdropFilter: 'blur(24px)'
+        bgcolor: resolvedMode === 'light' ? 'rgba(255,255,255, 0.75)' : 'hsla(204, 14%, 7%, 0.75)',
+        backdropFilter: 'blur(8px)'
       }}
     >
       {/* Barra de Progresso Estilo YouTube */}

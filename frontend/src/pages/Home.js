@@ -2,34 +2,41 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { client } from '../client';
 import CourseCard from '../components/CourseCard';
 import CourseCardSkeleton from '../components/CourseCardSkeleton';
+import CategoryTabs from '../components/CategoryTabs';
 import { useCourse } from '../contexts/CourseContext'; 
 import { 
   Container, TextField, Button, Box, Typography, 
-  Pagination, Stack, MenuItem,
-  Toolbar
+  Pagination, Stack, Toolbar, Skeleton, useTheme
 } from '@mui/material';
 import { RocketLaunch } from '@mui/icons-material';
 
 const COURSES_PER_PAGE = 5;
 
 const Home = () => {
+  const theme = useTheme();
   const [topic, setTopic] = useState('');
   const [fetching, setFetching] = useState(true);
+  const [fetchingCategories, setFetchingCategories] = useState(true); 
   const [courses, setCourses] = useState([]);
   const [totalCourses, setTotalCourses] = useState(0);
   const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState('Todos');
   const [categories, setCategories] = useState([]);
 
-  // Puxando o estado global do contexto
   const { isGenerating, generateCourse } = useCourse();
 
   const fetchCategories = async () => {
+    setFetchingCategories(true);
     try {
       const data = await client.fetch('*[_type == "course" && defined(category)].category.name');
-      const unique = ['Todos', ...new Set(data)];
-      setCategories(unique);
-    } catch (err) { console.error("Erro categorias:", err); }
+      const unique = [...new Set(data)];
+      const sorted = unique.sort((a, b) => a.localeCompare(b));
+      setCategories(['Todos', ...sorted]);
+    } catch (err) { 
+      console.error("Erro categorias:", err); 
+    } finally {
+      setFetchingCategories(false);
+    }
   };
 
   const fetchCourses = useCallback(async () => {
@@ -56,13 +63,9 @@ const Home = () => {
   useEffect(() => { fetchCategories(); }, []);
   useEffect(() => { fetchCourses(); }, [fetchCourses]);
 
-  // Função disparada ao clicar em Gerar
   const handleGenerate = async (e) => {
     e.preventDefault();
-    
-    // Chama a função global do contexto
     await generateCourse(topic, () => {
-      // Este callback só roda quando o curso termina de ser criado
       setTopic('');
       setPage(1); 
       setCategoryFilter('Todos');
@@ -73,14 +76,19 @@ const Home = () => {
 
   const handlePageChange = (event, value) => {
     setPage(value);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.getElementById('back-to-top-anchor')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setCategoryFilter(newValue);
+    setPage(1);
+    document.getElementById('back-to-top-anchor')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
     <>
       <Toolbar />
-      <Container maxWidth="xl" sx={{ mt: 2, pb: 10 }}>
-        {/* Formulário de Geração */}
+      <Container maxWidth="xl" sx={{ mt: 2 }}>
         <Box component="form" onSubmit={handleGenerate} sx={{ display: 'flex', gap: 2, mb: 4 }}>
           <TextField
             fullWidth
@@ -88,7 +96,7 @@ const Home = () => {
             variant="outlined"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            disabled={isGenerating} // Desabilita se estiver gerando (globalmente)
+            disabled={isGenerating}
             placeholder="Ex: Marketing Digital avançado, Culinária Vegana..."
           />
           <Button 
@@ -96,57 +104,75 @@ const Home = () => {
             type="submit" 
             size="large" 
             disabled={isGenerating || !topic} 
-            sx={{ px: 4, minWidth: 120 }}
+            sx={{ px: 4 }}
           >
             {isGenerating ? 'Gerando...' : 'Gerar'}
           </Button>
         </Box>
+      </Container>
 
-        {/* Cabeçalho da Listagem */}
-        <Stack direction='row' spacing={2} sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-          <Box>
-            <Typography variant="h6">Recentes</Typography>
-            {!fetching ? (
-              <Typography variant="body2" color="text.secondary">
-                {totalCourses === 1 ? `${totalCourses} curso disponível` : `${totalCourses} cursos disponíveis`}
-              </Typography>
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                Carregando
-              </Typography>
-            )}
-          </Box>
-          
-          <TextField
-            select
-            label="Categoria"
-            size="small"
-            value={categoryFilter}
-            onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-            sx={{ minWidth: 128 }}
-          >
-            {categories.map((cat) => <MenuItem key={cat} value={cat}>{cat}</MenuItem>)}
-          </TextField>
-        </Stack>
+      {/* Renderização condicional do Skeleton das Tabs */}
+      {fetchingCategories ? (
+        <Box sx={{ 
+          position: 'sticky', top: 0, zIndex: 1000, width: '100%', minHeight: 48,
+          bgcolor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.75)' : 'hsla(204, 14%, 7%, 0.75)',
+          backdropFilter: 'blur(8px)', borderBottom: 1, borderColor: 'divider'
+        }}>
+          <Container maxWidth="xl">
+            <Stack direction="row" spacing={4} sx={{ py: 1.5 }}>
+              {[...Array(6)].map((_, i) => (
+                <Skeleton key={i} variant="text" width={80} height={24} sx={{ borderRadius: 1 }} />
+              ))}
+            </Stack>
+          </Container>
+        </Box>
+      ) : (
+        <CategoryTabs 
+          categories={categories} 
+          value={categoryFilter} 
+          onChange={handleTabChange} 
+        />
+      )}
 
-        {/* Grid de Cursos ou Skeletons */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Container maxWidth="xl" sx={{ mt: 2 }}>
+        {/* Título da Categoria - Fora do fetching para não piscar */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            {categoryFilter === 'Todos' ? 'Recentes' : categoryFilter}
+          </Typography>
+
+          {/* Apenas a contagem de cursos mostra o Skeleton durante o fetch */}
           {fetching ? (
-            [...Array(3)].map((_, i) => <CourseCardSkeleton key={i} />)
+            <Skeleton variant="text" width="150px" height={20} />
           ) : (
-            <>
-              {courses.map((course) => <CourseCard key={course._id} course={course} />)}
-              {courses.length === 0 && (
-                <Box sx={{ textAlign: 'center', py: 8, border: '1px dashed', borderColor: 'divider', borderRadius: 4 }}>
-                  <RocketLaunch sx={{ fontSize: 56, color: 'text.disabled', mb: 1 }} />
-                  <Typography color="text.secondary">Nenhum curso encontrado.</Typography>
-                </Box>
-              )}
-            </>
+            <Typography variant="body2" color="text.secondary">
+              {totalCourses === 1 
+                ? `${totalCourses} curso disponível` 
+                : `${totalCourses} cursos disponíveis`}
+            </Typography>
           )}
         </Box>
+      </Container>
+      
+      {/* Listagem de Cursos */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {fetching ? (
+          [...Array(3)].map((_, i) => <CourseCardSkeleton key={i} />)
+        ) : (
+          <>
+            {courses.map((course) => <CourseCard key={course._id} course={course} />)}
+            {courses.length === 0 && (
+              <Box sx={{ textAlign: 'center', py: 8, border: '1px dashed', borderColor: 'divider', borderRadius: 4, mx: 2 }}>
+                <RocketLaunch sx={{ fontSize: 56, color: 'text.disabled', mb: 1 }} />
+                <Typography color="text.secondary">Nenhum curso encontrado nesta categoria.</Typography>
+              </Box>
+            )}
+          </>
+        )}
+      </Box>
 
-        {/* Paginação */}
+      {/* Paginação */}
+      <Container maxWidth="xl" sx={{ mt: 2, pb: 10 }}>
         {!fetching && totalCourses > COURSES_PER_PAGE && (
           <Stack sx={{ mt: 6, alignItems: 'center' }}>
             <Pagination 

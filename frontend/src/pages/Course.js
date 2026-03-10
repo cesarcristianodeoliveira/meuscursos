@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppTheme } from '../contexts/ThemeContext';
+import { useCourse } from '../contexts/CourseContext';
 import { useParams } from 'react-router-dom';
 import { client, urlFor } from '../client';
 import ReactMarkdown from 'react-markdown';
@@ -59,9 +60,11 @@ function Course() {
   const { slug } = useParams();
   const accordionRefs = useRef({});
   const { resolvedMode } = useAppTheme();
+  const { getCourseProgress } = useCourse();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [completedSteps, setCompletedSteps] = useState([]);
+  const progressPercentage = getCourseProgress(course);
   const [expanded, setExpanded] = useState({});
 
   useEffect(() => {
@@ -121,12 +124,6 @@ function Course() {
   //   element.style.display = 'block';
   //   html2pdf().set(opt).from(element).save().then(() => element.style.display = 'none');
   // };
-
-  const progressPercentage = useMemo(() => {
-    if (!course) return 0;
-    const total = (course.modules?.length || 0) + (course.finalExam ? 1 : 0);
-    return Math.round((completedSteps.length / total) * 100);
-  }, [completedSteps, course]);
 
   const isFinalExamCompleted = completedSteps.includes('final-exam');
 

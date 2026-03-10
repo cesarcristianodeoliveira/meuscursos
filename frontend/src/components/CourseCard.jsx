@@ -2,16 +2,25 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { urlFor } from '../client';
 import timeAgo from '../utils/timeAgo';
+import { useCourse } from '../contexts/CourseContext';
 import { 
   Card, Box, CardMedia, CardActionArea, Typography, Chip, 
   Rating
 } from '@mui/material';
-import { RocketLaunch, AccessTime, AutoStoriesOutlined, TimerOutlined } from '@mui/icons-material';
+import { RocketLaunch, AccessTime, AutoStoriesOutlined, TimerOutlined, Percent } from '@mui/icons-material';
 import StarIcon from '@mui/icons-material/Star';
 
 const CourseCard = ({ course }) => {
+  const { getCourseProgress } = useCourse();
+  const progressPercentage = getCourseProgress(course);
   return (
-    <Card sx={{ display: 'flex', overflow: 'hidden', mb: 2 }}>
+    <Card 
+      elevation={0}
+      sx={{ 
+        borderRadius: 0,
+        display: 'flex', overflow: 'hidden' 
+      }}
+    >
       <CardActionArea 
         component={Link} 
         to={`/curso/${course.slug?.current}`}
@@ -148,12 +157,12 @@ const CourseCard = ({ course }) => {
                   {course.estimatedTime}h
                 </Typography>
               </Box>
-              {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Percent sx={{ fontSize: 14, color: 'text.secondary' }} />
                 <Typography variant="caption" color="text.secondary" lineHeight={1}>
                   {progressPercentage}
                 </Typography>
-              </Box> */}
+              </Box>
             </Box>
           </Box>
 
