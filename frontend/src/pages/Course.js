@@ -172,6 +172,7 @@ function Course() {
             spacing={2}
           >
             <Grid
+              order={{ xs: 2, sm: 1 }}
               size={{ xs: 12, sm: 12, md: 12, lg: 8 }}
             >
               <Typography variant="h6" gutterBottom>{course.title}</Typography>
@@ -242,6 +243,7 @@ function Course() {
               </Box>
             </Grid>
             <Grid
+              order={{ xs: 1, sm: 2 }}
               size={{ xs: 12, sm: 12, md: 12, lg: 4 }}
             >
               {course.thumbnail && (

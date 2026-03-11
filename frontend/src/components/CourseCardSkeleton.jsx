@@ -46,7 +46,7 @@ const CourseCardSkeleton = () => {
           {/* Linha 2: Título (Simulando 1 linha) */}
           <Skeleton 
             variant="text" 
-            width="80%" 
+            width="25%" 
             height={24} // Altura de uma linha h6
             animation="wave" 
             sx={{ mb: 1, transform: 'none' }} // transform: none tira o respiro extra do Skeleton

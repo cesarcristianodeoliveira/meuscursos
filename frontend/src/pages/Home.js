@@ -20,7 +20,7 @@ const Home = () => {
   const [courses, setCourses] = useState([]);
   const [totalCourses, setTotalCourses] = useState(0);
   const [page, setPage] = useState(1);
-  const [categoryFilter, setCategoryFilter] = useState('Todos');
+  const [categoryFilter, setCategoryFilter] = useState('Recentes');
   const [categories, setCategories] = useState([]);
 
   const { isGenerating, generateCourse } = useCourse();
@@ -31,7 +31,7 @@ const Home = () => {
       const data = await client.fetch('*[_type == "course" && defined(category)].category.name');
       const unique = [...new Set(data)];
       const sorted = unique.sort((a, b) => a.localeCompare(b));
-      setCategories(['Todos', ...sorted]);
+      setCategories(['Recentes', ...sorted]);
     } catch (err) { 
       console.error("Erro categorias:", err); 
     } finally {
@@ -43,7 +43,7 @@ const Home = () => {
     setFetching(true);
     try {
       let conditions = ['_type == "course"'];
-      if (categoryFilter !== 'Todos') {
+      if (categoryFilter !== 'Recentes') {
         conditions.push(`category.name == "${categoryFilter}"`);
       }
       const filter = `*[${conditions.join(' && ')}]`;
@@ -68,7 +68,7 @@ const Home = () => {
     await generateCourse(topic, () => {
       setTopic('');
       setPage(1); 
-      setCategoryFilter('Todos');
+      setCategoryFilter('Recentes');
       fetchCourses(); 
       fetchCategories();
     });
@@ -89,7 +89,7 @@ const Home = () => {
     <>
       <Toolbar />
       <Container maxWidth="xl" sx={{ mt: 2 }}>
-        <Box component="form" onSubmit={handleGenerate} sx={{ display: 'flex', gap: 2, mb: 4 }}>
+        <Box component="form" onSubmit={handleGenerate} sx={{ display: 'flex', gap: 2, mb: 2 }}>
           <TextField
             fullWidth
             label="O que você deseja aprender?"
@@ -104,9 +104,9 @@ const Home = () => {
             type="submit" 
             size="large" 
             disabled={isGenerating || !topic} 
-            sx={{ px: 4 }}
+            sx={{ px: 2 }}
           >
-            {isGenerating ? 'Gerando...' : 'Gerar'}
+            {isGenerating ? 'Gerando' : 'Gerar'}
           </Button>
         </Box>
       </Container>
@@ -116,12 +116,12 @@ const Home = () => {
         <Box sx={{ 
           position: 'sticky', top: 0, zIndex: 1000, width: '100%', minHeight: 48,
           bgcolor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.75)' : 'hsla(204, 14%, 7%, 0.75)',
-          backdropFilter: 'blur(8px)', borderBottom: 1, borderColor: 'divider'
+          backdropFilter: 'blur(8px)'
         }}>
           <Container maxWidth="xl">
             <Stack direction="row" spacing={4} sx={{ py: 1.5 }}>
               {[...Array(6)].map((_, i) => (
-                <Skeleton key={i} variant="text" width={80} height={24} sx={{ borderRadius: 1 }} />
+                <Skeleton key={i} variant="text" width={96} height={24} />
               ))}
             </Stack>
           </Container>
@@ -136,19 +136,19 @@ const Home = () => {
 
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         {/* Título da Categoria - Fora do fetching para não piscar */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            {categoryFilter === 'Todos' ? 'Recentes' : categoryFilter}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="h6">
+            {categoryFilter === 'Recentes' ? 'Recentes' : categoryFilter}
           </Typography>
 
           {/* Apenas a contagem de cursos mostra o Skeleton durante o fetch */}
           {fetching ? (
-            <Skeleton variant="text" width="150px" height={20} />
+            <Skeleton variant="text" width="64px" height={20} />
           ) : (
             <Typography variant="body2" color="text.secondary">
               {totalCourses === 1 
-                ? `${totalCourses} curso disponível` 
-                : `${totalCourses} cursos disponíveis`}
+                ? `${totalCourses} curso` 
+                : `${totalCourses} cursos`}
             </Typography>
           )}
         </Box>
@@ -162,9 +162,9 @@ const Home = () => {
           <>
             {courses.map((course) => <CourseCard key={course._id} course={course} />)}
             {courses.length === 0 && (
-              <Box sx={{ textAlign: 'center', py: 8, border: '1px dashed', borderColor: 'divider', borderRadius: 4, mx: 2 }}>
+              <Box sx={{ textAlign: 'center', p: 2 }}>
                 <RocketLaunch sx={{ fontSize: 56, color: 'text.disabled', mb: 1 }} />
-                <Typography color="text.secondary">Nenhum curso encontrado nesta categoria.</Typography>
+                <Typography color="text.secondary">Nenhum curso encontrado.</Typography>
               </Box>
             )}
           </>
@@ -172,8 +172,8 @@ const Home = () => {
       </Box>
 
       {/* Paginação */}
-      <Container maxWidth="xl" sx={{ mt: 2, pb: 10 }}>
-        {!fetching && totalCourses > COURSES_PER_PAGE && (
+      {!fetching && courses.length !== 0 && totalCourses > COURSES_PER_PAGE && (
+        <Container maxWidth="xl" sx={{ mt: 2, pb: 10 }}>
           <Stack sx={{ mt: 6, alignItems: 'center' }}>
             <Pagination 
               count={Math.ceil(totalCourses / COURSES_PER_PAGE)} 
@@ -182,8 +182,8 @@ const Home = () => {
               color="primary" 
             />
           </Stack>
-        )}
-      </Container>
+        </Container>
+      )}
     </>
   );
 };

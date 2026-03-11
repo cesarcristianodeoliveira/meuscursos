@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { 
   Box, 
   useScrollTrigger, 
-  Slide, 
   Fade, 
   Fab 
 } from '@mui/material';
@@ -15,15 +14,6 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Course from './pages/Course';
 import Search from './pages/Search';
-
-function HideOnScroll({ children }) {
-  const trigger = useScrollTrigger();
-  return (
-    <Slide appear={false} direction="down" in={!trigger}>
-      {React.cloneElement(children)}
-    </Slide>
-  );
-}
 
 function ScrollTop() {
   const trigger = useScrollTrigger({
@@ -61,9 +51,7 @@ const AppContent = () => {
 
       <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
         
-        <HideOnScroll>
-          <Navbar />
-        </HideOnScroll>
+        <Navbar />
         
         <Box component="main">
           <Routes>

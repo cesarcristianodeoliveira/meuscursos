@@ -8,7 +8,6 @@ const CategoryTabs = ({ categories, value, onChange }) => {
     <Box 
       sx={{ 
         position: 'sticky', 
-        top: 0, 
         zIndex: 1000, 
         width: '100%',
         bgcolor: theme.palette.mode === 'light' 
@@ -22,7 +21,6 @@ const CategoryTabs = ({ categories, value, onChange }) => {
         onChange={onChange}
         variant="scrollable"
         scrollButtons="auto"
-        allowScrollButtonsMobile
         aria-label="Categorias de cursos"
         sx={{
           minHeight: 48,
