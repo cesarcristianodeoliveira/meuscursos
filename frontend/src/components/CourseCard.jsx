@@ -7,7 +7,7 @@ import {
   Card, Box, CardMedia, CardActionArea, Typography, Chip, 
   Rating
 } from '@mui/material';
-import { Rocket, AccessTime, AutoStoriesOutlined, TimerOutlined, Percent } from '@mui/icons-material';
+import { MenuBook, AccessTime, AutoStoriesOutlined, TimerOutlined, Percent } from '@mui/icons-material';
 import StarIcon from '@mui/icons-material/Star';
 
 const CourseCard = ({ course }) => {
@@ -59,7 +59,7 @@ const CourseCard = ({ course }) => {
               justifyContent: 'center'
             }}
           >
-            <Rocket sx={{ fontSize: 64, color: 'text.disabled' }} />
+            <MenuBook sx={{ fontSize: 64, color: 'text.disabled' }} />
           </Box>
         )}
 

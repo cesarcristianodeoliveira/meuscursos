@@ -4,7 +4,9 @@ import {
   Box, 
   useScrollTrigger, 
   Fade, 
-  Fab 
+  Fab,
+  useTheme,
+  useMediaQuery 
 } from '@mui/material';
 import { KeyboardArrowUp } from '@mui/icons-material'; 
 import { ThemeProviderWrapper } from './contexts/ThemeContext';
@@ -16,29 +18,34 @@ import Course from './pages/Course';
 import Search from './pages/Search';
 
 function ScrollTop() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
   const trigger = useScrollTrigger({
     disableHysteresis: true,
-    threshold: 400, // Aumentado para que o botão só apareça quando realmente houver scroll longo
+    threshold: 400, 
   });
 
   const handleClick = (event) => {
-    // Busca primeiro o ponto das Tabs (específico da Dashboard)
     const tabsAnchor = document.querySelector('#tabs-scroll-point');
-    // Busca o ponto do topo absoluto (fallback para outras páginas)
     const topAnchor = (event.target.ownerDocument || document).querySelector('#back-to-top-anchor');
 
     if (tabsAnchor) {
-      // Se estamos na Home, rolar até as Tabs com compensação da Navbar
+      // Lógica idêntica ao Dashboard para manter consistência
+      const navHeight = isMobile ? 56 : 64;
+      const tabsHeight = 48;
+      
       const bodyRect = document.body.getBoundingClientRect().top;
       const elementRect = tabsAnchor.getBoundingClientRect().top;
       const elementPosition = elementRect - bodyRect;
       
       window.scrollTo({
-        top: elementPosition,
+        // Descontamos a Navbar e a Tab que ficará sticky
+        top: elementPosition - (navHeight + tabsHeight),
         behavior: 'smooth'
       });
     } else if (topAnchor) {
-      // Se não houver tabs (ex: página de curso), vai até o topo absoluto
+      // Em outras páginas, sobe para o topo absoluto
       topAnchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
@@ -48,7 +55,7 @@ function ScrollTop() {
       <Box
         onClick={handleClick}
         role="presentation"
-        sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}
+        sx={{ position: 'fixed', bottom: 16, right: 16, zIndex: 1000 }}
       >
         <Fab color="primary" size="small" aria-label="voltar ao topo">
           <KeyboardArrowUp />
