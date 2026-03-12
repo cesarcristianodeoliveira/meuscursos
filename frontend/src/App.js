@@ -18,13 +18,28 @@ import Search from './pages/Search';
 function ScrollTop() {
   const trigger = useScrollTrigger({
     disableHysteresis: true,
-    threshold: 100,
+    threshold: 400, // Aumentado para que o botão só apareça quando realmente houver scroll longo
   });
 
   const handleClick = (event) => {
-    const anchor = (event.target.ownerDocument || document).querySelector('#back-to-top-anchor');
-    if (anchor) {
-      anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Busca primeiro o ponto das Tabs (específico da Dashboard)
+    const tabsAnchor = document.querySelector('#tabs-scroll-point');
+    // Busca o ponto do topo absoluto (fallback para outras páginas)
+    const topAnchor = (event.target.ownerDocument || document).querySelector('#back-to-top-anchor');
+
+    if (tabsAnchor) {
+      // Se estamos na Home, rolar até as Tabs com compensação da Navbar
+      const bodyRect = document.body.getBoundingClientRect().top;
+      const elementRect = tabsAnchor.getBoundingClientRect().top;
+      const elementPosition = elementRect - bodyRect;
+      
+      window.scrollTo({
+        top: elementPosition,
+        behavior: 'smooth'
+      });
+    } else if (topAnchor) {
+      // Se não houver tabs (ex: página de curso), vai até o topo absoluto
+      topAnchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
@@ -47,6 +62,7 @@ const AppContent = () => {
   return (
     <Router>
       <ScrollToTop />
+      {/* Ponto zero absoluto da aplicação */}
       <div id="back-to-top-anchor" />
 
       <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>

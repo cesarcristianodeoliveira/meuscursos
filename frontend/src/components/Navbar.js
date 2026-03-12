@@ -70,7 +70,7 @@ const Navbar = forwardRef((props, ref) => {
       {...props} 
       color="inherit" 
       position="fixed" 
-      elevation={0}
+      elevation={1}
       sx={{
         bgcolor: resolvedMode === 'light' ? 'rgba(255,255,255, 0.75)' : 'hsla(204, 14%, 7%, 0.75)',
         backdropFilter: 'blur(8px)'

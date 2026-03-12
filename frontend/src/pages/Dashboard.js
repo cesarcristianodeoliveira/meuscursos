@@ -29,6 +29,22 @@ const Dashboard = () => {
   const [stats, setStats] = useState({ courses: 0, lessons: 0, quizzes: 0, categories: 0 });
   const [fetchingStats, setFetchingStats] = useState(true);
 
+  // Função centralizada para scroll inteligente até as Tabs
+  const scrollToTabs = () => {
+    const anchor = document.querySelector('#tabs-scroll-point');
+    if (anchor) {
+      const offset = 80; // Altura da sua Navbar + um respiro
+      const bodyRect = document.body.getBoundingClientRect().top;
+      const elementRect = anchor.getBoundingClientRect().top;
+      const elementPosition = elementRect - bodyRect;
+      
+      window.scrollTo({
+        top: elementPosition - offset,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   const fetchCategories = async () => {
     setFetchingCategories(true);
     try {
@@ -67,14 +83,10 @@ const Dashboard = () => {
   const fetchStats = async () => {
     setFetchingStats(true);
     try {
-      // Query otimizada para buscar tudo de uma vez
       const query = `{
         "courses": count(*[_type == "course"]),
-        // Pega todos os nomes de categorias, remove nulos e conta os únicos
         "categories": count(array::unique(*[_type == "course"].category.name)),
-        // Conta o total de itens dentro do array modules de todos os cursos
         "lessons": count(*[_type == "course"].modules[]),
-        // Soma o total de exercícios dentro de cada módulo
         "quizzes": count(*[_type == "course"].modules[].exercises[])
       }`;
       const data = await client.fetch(query);
@@ -97,18 +109,19 @@ const Dashboard = () => {
       setCategoryFilter('Recentes');
       fetchCourses(); 
       fetchCategories();
+      fetchStats(); // Atualiza estatísticas após gerar novo curso
     });
   };
 
   const handlePageChange = (event, value) => {
     setPage(value);
-    document.getElementById('back-to-top-anchor')?.scrollIntoView({ behavior: 'smooth' });
+    scrollToTabs(); // Usa a nova lógica de scroll
   };
 
   const handleTabChange = (event, newValue) => {
     setCategoryFilter(newValue);
     setPage(1);
-    document.getElementById('back-to-top-anchor')?.scrollIntoView({ behavior: 'smooth' });
+    scrollToTabs(); // Usa a nova lógica de scroll
   };
 
   return (
@@ -130,15 +143,17 @@ const Dashboard = () => {
             type="submit" 
             size="large" 
             disabled={isGenerating || !topic} 
-            sx={{ px: 2 }}
+            sx={{ px: 2, minWidth: 100 }}
           >
             {isGenerating ? 'Gerando' : 'Gerar'}
           </Button>
         </Box>
 
         <StatsBanner stats={stats} fetching={fetchingStats} />
-
       </Container>
+
+      {/* Âncora Invisível para o Scroll Inteligente */}
+      <div id="tabs-scroll-point" style={{ position: 'relative' }} />
 
       {/* Renderização condicional do Skeleton das Tabs */}
       {fetchingCategories ? (
@@ -164,13 +179,11 @@ const Dashboard = () => {
       )}
 
       <Container maxWidth="xl" sx={{ mt: 2 }}>
-        {/* Título da Categoria - Fora do fetching para não piscar */}
         <Box sx={{ mb: 2 }}>
           <Typography variant="h6">
-            {categoryFilter === 'Recentes' ? 'Recentes' : categoryFilter}
+            {categoryFilter}
           </Typography>
 
-          {/* Apenas a contagem de cursos mostra o Skeleton durante o fetch */}
           {fetching ? (
             <Skeleton variant="text" width="64px" height={20} />
           ) : (
@@ -191,9 +204,9 @@ const Dashboard = () => {
           <>
             {courses.map((course) => <CourseCard key={course._id} course={course} />)}
             {courses.length === 0 && (
-              <Box sx={{ textAlign: 'center', p: 2 }}>
+              <Box sx={{ textAlign: 'center', p: 5 }}>
                 <RocketLaunch sx={{ fontSize: 56, color: 'text.disabled', mb: 1 }} />
-                <Typography color="text.secondary">Nenhum curso encontrado.</Typography>
+                <Typography color="text.secondary">Nenhum curso encontrado nesta categoria.</Typography>
               </Box>
             )}
           </>
