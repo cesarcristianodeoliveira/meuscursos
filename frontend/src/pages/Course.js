@@ -169,10 +169,10 @@ function Course() {
           <Grid
             alignItems="center"
             container
-            spacing={2}
+            spacing={{ xs: 0, lg: 2 }}
           >
             <Grid
-              order={{ xs: 2, sm: 1 }}
+              order={{ xs: 2, sm: 2, md: 2, lg: 1 }}
               size={{ xs: 12, sm: 12, md: 12, lg: 8 }}
             >
               <Typography variant="h6" gutterBottom>{course.title}</Typography>
@@ -208,9 +208,9 @@ function Course() {
                     size="small" 
                     name="half-rating-read" 
                     defaultValue={course.rating} precision={0.5} readOnly 
-                    emptyIcon={<StarIcon style={{ opacity: 0.75 }} fontSize="inherit" />}
+                    emptyIcon={<StarIcon style={{ opacity: 0.5 }} fontSize="inherit" />}
                   />
-                  <Typography variant='caption' color="text.secondary" lineHeight={1}>{course.rating}</Typography>
+                  <Typography variant='caption' color="text.secondary" lineHeight={1}>{course.rating.toFixed(1)}</Typography>
                 </Box>
 
                 <Box
@@ -243,11 +243,11 @@ function Course() {
               </Box>
             </Grid>
             <Grid
-              order={{ xs: 1, sm: 2 }}
+              order={{ xs: 1, sm: 1, md: 1, lg: 2 }}
               size={{ xs: 12, sm: 12, md: 12, lg: 4 }}
             >
               {course.thumbnail && (
-                <Card elevation={0} component="img" src={urlFor(course.thumbnail).url()} sx={{ width: '100%', height: { xs: 128, md: 256 }, objectFit: 'cover' }} />
+                <Card elevation={0} component="img" src={urlFor(course.thumbnail).url()} sx={{ width: '100%', height: { xs: 128, md: 256 }, objectFit: 'cover', p: 0 }} />
               )}
             </Grid>
           </Grid>

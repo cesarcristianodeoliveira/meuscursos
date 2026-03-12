@@ -8,6 +8,7 @@ const CategoryTabs = ({ categories, value, onChange }) => {
     <Box 
       sx={{ 
         position: 'sticky', 
+        top: { xs: 56, md: 64 }, 
         zIndex: 1000, 
         width: '100%',
         bgcolor: theme.palette.mode === 'light' 

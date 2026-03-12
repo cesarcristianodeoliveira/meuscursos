@@ -11,7 +11,7 @@ import { ThemeProviderWrapper } from './contexts/ThemeContext';
 import { CourseProvider } from './contexts/CourseContext'; 
 import ScrollToTop from './components/ScrollToTop';
 import Navbar from './components/Navbar';
-import Home from './pages/Home';
+import Dashboard from './pages/Dashboard';
 import Course from './pages/Course';
 import Search from './pages/Search';
 
@@ -55,7 +55,7 @@ const AppContent = () => {
         
         <Box component="main">
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<Dashboard />} />
             <Route path="/search" element={<Search />} />
             <Route path="/curso/:slug" element={<Course />} />
           </Routes>

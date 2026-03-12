@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { client } from '../client';
 import CourseCard from '../components/CourseCard';
 import CourseCardSkeleton from '../components/CourseCardSkeleton';
+import StatsBanner from '../components/StatsBanner';
 import CategoryTabs from '../components/CategoryTabs';
 import { useCourse } from '../contexts/CourseContext'; 
 import { 
@@ -12,7 +13,7 @@ import { RocketLaunch } from '@mui/icons-material';
 
 const COURSES_PER_PAGE = 5;
 
-const Home = () => {
+const Dashboard = () => {
   const theme = useTheme();
   const [topic, setTopic] = useState('');
   const [fetching, setFetching] = useState(true);
@@ -24,6 +25,9 @@ const Home = () => {
   const [categories, setCategories] = useState([]);
 
   const { isGenerating, generateCourse } = useCourse();
+
+  const [stats, setStats] = useState({ courses: 0, lessons: 0, quizzes: 0, categories: 0 });
+  const [fetchingStats, setFetchingStats] = useState(true);
 
   const fetchCategories = async () => {
     setFetchingCategories(true);
@@ -60,7 +64,29 @@ const Home = () => {
     } finally { setFetching(false); }
   }, [page, categoryFilter]);
 
-  useEffect(() => { fetchCategories(); }, []);
+  const fetchStats = async () => {
+    setFetchingStats(true);
+    try {
+      // Query otimizada para buscar tudo de uma vez
+      const query = `{
+        "courses": count(*[_type == "course"]),
+        // Pega todos os nomes de categorias, remove nulos e conta os únicos
+        "categories": count(array::unique(*[_type == "course"].category.name)),
+        // Conta o total de itens dentro do array modules de todos os cursos
+        "lessons": count(*[_type == "course"].modules[]),
+        // Soma o total de exercícios dentro de cada módulo
+        "quizzes": count(*[_type == "course"].modules[].exercises[])
+      }`;
+      const data = await client.fetch(query);
+      setStats(data);
+    } catch (err) {
+      console.error("Erro stats:", err);
+    } finally {
+      setFetchingStats(false);
+    }
+  };
+
+  useEffect(() => { fetchCategories(); fetchStats(); }, []);
   useEffect(() => { fetchCourses(); }, [fetchCourses]);
 
   const handleGenerate = async (e) => {
@@ -109,6 +135,9 @@ const Home = () => {
             {isGenerating ? 'Gerando' : 'Gerar'}
           </Button>
         </Box>
+
+        <StatsBanner stats={stats} fetching={fetchingStats} />
+
       </Container>
 
       {/* Renderização condicional do Skeleton das Tabs */}
@@ -188,4 +217,4 @@ const Home = () => {
   );
 };
 
-export default Home;
+export default Dashboard;

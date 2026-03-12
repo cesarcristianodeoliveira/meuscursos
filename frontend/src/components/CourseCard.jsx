@@ -7,7 +7,7 @@ import {
   Card, Box, CardMedia, CardActionArea, Typography, Chip, 
   Rating
 } from '@mui/material';
-import { RocketLaunch, AccessTime, AutoStoriesOutlined, TimerOutlined, Percent } from '@mui/icons-material';
+import { Rocket, AccessTime, AutoStoriesOutlined, TimerOutlined, Percent } from '@mui/icons-material';
 import StarIcon from '@mui/icons-material/Star';
 
 const CourseCard = ({ course }) => {
@@ -18,7 +18,7 @@ const CourseCard = ({ course }) => {
       elevation={0}
       sx={{ 
         borderRadius: 0,
-        display: 'flex', overflow: 'hidden' 
+        display: 'flex', overflow: 'hidden',
       }}
     >
       <CardActionArea 
@@ -51,7 +51,7 @@ const CourseCard = ({ course }) => {
           <Box
             sx={{
               width: { xs: '100%', sm: 256 },
-              height: { xs: 160, sm: '100%' },
+              height: { xs: 128, sm: '100%' },
               minWidth: { xs: '100%', sm: 256 },
               bgcolor: 'action.hover',
               display: 'flex',
@@ -59,7 +59,7 @@ const CourseCard = ({ course }) => {
               justifyContent: 'center'
             }}
           >
-            <RocketLaunch sx={{ fontSize: 32, color: 'text.disabled' }} />
+            <Rocket sx={{ fontSize: 64, color: 'text.disabled' }} />
           </Box>
         )}
 
@@ -102,7 +102,7 @@ const CourseCard = ({ course }) => {
 
           <Typography 
             variant="body2" 
-            color="text.secondary"
+            // color="text.secondary"
             sx={{
               display: '-webkit-box',
               WebkitLineClamp: 2,
@@ -130,11 +130,14 @@ const CourseCard = ({ course }) => {
             >
               <Rating 
                 size="small" 
-                name="half-rating-read" 
-                defaultValue={course.rating} precision={0.5} readOnly 
-                emptyIcon={<StarIcon style={{ opacity: 0.75 }} fontSize="inherit" />}
+                name="single-star-read" 
+                value={course.rating >= 1 ? (course.rating % 1 === 0 ? 1 : 0.5) : 0} 
+                max={1}
+                precision={0.5} 
+                readOnly 
+                emptyIcon={<StarIcon style={{ opacity: 0.5 }} fontSize="inherit" />}
               />
-              <Typography variant='caption' color="text.secondary" lineHeight={1}>{course.rating}</Typography>
+              <Typography variant='caption' color="text.secondary" lineHeight={1}>{course.rating.toFixed(1)}</Typography>
             </Box>
 
             <Box
