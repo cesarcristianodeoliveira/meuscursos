@@ -10,22 +10,20 @@ const CategoryTabsSkeleton = () => {
         zIndex: 1000, 
         width: '100%',
         bgcolor: 'background.default',
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-        minHeight: 49, // 48px das abas + 1px da borda
-        maxHeight: 49, 
+        // Removemos a borda e ajustamos para 48px exatos
+        minHeight: 48, 
+        maxHeight: 48, 
         display: 'flex',
         alignItems: 'center'
       }}
     >
       <Container maxWidth="xl">
         <Stack direction="row" spacing={1}>
-          {/* Criamos larguras variadas para simular categorias reais (Ex: Recentes, Design, etc) */}
           {[100, 120, 85, 130, 95, 110].map((width, i) => (
             <Box 
               key={i} 
               sx={{ 
-                minWidth: 100, // Mesma largura mínima da Tab real
+                minWidth: 100, 
                 height: 48, 
                 display: 'flex', 
                 alignItems: 'center', 

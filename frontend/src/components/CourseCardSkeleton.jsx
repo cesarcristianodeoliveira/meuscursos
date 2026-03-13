@@ -9,8 +9,7 @@ const CourseCardSkeleton = () => {
         borderRadius: 0,
         display: 'flex', 
         overflow: 'hidden',
-        bgcolor: 'transparent',
-        // Forçamos a altura exata do seu Card real no desktop para evitar o pulo de 4px
+        bgcolor: 'background.paper', // Usar a cor do card real em vez de transparent
         minHeight: { xs: 'auto', sm: 172 }, 
         maxHeight: { xs: 'auto', sm: 172 },
       }}
@@ -18,11 +17,12 @@ const CourseCardSkeleton = () => {
       <Box sx={{ 
         display: 'flex', 
         flexDirection: { xs: 'column', sm: 'row' }, 
-        alignItems: 'stretch',
+        alignItems: 'center', // Alinhado ao centro como no real
+        justifyContent: 'flex-start',
         width: '100%'
       }}>
         
-        {/* 1. Skeleton da Imagem - Ajustado para 172px no Desktop */}
+        {/* 1. Imagem - Proporção exata */}
         <Skeleton 
           variant="rectangular" 
           animation="wave"
@@ -33,54 +33,60 @@ const CourseCardSkeleton = () => {
           }} 
         />
 
-        {/* 2. Skeleton do Conteúdo */}
+        {/* 2. Conteúdo - Espelhamento de Paddings e Margens */}
         <Box sx={{ 
           display: 'flex', 
           flexDirection: 'column', 
           flex: 1,
           p: 2,
+          width: '100%',
+          height: '100%', // Para o mt: 'auto' funcionar perfeitamente
           overflow: 'hidden',
-          height: { sm: 172 },
           boxSizing: 'border-box'
         }}>
           
-          {/* Linha 1: Chip e Tempo Ago */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-            <Skeleton variant="rounded" width={60} height={24} animation="wave" />
-            <Skeleton variant="text" width={80} height={14} animation="wave" sx={{ transform: 'none' }} />
+          {/* Categoria e Tempo Ago */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Skeleton variant="rounded" width={50} height={20} animation="wave" sx={{ borderRadius: 1 }} />
+            <Skeleton variant="text" width={60} height={14} animation="wave" sx={{ transform: 'none' }} />
           </Box>
 
-          {/* Linha 2: Título (Simulando o h6 com altura de 28px) */}
+          {/* Título - Simulando 1 linha (ou 2 no mobile) */}
           <Skeleton 
             variant="text" 
-            width="85%" 
-            height={28} 
+            width="80%" 
+            height={24} 
             animation="wave" 
-            sx={{ mb: 1.5, transform: 'none' }} 
+            sx={{ mb: 1, transform: 'none' }} 
           />
 
-          {/* Linha 3 e 4: Descrição (2 linhas exatas) */}
-          <Box sx={{ mb: 1 }}>
-            <Skeleton variant="text" width="100%" height={16} animation="wave" sx={{ transform: 'none', mb: 0.8 }} />
-            <Skeleton variant="text" width="90%" height={16} animation="wave" sx={{ transform: 'none' }} />
+          {/* Descrição - 2 linhas */}
+          <Box sx={{ mb: 2 }}>
+            <Skeleton variant="text" width="100%" height={14} animation="wave" sx={{ transform: 'none', mb: 0.5 }} />
+            <Skeleton variant="text" width="95%" height={14} animation="wave" sx={{ transform: 'none' }} />
           </Box>
 
-          {/* Linha Final: Footer com Rating e Ícones */}
+          {/* Footer - Rating e Status */}
           <Box sx={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center',
-            mt: 'auto', // Faz o footer "grudar" na base dos 172px
-            pb: 0.5 
+            mt: 'auto' // Empurra para a base
           }}>
-            {/* Espaço do Rating */}
-            <Skeleton variant="text" width={40} height={16} animation="wave" sx={{ transform: 'none' }} />
+            {/* Rating */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Skeleton variant="circular" width={16} height={16} animation="wave" />
+              <Skeleton variant="text" width={20} height={14} animation="wave" sx={{ transform: 'none' }} />
+            </Box>
             
-            {/* Espaço dos 3 ícones (Aulas, Tempo, Porcentagem) */}
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Skeleton variant="circular" width={16} height={16} animation="wave" />
-              <Skeleton variant="circular" width={16} height={16} animation="wave" />
-              <Skeleton variant="circular" width={16} height={16} animation="wave" />
+            {/* Ícones de Aulas, Tempo e Progressão */}
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {[1, 2, 3].map((i) => (
+                <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Skeleton variant="circular" width={14} height={14} animation="wave" />
+                  <Skeleton variant="text" width={30} height={12} animation="wave" sx={{ transform: 'none' }} />
+                </Box>
+              ))}
             </Box>
           </Box>
         </Box>
