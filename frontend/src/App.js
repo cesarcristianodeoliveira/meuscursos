@@ -55,7 +55,7 @@ function ScrollTop() {
       <Box
         onClick={handleClick}
         role="presentation"
-        sx={{ position: 'fixed', bottom: 16, right: 24, zIndex: 1000 }}
+        sx={{ position: 'fixed', bottom: 16, right: 16, zIndex: 1000 }}
       >
         <Fab color="primary" size="small" aria-label="voltar ao topo">
           <KeyboardArrowUp />

@@ -97,7 +97,6 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                 variant="contained" 
                 type="submit" 
                 disabled={!topic.trim()}
-                startIcon={<AutoAwesome />}
                 sx={{ 
                   borderRadius: 2.5, 
                   px: 4, 
@@ -107,7 +106,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   boxShadow: 2
                 }}
               >
-                Gerar
+                <AutoAwesome />
               </Button>
             </Paper>
           </Zoom>
