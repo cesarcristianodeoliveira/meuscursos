@@ -8,14 +8,12 @@ export const CourseProvider = ({ children }) => {
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
 
-  // --- ESTADOS DE CACHE GLOBAL ---
   const [stats, setStats] = useState({ courses: 0, lessons: 0, quizzes: 0, categories: 0 });
   const [categories, setCategories] = useState(['Recentes']);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
-  // Busca estatísticas e categorias do Sanity
   const fetchGlobalData = useCallback(async (force = false) => {
     if (initialDataLoaded && !force) return;
     try {
@@ -40,7 +38,6 @@ export const CourseProvider = ({ children }) => {
     }
   }, [initialDataLoaded]);
 
-  // CALCULA O PROGRESSO DO ALUNO (Necessário para o CourseCard)
   const getCourseProgress = useCallback((course) => {
     if (!course) return 0;
     const saved = localStorage.getItem(`progress-${course._id}`);
@@ -49,13 +46,12 @@ export const CourseProvider = ({ children }) => {
     return totalSteps === 0 ? 0 : Math.round((completedSteps.length / totalSteps) * 100);
   }, []);
 
-  // GERAÇÃO DE CURSO COM STREAMING (Progresso Real)
   const generateCourse = async (topic, callback) => {
     if (isGenerating) return;
 
     setIsGenerating(true);
-    setProgress(0);
-    setStatusMessage('Conectando ao motor de IA...');
+    setProgress(1); // Inicia com 1% para dar feedback imediato
+    setStatusMessage('Iniciando conexão com o motor de IA...');
 
     try {
       const response = await fetch(`${API_BASE_URL}/generate-course`, {
@@ -64,62 +60,68 @@ export const CourseProvider = ({ children }) => {
         body: JSON.stringify({ topic }),
       });
 
-      if (!response.body) throw new Error("ReadableStream não suportado.");
+      if (!response.body) throw new Error("O navegador não suporta streaming.");
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      
+      // Variável para acumular pedaços de JSON caso venham cortados
+      let leftover = '';
 
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n\n');
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = (leftover + chunk).split('\n');
+        
+        // A última linha pode estar incompleta, guardamos para o próximo chunk
+        leftover = lines.pop() || '';
 
-        lines.forEach(line => {
-          if (line.startsWith('data: ')) {
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          
+          // Ignora linhas de padding (espaços) ou comentários SSE que começam com ":"
+          if (!trimmedLine || trimmedLine.startsWith(':')) continue;
+
+          if (trimmedLine.startsWith('data: ')) {
             try {
-              const data = JSON.parse(line.replace('data: ', ''));
+              const jsonStr = trimmedLine.replace('data: ', '');
+              const data = JSON.parse(jsonStr);
+
               if (data.progress !== undefined) setProgress(data.progress);
               if (data.message) setStatusMessage(data.message);
               if (data.error) throw new Error(data.error);
             } catch (e) {
-              console.error("Erro ao processar chunk:", e);
+              console.warn("Aguardando fragmento de dados completo...");
             }
           }
-        });
+        }
       }
 
-      // Finalização
+      // Finalização bem-sucedida
       setProgress(100);
-      setStatusMessage('Curso finalizado com sucesso!');
+      setStatusMessage('Curso pronto! Redirecionando...');
       await fetchGlobalData(true);
+      
       if (callback) callback();
 
     } catch (error) {
-      console.error("Erro ao gerar curso:", error);
-      setStatusMessage('Ocorreu um erro. Tente novamente em instantes.');
+      console.error("Erro na geração:", error);
+      setStatusMessage(error.message || 'Erro ao gerar curso. Tente novamente.');
     } finally {
-      // Mantém a mensagem de sucesso por 3 segundos antes de resetar o Hero
       setTimeout(() => {
         setIsGenerating(false);
         setProgress(0);
         setStatusMessage('');
-      }, 3000);
+      }, 3500);
     }
   };
 
   return (
     <CourseContext.Provider value={{ 
-      isGenerating, 
-      progress, 
-      statusMessage, 
-      generateCourse,
-      getCourseProgress, // Reintegrado para o CourseCard parar de dar erro
-      stats,
-      categories,
-      fetchGlobalData,
-      initialDataLoaded 
+      isGenerating, progress, statusMessage, generateCourse,
+      getCourseProgress, stats, categories, fetchGlobalData, initialDataLoaded 
     }}>
       {children}
     </CourseContext.Provider>

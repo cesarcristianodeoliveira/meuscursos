@@ -5,7 +5,7 @@ import CourseCardSkeleton from '../components/CourseCardSkeleton';
 import CategoryTabsSkeleton from '../components/CategoryTabsSkeleton';
 import StatsBanner from '../components/StatsBanner';
 import CategoryTabs from '../components/CategoryTabs';
-import Hero from '../components/Hero'; // Substituído o CourseGenerateForm pelo Hero
+import Hero from '../components/Hero';
 import { useCourse } from '../contexts/CourseContext'; 
 import { 
   Container, Box, Typography, Pagination, Stack, Toolbar, Skeleton, useTheme, useMediaQuery
@@ -33,12 +33,12 @@ const Dashboard = () => {
   const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState('Recentes');
 
-  // Carrega dados globais (Stats e Categorias) apenas uma vez
+  // 1. Carrega dados globais (Stats e Categorias)
   useEffect(() => {
     fetchGlobalData();
   }, [fetchGlobalData]);
 
-  // Função para buscar a lista de cursos baseada em filtros e página
+  // 2. Função para buscar a lista de cursos (Memorizada para evitar loops)
   const fetchCoursesList = useCallback(async () => {
     setFetchingCourses(true);
     try {
@@ -63,11 +63,12 @@ const Dashboard = () => {
     }
   }, [page, categoryFilter]);
 
+  // Executa a busca sempre que a página ou filtro mudar
   useEffect(() => {
     fetchCoursesList();
   }, [fetchCoursesList]);
 
-  // Lógica de Scroll suave ao trocar de aba ou página
+  // 3. Lógica de Scroll suave
   const scrollToTabs = useCallback(() => {
     setTimeout(() => {
       const anchor = document.querySelector('#tabs-scroll-point');
@@ -84,6 +85,7 @@ const Dashboard = () => {
     }, 50);
   }, [isMobile]);
 
+  // 4. Handlers de Navegação
   const handlePageChange = (event, value) => {
     setPage(value);
     scrollToTabs();
@@ -95,15 +97,19 @@ const Dashboard = () => {
     scrollToTabs();
   };
 
-  // Callback executado após a IA gerar o curso com sucesso
-  const onGenerateSuccess = () => {
-    setTopic('');
-    setPage(1); 
-    setCategoryFilter('Recentes');
-    fetchCoursesList(); // Atualiza a lista para mostrar o novo curso
-  };
+  // 5. LOGICA DE PÓS-GERAÇÃO (Ajustada para o Streaming)
+  const onGenerateSuccess = useCallback(() => {
+    // Aguarda um momento para o usuário ler a mensagem de sucesso e o Sanity indexar
+    setTimeout(async () => {
+      setTopic('');
+      setPage(1); 
+      setCategoryFilter('Recentes');
+      await fetchCoursesList(); // Atualiza a lista para mostrar o novo curso no topo
+    }, 2000); 
+  }, [fetchCoursesList]);
 
   const handleGenerateAction = () => {
+    if (!topic.trim()) return;
     generateCourse(topic, onGenerateSuccess);
   };
 
@@ -111,7 +117,7 @@ const Dashboard = () => {
     <>
       <Toolbar />
       
-      {/* 1. SEÇÃO HERO: Onde a mágica acontece */}
+      {/* SEÇÃO HERO & GERAÇÃO */}
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         <Hero 
           topic={topic} 
@@ -124,24 +130,24 @@ const Dashboard = () => {
         </Box>
       </Container>
 
-      {/* 2. NAVEGAÇÃO POR CATEGORIAS (Sticky via CSS no componente CategoryTabs) */}
+      {/* NAVEGAÇÃO POR CATEGORIAS */}
       {!initialDataLoaded ? (
         <CategoryTabsSkeleton />
       ) : (
         <CategoryTabs categories={categories} value={categoryFilter} onChange={handleTabChange} />
       )}
 
-      {/* Ponto de ancoragem para o scroll automático */}
+      {/* Ponto de ancoragem para o scroll */}
       <div id="tabs-scroll-point" style={{ scrollMarginTop: isMobile ? '104px' : '112px' }} />
 
-      {/* 3. CONTAGEM E TÍTULO DA LISTA */}
+      {/* TÍTULO E CONTAGEM */}
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         <Box sx={{ mb: 2, minHeight: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
+          <Typography variant="h6" sx={{ lineHeight: 1.2, fontWeight: 700 }}>
             {categoryFilter}
           </Typography>
           {fetchingCourses ? (
-            <Skeleton variant="text" width={80} height={20} sx={{ transform: 'none', mt: 0.5 }} />
+            <Skeleton variant="text" width={80} height={20} sx={{ mt: 0.5 }} />
           ) : (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {totalCourses} {totalCourses === 1 ? 'curso encontrado' : 'cursos encontrados'}
@@ -150,14 +156,15 @@ const Dashboard = () => {
         </Box>
       </Container>
 
-      {/* 4. LISTAGEM DE CURSOS */}
+      {/* LISTAGEM DE CARDS */}
       <Stack spacing={2} sx={{ mb: 4 }}>
         {fetchingCourses ? (
-          // Skeletons idênticos aos cards reais
           [...Array(3)].map((_, i) => <CourseCardSkeleton key={i} />)
         ) : (
           <>
-            {courses.map((course) => <CourseCard key={course._id} course={course} />)}
+            {courses.map((course) => (
+              <CourseCard key={course._id} course={course} />
+            ))}
             
             {/* Estado Vazio */}
             {courses.length === 0 && (
@@ -172,7 +179,7 @@ const Dashboard = () => {
         )}
       </Stack>
 
-      {/* 5. PAGINAÇÃO */}
+      {/* PAGINAÇÃO */}
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         {!fetchingCourses && courses.length !== 0 && totalCourses > COURSES_PER_PAGE && (
           <Stack sx={{ mt: 6, mb: 10, alignItems: 'center' }}>

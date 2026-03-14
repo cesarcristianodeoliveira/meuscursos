@@ -4,25 +4,37 @@ const { fetchAndUploadImage } = require('../services/imageService');
 const { generateCourseContent } = require('../services/aiService');
 
 const generateCourse = async (req, res) => {
-  // Aumenta o timeout para lidar com o processamento denso da IA
+  // Aumenta o timeout para 10 minutos
   req.setTimeout(600000); 
 
   const { topic } = req.body;
   if (!topic) return res.status(400).json({ error: 'O tema é obrigatório' });
 
-  // --- CONFIGURAÇÃO PARA PROGRESSO REAL (SSE - Server Sent Events) ---
-  // Isso permite que o backend envie mensagens sem fechar a conexão
-  res.setHeader('Content-Type', 'application/json'); 
-  // Nota: Para simplificar sem mudar o frontend para EventSource agora, 
-  // vamos usar um helper para logs no console do backend e manter o res.json no final,
-  // mas preparei os pontos de progresso para a integração total.
+  // --- CONFIGURAÇÃO PARA PROGRESSO REAL (SSE) ---
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Desativa buffering no Nginx/Render
+
+  // Helper para enviar o progresso com "Padding" para forçar o Render a liberar o buffer
+  const sendProgress = (progress, message) => {
+    const payload = JSON.stringify({ progress, message });
+    // Enviamos um comentário inicial ":" seguido de espaços para garantir que o pacote tenha > 1kb
+    // Isso "destrava" o streaming em proxies como o do Render
+    const padding = " ".repeat(1024);
+    res.write(`:${padding}\n`); 
+    res.write(`data: ${payload}\n\n`);
+    
+    // Log no console do backend
+    console.log(`🚀 [${progress}%] ${message}`);
+  };
 
   try {
-    console.log(`🚀 [0%] Iniciando geração pedagógica para: ${topic}`);
+    sendProgress(5, "Iniciando integração com a IA...");
 
     // --- Passo 1: IA Gerando Conteúdo ---
     const courseData = await generateCourseContent(topic);
-    console.log(`🧠 [40%] IA estruturou o conteúdo. Processando dados...`);
+    sendProgress(40, "Conteúdo estruturado. Calculando métricas pedagógicas...");
 
     const rawModules = courseData.modules || [];
     if (rawModules.length === 0) {
@@ -30,7 +42,7 @@ const generateCourse = async (req, res) => {
     }
 
     // --- Passo 2: Lógica de Cálculos ---
-    const allText = courseData.description + rawModules.reduce((acc, mod) => acc + (mod.content || ""), "");
+    const allText = (courseData.description || "") + rawModules.reduce((acc, mod) => acc + (mod.content || ""), "");
     const wordCount = allText.split(/\s+/).filter(word => word.length > 0).length;
     const readingMinutes = wordCount / 200;
     const exerciseMinutes = (rawModules.length * 3 * 2) + (courseData.finalExam?.length || 10);
@@ -44,15 +56,20 @@ const generateCourse = async (req, res) => {
     const existing = await client.fetch(`*[_type == "course" && slug.current == $slugCandidate][0]`, { slugCandidate });
     if (existing) slugCandidate = `${slugCandidate}-${Math.floor(Math.random() * 1000)}`;
 
-    console.log(`🎨 [60%] Gerando identidade visual e buscando imagens...`);
+    sendProgress(65, "Buscando imagens e gerando identidade visual...");
 
     // --- Passo 4: Upload da Imagem ---
-    const imageAsset = await fetchAndUploadImage(
-      courseData.searchQuery || topic, 
-      courseData.pixabay_category || "education" 
-    );
+    let imageAsset = null;
+    try {
+      imageAsset = await fetchAndUploadImage(
+        courseData.searchQuery || topic, 
+        courseData.pixabay_category || "education" 
+      );
+    } catch (imgErr) {
+      console.error("Erro ao carregar imagem:", imgErr);
+    }
 
-    console.log(`🏗️ [80%] Montando documento final para o Sanity...`);
+    sendProgress(85, "Finalizando montagem do material didático...");
 
     // --- Passo 5: Montagem do Documento ---
     const doc = {
@@ -90,25 +107,28 @@ const generateCourse = async (req, res) => {
     if (imageAsset) doc.thumbnail = imageAsset;
 
     // --- Passo 6: Persistência ---
-    console.log(`📦 [95%] Salvando no banco de dados...`);
+    sendProgress(95, "Salvando no Sanity e indexando conteúdo...");
     const result = await client.create(doc);
     
-    console.log(`✅ [100%] Curso pronto: ${finalTitle}`);
-
-    // Resposta Final
-    res.status(200).json({ 
+    // --- RESPOSTA FINAL (Ainda via stream) ---
+    const finalResult = JSON.stringify({ 
+      progress: 100,
       message: 'Curso gerado com sucesso!', 
       courseId: result._id,
-      slug: doc.slug.current,
-      debug: { time: finalEstimatedTime, words: wordCount, rating: finalRating }
+      slug: doc.slug.current
     });
+
+    res.write(`data: ${finalResult}\n\n`);
+    res.end(); // Finaliza a conexão
 
   } catch (error) {
     console.error("❌ Erro Crítico no Controller:", error);
-    res.status(500).json({ 
+    const errorPayload = JSON.stringify({ 
       error: 'Falha técnica ao processar curso.',
       message: error.message 
     });
+    res.write(`data: ${errorPayload}\n\n`);
+    res.end();
   }
 };
 
