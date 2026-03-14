@@ -15,7 +15,9 @@ export const CourseProvider = ({ children }) => {
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
   const fetchGlobalData = useCallback(async (force = false) => {
+    // Se já carregou e não é um force fetch, ignora
     if (initialDataLoaded && !force) return;
+    
     try {
       const query = `{
         "stats": {
@@ -50,7 +52,7 @@ export const CourseProvider = ({ children }) => {
     if (isGenerating) return;
 
     setIsGenerating(true);
-    setProgress(1); // Inicia com 1% para dar feedback imediato
+    setProgress(1); 
     setStatusMessage('Iniciando conexão com o motor de IA...');
 
     try {
@@ -64,8 +66,6 @@ export const CourseProvider = ({ children }) => {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      
-      // Variável para acumular pedaços de JSON caso venham cortados
       let leftover = '';
 
       while (true) {
@@ -74,14 +74,10 @@ export const CourseProvider = ({ children }) => {
 
         const chunk = decoder.decode(value, { stream: true });
         const lines = (leftover + chunk).split('\n');
-        
-        // A última linha pode estar incompleta, guardamos para o próximo chunk
         leftover = lines.pop() || '';
 
         for (const line of lines) {
           const trimmedLine = line.trim();
-          
-          // Ignora linhas de padding (espaços) ou comentários SSE que começam com ":"
           if (!trimmedLine || trimmedLine.startsWith(':')) continue;
 
           if (trimmedLine.startsWith('data: ')) {
@@ -93,15 +89,20 @@ export const CourseProvider = ({ children }) => {
               if (data.message) setStatusMessage(data.message);
               if (data.error) throw new Error(data.error);
             } catch (e) {
-              console.warn("Aguardando fragmento de dados completo...");
+              console.warn("Fragmento recebido, aguardando conclusão...");
             }
           }
         }
       }
 
-      // Finalização bem-sucedida
+      // --- FINALIZAÇÃO E SINCRONIA ---
       setProgress(100);
-      setStatusMessage('Curso pronto! Redirecionando...');
+      setStatusMessage('Curso pronto! Atualizando plataforma...');
+      
+      // Resetamos o flag para forçar o Dashboard a re-executar o useEffect de fetch
+      setInitialDataLoaded(false); 
+      
+      // Atualiza os stats globais imediatamente
       await fetchGlobalData(true);
       
       if (callback) callback();
@@ -110,6 +111,7 @@ export const CourseProvider = ({ children }) => {
       console.error("Erro na geração:", error);
       setStatusMessage(error.message || 'Erro ao gerar curso. Tente novamente.');
     } finally {
+      // Limpa os estados de progresso após um tempo para o usuário ver o 100%
       setTimeout(() => {
         setIsGenerating(false);
         setProgress(0);
@@ -120,8 +122,15 @@ export const CourseProvider = ({ children }) => {
 
   return (
     <CourseContext.Provider value={{ 
-      isGenerating, progress, statusMessage, generateCourse,
-      getCourseProgress, stats, categories, fetchGlobalData, initialDataLoaded 
+      isGenerating, 
+      progress, 
+      statusMessage, 
+      generateCourse,
+      getCourseProgress, 
+      stats, 
+      categories, 
+      fetchGlobalData, 
+      initialDataLoaded 
     }}>
       {children}
     </CourseContext.Provider>

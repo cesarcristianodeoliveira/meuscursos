@@ -1,78 +1,35 @@
-import React, { 
-  // useState, 
-  forwardRef 
-} from 'react';
-import { 
-  Link, 
-  // useNavigate 
-} from 'react-router-dom';
+import React, { forwardRef } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   AppBar, Toolbar, Typography, IconButton, Box, 
-  // InputBase, alpha, styled, 
   LinearProgress 
 } from '@mui/material';
 import { 
   Brightness4, 
-  Brightness7, RocketLaunch, 
-  // Search as SearchIcon 
+  Brightness7, RocketLaunch 
 } from '@mui/icons-material';
 import { useAppTheme } from '../contexts/ThemeContext';
-import { useCourse } from '../contexts/CourseContext'; // Importando o contexto de curso
-
-// const SearchContainer = styled('div')(({ theme }) => ({
-//   position: 'relative',
-//   borderRadius: theme.shape.borderRadius,
-//   backgroundColor: alpha(theme.palette.common.white, 0.15),
-//   '&:hover': { backgroundColor: alpha(theme.palette.common.white, 0.25) },
-//   marginRight: theme.spacing(2),
-//   marginLeft: theme.spacing(2),
-//   width: '100%',
-//   [theme.breakpoints.up('sm')]: { marginLeft: theme.spacing(2), width: 'auto' },
-// }));
-
-// const SearchIconWrapper = styled('div')(({ theme }) => ({
-//   padding: theme.spacing(0, 2),
-//   height: '100%',
-//   position: 'absolute',
-//   pointerEvents: 'none',
-//   display: 'flex',
-//   alignItems: 'center',
-//   justifyContent: 'center',
-// }));
-
-// const StyledInputBase = styled(InputBase)(({ theme }) => ({
-//   color: 'inherit',
-//   '& .MuiInputBase-input': {
-//     padding: theme.spacing(1, 1, 1, 0),
-//     paddingLeft: `calc(1em + ${theme.spacing(4)})`,
-//     transition: theme.transitions.create('width'),
-//     width: '100%',
-//     [theme.breakpoints.up('md')]: { width: '30ch' },
-//   },
-// }));
+import { useCourse } from '../contexts/CourseContext';
 
 const Navbar = forwardRef((props, ref) => {
   const { resolvedMode, toggleTheme } = useAppTheme();
-  const { isGenerating, progress } = useCourse(); // Pegando o estado global
-  // const [searchValue, setSearchValue] = useState('');
-  // const navigate = useNavigate();
-
-  // const handleSearch = (e) => {
-  //   if (e.key === 'Enter' && searchValue.trim()) {
-  //     navigate(`/search?q=${encodeURIComponent(searchValue.trim())}`);
-  //     setSearchValue('');
-  //   }
-  // };
+  const { isGenerating, progress } = useCourse();
 
   return (
     <AppBar 
       ref={ref} 
       {...props} 
       color="inherit" 
-      position="sticky" 
+      position="fixed" // Alterado de sticky para fixed para garantir que a barra de progresso flutue no topo
       elevation={0}
+      sx={{ 
+        borderBottom: '1px solid', 
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+        zIndex: (theme) => theme.zIndex.drawer + 1 // Garante que fique acima de outros elementos
+      }}
     >
-      {/* Barra de Progresso Estilo YouTube */}
+      {/* Barra de Progresso Estilo YouTube/NProgress */}
       {isGenerating && (
         <LinearProgress 
           variant="determinate" 
@@ -82,11 +39,12 @@ const Navbar = forwardRef((props, ref) => {
             top: 0, 
             left: 0, 
             right: 0, 
-            height: 3, // Bem fininha
-            zIndex: 1500,
+            height: 4, // Um pouquinho mais grossa para visibilidade
+            zIndex: 2000,
             backgroundColor: 'transparent',
             '& .MuiLinearProgress-bar': {
-              backgroundColor: resolvedMode === 'dark' ? '#90caf9' : '#fff', // Branco no tema azul, azul claro no dark
+              backgroundColor: 'primary.main', // Usa a cor principal da marca
+              boxShadow: '0 0 10px rgba(25, 118, 210, 0.5)', // Brilho suave
             }
           }} 
         />
@@ -100,42 +58,34 @@ const Navbar = forwardRef((props, ref) => {
             alignItems: 'center',
             display: 'flex',
             color: 'inherit',
-            textDecoration: 'none'
+            textDecoration: 'none',
+            '&:hover': { opacity: 0.8 }
           }}
         >
           <RocketLaunch
             color='primary'
             sx={{
-              mr: { xs: 0, sm: 1 }
+              mr: { xs: 1, sm: 1.5 },
+              fontSize: '1.8rem'
             }}
           />
           <Typography 
-            color='primary'
+            color='text.primary'
             variant="h6" 
-            lineHeight={1}
             sx={{ 
-              fontWeight: 600,
-              display: { xs: 'none', sm: 'inherit' }
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+              display: { xs: 'inherit', sm: 'inherit' } // Ajustado para aparecer no mobile também se desejar
             }}
           >
             Meus Cursos
           </Typography>
         </Box>
 
-        {/* <SearchContainer>
-          <SearchIconWrapper><SearchIcon /></SearchIconWrapper>
-          <StyledInputBase
-            placeholder="Pesquisar"
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            onKeyDown={handleSearch}
-          />
-        </SearchContainer> */}
-
         <Box sx={{ flexGrow: 1 }} />
 
-        <IconButton onClick={toggleTheme} color="inherit">
-          {resolvedMode === 'dark' ? <Brightness7 /> : <Brightness4 />}
+        <IconButton onClick={toggleTheme} color="inherit" sx={{ ml: 1 }}>
+          {resolvedMode === 'dark' ? <Brightness7 color="warning" /> : <Brightness4 color="primary" />}
         </IconButton>
       </Toolbar>
     </AppBar>

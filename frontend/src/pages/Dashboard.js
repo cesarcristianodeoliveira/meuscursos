@@ -38,7 +38,7 @@ const Dashboard = () => {
     fetchGlobalData();
   }, [fetchGlobalData]);
 
-  // 2. Função para buscar a lista de cursos (Memorizada para evitar loops)
+  // 2. Função para buscar a lista de cursos
   const fetchCoursesList = useCallback(async () => {
     setFetchingCourses(true);
     try {
@@ -63,12 +63,14 @@ const Dashboard = () => {
     }
   }, [page, categoryFilter]);
 
-  // Executa a busca sempre que a página ou filtro mudar
+  // 3. Efeito de Sincronia: Executa a busca se a página/filtro mudar OU se o sinal de 'dados carregados' for resetado
   useEffect(() => {
     fetchCoursesList();
-  }, [fetchCoursesList]);
+    // initialDataLoaded aqui é o segredo: quando o Context termina a geração, ele seta como false, 
+    // forçando este Dashboard a buscar os cursos novos automaticamente.
+  }, [fetchCoursesList, initialDataLoaded]);
 
-  // 3. Lógica de Scroll suave
+  // 4. Lógica de Scroll suave
   const scrollToTabs = useCallback(() => {
     setTimeout(() => {
       const anchor = document.querySelector('#tabs-scroll-point');
@@ -85,7 +87,7 @@ const Dashboard = () => {
     }, 50);
   }, [isMobile]);
 
-  // 4. Handlers de Navegação
+  // 5. Handlers de Navegação
   const handlePageChange = (event, value) => {
     setPage(value);
     scrollToTabs();
@@ -97,16 +99,13 @@ const Dashboard = () => {
     scrollToTabs();
   };
 
-  // 5. LOGICA DE PÓS-GERAÇÃO (Ajustada para o Streaming)
+  // 6. LOGICA DE PÓS-GERAÇÃO LOCAL
   const onGenerateSuccess = useCallback(() => {
-    // Aguarda um momento para o usuário ler a mensagem de sucesso e o Sanity indexar
-    setTimeout(async () => {
-      setTopic('');
-      setPage(1); 
-      setCategoryFilter('Recentes');
-      await fetchCoursesList(); // Atualiza a lista para mostrar o novo curso no topo
-    }, 2000); 
-  }, [fetchCoursesList]);
+    setTopic('');
+    // Não precisamos chamar fetchCoursesList aqui manualmente, 
+    // pois o CourseContext vai setar initialDataLoaded como false, 
+    // disparando o useEffect principal (item 3) automaticamente.
+  }, []);
 
   const handleGenerateAction = () => {
     if (!topic.trim()) return;
@@ -117,7 +116,6 @@ const Dashboard = () => {
     <>
       <Toolbar />
       
-      {/* SEÇÃO HERO & GERAÇÃO */}
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         <Hero 
           topic={topic} 
@@ -130,17 +128,14 @@ const Dashboard = () => {
         </Box>
       </Container>
 
-      {/* NAVEGAÇÃO POR CATEGORIAS */}
       {!initialDataLoaded ? (
         <CategoryTabsSkeleton />
       ) : (
         <CategoryTabs categories={categories} value={categoryFilter} onChange={handleTabChange} />
       )}
 
-      {/* Ponto de ancoragem para o scroll */}
       <div id="tabs-scroll-point" style={{ scrollMarginTop: isMobile ? '104px' : '112px' }} />
 
-      {/* TÍTULO E CONTAGEM */}
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         <Box sx={{ mb: 2, minHeight: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <Typography variant="h6" sx={{ lineHeight: 1.2, fontWeight: 700 }}>
@@ -156,7 +151,6 @@ const Dashboard = () => {
         </Box>
       </Container>
 
-      {/* LISTAGEM DE CARDS */}
       <Stack spacing={2} sx={{ mb: 4 }}>
         {fetchingCourses ? (
           [...Array(3)].map((_, i) => <CourseCardSkeleton key={i} />)
@@ -166,7 +160,6 @@ const Dashboard = () => {
               <CourseCard key={course._id} course={course} />
             ))}
             
-            {/* Estado Vazio */}
             {courses.length === 0 && (
               <Box sx={{ textAlign: 'center', py: 10 }}>
                 <RocketLaunch sx={{ fontSize: 56, color: 'text.disabled', mb: 1 }} />
@@ -179,7 +172,6 @@ const Dashboard = () => {
         )}
       </Stack>
 
-      {/* PAGINAÇÃO */}
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         {!fetchingCourses && courses.length !== 0 && totalCourses > COURSES_PER_PAGE && (
           <Stack sx={{ mt: 6, mb: 10, alignItems: 'center' }}>

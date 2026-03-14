@@ -67,10 +67,10 @@ const StatsBanner = ({ stats, fetching }) => {
     >
       <Grid container spacing={isMobile ? 3 : 2} alignItems="center">
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatItem icon={MenuBook} label="Cursos" value={stats.courses} loading={fetching} />
+          <StatItem icon={CategoryOutlined} label="Categorias" value={stats.categories} loading={fetching} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatItem icon={CategoryOutlined} label="Categorias" value={stats.categories} loading={fetching} />
+          <StatItem icon={MenuBook} label="Cursos" value={stats.courses} loading={fetching} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
           <StatItem icon={AutoStoriesOutlined} label="Aulas" value={stats.lessons} loading={fetching} />
