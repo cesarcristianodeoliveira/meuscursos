@@ -138,7 +138,7 @@ const Dashboard = () => {
 
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         <Box sx={{ mb: 2, minHeight: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <Typography variant="h6" sx={{ lineHeight: 1.2, fontWeight: 700 }}>
+          <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
             {categoryFilter}
           </Typography>
           {fetchingCourses ? (

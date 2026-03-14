@@ -35,9 +35,6 @@ export const ThemeProviderWrapper = ({ children }) => {
       palette: {
         mode: resolvedMode,
       },
-      typography: {
-        fontFamily: "Roboto, sans-serif"
-      },
       components: {
         MuiTypography: {
           styleOverrides: {

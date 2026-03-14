@@ -5,9 +5,10 @@ import {
   LinearProgress 
 } from '@mui/material';
 import { 
-  Brightness4, 
-  Brightness7, RocketLaunch 
+  RocketLaunch 
 } from '@mui/icons-material';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { useCourse } from '../contexts/CourseContext';
 
@@ -23,8 +24,6 @@ const Navbar = forwardRef((props, ref) => {
       position="fixed" // Alterado de sticky para fixed para garantir que a barra de progresso flutue no topo
       elevation={0}
       sx={{ 
-        borderBottom: '1px solid', 
-        borderColor: 'divider',
         bgcolor: 'background.paper',
         zIndex: (theme) => theme.zIndex.drawer + 1 // Garante que fique acima de outros elementos
       }}
@@ -59,7 +58,7 @@ const Navbar = forwardRef((props, ref) => {
             display: 'flex',
             color: 'inherit',
             textDecoration: 'none',
-            '&:hover': { opacity: 0.8 }
+            '&:hover': { opacity: 0.75 }
           }}
         >
           <RocketLaunch
@@ -85,7 +84,7 @@ const Navbar = forwardRef((props, ref) => {
         <Box sx={{ flexGrow: 1 }} />
 
         <IconButton onClick={toggleTheme} color="inherit" sx={{ ml: 1 }}>
-          {resolvedMode === 'dark' ? <Brightness7 color="warning" /> : <Brightness4 color="primary" />}
+          {resolvedMode === 'dark' ? <DarkModeIcon /> : <LightModeIcon />}
         </IconButton>
       </Toolbar>
     </AppBar>
