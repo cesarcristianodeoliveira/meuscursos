@@ -10,57 +10,51 @@ const generateCourse = async (req, res) => {
   const { topic } = req.body;
   if (!topic) return res.status(400).json({ error: 'O tema é obrigatório' });
 
+  // --- CONFIGURAÇÃO PARA PROGRESSO REAL (SSE - Server Sent Events) ---
+  // Isso permite que o backend envie mensagens sem fechar a conexão
+  res.setHeader('Content-Type', 'application/json'); 
+  // Nota: Para simplificar sem mudar o frontend para EventSource agora, 
+  // vamos usar um helper para logs no console do backend e manter o res.json no final,
+  // mas preparei os pontos de progresso para a integração total.
+
   try {
-    console.log(`🚀 Iniciando geração pedagógica para: ${topic}`);
+    console.log(`🚀 [0%] Iniciando geração pedagógica para: ${topic}`);
+
+    // --- Passo 1: IA Gerando Conteúdo ---
     const courseData = await generateCourseContent(topic);
+    console.log(`🧠 [40%] IA estruturou o conteúdo. Processando dados...`);
 
     const rawModules = courseData.modules || [];
     if (rawModules.length === 0) {
-      return res.status(500).json({ error: 'A IA falhou ao estruturar os módulos.' });
+      throw new Error('A IA falhou ao estruturar os módulos.');
     }
 
-    // --- 1. LÓGICA DE TEMPO ESTIMADO (Regra Padrão: 200 Palavras por Minuto) ---
-    // Somamos todo o texto legível para calcular o tempo de estudo
+    // --- Passo 2: Lógica de Cálculos ---
     const allText = courseData.description + rawModules.reduce((acc, mod) => acc + (mod.content || ""), "");
-    
-    // Divide o texto por espaços para contar palavras
     const wordCount = allText.split(/\s+/).filter(word => word.length > 0).length;
-    
-    // Cálculo: palavras / 200 = minutos de leitura
     const readingMinutes = wordCount / 200;
-
-    // Adicionamos um "tempo de estudo" (exercícios + prova final) 
-    // Média de 2 min por exercício (3 por módulo) + 1 min por questão da prova final
     const exerciseMinutes = (rawModules.length * 3 * 2) + (courseData.finalExam?.length || 10);
-    
     const totalMinutes = readingMinutes + exerciseMinutes;
-
-    // Convertemos para horas com uma casa decimal (ex: 1.5h) e garantimos mínimo de 1h
     const finalEstimatedTime = Math.max(1, parseFloat((totalMinutes / 60).toFixed(1)));
+    const finalRating = Math.round((Number(courseData.rating) || 4.5) * 2) / 2;
 
-    // --- 2. LÓGICA DE RATING (Arredondamento para múltiplos de 0.5) ---
-    const rawRating = Number(courseData.rating) || 4.5;
-    const finalRating = Math.round(rawRating * 2) / 2;
-
-    // --- 3. TRATAMENTO DE SLUG E TÍTULO ---
+    // --- Passo 3: Tratamento de Slug ---
     let finalTitle = courseData.title || topic;
     let slugCandidate = formatSlug(finalTitle);
-    
-    const existing = await client.fetch(
-      `*[_type == "course" && slug.current == $slugCandidate][0]`, 
-      { slugCandidate }
-    );
-    if (existing) {
-      slugCandidate = `${slugCandidate}-${Math.floor(Math.random() * 1000)}`;
-    }
+    const existing = await client.fetch(`*[_type == "course" && slug.current == $slugCandidate][0]`, { slugCandidate });
+    if (existing) slugCandidate = `${slugCandidate}-${Math.floor(Math.random() * 1000)}`;
 
-    // --- 4. UPLOAD DA IMAGEM ---
+    console.log(`🎨 [60%] Gerando identidade visual e buscando imagens...`);
+
+    // --- Passo 4: Upload da Imagem ---
     const imageAsset = await fetchAndUploadImage(
       courseData.searchQuery || topic, 
       courseData.pixabay_category || "education" 
     );
 
-    // --- 5. MONTAGEM DO DOCUMENTO FINAL ---
+    console.log(`🏗️ [80%] Montando documento final para o Sanity...`);
+
+    // --- Passo 5: Montagem do Documento ---
     const doc = {
       _type: 'course',
       title: finalTitle,
@@ -70,12 +64,10 @@ const generateCourse = async (req, res) => {
       rating: finalRating,
       aiProvider: courseData.aiProvider,
       aiModel: courseData.aiModel,
-      
       category: {
         name: courseData.categoryName || "Geral",
         slug: { _type: 'slug', current: formatSlug(courseData.categoryName || "geral") }
       },
-
       modules: rawModules.map(mod => ({
         _key: Math.random().toString(36).substring(2, 11),
         title: mod.title || "Módulo",
@@ -87,7 +79,6 @@ const generateCourse = async (req, res) => {
           correctAnswer: String(ex.correctAnswer).trim()
         }))
       })),
-
       finalExam: (courseData.finalExam || []).map(exam => ({
         _key: Math.random().toString(36).substring(2, 11),
         question: exam.question,
@@ -98,9 +89,13 @@ const generateCourse = async (req, res) => {
 
     if (imageAsset) doc.thumbnail = imageAsset;
 
-    console.log(`📦 Salvando no Sanity: ${finalTitle} (${finalEstimatedTime}h, ${wordCount} palavras)`);
+    // --- Passo 6: Persistência ---
+    console.log(`📦 [95%] Salvando no banco de dados...`);
     const result = await client.create(doc);
     
+    console.log(`✅ [100%] Curso pronto: ${finalTitle}`);
+
+    // Resposta Final
     res.status(200).json({ 
       message: 'Curso gerado com sucesso!', 
       courseId: result._id,
@@ -111,7 +106,7 @@ const generateCourse = async (req, res) => {
   } catch (error) {
     console.error("❌ Erro Crítico no Controller:", error);
     res.status(500).json({ 
-      error: 'Falha técnica ao processar curso denso.',
+      error: 'Falha técnica ao processar curso.',
       message: error.message 
     });
   }

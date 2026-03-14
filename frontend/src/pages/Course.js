@@ -128,6 +128,7 @@ function Course() {
   const isFinalExamCompleted = completedSteps.includes('final-exam');
 
   const muiComponents = {
+    h1: ({ children }) => <Typography lineHeight={1} sx={{ mb: 2 }}>{children}</Typography>,
     h2: ({ children }) => <Typography lineHeight={1} sx={{ mb: 2 }}>{children}</Typography>,
     h3: ({ children }) => <Typography lineHeight={1} sx={{ mb: 2 }}>{children}</Typography>,
     h4: ({ children }) => <Typography lineHeight={1} sx={{ mb: 2 }}>{children}</Typography>,

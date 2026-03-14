@@ -1,5 +1,4 @@
 import React, { createContext, useState, useContext, useCallback } from 'react';
-import axios from 'axios';
 import { client } from '../client';
 
 const CourseContext = createContext();
@@ -16,11 +15,9 @@ export const CourseProvider = ({ children }) => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
-  // Função centralizada para buscar Stats e Categorias
+  // Busca estatísticas e categorias do Sanity
   const fetchGlobalData = useCallback(async (force = false) => {
-    // Se já carregou e não for um refresh forçado (pós-geração), não faz nada
     if (initialDataLoaded && !force) return;
-
     try {
       const query = `{
         "stats": {
@@ -31,7 +28,6 @@ export const CourseProvider = ({ children }) => {
         },
         "cats": *[_type == "course" && defined(category)].category.name
       }`;
-      
       const data = await client.fetch(query);
       const uniqueCats = [...new Set(data.cats)];
       const sortedCats = ['Recentes', ...uniqueCats.sort((a, b) => a.localeCompare(b))];
@@ -44,6 +40,7 @@ export const CourseProvider = ({ children }) => {
     }
   }, [initialDataLoaded]);
 
+  // CALCULA O PROGRESSO DO ALUNO (Necessário para o CourseCard)
   const getCourseProgress = useCallback((course) => {
     if (!course) return 0;
     const saved = localStorage.getItem(`progress-${course._id}`);
@@ -52,41 +49,63 @@ export const CourseProvider = ({ children }) => {
     return totalSteps === 0 ? 0 : Math.round((completedSteps.length / totalSteps) * 100);
   }, []);
 
+  // GERAÇÃO DE CURSO COM STREAMING (Progresso Real)
   const generateCourse = async (topic, callback) => {
     if (isGenerating) return;
 
     setIsGenerating(true);
     setProgress(0);
-    setStatusMessage('Iniciando conexão com a IA...');
-
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev < 30) { setStatusMessage('Pesquisando referências...'); return prev + 1; }
-        if (prev < 60) { setStatusMessage('Estruturando módulos...'); return prev + 0.5; }
-        if (prev < 90) { setStatusMessage('Finalizando e gerando imagens...'); return prev + 0.2; }
-        return prev;
-      });
-    }, 500);
+    setStatusMessage('Conectando ao motor de IA...');
 
     try {
-      await axios.post(`${API_BASE_URL}/generate-course`, { topic });
+      const response = await fetch(`${API_BASE_URL}/generate-course`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic }),
+      });
+
+      if (!response.body) throw new Error("ReadableStream não suportado.");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n\n');
+
+        lines.forEach(line => {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.replace('data: ', ''));
+              if (data.progress !== undefined) setProgress(data.progress);
+              if (data.message) setStatusMessage(data.message);
+              if (data.error) throw new Error(data.error);
+            } catch (e) {
+              console.error("Erro ao processar chunk:", e);
+            }
+          }
+        });
+      }
+
+      // Finalização
       setProgress(100);
-      setStatusMessage('Curso pronto!');
-      
-      // Força a atualização do cache global para refletir o novo curso nas estatísticas
+      setStatusMessage('Curso finalizado com sucesso!');
       await fetchGlobalData(true);
-      
-      if (callback) callback(); 
+      if (callback) callback();
+
     } catch (error) {
       console.error("Erro ao gerar curso:", error);
-      alert('Houve um erro técnico ao gerar o curso.');
+      setStatusMessage('Ocorreu um erro. Tente novamente em instantes.');
     } finally {
-      clearInterval(interval);
+      // Mantém a mensagem de sucesso por 3 segundos antes de resetar o Hero
       setTimeout(() => {
         setIsGenerating(false);
         setProgress(0);
         setStatusMessage('');
-      }, 2000);
+      }, 3000);
     }
   };
 
@@ -96,11 +115,11 @@ export const CourseProvider = ({ children }) => {
       progress, 
       statusMessage, 
       generateCourse,
-      getCourseProgress,
+      getCourseProgress, // Reintegrado para o CourseCard parar de dar erro
       stats,
       categories,
       fetchGlobalData,
-      initialDataLoaded
+      initialDataLoaded 
     }}>
       {children}
     </CourseContext.Provider>

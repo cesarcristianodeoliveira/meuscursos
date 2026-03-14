@@ -5,21 +5,20 @@ import CourseCardSkeleton from '../components/CourseCardSkeleton';
 import CategoryTabsSkeleton from '../components/CategoryTabsSkeleton';
 import StatsBanner from '../components/StatsBanner';
 import CategoryTabs from '../components/CategoryTabs';
-import CourseGenerateForm from '../components/CourseGenerateForm'; // Import do novo componente
+import Hero from '../components/Hero'; // Substituído o CourseGenerateForm pelo Hero
 import { useCourse } from '../contexts/CourseContext'; 
 import { 
   Container, Box, Typography, Pagination, Stack, Toolbar, Skeleton, useTheme, useMediaQuery
 } from '@mui/material';
 import { RocketLaunch } from '@mui/icons-material';
 
-const COURSES_PER_PAGE = 5;
+const COURSES_PER_PAGE = 6;
 
 const Dashboard = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
   const { 
-    isGenerating, 
     generateCourse, 
     stats, 
     categories, 
@@ -34,10 +33,12 @@ const Dashboard = () => {
   const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState('Recentes');
 
+  // Carrega dados globais (Stats e Categorias) apenas uma vez
   useEffect(() => {
     fetchGlobalData();
   }, [fetchGlobalData]);
 
+  // Função para buscar a lista de cursos baseada em filtros e página
   const fetchCoursesList = useCallback(async () => {
     setFetchingCourses(true);
     try {
@@ -66,6 +67,7 @@ const Dashboard = () => {
     fetchCoursesList();
   }, [fetchCoursesList]);
 
+  // Lógica de Scroll suave ao trocar de aba ou página
   const scrollToTabs = useCallback(() => {
     setTimeout(() => {
       const anchor = document.querySelector('#tabs-scroll-point');
@@ -93,11 +95,12 @@ const Dashboard = () => {
     scrollToTabs();
   };
 
+  // Callback executado após a IA gerar o curso com sucesso
   const onGenerateSuccess = () => {
     setTopic('');
     setPage(1); 
     setCategoryFilter('Recentes');
-    fetchCoursesList();
+    fetchCoursesList(); // Atualiza a lista para mostrar o novo curso
   };
 
   const handleGenerateAction = () => {
@@ -108,13 +111,12 @@ const Dashboard = () => {
     <>
       <Toolbar />
       
-      {/* Seção Superior: Form e Stats */}
+      {/* 1. SEÇÃO HERO: Onde a mágica acontece */}
       <Container maxWidth="xl" sx={{ mt: 2 }}>
-        <CourseGenerateForm 
+        <Hero 
           topic={topic} 
           setTopic={setTopic} 
           onGenerate={handleGenerateAction} 
-          isGenerating={isGenerating} 
         />
 
         <Box sx={{ mb: 2 }}>
@@ -122,55 +124,64 @@ const Dashboard = () => {
         </Box>
       </Container>
 
-      {/* Navegação Sticky */}
+      {/* 2. NAVEGAÇÃO POR CATEGORIAS (Sticky via CSS no componente CategoryTabs) */}
       {!initialDataLoaded ? (
         <CategoryTabsSkeleton />
       ) : (
         <CategoryTabs categories={categories} value={categoryFilter} onChange={handleTabChange} />
       )}
 
+      {/* Ponto de ancoragem para o scroll automático */}
       <div id="tabs-scroll-point" style={{ scrollMarginTop: isMobile ? '104px' : '112px' }} />
 
-      {/* Título e Contador */}
+      {/* 3. CONTAGEM E TÍTULO DA LISTA */}
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         <Box sx={{ mb: 2, minHeight: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <Typography variant="h6" sx={{ lineHeight: 1.2 }}>{categoryFilter}</Typography>
+          <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
+            {categoryFilter}
+          </Typography>
           {fetchingCourses ? (
             <Skeleton variant="text" width={80} height={20} sx={{ transform: 'none', mt: 0.5 }} />
           ) : (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              {totalCourses} {totalCourses === 1 ? 'curso' : 'cursos'}
+              {totalCourses} {totalCourses === 1 ? 'curso encontrado' : 'cursos encontrados'}
             </Typography>
           )}
         </Box>
       </Container>
 
-      {/* Lista de Cursos - Sem Container interno para evitar margens duplas */}
+      {/* 4. LISTAGEM DE CURSOS */}
       <Stack spacing={2} sx={{ mb: 4 }}>
         {fetchingCourses ? (
+          // Skeletons idênticos aos cards reais
           [...Array(3)].map((_, i) => <CourseCardSkeleton key={i} />)
         ) : (
           <>
             {courses.map((course) => <CourseCard key={course._id} course={course} />)}
+            
+            {/* Estado Vazio */}
             {courses.length === 0 && (
               <Box sx={{ textAlign: 'center', py: 10 }}>
                 <RocketLaunch sx={{ fontSize: 56, color: 'text.disabled', mb: 1 }} />
-                <Typography color="text.secondary">Nenhum curso encontrado nesta categoria.</Typography>
+                <Typography color="text.secondary">
+                  Nenhum curso encontrado nesta categoria.
+                </Typography>
               </Box>
             )}
           </>
         )}
       </Stack>
 
-      {/* Paginação */}
+      {/* 5. PAGINAÇÃO */}
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         {!fetchingCourses && courses.length !== 0 && totalCourses > COURSES_PER_PAGE && (
           <Stack sx={{ mt: 6, mb: 10, alignItems: 'center' }}>
             <Pagination 
-                count={Math.ceil(totalCourses / COURSES_PER_PAGE)} 
-                page={page} 
-                onChange={handlePageChange} 
-                color="primary" 
+              count={Math.ceil(totalCourses / COURSES_PER_PAGE)} 
+              page={page} 
+              onChange={handlePageChange} 
+              color="primary"
+              size={isMobile ? "medium" : "large"}
             />
           </Stack>
         )}
