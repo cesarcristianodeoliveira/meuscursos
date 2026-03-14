@@ -58,23 +58,22 @@ const Navbar = forwardRef((props, ref) => {
             display: 'flex',
             color: 'inherit',
             textDecoration: 'none',
-            '&:hover': { opacity: 0.75 }
+            '&:hover': { opacity: 0.92 }
           }}
         >
           <RocketLaunch
             color='primary'
             sx={{
-              mr: { xs: 1, sm: 1.5 },
-              fontSize: '1.8rem'
+              mr: { xs: 0, sm: 1 },
             }}
           />
           <Typography 
             color='text.primary'
             variant="h6" 
             sx={{ 
-              fontWeight: 800,
+              fontWeight: 600,
               letterSpacing: '-0.02em',
-              display: { xs: 'inherit', sm: 'inherit' } // Ajustado para aparecer no mobile também se desejar
+              display: { xs: 'none', sm: 'inherit' } // Ajustado para aparecer no mobile também se desejar
             }}
           >
             Meus Cursos
