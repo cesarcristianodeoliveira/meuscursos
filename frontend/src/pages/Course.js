@@ -12,7 +12,6 @@ import {
   Container, Table, TableCell, 
   TableContainer, IconButton, Tooltip,
   Chip, LinearProgress,
-  Toolbar,
   Grid,
   Card,
   Rating
@@ -143,7 +142,7 @@ function Course() {
       : <CodeBlock>{children}</CodeBlock>,
   };
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', flexDirection: 'column', alignItems: 'center', minHeight: '100vh' }}><Toolbar /><CircularProgress /></Box>;
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', flexDirection: 'column', alignItems: 'center', minHeight: '100vh' }}><CircularProgress /></Box>;
   if (!course) return <Typography sx={{ p: 5, textAlign: 'center' }}>Curso não encontrado.</Typography>;
 
   return (
@@ -165,7 +164,6 @@ function Course() {
           bgcolor: resolvedMode === 'light' ? grey[100] : grey[900], 
         }}
       >
-        <Toolbar />
         <Container maxWidth="xl" sx={{ py: 2 }}>
           <Grid
             alignItems="center"
