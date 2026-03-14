@@ -69,7 +69,7 @@ const Navbar = forwardRef((props, ref) => {
       ref={ref} 
       {...props} 
       color="inherit" 
-      position="fixed" 
+      position="sticky" 
       elevation={0}
     >
       {/* Barra de Progresso Estilo YouTube */}
