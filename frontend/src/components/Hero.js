@@ -5,6 +5,8 @@ import {
 } from '@mui/material';
 import { AutoAwesome, School } from '@mui/icons-material';
 import { useCourse } from '../contexts/CourseContext';
+import { grey } from '@mui/material/colors';
+import { useAppTheme } from '../contexts/ThemeContext';
 
 function CircularProgressWithLabel({ value }) {
   return (
@@ -12,7 +14,6 @@ function CircularProgressWithLabel({ value }) {
       <CircularProgress 
         variant="determinate" 
         value={value} 
-        size={90} // Aumentado levemente para destaque
         thickness={4.5} 
         sx={{ color: 'primary.main' }}
       />
@@ -33,7 +34,7 @@ function CircularProgressWithLabel({ value }) {
 
 const Hero = ({ topic, setTopic, onGenerate }) => {
   const { isGenerating, progress, statusMessage } = useCourse();
-
+  const { resolvedMode } = useAppTheme();
   const handleSubmit = (e) => {
     e.preventDefault();
     if (topic.trim() && !isGenerating) {
@@ -42,24 +43,36 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
   };
 
   return (
-    <Box sx={{ pt: { xs: 4, md: 8 }, pb: 4, textAlign: 'center' }}>
+    <Box
+      sx={{
+        bgcolor: resolvedMode === 'light' ? grey[100] : grey[900],
+        p: 4,
+        width: '100%',
+      }}
+    >
       <Typography 
-        variant="h3" 
+        align='center'
+        variant="h4" 
         sx={{ 
-          fontWeight: 800, 
-          mb: 2, 
-          color: 'primary.main', 
+          mb: .5, 
+          lineHeight: 1,
           letterSpacing: '-0.02em',
-          fontSize: { xs: '2.5rem', md: '3.5rem' } 
         }}
       >
         Meus Cursos
       </Typography>
-      <Typography variant="h6" color="text.secondary" sx={{ mb: 4, fontWeight: 400, px: 2 }}>
+      <Typography 
+        align='center'
+        color="text.secondary" 
+        sx={{ 
+          mb: 2,
+          lineHeight: 1 
+        }}
+      >
         Gere cursos completos com inteligência artificial em segundos.
       </Typography>
 
-      <Box sx={{ maxWidth: 700, mx: 'auto', position: 'relative', minHeight: 160 }}>
+      <Box sx={{ mx: 'auto', position: 'relative' }}>
         {!isGenerating ? (
           <Zoom in={!isGenerating}>
             <Paper 

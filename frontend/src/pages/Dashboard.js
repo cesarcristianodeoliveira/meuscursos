@@ -115,14 +115,14 @@ const Dashboard = () => {
   return (
     <>
       <Toolbar />
-      
-      <Container maxWidth="xl" sx={{ mt: 2 }}>
-        <Hero 
-          topic={topic} 
-          setTopic={setTopic} 
-          onGenerate={handleGenerateAction} 
-        />
 
+      <Hero 
+        topic={topic} 
+        setTopic={setTopic} 
+        onGenerate={handleGenerateAction} 
+      />
+
+      <Container maxWidth="xl" sx={{ mt: 2 }}>
         <Box sx={{ mb: 2 }}>
           <StatsBanner stats={stats} fetching={!initialDataLoaded} />
         </Box>
