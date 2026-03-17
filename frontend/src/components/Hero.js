@@ -84,7 +84,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
           sx={{
             alignItems: 'center',
             display: 'flex',
-            gap: 1,
+            gap: .75,
             justifyContent: 'center',
             mb: 1
           }}
