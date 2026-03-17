@@ -1,135 +1,171 @@
-const client = require('../config/sanity');
-const { formatSlug } = require('../utils/formatter');
-const { fetchAndUploadImage } = require('../services/imageService');
-const { generateCourseContent } = require('../services/aiService');
+import React, { createContext, useState, useContext, useCallback } from 'react';
+import { client } from '../client';
 
-const generateCourse = async (req, res) => {
-  // Aumenta o timeout para 10 minutos
-  req.setTimeout(600000); 
+const CourseContext = createContext();
 
-  const { topic } = req.body;
-  if (!topic) return res.status(400).json({ error: 'O tema é obrigatório' });
+export const CourseProvider = ({ children }) => {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState('');
 
-  // --- CONFIGURAÇÃO PARA PROGRESSO REAL (SSE) ---
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no'); // Desativa buffering no Nginx/Render
+  // --- GESTÃO DE PROVIDERS E "CRÉDITOS" (AutoAwesome) ---
+  const [selectedProvider, setSelectedProvider] = useState('groq');
+  const [providers] = useState([
+    { 
+      id: 'groq', 
+      name: 'Groq Cloud', 
+      model: 'Llama 3.3 70B', 
+      enabled: true, 
+      quotaLabel: 'Livre (Beta)',
+      cost: 3 // Representação visual dos créditos
+    },
+    { 
+      id: 'openai', 
+      name: 'OpenAI', 
+      model: 'GPT-4o', 
+      enabled: false, 
+      quotaLabel: 'Esgotado',
+      cost: 5
+    },
+    { 
+      id: 'google', 
+      name: 'Google Gemini', 
+      model: '1.5 Pro', 
+      enabled: false, 
+      quotaLabel: 'Em Breve',
+      cost: 3
+    },
+  ]);
 
-  // Helper para enviar o progresso com "Padding" para forçar o Render a liberar o buffer
-  const sendProgress = (progress, message) => {
-    const payload = JSON.stringify({ progress, message });
-    // Enviamos um comentário inicial ":" seguido de espaços para garantir que o pacote tenha > 1kb
-    // Isso "destrava" o streaming em proxies como o do Render
-    const padding = " ".repeat(1024);
-    res.write(`:${padding}\n`); 
-    res.write(`data: ${payload}\n\n`);
+  const [stats, setStats] = useState({ courses: 0, lessons: 0, quizzes: 0, categories: 0 });
+  const [categories, setCategories] = useState(['Recentes']);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
+  const fetchGlobalData = useCallback(async (force = false) => {
+    if (initialDataLoaded && !force) return;
     
-    // Log no console do backend
-    console.log(`🚀 [${progress}%] ${message}`);
+    try {
+      const query = `{
+        "stats": {
+          "courses": count(*[_type == "course"]),
+          "categories": count(array::unique(*[_type == "course"].category.name)),
+          "lessons": count(*[_type == "course"].modules[]),
+          "quizzes": count(*[_type == "course"].modules[].exercises[])
+        },
+        "cats": *[_type == "course" && defined(category)].category.name
+      }`;
+      const data = await client.fetch(query);
+      const uniqueCats = [...new Set(data.cats)];
+      const sortedCats = ['Recentes', ...uniqueCats.sort((a, b) => a.localeCompare(b))];
+
+      setStats(data.stats);
+      setCategories(sortedCats);
+      setInitialDataLoaded(true);
+    } catch (err) {
+      console.error("Erro ao carregar dados globais:", err);
+    }
+  }, [initialDataLoaded]);
+
+  const getCourseProgress = useCallback((course) => {
+    if (!course) return 0;
+    const saved = localStorage.getItem(`progress-${course._id}`);
+    const completedSteps = saved ? JSON.parse(saved) : [];
+    const totalSteps = (course.modules?.length || 0) + (course.finalExam ? 1 : 0);
+    return totalSteps === 0 ? 0 : Math.round((completedSteps.length / totalSteps) * 100);
+  }, []);
+
+  const generateCourse = async (topic, callback) => {
+    if (isGenerating) return;
+
+    setIsGenerating(true);
+    setProgress(1); 
+    setStatusMessage(`Solicitando ao ${selectedProvider.toUpperCase()}...`);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/generate-course`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // AGORA ENVIAMOS O PROVIDER SELECIONADO PARA O BACKEND
+        body: JSON.stringify({ 
+          topic, 
+          provider: selectedProvider 
+        }),
+      });
+
+      if (!response.body) throw new Error("O navegador não suporta streaming.");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let leftover = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = (leftover + chunk).split('\n');
+        leftover = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || trimmedLine.startsWith(':')) continue;
+
+          if (trimmedLine.startsWith('data: ')) {
+            try {
+              const jsonStr = trimmedLine.replace('data: ', '');
+              const data = JSON.parse(jsonStr);
+
+              if (data.progress !== undefined) setProgress(data.progress);
+              if (data.message) setStatusMessage(data.message);
+              if (data.error) throw new Error(data.error);
+            } catch (e) {
+              console.warn("Processando dados de streaming...");
+            }
+          }
+        }
+      }
+
+      setProgress(100);
+      setStatusMessage('Curso finalizado com sucesso!');
+      
+      setInitialDataLoaded(false); 
+      await fetchGlobalData(true);
+      
+      if (callback) callback();
+
+    } catch (error) {
+      console.error("Erro na geração:", error);
+      setStatusMessage(error.message || 'Erro ao gerar curso.');
+    } finally {
+      setTimeout(() => {
+        setIsGenerating(false);
+        setProgress(0);
+        setStatusMessage('');
+      }, 3500);
+    }
   };
 
-  try {
-    sendProgress(5, "Iniciando integração com a IA...");
-
-    // --- Passo 1: IA Gerando Conteúdo ---
-    const courseData = await generateCourseContent(topic);
-    sendProgress(40, "Conteúdo estruturado. Calculando métricas pedagógicas...");
-
-    const rawModules = courseData.modules || [];
-    if (rawModules.length === 0) {
-      throw new Error('A IA falhou ao estruturar os módulos.');
-    }
-
-    // --- Passo 2: Lógica de Cálculos ---
-    const allText = (courseData.description || "") + rawModules.reduce((acc, mod) => acc + (mod.content || ""), "");
-    const wordCount = allText.split(/\s+/).filter(word => word.length > 0).length;
-    const readingMinutes = wordCount / 200;
-    const exerciseMinutes = (rawModules.length * 3 * 2) + (courseData.finalExam?.length || 10);
-    const totalMinutes = readingMinutes + exerciseMinutes;
-    const finalEstimatedTime = Math.max(1, parseFloat((totalMinutes / 60).toFixed(1)));
-    const finalRating = Math.round((Number(courseData.rating) || 4.5) * 2) / 2;
-
-    // --- Passo 3: Tratamento de Slug ---
-    let finalTitle = courseData.title || topic;
-    let slugCandidate = formatSlug(finalTitle);
-    const existing = await client.fetch(`*[_type == "course" && slug.current == $slugCandidate][0]`, { slugCandidate });
-    if (existing) slugCandidate = `${slugCandidate}-${Math.floor(Math.random() * 1000)}`;
-
-    sendProgress(65, "Buscando imagens e gerando identidade visual...");
-
-    // --- Passo 4: Upload da Imagem ---
-    let imageAsset = null;
-    try {
-      imageAsset = await fetchAndUploadImage(
-        courseData.searchQuery || topic, 
-        courseData.pixabay_category || "education" 
-      );
-    } catch (imgErr) {
-      console.error("Erro ao carregar imagem:", imgErr);
-    }
-
-    sendProgress(85, "Finalizando montagem do material didático...");
-
-    // --- Passo 5: Montagem do Documento ---
-    const doc = {
-      _type: 'course',
-      title: finalTitle,
-      slug: { _type: 'slug', current: slugCandidate },
-      description: courseData.description,
-      estimatedTime: finalEstimatedTime, 
-      rating: finalRating,
-      aiProvider: courseData.aiProvider,
-      aiModel: courseData.aiModel,
-      category: {
-        name: courseData.categoryName || "Geral",
-        slug: { _type: 'slug', current: formatSlug(courseData.categoryName || "geral") }
-      },
-      modules: rawModules.map(mod => ({
-        _key: Math.random().toString(36).substring(2, 11),
-        title: mod.title || "Módulo",
-        content: mod.content || "",
-        exercises: (mod.exercises || []).slice(0, 3).map(ex => ({
-          _key: Math.random().toString(36).substring(2, 11),
-          question: ex.question,
-          options: ex.options,
-          correctAnswer: String(ex.correctAnswer).trim()
-        }))
-      })),
-      finalExam: (courseData.finalExam || []).map(exam => ({
-        _key: Math.random().toString(36).substring(2, 11),
-        question: exam.question,
-        options: exam.options,
-        correctAnswer: String(exam.correctAnswer).trim()
-      }))
-    };
-
-    if (imageAsset) doc.thumbnail = imageAsset;
-
-    // --- Passo 6: Persistência ---
-    sendProgress(95, "Salvando no Sanity e indexando conteúdo...");
-    const result = await client.create(doc);
-    
-    // --- RESPOSTA FINAL (Ainda via stream) ---
-    const finalResult = JSON.stringify({ 
-      progress: 100,
-      message: 'Curso gerado com sucesso!', 
-      courseId: result._id,
-      slug: doc.slug.current
-    });
-
-    res.write(`data: ${finalResult}\n\n`);
-    res.end(); // Finaliza a conexão
-
-  } catch (error) {
-    console.error("❌ Erro Crítico no Controller:", error);
-    const errorPayload = JSON.stringify({ 
-      error: 'Falha técnica ao processar curso.',
-      message: error.message 
-    });
-    res.write(`data: ${errorPayload}\n\n`);
-    res.end();
-  }
+  return (
+    <CourseContext.Provider value={{ 
+      isGenerating, 
+      progress, 
+      statusMessage, 
+      generateCourse,
+      getCourseProgress, 
+      stats, 
+      categories, 
+      fetchGlobalData, 
+      initialDataLoaded,
+      // EXPORTANDO OS NOVOS ESTADOS PARA O HERO
+      selectedProvider,
+      setSelectedProvider,
+      providers
+    }}>
+      {children}
+    </CourseContext.Provider>
+  );
 };
 
-module.exports = { generateCourse };
+export const useCourse = () => useContext(CourseContext);

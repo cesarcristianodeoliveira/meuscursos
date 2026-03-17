@@ -8,7 +8,7 @@ import CategoryTabs from '../components/CategoryTabs';
 import Hero from '../components/Hero';
 import { useCourse } from '../contexts/CourseContext'; 
 import { 
-  Container, Box, Typography, Pagination, Stack, Toolbar, Skeleton, useTheme, useMediaQuery
+  Container, Box, Typography, Pagination, Stack, Skeleton, useTheme, useMediaQuery
 } from '@mui/material';
 import { RocketLaunch } from '@mui/icons-material';
 
@@ -114,7 +114,6 @@ const Dashboard = () => {
 
   return (
     <>
-      <Toolbar />
 
       <Hero 
         topic={topic} 

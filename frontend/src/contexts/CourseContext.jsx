@@ -8,6 +8,35 @@ export const CourseProvider = ({ children }) => {
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
 
+  // --- GESTÃO DE PROVIDERS E "CRÉDITOS" (AutoAwesome) ---
+  const [selectedProvider, setSelectedProvider] = useState('groq');
+  const [providers] = useState([
+    { 
+      id: 'groq', 
+      name: 'Groq Cloud', 
+      model: 'Llama 3.3 70B', 
+      enabled: true, 
+      quotaLabel: 'Livre (Beta)',
+      cost: 3 // Representação visual dos créditos
+    },
+    { 
+      id: 'openai', 
+      name: 'OpenAI', 
+      model: 'GPT-4o', 
+      enabled: false, 
+      quotaLabel: 'Esgotado',
+      cost: 5
+    },
+    { 
+      id: 'google', 
+      name: 'Google Gemini', 
+      model: '1.5 Pro', 
+      enabled: false, 
+      quotaLabel: 'Em Breve',
+      cost: 3
+    },
+  ]);
+
   const [stats, setStats] = useState({ courses: 0, lessons: 0, quizzes: 0, categories: 0 });
   const [categories, setCategories] = useState(['Recentes']);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
@@ -15,7 +44,6 @@ export const CourseProvider = ({ children }) => {
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
   const fetchGlobalData = useCallback(async (force = false) => {
-    // Se já carregou e não é um force fetch, ignora
     if (initialDataLoaded && !force) return;
     
     try {
@@ -53,13 +81,17 @@ export const CourseProvider = ({ children }) => {
 
     setIsGenerating(true);
     setProgress(1); 
-    setStatusMessage('Iniciando conexão com o motor de IA...');
+    setStatusMessage(`Solicitando ao ${selectedProvider.toUpperCase()}...`);
 
     try {
       const response = await fetch(`${API_BASE_URL}/generate-course`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic }),
+        // AGORA ENVIAMOS O PROVIDER SELECIONADO PARA O BACKEND
+        body: JSON.stringify({ 
+          topic, 
+          provider: selectedProvider 
+        }),
       });
 
       if (!response.body) throw new Error("O navegador não suporta streaming.");
@@ -89,29 +121,24 @@ export const CourseProvider = ({ children }) => {
               if (data.message) setStatusMessage(data.message);
               if (data.error) throw new Error(data.error);
             } catch (e) {
-              console.warn("Fragmento recebido, aguardando conclusão...");
+              console.warn("Processando dados de streaming...");
             }
           }
         }
       }
 
-      // --- FINALIZAÇÃO E SINCRONIA ---
       setProgress(100);
-      setStatusMessage('Curso pronto! Atualizando plataforma...');
+      setStatusMessage('Curso finalizado com sucesso!');
       
-      // Resetamos o flag para forçar o Dashboard a re-executar o useEffect de fetch
       setInitialDataLoaded(false); 
-      
-      // Atualiza os stats globais imediatamente
       await fetchGlobalData(true);
       
       if (callback) callback();
 
     } catch (error) {
       console.error("Erro na geração:", error);
-      setStatusMessage(error.message || 'Erro ao gerar curso. Tente novamente.');
+      setStatusMessage(error.message || 'Erro ao gerar curso.');
     } finally {
-      // Limpa os estados de progresso após um tempo para o usuário ver o 100%
       setTimeout(() => {
         setIsGenerating(false);
         setProgress(0);
@@ -130,7 +157,11 @@ export const CourseProvider = ({ children }) => {
       stats, 
       categories, 
       fetchGlobalData, 
-      initialDataLoaded 
+      initialDataLoaded,
+      // EXPORTANDO OS NOVOS ESTADOS PARA O HERO
+      selectedProvider,
+      setSelectedProvider,
+      providers
     }}>
       {children}
     </CourseContext.Provider>

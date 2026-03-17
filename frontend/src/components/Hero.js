@@ -1,11 +1,12 @@
 import React from 'react';
 import { 
   Box, TextField, Button, Typography, Paper, 
-  CircularProgress, InputAdornment, Zoom, Fade 
+  CircularProgress, InputAdornment, Zoom, Fade, 
+  Toolbar, MenuItem, Select, FormControl,
+  Stack
 } from '@mui/material';
-import { AutoAwesome, School } from '@mui/icons-material';
+import { AutoAwesome, School, Bolt, Psychology, Google } from '@mui/icons-material';
 import { useCourse } from '../contexts/CourseContext';
-import { grey } from '@mui/material/colors';
 import { useAppTheme } from '../contexts/ThemeContext';
 
 function CircularProgressWithLabel({ value }) {
@@ -15,6 +16,7 @@ function CircularProgressWithLabel({ value }) {
         variant="determinate" 
         value={value} 
         thickness={4.5} 
+        size={80}
         sx={{ color: 'primary.main' }}
       />
       <Box
@@ -33,8 +35,18 @@ function CircularProgressWithLabel({ value }) {
 }
 
 const Hero = ({ topic, setTopic, onGenerate }) => {
-  const { isGenerating, progress, statusMessage } = useCourse();
+  // Puxamos os novos estados do contexto atualizado
+  const { 
+    isGenerating, 
+    progress, 
+    statusMessage, 
+    selectedProvider, 
+    setSelectedProvider, 
+    providers 
+  } = useCourse();
+  
   const { resolvedMode } = useAppTheme();
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (topic.trim() && !isGenerating) {
@@ -42,113 +54,173 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
     }
   };
 
-  return (
-    <Box
-      sx={{
-        bgcolor: resolvedMode === 'light' ? grey[100] : grey[900],
-        p: 4,
-        width: '100%',
-      }}
-    >
-      <Typography 
-        align='center'
-        variant="h4" 
-        sx={{ 
-          mb: .5, 
-          lineHeight: 1,
-          letterSpacing: '-0.02em',
-        }}
-      >
-        Meus Cursos
-      </Typography>
-      <Typography 
-        align='center'
-        color="text.secondary" 
-        sx={{ 
-          mb: 2,
-          lineHeight: 1 
-        }}
-      >
-        Gere cursos completos com inteligência artificial em segundos.
-      </Typography>
+  // Helper para ícones dos provedores
+  const getProviderIcon = (id) => {
+    if (id === 'groq') return <Bolt fontSize="small" sx={{ color: '#f59e0b' }} />;
+    if (id === 'openai') return <Psychology fontSize="small" color="primary" />;
+    if (id === 'google') return <Google fontSize="small" sx={{ color: '#4285F4' }} />;
+    return <AutoAwesome fontSize="small" />;
+  };
 
-      <Box sx={{ mx: 'auto', position: 'relative' }}>
-        {!isGenerating ? (
-          <Zoom in={!isGenerating}>
-            <Paper 
-              elevation={0}
-              component="form" 
-              onSubmit={handleSubmit}
-              sx={{ 
-                p: 0.5, display: 'flex', alignItems: 'center', borderRadius: 3,
-                border: '1px solid', borderColor: 'divider',
-                bgcolor: 'background.paper',
-                transition: 'all 0.3s ease',
-                '&:focus-within': { 
-                  borderColor: 'primary.main', 
-                  boxShadow: '0 0 0 4px rgba(25, 118, 210, 0.08)' 
-                }
-              }}
-            >
-              <TextField
-                fullWidth
-                variant="standard"
-                placeholder="Ex: Fundamentos de React, Culinária Italiana..."
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                InputProps={{
-                  disableUnderline: true,
-                  startAdornment: (
-                    <InputAdornment position="start" sx={{ pl: 2 }}>
-                      <School color="action" />
-                    </InputAdornment>
-                  ),
-                  sx: { py: 1.5, px: 1, fontSize: '1.1rem' }
-                }}
-              />
-              <Button 
-                variant="contained" 
-                type="submit" 
-                disabled={!topic.trim()}
+  return (
+    <>
+      <Toolbar />
+    
+      <Box
+        sx={{
+          alignItems: 'center',
+          background: resolvedMode === 'light' 
+            ? `linear-gradient(180deg, #ffffff, #f9fafb 100%)` 
+            : `linear-gradient(180deg, #121212, #1a1a1a 100%)`,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          p: { xs: 2, md: 4 },
+          width: '100%',
+          minHeight: '40vh'
+        }}
+      >
+        {/* TEXTO DE CHAMADA */}
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1 }}>
+            <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: '-0.02em', fontSize: { xs: '2rem', md: '3rem' } }}>
+              O que você quer
+            </Typography>
+            <Typography variant="h3" color='primary' sx={{ fontWeight: 800, letterSpacing: '-0.02em', fontSize: { xs: '2rem', md: '3rem' } }}>
+              aprender?
+            </Typography>
+          </Stack>
+          <Typography variant='body1' fontWeight={400} color='text.secondary' sx={{ fontSize: '1.1rem' }}>
+            Transforme qualquer tópico em um curso técnico exaustivo em segundos.
+          </Typography>
+        </Box>
+
+        {/* ÁREA DO FORMULÁRIO */}
+        <Box sx={{ width: '100%', maxWidth: 850, position: 'relative' }}>
+          {!isGenerating ? (
+            <Zoom in={!isGenerating}>
+              <Paper 
+                elevation={0}
+                component="form" 
+                onSubmit={handleSubmit}
                 sx={{ 
-                  borderRadius: 2.5, 
-                  px: 4, 
-                  height: 56, 
-                  fontWeight: 700, 
-                  textTransform: 'none',
-                  boxShadow: 2
+                  p: 1, borderRadius: 4,
+                  border: '1px solid', borderColor: 'divider',
+                  bgcolor: 'background.paper',
+                  boxShadow: resolvedMode === 'light' ? '0 10px 40px rgba(0,0,0,0.04)' : '0 10px 40px rgba(0,0,0,0.4)',
+                  overflow: 'hidden'
                 }}
               >
-                <AutoAwesome />
-              </Button>
-            </Paper>
-          </Zoom>
-        ) : (
-          <Fade in={isGenerating}>
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              p: 4, 
-              borderRadius: 3, 
-              bgcolor: 'rgba(25, 118, 210, 0.04)', // Tom azulado sutil
-              border: '1px dashed',
-              borderColor: 'primary.light'
-            }}>
-              <CircularProgressWithLabel value={progress} />
-              <Typography variant="h6" sx={{ mt: 2, fontWeight: 600, color: 'text.primary' }}>
-                {statusMessage}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                {progress < 100 
-                  ? "Isso pode levar alguns instantes, estamos preparando o melhor conteúdo." 
-                  : "Quase lá! Finalizando os últimos detalhes..."}
-              </Typography>
-            </Box>
-          </Fade>
-        )}
+                {/* INPUT PRINCIPAL EM CIMA */}
+                <TextField
+                  fullWidth
+                  variant="standard"
+                  placeholder="Ex: Arquitetura de Microserviços com Node.js e Docker..."
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  autoComplete="off"
+                  InputProps={{
+                    disableUnderline: true,
+                    startAdornment: (
+                      <InputAdornment position="start" sx={{ pl: 2 }}>
+                        <School color="primary" />
+                      </InputAdornment>
+                    ),
+                    sx: { py: 2, px: 1, fontSize: '1.2rem', fontWeight: 500 }
+                  }}
+                />
+
+                {/* BARRA DE AÇÕES EMBAIXO */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  mt: 1, p: 1, 
+                  borderTop: '1px solid', borderColor: 'divider',
+                  flexWrap: 'wrap', gap: 2
+                }}>
+                  
+                  {/* SELETOR DE INTELIGÊNCIA */}
+                  <FormControl size="small" sx={{ minWidth: 220 }}>
+                    <Select
+                      value={selectedProvider}
+                      onChange={(e) => setSelectedProvider(e.target.value)}
+                      variant="outlined"
+                      sx={{ 
+                        borderRadius: 3, 
+                        height: 45, 
+                        bgcolor: resolvedMode === 'light' ? '#f3f4f6' : '#2d2d2d',
+                        '& .MuiOutlinedInput-notchedOutline': { border: 'none' }
+                      }}
+                    >
+                      {providers.map((p) => (
+                        <MenuItem key={p.id} value={p.id} disabled={!p.enabled}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            {getProviderIcon(p.id)}
+                            <Box>
+                              <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1 }}>
+                                {p.name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {p.quotaLabel}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  {/* BOTÃO GERAR COM CRÉDITOS */}
+                  <Button 
+                    variant="contained" 
+                    type="submit" 
+                    disabled={!topic.trim()}
+                    startIcon={<AutoAwesome />}
+                    endIcon={<Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', opacity: 0.8, bgcolor: 'rgba(0,0,0,0.2)', px: 1, borderRadius: 1, ml: 1 }}>
+                      3 <Bolt sx={{ fontSize: 14, ml: 0.5 }} />
+                    </Typography>}
+                    sx={{ 
+                      borderRadius: 3, 
+                      px: 3, 
+                      height: 48, 
+                      fontWeight: 700, 
+                      textTransform: 'none',
+                      boxShadow: '0 4px 14px 0 rgba(25, 118, 210, 0.39)',
+                    }}
+                  >
+                    Gerar Conteúdo
+                  </Button>
+                </Box>
+              </Paper>
+            </Zoom>
+          ) : (
+            <Fade in={isGenerating}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                p: { xs: 4, md: 6 }, 
+                borderRadius: 4, 
+                bgcolor: resolvedMode === 'light' ? 'rgba(25, 118, 210, 0.02)' : 'rgba(25, 118, 210, 0.05)',
+                border: '1px dashed',
+                borderColor: 'primary.light'
+              }}>
+                <CircularProgressWithLabel value={progress} />
+                <Typography variant="h5" sx={{ mt: 3, fontWeight: 700, color: 'text.primary', textAlign: 'center' }}>
+                  {statusMessage}
+                </Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mt: 1, textAlign: 'center', maxWidth: 500 }}>
+                  {progress < 100 
+                    ? "Nossa IA está estruturando módulos, criando exercícios e gerando material técnico de alta qualidade." 
+                    : "Finalizando a indexação e salvando seu novo curso..."}
+                </Typography>
+              </Box>
+            </Fade>
+          )}
+        </Box>
       </Box>
-    </Box>
+    </>
   );
 };
 
