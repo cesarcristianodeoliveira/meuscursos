@@ -3,7 +3,6 @@ import {
   Box, TextField, Button, Typography, Paper, 
   CircularProgress, InputAdornment, Zoom, Fade, 
   Toolbar, MenuItem, Select, FormControl,
-  Stack
 } from '@mui/material';
 import { AutoAwesome, School, Bolt, Psychology, Google } from '@mui/icons-material';
 import { useCourse } from '../contexts/CourseContext';
@@ -81,17 +80,42 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
         }}
       >
         {/* TEXTO DE CHAMADA */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 1 }}>
-            <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: '-0.02em', fontSize: { xs: '2rem', md: '3rem' } }}>
-              O que você quer
-            </Typography>
-            <Typography variant="h3" color='primary' sx={{ fontWeight: 800, letterSpacing: '-0.02em', fontSize: { xs: '2rem', md: '3rem' } }}>
-              aprender?
-            </Typography>
-          </Stack>
-          <Typography variant='body1' fontWeight={400} color='text.secondary' sx={{ fontSize: '1.1rem' }}>
-            Transforme qualquer tópico em um curso técnico exaustivo em segundos.
+        <Box
+          sx={{
+            alignItems: 'center',
+            display: 'flex',
+            gap: 1,
+            justifyContent: 'center',
+            mb: 1
+          }}
+        >
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              lineHeight: 1,
+              fontWeight: 600
+            }}
+          >
+            O que você deseja
+          </Typography>
+          <Typography 
+            variant="h6" 
+            color='primary'
+            sx={{ 
+              lineHeight: 1,
+              fontWeight: 600
+            }}
+          >
+            aprender?
+          </Typography>
+        </Box>
+        <Box
+          sx={{
+            mb: 3
+          }}
+        >
+          <Typography variant='body2' fontWeight={500} color='text.secondary'>
+            Plataforma de Cursos com Inteligência Artificial.
           </Typography>
         </Box>
 
