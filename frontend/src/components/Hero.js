@@ -70,8 +70,8 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
         sx={{
           alignItems: 'center',
           background: resolvedMode === 'light' 
-            ? `linear-gradient(180deg, #ffffff, #f9fafb 100%)` 
-            : `linear-gradient(180deg, #121212, #1a1a1a 100%)`,
+            ? `linear-gradient(0deg, #ffffff, #f5f5f5 100%)` 
+            : `linear-gradient(0deg, #121212, #1a1a1a 100%)`,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
