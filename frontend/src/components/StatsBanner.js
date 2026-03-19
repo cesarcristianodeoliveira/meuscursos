@@ -13,6 +13,7 @@ const StatItem = ({ icon: Icon, label, value, loading }) => {
       sx={{ 
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: 2,
         // Forçamos uma altura mínima para o item não variar entre loading e dado real
         height: 40, 

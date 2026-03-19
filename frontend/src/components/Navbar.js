@@ -24,13 +24,13 @@ const Navbar = forwardRef((props, ref) => {
       position="fixed" // Alterado de sticky para fixed para garantir que a barra de progresso flutue no topo
       elevation={0}
       sx={{ 
-        bgcolor: resolvedMode === 'light' ? '#f5f5f5' : '#1a1a1a',
         zIndex: (theme) => theme.zIndex.drawer + 1 // Garante que fique acima de outros elementos
       }}
     >
       {/* Barra de Progresso Estilo YouTube/NProgress */}
       {isGenerating && (
         <LinearProgress 
+          color='secondary'
           variant="determinate" 
           value={progress} 
           sx={{ 
@@ -61,7 +61,7 @@ const Navbar = forwardRef((props, ref) => {
           }}
         >
           <RocketLaunch
-            color='primary'
+            color='secondary'
             sx={{
               mr: { xs: 0, sm: 1 },
             }}

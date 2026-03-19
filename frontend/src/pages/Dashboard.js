@@ -10,7 +10,7 @@ import { useCourse } from '../contexts/CourseContext';
 import { 
   Container, Box, Typography, Pagination, Stack, Skeleton, useTheme, useMediaQuery
 } from '@mui/material';
-import { RocketLaunch } from '@mui/icons-material';
+import { MenuBook } from '@mui/icons-material';
 
 const COURSES_PER_PAGE = 6;
 
@@ -161,9 +161,9 @@ const Dashboard = () => {
             
             {courses.length === 0 && (
               <Box sx={{ textAlign: 'center', py: 10 }}>
-                <RocketLaunch sx={{ fontSize: 56, color: 'text.disabled', mb: 1 }} />
+                <MenuBook sx={{ fontSize: 56, color: 'text.disabled', mb: 1 }} />
                 <Typography color="text.secondary">
-                  Nenhum curso encontrado nesta categoria.
+                  Nenhum curso encontrado.
                 </Typography>
               </Box>
             )}

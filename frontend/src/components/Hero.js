@@ -1,12 +1,14 @@
 import React from 'react';
 import { 
   Box, TextField, Button, Typography, Paper, 
-  CircularProgress, InputAdornment, Zoom, Fade, 
+  CircularProgress, Zoom, Fade, 
   Toolbar, MenuItem, Select, FormControl,
+  Container,
 } from '@mui/material';
-import { AutoAwesome, School, Bolt, Psychology, Google } from '@mui/icons-material';
+import { AutoAwesome, Bolt, Psychology, Google } from '@mui/icons-material';
 import { useCourse } from '../contexts/CourseContext';
 import { useAppTheme } from '../contexts/ThemeContext';
+import { blue } from '@mui/material/colors';
 
 function CircularProgressWithLabel({ value }) {
   return (
@@ -64,19 +66,15 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
   return (
     <>
       <Toolbar />
-    
       <Box
         sx={{
           alignItems: 'center',
-          background: resolvedMode === 'light' 
-            ? `linear-gradient(0deg, #ffffff, #f5f5f5 100%)` 
-            : `linear-gradient(0deg, #121212, #1a1a1a 100%)`,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          p: { xs: 2, md: 4 },
+          px: 2,
+          py: { xs: 2, md: 4 },
           width: '100%',
-          minHeight: '40vh'
         }}
       >
         {/* TEXTO DE CHAMADA */}
@@ -84,26 +82,32 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
           sx={{
             alignItems: 'center',
             display: 'flex',
-            gap: .75,
+            gap: { xs: .75, md: 2 },
+            flexDirection: { xs: 'column', md: 'row' },
             justifyContent: 'center',
-            mb: 1
+            width: '100%',
+            mb: 1.5
           }}
         >
           <Typography 
-            variant="h6" 
+            variant="h2" 
             sx={{ 
               lineHeight: 1,
               fontWeight: 600
             }}
           >
-            O que você deseja
+            O que você quer
           </Typography>
           <Typography 
-            variant="h6" 
-            color='primary'
+            variant="h2"
             sx={{ 
               lineHeight: 1,
-              fontWeight: 600
+              fontWeight: 600,
+              background: `linear-gradient(90deg, ${blue[300]} 0%, ${blue[700]} 100%)`,
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              color: 'transparent',
+              display: 'inline-block'
             }}
           >
             aprender?
@@ -111,16 +115,24 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
         </Box>
         <Box
           sx={{
-            mb: 3
+            mb: 4
           }}
         >
-          <Typography variant='body2' fontWeight={500} color='text.secondary'>
-            Plataforma de Cursos com Inteligência Artificial.
+          <Typography 
+            align='center' 
+            variant='h4' 
+            fontWeight={500} 
+            color='text.secondary'
+            sx={{
+              fontSize: { xs: '1.25rem', md: '2.0243rem' }
+            }}
+          >
+            Cursos com Inteligência Artificial
           </Typography>
         </Box>
 
         {/* ÁREA DO FORMULÁRIO */}
-        <Box sx={{ width: '100%', maxWidth: 850, position: 'relative' }}>
+        <Container maxWidth='md' sx={{ px: [0] }}>
           {!isGenerating ? (
             <Zoom in={!isGenerating}>
               <Paper 
@@ -128,7 +140,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                 component="form" 
                 onSubmit={handleSubmit}
                 sx={{ 
-                  p: 1, borderRadius: 4,
+                  p: 1, borderRadius: 2,
                   border: '1px solid', borderColor: 'divider',
                   bgcolor: 'background.paper',
                   boxShadow: resolvedMode === 'light' ? '0 10px 40px rgba(0,0,0,0.04)' : '0 10px 40px rgba(0,0,0,0.4)',
@@ -145,12 +157,12 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   autoComplete="off"
                   InputProps={{
                     disableUnderline: true,
-                    startAdornment: (
-                      <InputAdornment position="start" sx={{ pl: 2 }}>
-                        <School color="primary" />
-                      </InputAdornment>
-                    ),
-                    sx: { py: 2, px: 1, fontSize: '1.2rem', fontWeight: 500 }
+                    // startAdornment: (
+                    //   <InputAdornment position="start" sx={{ pl: 2 }}>
+                    //     <School color="primary" />
+                    //   </InputAdornment>
+                    // ),
+                    // sx: { py: 2, px: 1, fontSize: '1.2rem', fontWeight: 500 }
                   }}
                 />
 
@@ -242,7 +254,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
               </Box>
             </Fade>
           )}
-        </Box>
+        </Container>
       </Box>
     </>
   );

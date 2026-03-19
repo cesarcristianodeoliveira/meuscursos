@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAppTheme } from '../contexts/ThemeContext';
 import { useCourse } from '../contexts/CourseContext';
 import { useParams } from 'react-router-dom';
 import { client, urlFor } from '../client';
@@ -32,7 +31,6 @@ import StarIcon from '@mui/icons-material/Star';
 // Importando seus componentes
 import QuizSection from '../components/QuizSection';
 import CertificateDialog from '../components/CertificateDialog';
-import { grey } from '@mui/material/colors';
 import timeAgo from '../utils/timeAgo';
 
 const CodeBlock = ({ children }) => {
@@ -59,7 +57,6 @@ const CodeBlock = ({ children }) => {
 function Course() {
   const { slug } = useParams();
   const accordionRefs = useRef({});
-  const { resolvedMode } = useAppTheme();
   const { getCourseProgress } = useCourse();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -160,12 +157,8 @@ function Course() {
         </>
       )}
 
-      <Box 
-        sx={{ 
-          bgcolor: resolvedMode === 'light' ? grey[100] : grey[900], 
-        }}
-      >
-        <Toolbar />
+      <Toolbar />
+      <Box>
         <Container maxWidth="xl" sx={{ py: 2 }}>
           <Grid
             alignItems="center"

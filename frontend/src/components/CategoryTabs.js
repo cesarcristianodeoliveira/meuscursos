@@ -18,6 +18,7 @@ const CategoryTabs = ({ categories, value, onChange }) => {
         onChange={onChange}
         variant="scrollable"
         scrollButtons="auto"
+        indicatorColor='secondary'
         aria-label="Categorias de cursos"
         sx={{
           minHeight: 48,
@@ -31,12 +32,12 @@ const CategoryTabs = ({ categories, value, onChange }) => {
             color: 'text.secondary',
             transition: 'all 0.2s',
             '&.Mui-selected': {
-              color: 'primary.main',
+              color: 'secondary.main',
               fontWeight: 700,
             },
             '&:hover': {
-                color: 'primary.light',
-                opacity: 1
+              color: 'secondary.light',
+              opacity: 1
             }
           },
           [`& .${tabsClasses.scrollButtons}`]: {

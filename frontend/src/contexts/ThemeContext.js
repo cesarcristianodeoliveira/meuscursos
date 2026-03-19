@@ -5,6 +5,7 @@ import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/600.css';
 import '@fontsource/roboto/700.css';
+import { blue, grey } from '@mui/material/colors';
 
 const ThemeContext = createContext();
 
@@ -33,6 +34,12 @@ export const ThemeProviderWrapper = ({ children }) => {
   const theme = useMemo(() => {
     let baseTheme = createTheme({
       palette: {
+        primary: {
+          main: resolvedMode === 'light' ? grey[900] : grey[300]
+        },
+        secondary: {
+          main: resolvedMode === 'light' ? blue[500] : blue[300]
+        },
         mode: resolvedMode,
       },
       components: {
