@@ -90,7 +90,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
           }}
         >
           <Typography 
-            variant="h2" 
+            variant="h3" 
             sx={{ 
               lineHeight: 1,
               fontWeight: 600
@@ -99,7 +99,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
             O que você quer
           </Typography>
           <Typography 
-            variant="h2"
+            variant="h3"
             sx={{ 
               lineHeight: 1,
               fontWeight: 600,
@@ -132,7 +132,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
         </Box>
 
         {/* ÁREA DO FORMULÁRIO */}
-        <Container maxWidth='md' sx={{ px: [0] }}>
+        <Container maxWidth='sm' sx={{ px: [0] }}>
           {!isGenerating ? (
             <Zoom in={!isGenerating}>
               <Paper 
