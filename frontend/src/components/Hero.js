@@ -8,10 +8,10 @@ import {
   InputAdornment,
   Tooltip
 } from '@mui/material';
-import { Send, ContentCopy, Clear, InfoOutlined } from '@mui/icons-material';
+import { Send, ContentCopy, Clear, WarningAmber } from '@mui/icons-material';
 import { useCourse } from '../contexts/CourseContext';
 import { useAppTheme } from '../contexts/ThemeContext';
-import { blue, grey } from '@mui/material/colors';
+import { blue, grey, red } from '@mui/material/colors';
 import prompts from '../utils/prompts';
 
 function CircularProgressWithLabel({ value }) {
@@ -56,6 +56,10 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
   
   const { resolvedMode } = useAppTheme();
 
+  // Bloqueio visual se o provedor selecionado estiver sem cota
+  const currentProvider = providers.find(p => p.id === selectedProvider);
+  const isProviderDisabled = currentProvider ? !currentProvider.enabled : false;
+
   const getRandomPrompt = () => {
     const randomIndex = Math.floor(Math.random() * prompts.length);
     return prompts[randomIndex];
@@ -86,7 +90,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (topic.trim() && !isGenerating) {
+    if (topic.trim() && !isGenerating && !isProviderDisabled) {
       onGenerate();
     }
   };
@@ -133,7 +137,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
             color='text.secondary'
             sx={{ fontSize: { xs: '1.1rem', md: '1.8rem' }, fontWeight: 500 }}
           >
-            Crie cursos completos com Inteligência Artificial
+            Cursos com Inteligência Artificial
           </Typography>
         </Box>
 
@@ -146,11 +150,13 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                 component="form" 
                 onSubmit={handleSubmit}
                 sx={{ 
-                  border: '1px solid', borderColor: 'divider',
+                  border: '1px solid', 
+                  borderColor: isProviderDisabled ? red[300] : 'divider',
                   bgcolor: 'background.paper',
                   boxShadow: resolvedMode === 'light' ? '0 10px 40px rgba(0,0,0, 0.04)' : '0 10px 40px rgba(0,0,0, 0.4)',
                   overflow: 'hidden',
-                  borderRadius: 3
+                  borderRadius: 3,
+                  transition: 'border-color 0.3s ease'
                 }}
               >
                 <TextField
@@ -191,7 +197,6 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   bgcolor: resolvedMode === 'light' ? grey[50] : 'rgba(255,255,255,0.02)'
                 }}>
                   
-                  {/* SELETOR DE PROVEDOR COM DADOS REAIS */}
                   <FormControl size="small">
                     <Select
                       color='primary'
@@ -206,17 +211,17 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                       }}
                     >
                       {providers.map((p) => (
-                        <MenuItem key={p.id} value={p.id} disabled={!p.enabled}>
+                        <MenuItem key={p.id} value={p.id}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
-                            <Typography variant="body2" fontWeight={700}>
+                            <Typography variant="body2" fontWeight={700} color={p.enabled ? "text.primary" : "text.disabled"}>
                               {p.name}
                             </Typography>
                             <Typography 
                               variant="caption" 
                               sx={{ 
-                                color: p.enabled ? "text.secondary" : "error.main",
+                                color: p.enabled ? blue[600] : red[400],
                                 fontSize: '0.65rem',
-                                fontWeight: 600,
+                                fontWeight: 800,
                                 textTransform: 'uppercase'
                               }}
                             >
@@ -229,15 +234,16 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   </FormControl>
 
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Tooltip title="A IA gera módulos, exercícios e prova final baseada no tema.">
-                      <IconButton size="small" sx={{ color: 'text.disabled' }}>
-                        <InfoOutlined fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                    {isProviderDisabled && (
+                       <Tooltip title="Este provedor atingiu o limite da hora. Troque de provedor ou aguarde.">
+                        <WarningAmber sx={{ color: red[400], mr: 1 }} fontSize="small" />
+                       </Tooltip>
+                    )}
+                    
                     <IconButton 
                       color='primary'
                       type="submit" 
-                      disabled={!topic.trim() || isGenerating}
+                      disabled={!topic.trim() || isGenerating || isProviderDisabled}
                       sx={{ 
                         bgcolor: 'primary.main', 
                         color: 'white', 
@@ -275,15 +281,14 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                 
                 <Typography variant="body1" color="text.secondary" sx={{ mt: 1.5, maxWidth: 450, lineHeight: 1.6 }}>
                   {progress < 100 
-                    ? "Isso pode levar até 2 minutos. Estamos processando uma grande quantidade de dados técnicos para garantir a qualidade do curso." 
-                    : "Quase lá! Estamos finalizando os últimos detalhes e salvando no banco de dados."}
+                    ? "Isso pode levar até 2 minutos. Estamos gerando conteúdo técnico exaustivo." 
+                    : "Quase lá! Estamos salvando seu novo curso no banco de dados."}
                 </Typography>
 
-                {/* Dica dinâmica durante a geração */}
-                <Paper sx={{ mt: 4, p: 2, borderRadius: 2, bgcolor: 'background.paper', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Paper elevation={0} sx={{ mt: 4, p: 2, borderRadius: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', animation: 'pulse 1.5s infinite' }} />
                   <Typography variant="caption" fontWeight={600} color="text.secondary">
-                    {progress < 50 ? "DICA: Você pode baixar o certificado após concluir a prova final." : "DICA: O conteúdo gerado é otimizado para leitura técnica."}
+                    {progress < 50 ? "SABIA? Nossos cursos usam Llama 3.3 para máxima precisão técnica." : "DICA: O certificado é gerado automaticamente ao final."}
                   </Typography>
                 </Paper>
               </Box>

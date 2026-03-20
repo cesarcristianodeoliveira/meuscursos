@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { generateCourse } = require('./controllers/courseController');
-const client = require('./config/sanity'); // Importando o client do Sanity
+const client = require('./config/sanity');
 require('dotenv').config();
 
 const app = express();
@@ -12,27 +12,40 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// --- NOVA ROTA DE MONITORAMENTO REAL ---
+// --- ROTA DE MONITORAMENTO DE COTAS (TOKEN-BASED) ---
 app.get('/provider-status', async (req, res) => {
   try {
-    // Definimos o limite com base no plano Free da Groq (aprox. 30 requisições por hora para o Llama 3.3)
-    const MAX_PER_HOUR = 30; 
-    
-    // Contamos quantos cursos foram criados na ÚLTIMA HORA no seu Sanity
+    // 1. Definição de limites (Plano Free Groq Llama 3.3 70B costuma ter ~100k TPM)
+    // Vamos definir um teto de segurança por hora para não estourar o limite diário
+    const HOURLY_TOKEN_LIMIT = 100000; 
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const query = `count(*[_type == "course" && _createdAt > $oneHourAgo])`;
+
+    // 2. Query GROQ: Soma os tokens reais e conta os cursos na última hora
+    const stats = await client.fetch(`{
+      "count": count(*[_type == "course" && _createdAt > $oneHourAgo]),
+      "usedTokens": sum(*[_type == "course" && _createdAt > $oneHourAgo].stats.totalTokens)
+    }`, { oneHourAgo });
+
+    const usedTokens = stats.usedTokens || 0;
+    const remainingTokens = Math.max(0, HOURLY_TOKEN_LIMIT - usedTokens);
     
-    const count = await client.fetch(query, { oneHourAgo });
-    const available = Math.max(0, MAX_PER_HOUR - count);
+    // 3. Estimativa de cursos restantes: 
+    // Como seus cursos são densos, usamos uma média segura de 6000 tokens por curso
+    const availableByTokens = Math.floor(remainingTokens / 6000);
 
     res.json({
       groq: {
-        available,
-        limit: MAX_PER_HOUR,
-        enabled: available > 0,
-        // Mensagem dinâmica para o seu Select no Hero
-        message: available > 0 ? `${available} cursos disponíveis (esta hora)` : "Limite da hora atingido"
-      }
+        available: availableByTokens,
+        usedInHour: usedTokens,
+        limit: HOURLY_TOKEN_LIMIT,
+        enabled: availableByTokens > 0,
+        // Mensagem dinâmica que reflete a realidade do consumo
+        message: availableByTokens > 0 
+          ? `${availableByTokens} cursos disponíveis (cota real)` 
+          : "Cota de tokens esgotada (1h)"
+      },
+      openai: { enabled: false, message: "Esgotado" },
+      google: { enabled: false, message: "Em Breve" }
     });
   } catch (error) {
     console.error("Erro ao checar status:", error);
@@ -40,11 +53,12 @@ app.get('/provider-status', async (req, res) => {
   }
 });
 
-// Rotas existentes
+// Rotas
 app.post('/generate-course', generateCourse);
 
 // Servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Motor de Cursos Master rodando na porta ${PORT}`);
+  console.log(`🚀 Motor de Cursos Master v1.2 rodando na porta ${PORT}`);
+  console.log(`📊 Monitoramento de tokens ativado`);
 });

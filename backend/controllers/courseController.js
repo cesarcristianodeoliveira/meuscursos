@@ -33,7 +33,6 @@ const generateCourse = async (req, res) => {
     const currentAiLimits = courseData.limits || {};
     
     sendProgress(40, "Conteúdo estruturado. Calculando métricas pedagógicas...", {
-      // Já enviamos para o front o saldo atualizado de tokens/cursos
       quotaInfo: currentAiLimits 
     });
 
@@ -79,8 +78,15 @@ const generateCourse = async (req, res) => {
       rating: finalRating,
       aiProvider: courseData.aiProvider,
       aiModel: courseData.aiModel,
-      // Salva o custo real de tokens deste curso para auditoria
-      tokenUsage: courseData.usage, 
+      
+      // SALVANDO ESTATÍSTICAS DE TOKENS (Crucial para o novo index.js)
+      stats: {
+        promptTokens: courseData.usage?.prompt_tokens || 0,
+        completionTokens: courseData.usage?.completion_tokens || 0,
+        totalTokens: courseData.usage?.total_tokens || 0,
+        generatedAt: new Date().toISOString()
+      },
+
       category: {
         name: courseData.categoryName || "Geral",
         slug: { _type: 'slug', current: formatSlug(courseData.categoryName || "geral") }
@@ -115,7 +121,6 @@ const generateCourse = async (req, res) => {
       message: 'Curso pronto!', 
       courseId: result._id,
       slug: doc.slug.current,
-      // Enviamos o saldo final para o Frontend atualizar o seletor imediatamente
       quotaUpdate: currentAiLimits 
     });
 
@@ -129,7 +134,6 @@ const generateCourse = async (req, res) => {
       const quotaPayload = JSON.stringify({ 
         error: "QUOTA_EXCEEDED", 
         provider: error.provider || provider,
-        // Informa quanto tempo falta para resetar (vinda do aiService/Groq)
         resetTime: error.resetTime, 
         message: `Limite atingido. Tente novamente em ${error.resetTime || 'alguns minutos'}.`
       });

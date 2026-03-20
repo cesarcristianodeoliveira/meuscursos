@@ -56,14 +56,26 @@ export default {
       name: 'aiProvider',
       title: 'Provedor da IA',
       type: 'string',
-      description: 'Ex: OpenAI, Anthropic, Google'
     },
     {
       name: 'aiModel',
       title: 'Modelo da IA',
       type: 'string',
-      description: 'Ex: GPT-4, Claude 3, Gemini 1.5'
     },
+
+    // --- NOVO CAMPO: ESTATÍSTICAS DE CONSUMO ---
+    {
+      name: 'stats',
+      title: 'Métricas de Geração',
+      type: 'object',
+      fields: [
+        { name: 'totalTokens', title: 'Total de Tokens', type: 'number' },
+        { name: 'promptTokens', title: 'Tokens de Entrada', type: 'number' },
+        { name: 'completionTokens', title: 'Tokens de Saída', type: 'number' },
+        { name: 'generatedAt', title: 'Data de Geração', type: 'datetime' },
+      ]
+    },
+
     {
       name: 'modules',
       title: 'Módulos/Aulas',
