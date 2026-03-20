@@ -5,12 +5,13 @@ import {
   Toolbar, MenuItem, Select, FormControl,
   Container,
   IconButton,
-  InputAdornment
+  InputAdornment,
+  Tooltip
 } from '@mui/material';
-import { Send, ContentCopy, Clear } from '@mui/icons-material';
+import { Send, ContentCopy, Clear, InfoOutlined } from '@mui/icons-material';
 import { useCourse } from '../contexts/CourseContext';
 import { useAppTheme } from '../contexts/ThemeContext';
-import { blue } from '@mui/material/colors';
+import { blue, grey } from '@mui/material/colors';
 import prompts from '../utils/prompts';
 
 function CircularProgressWithLabel({ value }) {
@@ -21,7 +22,10 @@ function CircularProgressWithLabel({ value }) {
         value={value} 
         thickness={4.5} 
         size={80}
-        sx={{ color: 'primary.main' }}
+        sx={{ 
+          color: 'primary.main',
+          filter: 'drop-shadow(0 0 8px rgba(25, 118, 210, 0.3))'
+        }}
       />
       <Box
         sx={{
@@ -103,7 +107,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
       >
         {/* TITULOS */}
         <Box sx={{ textAlign: 'center', mb: 1.5 }}>
-          <Typography variant="h3" sx={{ fontWeight: 600, display: 'inline-block', mr: 1 }}>
+          <Typography variant="h3" sx={{ fontWeight: 600, display: 'inline-block', mr: 1, fontSize: { xs: '2rem', md: '3rem' } }}>
             O que você quer
           </Typography>
           <Typography 
@@ -114,7 +118,8 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
               backgroundClip: 'text',
               WebkitBackgroundClip: 'text',
               color: 'transparent',
-              display: 'inline-block'
+              display: 'inline-block',
+              fontSize: { xs: '2rem', md: '3rem' }
             }}
           >
             aprender?
@@ -126,9 +131,9 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
             align='center' 
             variant='h4' 
             color='text.secondary'
-            sx={{ fontSize: { xs: '1.25rem', md: '2.0243rem' }, fontWeight: 500 }}
+            sx={{ fontSize: { xs: '1.1rem', md: '1.8rem' }, fontWeight: 500 }}
           >
-            Cursos com Inteligência Artificial
+            Crie cursos completos com Inteligência Artificial
           </Typography>
         </Box>
 
@@ -145,7 +150,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   bgcolor: 'background.paper',
                   boxShadow: resolvedMode === 'light' ? '0 10px 40px rgba(0,0,0, 0.04)' : '0 10px 40px rgba(0,0,0, 0.4)',
                   overflow: 'hidden',
-                  borderRadius: 2
+                  borderRadius: 3
                 }}
               >
                 <TextField
@@ -158,7 +163,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   sx={{ '.MuiInputBase-input': { p: 0, height: 'auto' } }}
                   InputProps={{
                     disableUnderline: true,
-                    sx: { p: 2, fontSize: '1.2rem', fontWeight: 500, pr: 7 },
+                    sx: { p: 2.5, fontSize: '1.1rem', fontWeight: 500, pr: 7 },
                     endAdornment: (
                       <InputAdornment position="end" sx={{ position: 'absolute', right: 16 }}>
                         {topic ? (
@@ -166,9 +171,11 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                             <Clear fontSize="small" />
                           </IconButton>
                         ) : (
-                          <IconButton size="small" onClick={handleUsePrompt} color="primary" title="Usar sugestão">
-                            <ContentCopy fontSize="small" />
-                          </IconButton>
+                          <Tooltip title="Usar sugestão">
+                            <IconButton size="small" onClick={handleUsePrompt} color="primary">
+                              <ContentCopy fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                         )}
                       </InputAdornment>
                     )
@@ -180,25 +187,39 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   alignItems: 'center', 
                   justifyContent: 'space-between',
                   borderTop: '1px solid', borderColor: 'divider',
-                  p: 1.5, px: 2
+                  p: 1.5, px: 2,
+                  bgcolor: resolvedMode === 'light' ? grey[50] : 'rgba(255,255,255,0.02)'
                 }}>
                   
-                  {/* SELETOR DE PROVEDOR COM FEEDBACK DE COTA */}
+                  {/* SELETOR DE PROVEDOR COM DADOS REAIS */}
                   <FormControl size="small">
                     <Select
-                      color='secondary'
+                      color='primary'
                       value={selectedProvider}
                       onChange={(e) => setSelectedProvider(e.target.value)}
                       variant="outlined"
-                      sx={{ minWidth: 140, borderRadius: 1.5 }}
+                      sx={{ 
+                        minWidth: 160, 
+                        borderRadius: 2,
+                        bgcolor: 'background.paper',
+                        '& .MuiSelect-select': { py: 0.5 }
+                      }}
                     >
                       {providers.map((p) => (
                         <MenuItem key={p.id} value={p.id} disabled={!p.enabled}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                            <Typography variant="body2" fontWeight={600}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+                            <Typography variant="body2" fontWeight={700}>
                               {p.name}
                             </Typography>
-                            <Typography variant="caption" color={p.enabled ? "text.secondary" : "error"}>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                color: p.enabled ? "text.secondary" : "error.main",
+                                fontSize: '0.65rem',
+                                fontWeight: 600,
+                                textTransform: 'uppercase'
+                              }}
+                            >
                               {p.quotaLabel}
                             </Typography>
                           </Box>
@@ -207,14 +228,29 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                     </Select>
                   </FormControl>
 
-                  <IconButton 
-                    color='primary'
-                    type="submit" 
-                    disabled={!topic.trim()}
-                    sx={{ bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}
-                  >
-                    <Send />
-                  </IconButton>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Tooltip title="A IA gera módulos, exercícios e prova final baseada no tema.">
+                      <IconButton size="small" sx={{ color: 'text.disabled' }}>
+                        <InfoOutlined fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <IconButton 
+                      color='primary'
+                      type="submit" 
+                      disabled={!topic.trim() || isGenerating}
+                      sx={{ 
+                        bgcolor: 'primary.main', 
+                        color: 'white', 
+                        width: 45, 
+                        height: 45,
+                        '&:hover': { bgcolor: 'primary.dark', transform: 'scale(1.05)' }, 
+                        '&.Mui-disabled': { bgcolor: 'action.disabledBackground' },
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <Send fontSize="small" />
+                    </IconButton>
+                  </Box>
                 </Box>
               </Paper>
             </Zoom>
@@ -225,25 +261,46 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                 flexDirection: 'column', 
                 alignItems: 'center', 
                 p: { xs: 4, md: 6 }, 
-                borderRadius: 4, 
-                bgcolor: resolvedMode === 'light' ? 'rgba(25, 118, 210, 0.02)' : 'rgba(25, 118, 210, 0.05)',
-                border: '1px dashed',
-                borderColor: 'primary.light'
+                borderRadius: 5, 
+                bgcolor: resolvedMode === 'light' ? 'rgba(25, 118, 210, 0.02)' : 'rgba(255, 255, 255, 0.03)',
+                border: '2px dashed',
+                borderColor: 'primary.light',
+                textAlign: 'center'
               }}>
                 <CircularProgressWithLabel value={progress} />
-                <Typography variant="h5" sx={{ mt: 3, fontWeight: 700, color: 'text.primary', textAlign: 'center' }}>
+                
+                <Typography variant="h5" sx={{ mt: 3, fontWeight: 800, color: 'text.primary' }}>
                   {statusMessage}
                 </Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mt: 1, textAlign: 'center', maxWidth: 500 }}>
+                
+                <Typography variant="body1" color="text.secondary" sx={{ mt: 1.5, maxWidth: 450, lineHeight: 1.6 }}>
                   {progress < 100 
-                    ? "Nossa IA está estruturando módulos, criando exercícios e gerando material técnico de alta qualidade." 
-                    : "Finalizando a indexação e salvando seu novo curso..."}
+                    ? "Isso pode levar até 2 minutos. Estamos processando uma grande quantidade de dados técnicos para garantir a qualidade do curso." 
+                    : "Quase lá! Estamos finalizando os últimos detalhes e salvando no banco de dados."}
                 </Typography>
+
+                {/* Dica dinâmica durante a geração */}
+                <Paper sx={{ mt: 4, p: 2, borderRadius: 2, bgcolor: 'background.paper', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', animation: 'pulse 1.5s infinite' }} />
+                  <Typography variant="caption" fontWeight={600} color="text.secondary">
+                    {progress < 50 ? "DICA: Você pode baixar o certificado após concluir a prova final." : "DICA: O conteúdo gerado é otimizado para leitura técnica."}
+                  </Typography>
+                </Paper>
               </Box>
             </Fade>
           )}
         </Container>
       </Box>
+
+      <style>
+        {`
+          @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.7; }
+            70% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.7; }
+          }
+        `}
+      </style>
     </>
   );
 };

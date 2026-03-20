@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useCallback } from 'react';
+import React, { createContext, useState, useContext, useCallback, useEffect } from 'react';
 import { client } from '../client';
 
 const CourseContext = createContext();
@@ -8,7 +8,6 @@ export const CourseProvider = ({ children }) => {
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
 
-  // --- GESTÃO DINÂMICA DE PROVIDERS ---
   const [selectedProvider, setSelectedProvider] = useState('groq');
   const [providers, setProviders] = useState([
     { 
@@ -16,7 +15,7 @@ export const CourseProvider = ({ children }) => {
       name: 'Groq', 
       model: 'Llama 3.3 70B', 
       enabled: true, 
-      quotaLabel: 'Livre (Beta)',
+      quotaLabel: 'Consultando...',
       cost: 3 
     },
     { 
@@ -43,7 +42,48 @@ export const CourseProvider = ({ children }) => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
-  // Função interna para desabilitar um provedor caso a cota estoure
+  // --- SINCRONIZAÇÃO DE COTAS COM O BACKEND ---
+  const checkQuotas = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/provider-status`);
+      const data = await response.json();
+
+      setProviders(prev => prev.map(p => {
+        if (data[p.id]) {
+          return { 
+            ...p, 
+            enabled: data[p.id].enabled,
+            quotaLabel: data[p.id].message 
+          };
+        }
+        return p;
+      }));
+    } catch (err) {
+      console.error("Erro ao sincronizar cotas:", err);
+    }
+  }, [API_BASE_URL]);
+
+  // Busca inicial de cotas e dados
+  useEffect(() => {
+    checkQuotas();
+  }, [checkQuotas]);
+
+  const updateProviderQuota = useCallback((providerId, quotaInfo) => {
+    if (!quotaInfo) return;
+    
+    setProviders(prev => prev.map(p => {
+      if (p.id === providerId) {
+        const available = quotaInfo.estimatedCoursesLeft;
+        return { 
+          ...p, 
+          enabled: available > 0,
+          quotaLabel: available > 0 ? `${available} cursos disponíveis` : "Limite atingido"
+        };
+      }
+      return p;
+    }));
+  }, []);
+
   const disableProvider = useCallback((providerId, message) => {
     setProviders(prev => prev.map(p => 
       p.id === providerId 
@@ -125,11 +165,15 @@ export const CourseProvider = ({ children }) => {
               const jsonStr = trimmedLine.replace('data: ', '');
               const data = JSON.parse(jsonStr);
 
-              // CHECK DE COTA: Se o backend enviou QUOTA_EXCEEDED
+              // 1. Captura de erro de cota
               if (data.error === "QUOTA_EXCEEDED") {
                 disableProvider(data.provider || selectedProvider, data.message);
-                // Interrompemos o loop de leitura
                 return; 
+              }
+
+              // 2. Atualização dinâmica de cota (enviada pelo Controller em 40% e 100%)
+              if (data.quotaInfo || data.quotaUpdate) {
+                updateProviderQuota(selectedProvider, data.quotaInfo || data.quotaUpdate);
               }
 
               if (data.progress !== undefined) setProgress(data.progress);
@@ -137,7 +181,7 @@ export const CourseProvider = ({ children }) => {
               if (data.error) throw new Error(data.error);
             } catch (e) {
               if (e.message === "QUOTA_EXCEEDED") throw e;
-              console.warn("Processando fragmentos...");
+              console.warn("Fragmento processado.");
             }
           }
         }
@@ -151,12 +195,10 @@ export const CourseProvider = ({ children }) => {
 
     } catch (error) {
       console.error("Erro na geração:", error);
-      // Se não for o erro de cota (já tratado), mostra erro genérico
-      if (statusMessage !== 'Limite Atingido') {
+      if (!statusMessage.includes('Limite')) {
         setStatusMessage(error.message || 'Erro ao gerar curso.');
       }
     } finally {
-      // Se for erro de cota, deixamos a mensagem na tela por mais tempo
       const delay = statusMessage.includes('Limite') ? 6000 : 3500;
       setTimeout(() => {
         setIsGenerating(false);
@@ -179,7 +221,8 @@ export const CourseProvider = ({ children }) => {
       initialDataLoaded,
       selectedProvider,
       setSelectedProvider,
-      providers // Agora é um estado reativo
+      providers,
+      checkQuotas // Exposto caso queira forçar um refresh manual
     }}>
       {children}
     </CourseContext.Provider>

@@ -42,47 +42,60 @@ const generateCourseContent = async (topic, provider = 'groq') => {
   const selected = config[provider] || config.groq;
 
   try {
-    let completion;
+    if (!process.env.GROQ_API_KEY) throw new Error("API_KEY_MISSING");
 
-    if (provider === 'groq' || !provider) {
-      // Verificação de segurança da chave
-      if (!process.env.GROQ_API_KEY) throw new Error("API_KEY_MISSING");
+    // Realizamos a chamada e pedimos a resposta bruta para ler os Headers
+    const completion = await groq.chat.completions.create({
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `Gere um curso técnico exaustivo sobre: "${topic}".` }
+      ],
+      model: selected.model,
+      temperature: 0.5, 
+      max_tokens: 8000, 
+      response_format: { type: "json_object" }
+    });
 
-      completion = await groq.chat.completions.create({
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Gere um curso técnico exaustivo sobre: "${topic}".` }
-        ],
-        model: selected.model,
-        temperature: 0.5, 
-        max_tokens: 8000, 
-        response_format: { type: "json_object" }
-      });
-    }
+    // --- EXTRAÇÃO DE METADADOS DE COTA (HEADERS REAIS) ---
+    // O SDK da Groq expõe os headers da última resposta através do objeto global ou da instância
+    const headers = completion.response?.headers; 
+    
+    const rateLimits = {
+      remainingRequests: headers?.get('x-ratelimit-remaining-requests') || 'N/A',
+      remainingTokens: headers?.get('x-ratelimit-remaining-tokens') || 'N/A',
+      resetRequests: headers?.get('x-ratelimit-reset-requests') || '0s',
+    };
 
     const content = JSON.parse(completion.choices[0].message.content);
     
+    // Calculamos quantos cursos "cabem" nos tokens restantes (estimativa)
+    // Um curso denso gasta em média 5.000 a 7.000 tokens
+    const tokensRestantes = parseInt(rateLimits.remainingTokens);
+    const cursosEstimados = isNaN(tokensRestantes) ? null : Math.floor(tokensRestantes / 7000);
+
     return {
       ...content,
       aiProvider: selected.name,
-      aiModel: selected.model
+      aiModel: selected.model,
+      usage: completion.usage, // Info de quantos tokens gastou NESTA chamada
+      limits: {
+        ...rateLimits,
+        estimatedCoursesLeft: cursosEstimados
+      }
     };
 
   } catch (error) {
-    // --- TRATAMENTO DE COTAS E ERROS ESPECÍFICOS ---
-    
-    // Erro 429: Too Many Requests (Limite de cota atingido)
+    // Erro 429: Too Many Requests (Limite real da Groq atingido)
     if (error.status === 429 || (error.message && error.message.includes('rate_limit'))) {
       const quotaError = new Error("QUOTA_EXCEEDED");
       quotaError.status = 429;
       quotaError.provider = provider;
+      // Tenta pegar o tempo de reset do erro para avisar o usuário
+      quotaError.resetTime = error.headers?.['x-ratelimit-reset-requests'] || "1m";
       throw quotaError;
     }
 
-    // Erro de Autenticação
-    if (error.status === 401) {
-      throw new Error("AUTH_ERROR");
-    }
+    if (error.status === 401) throw new Error("AUTH_ERROR");
 
     console.error(`Erro crítico no AI Service (${provider}):`, error.message);
     throw error;

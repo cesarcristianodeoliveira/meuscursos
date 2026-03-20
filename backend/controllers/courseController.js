@@ -4,13 +4,13 @@ const { fetchAndUploadImage } = require('../services/imageService');
 const { generateCourseContent } = require('../services/aiService');
 
 const generateCourse = async (req, res) => {
-  // Aumenta o timeout para 10 minutos para processos longos de IA
+  // Timeout de 10 min para processos pesados de IA
   req.setTimeout(600000); 
 
   const { topic, provider } = req.body;
   if (!topic) return res.status(400).json({ error: 'O tema é obrigatório' });
 
-  // --- CONFIGURAÇÃO PARA PROGRESSO REAL (SSE) ---
+  // --- CONFIGURAÇÃO SSE ---
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -21,20 +21,26 @@ const generateCourse = async (req, res) => {
     const padding = " ".repeat(1024);
     res.write(`:${padding}\n`); 
     res.write(`data: ${payload}\n\n`);
-    console.log(`🚀 [${progress}%] ${message}`);
   };
 
   try {
     sendProgress(5, `Iniciando motor de IA via ${provider || 'Groq'}...`);
 
-    // --- Passo 1: IA Gerando Conteúdo ---
+    // --- Passo 1: IA Gerando Conteúdo + Captura de Limites Reais ---
     const courseData = await generateCourseContent(topic, provider);
-    sendProgress(40, "Conteúdo estruturado. Calculando métricas pedagógicas...");
+    
+    // Extraímos os limites reais vindos dos headers da Groq através do aiService
+    const currentAiLimits = courseData.limits || {};
+    
+    sendProgress(40, "Conteúdo estruturado. Calculando métricas pedagógicas...", {
+      // Já enviamos para o front o saldo atualizado de tokens/cursos
+      quotaInfo: currentAiLimits 
+    });
 
     const rawModules = courseData.modules || [];
     if (rawModules.length === 0) throw new Error('A IA falhou ao gerar os módulos.');
 
-    // --- Passo 2: Lógica de Cálculos de Tempo (V1.0) ---
+    // --- Passo 2: Cálculos de Tempo e Rating ---
     const allText = (courseData.description || "") + 
                     rawModules.reduce((acc, mod) => acc + (mod.content || ""), "");
     
@@ -73,6 +79,8 @@ const generateCourse = async (req, res) => {
       rating: finalRating,
       aiProvider: courseData.aiProvider,
       aiModel: courseData.aiModel,
+      // Salva o custo real de tokens deste curso para auditoria
+      tokenUsage: courseData.usage, 
       category: {
         name: courseData.categoryName || "Geral",
         slug: { _type: 'slug', current: formatSlug(courseData.categoryName || "geral") }
@@ -106,7 +114,9 @@ const generateCourse = async (req, res) => {
       progress: 100,
       message: 'Curso pronto!', 
       courseId: result._id,
-      slug: doc.slug.current
+      slug: doc.slug.current,
+      // Enviamos o saldo final para o Frontend atualizar o seletor imediatamente
+      quotaUpdate: currentAiLimits 
     });
 
     res.write(`data: ${finalResult}\n\n`);
@@ -115,16 +125,16 @@ const generateCourse = async (req, res) => {
   } catch (error) {
     console.error("❌ Erro no Controller:", error);
 
-    // Trata erro de cota enviando um sinal claro para o Frontend
     if (error.message === "QUOTA_EXCEEDED") {
       const quotaPayload = JSON.stringify({ 
         error: "QUOTA_EXCEEDED", 
         provider: error.provider || provider,
-        message: "Limite de criação atingido para este provedor. Tente novamente em alguns minutos ou troque a IA."
+        // Informa quanto tempo falta para resetar (vinda do aiService/Groq)
+        resetTime: error.resetTime, 
+        message: `Limite atingido. Tente novamente em ${error.resetTime || 'alguns minutos'}.`
       });
       res.write(`data: ${quotaPayload}\n\n`);
     } else {
-      // Erro Genérico
       res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
     }
     
