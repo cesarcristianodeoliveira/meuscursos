@@ -1,11 +1,12 @@
 import React from 'react';
 import { 
-  Box, TextField, Button, Typography, Paper, 
+  Box, TextField, Typography, Paper, 
   CircularProgress, Zoom, Fade, 
   Toolbar, MenuItem, Select, FormControl,
   Container,
+  IconButton,
 } from '@mui/material';
-import { AutoAwesome, Bolt, Psychology, Google } from '@mui/icons-material';
+import { Send } from '@mui/icons-material';
 import { useCourse } from '../contexts/CourseContext';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { blue } from '@mui/material/colors';
@@ -55,14 +56,6 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
     }
   };
 
-  // Helper para ícones dos provedores
-  const getProviderIcon = (id) => {
-    if (id === 'groq') return <Bolt fontSize="small" sx={{ color: '#f59e0b' }} />;
-    if (id === 'openai') return <Psychology fontSize="small" color="primary" />;
-    if (id === 'google') return <Google fontSize="small" sx={{ color: '#4285F4' }} />;
-    return <AutoAwesome fontSize="small" />;
-  };
-
   return (
     <>
       <Toolbar />
@@ -82,7 +75,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
           sx={{
             alignItems: 'center',
             display: 'flex',
-            gap: { xs: .75, md: 2 },
+            gap: { xs: .75, md: 1.75 },
             flexDirection: { xs: 'column', md: 'row' },
             justifyContent: 'center',
             width: '100%',
@@ -140,10 +133,9 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                 component="form" 
                 onSubmit={handleSubmit}
                 sx={{ 
-                  p: 1, borderRadius: 2,
                   border: '1px solid', borderColor: 'divider',
                   bgcolor: 'background.paper',
-                  boxShadow: resolvedMode === 'light' ? '0 10px 40px rgba(0,0,0,0.04)' : '0 10px 40px rgba(0,0,0,0.4)',
+                  boxShadow: resolvedMode === 'light' ? '0 10px 40px rgba(0,0,0, 0.04)' : '0 10px 40px rgba(0,0,0, 0.4)',
                   overflow: 'hidden'
                 }}
               >
@@ -155,6 +147,12 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   autoComplete="off"
+                  sx={{
+                    '.MuiInputBase-input': {
+                      p: [0],
+                      height: 'auto'
+                    }
+                  }}
                   InputProps={{
                     disableUnderline: true,
                     // startAdornment: (
@@ -162,7 +160,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                     //     <School color="primary" />
                     //   </InputAdornment>
                     // ),
-                    // sx: { py: 2, px: 1, fontSize: '1.2rem', fontWeight: 500 }
+                    sx: { p: 2, fontSize: '1.2rem', fontWeight: 500, lineHeight: 1 }
                   }}
                 />
 
@@ -171,62 +169,34 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'space-between',
-                  mt: 1, p: 1, 
                   borderTop: '1px solid', borderColor: 'divider',
-                  flexWrap: 'wrap', gap: 2
+                  flexWrap: 'wrap', p: 2
                 }}>
                   
                   {/* SELETOR DE INTELIGÊNCIA */}
-                  <FormControl size="small" sx={{ minWidth: 220 }}>
+                  <FormControl size="small">
                     <Select
+                      color='secondary'
                       value={selectedProvider}
                       onChange={(e) => setSelectedProvider(e.target.value)}
-                      variant="outlined"
-                      sx={{ 
-                        borderRadius: 3, 
-                        height: 45, 
-                        bgcolor: resolvedMode === 'light' ? '#f3f4f6' : '#2d2d2d',
-                        '& .MuiOutlinedInput-notchedOutline': { border: 'none' }
-                      }}
                     >
                       {providers.map((p) => (
                         <MenuItem key={p.id} value={p.id} disabled={!p.enabled}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            {getProviderIcon(p.id)}
-                            <Box>
-                              <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1 }}>
-                                {p.name}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {p.quotaLabel}
-                              </Typography>
-                            </Box>
-                          </Box>
+                          {p.name}
                         </MenuItem>
                       ))}
                     </Select>
                   </FormControl>
 
                   {/* BOTÃO GERAR COM CRÉDITOS */}
-                  <Button 
+                  <IconButton 
+                    color='secondary'
                     variant="contained" 
                     type="submit" 
                     disabled={!topic.trim()}
-                    startIcon={<AutoAwesome />}
-                    endIcon={<Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', opacity: 0.8, bgcolor: 'rgba(0,0,0,0.2)', px: 1, borderRadius: 1, ml: 1 }}>
-                      3 <Bolt sx={{ fontSize: 14, ml: 0.5 }} />
-                    </Typography>}
-                    sx={{ 
-                      borderRadius: 3, 
-                      px: 3, 
-                      height: 48, 
-                      fontWeight: 700, 
-                      textTransform: 'none',
-                      boxShadow: '0 4px 14px 0 rgba(25, 118, 210, 0.39)',
-                    }}
                   >
-                    Gerar Conteúdo
-                  </Button>
+                    <Send />
+                  </IconButton>
                 </Box>
               </Paper>
             </Zoom>

@@ -13,7 +13,7 @@ export const CourseProvider = ({ children }) => {
   const [providers] = useState([
     { 
       id: 'groq', 
-      name: 'Groq Cloud', 
+      name: 'Groq', 
       model: 'Llama 3.3 70B', 
       enabled: true, 
       quotaLabel: 'Livre (Beta)',
@@ -21,7 +21,7 @@ export const CourseProvider = ({ children }) => {
     },
     { 
       id: 'openai', 
-      name: 'OpenAI', 
+      name: 'ChatGPT', 
       model: 'GPT-4o', 
       enabled: false, 
       quotaLabel: 'Esgotado',
@@ -29,7 +29,7 @@ export const CourseProvider = ({ children }) => {
     },
     { 
       id: 'google', 
-      name: 'Google Gemini', 
+      name: 'Gemini', 
       model: '1.5 Pro', 
       enabled: false, 
       quotaLabel: 'Em Breve',
