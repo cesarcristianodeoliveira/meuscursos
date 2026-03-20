@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Box, TextField, Typography, Paper, 
   CircularProgress, Zoom, Fade, 
   Toolbar, MenuItem, Select, FormControl,
   Container,
   IconButton,
+  InputAdornment
 } from '@mui/material';
-import { Send } from '@mui/icons-material';
+import { Send, ContentCopy, Clear } from '@mui/icons-material';
 import { useCourse } from '../contexts/CourseContext';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { blue } from '@mui/material/colors';
+import prompts from '../utils/prompts';
 
 function CircularProgressWithLabel({ value }) {
   return (
@@ -37,6 +39,9 @@ function CircularProgressWithLabel({ value }) {
 }
 
 const Hero = ({ topic, setTopic, onGenerate }) => {
+  // Estado para o placeholder aleatório
+  const [randomPlaceholder, setRandomPlaceholder] = useState('');
+
   // Puxamos os novos estados do contexto atualizado
   const { 
     isGenerating, 
@@ -48,6 +53,46 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
   } = useCourse();
   
   const { resolvedMode } = useAppTheme();
+
+  // Função para pegar um prompt aleatório
+  const getRandomPrompt = () => {
+    const randomIndex = Math.floor(Math.random() * prompts.length);
+    return prompts[randomIndex];
+  };
+
+  // Função para atualizar o placeholder - memoizada com useCallback
+  const updatePlaceholder = useCallback(() => {
+    const newPlaceholder = getRandomPrompt();
+    setRandomPlaceholder(newPlaceholder);
+  }, []); // getRandomPrompt não precisa ser dependência pois é estável
+
+  // Função para usar o prompt atual
+  const handleUsePrompt = () => {
+    setTopic(randomPlaceholder);
+  };
+
+  // Função para limpar o campo
+  const handleClear = () => {
+    setTopic('');
+  };
+
+  // Atualiza o placeholder a cada 5 segundos
+  useEffect(() => {
+    // Só muda placeholder se não estiver gerando e se o campo estiver vazio
+    if (!isGenerating && !topic) {
+      // Define um placeholder inicial
+      updatePlaceholder();
+
+      // Intervalo para mudar o placeholder
+      const interval = setInterval(() => {
+        if (!topic) { // Só muda se o campo estiver vazio
+          updatePlaceholder();
+        }
+      }, 5000);
+
+      return () => clearInterval(interval);
+    }
+  }, [isGenerating, topic, updatePlaceholder]); // Adicionado updatePlaceholder nas dependências
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -143,7 +188,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                 <TextField
                   fullWidth
                   variant="standard"
-                  placeholder="Ex: Arquitetura de Microserviços com Node.js e Docker..."
+                  placeholder={randomPlaceholder}
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   autoComplete="off"
@@ -155,12 +200,36 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   }}
                   InputProps={{
                     disableUnderline: true,
-                    // startAdornment: (
-                    //   <InputAdornment position="start" sx={{ pl: 2 }}>
-                    //     <School color="primary" />
-                    //   </InputAdornment>
-                    // ),
-                    sx: { p: 2, fontSize: '1.2rem', fontWeight: 500, lineHeight: 1 }
+                    sx: { p: 2, fontSize: '1.2rem', fontWeight: 500, lineHeight: 1, pr: 7 },
+                    endAdornment: (
+                      <InputAdornment position="end" sx={{ position: 'absolute', right: 16 }}>
+                        {topic ? (
+                          // Se tem texto no campo, mostra botão de limpar
+                          <IconButton
+                            size="small"
+                            onClick={handleClear}
+                            sx={{ 
+                              color: 'text.secondary',
+                              '&:hover': { color: 'error.main' }
+                            }}
+                          >
+                            <Clear fontSize="small" />
+                          </IconButton>
+                        ) : (
+                          // Se o campo está vazio, mostra botão de usar prompt
+                          <IconButton
+                            size="small"
+                            onClick={handleUsePrompt}
+                            sx={{ 
+                              color: 'primary.main',
+                            }}
+                            title="Usar este prompt"
+                          >
+                            <ContentCopy fontSize="small" />
+                          </IconButton>
+                        )}
+                      </InputAdornment>
+                    )
                   }}
                 />
 
@@ -188,7 +257,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                     </Select>
                   </FormControl>
 
-                  {/* BOTÃO GERAR COM CRÉDITOS */}
+                  {/* BOTÃO GERAR */}
                   <IconButton 
                     color='secondary'
                     variant="contained" 

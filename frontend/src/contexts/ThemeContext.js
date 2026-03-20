@@ -42,6 +42,9 @@ export const ThemeProviderWrapper = ({ children }) => {
         },
         mode: resolvedMode,
       },
+      typography: {
+        fontFamily: 'Roboto'
+      },
       components: {
         MuiTypography: {
           styleOverrides: {
