@@ -39,10 +39,8 @@ function CircularProgressWithLabel({ value }) {
 }
 
 const Hero = ({ topic, setTopic, onGenerate }) => {
-  // Estado para o placeholder aleatório
   const [randomPlaceholder, setRandomPlaceholder] = useState('');
 
-  // Puxamos os novos estados do contexto atualizado
   const { 
     isGenerating, 
     progress, 
@@ -54,45 +52,33 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
   
   const { resolvedMode } = useAppTheme();
 
-  // Função para pegar um prompt aleatório
   const getRandomPrompt = () => {
     const randomIndex = Math.floor(Math.random() * prompts.length);
     return prompts[randomIndex];
   };
 
-  // Função para atualizar o placeholder - memoizada com useCallback
   const updatePlaceholder = useCallback(() => {
     const newPlaceholder = getRandomPrompt();
     setRandomPlaceholder(newPlaceholder);
-  }, []); // getRandomPrompt não precisa ser dependência pois é estável
+  }, []);
 
-  // Função para usar o prompt atual
   const handleUsePrompt = () => {
     setTopic(randomPlaceholder);
   };
 
-  // Função para limpar o campo
   const handleClear = () => {
     setTopic('');
   };
 
-  // Atualiza o placeholder a cada 5 segundos
   useEffect(() => {
-    // Só muda placeholder se não estiver gerando e se o campo estiver vazio
     if (!isGenerating && !topic) {
-      // Define um placeholder inicial
       updatePlaceholder();
-
-      // Intervalo para mudar o placeholder
       const interval = setInterval(() => {
-        if (!topic) { // Só muda se o campo estiver vazio
-          updatePlaceholder();
-        }
+        if (!topic) updatePlaceholder();
       }, 5000);
-
       return () => clearInterval(interval);
     }
-  }, [isGenerating, topic, updatePlaceholder]); // Adicionado updatePlaceholder nas dependências
+  }, [isGenerating, topic, updatePlaceholder]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -115,31 +101,14 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
           width: '100%',
         }}
       >
-        {/* TEXTO DE CHAMADA */}
-        <Box
-          sx={{
-            alignItems: 'center',
-            display: 'flex',
-            gap: { xs: .75, md: 1.75 },
-            flexDirection: { xs: 'column', md: 'row' },
-            justifyContent: 'center',
-            width: '100%',
-            mb: 1.5
-          }}
-        >
-          <Typography 
-            variant="h3" 
-            sx={{ 
-              lineHeight: 1,
-              fontWeight: 600
-            }}
-          >
+        {/* TITULOS */}
+        <Box sx={{ textAlign: 'center', mb: 1.5 }}>
+          <Typography variant="h3" sx={{ fontWeight: 600, display: 'inline-block', mr: 1 }}>
             O que você quer
           </Typography>
           <Typography 
             variant="h3"
             sx={{ 
-              lineHeight: 1,
               fontWeight: 600,
               background: `linear-gradient(90deg, ${blue[300]} 0%, ${blue[700]} 100%)`,
               backgroundClip: 'text',
@@ -151,25 +120,19 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
             aprender?
           </Typography>
         </Box>
-        <Box
-          sx={{
-            mb: 4
-          }}
-        >
+
+        <Box sx={{ mb: 4 }}>
           <Typography 
             align='center' 
             variant='h4' 
-            fontWeight={500} 
             color='text.secondary'
-            sx={{
-              fontSize: { xs: '1.25rem', md: '2.0243rem' }
-            }}
+            sx={{ fontSize: { xs: '1.25rem', md: '2.0243rem' }, fontWeight: 500 }}
           >
             Cursos com Inteligência Artificial
           </Typography>
         </Box>
 
-        {/* ÁREA DO FORMULÁRIO */}
+        {/* FORMULÁRIO */}
         <Container maxWidth='sm' sx={{ px: [0] }}>
           {!isGenerating ? (
             <Zoom in={!isGenerating}>
@@ -181,10 +144,10 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   border: '1px solid', borderColor: 'divider',
                   bgcolor: 'background.paper',
                   boxShadow: resolvedMode === 'light' ? '0 10px 40px rgba(0,0,0, 0.04)' : '0 10px 40px rgba(0,0,0, 0.4)',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  borderRadius: 2
                 }}
               >
-                {/* INPUT PRINCIPAL EM CIMA */}
                 <TextField
                   fullWidth
                   variant="standard"
@@ -192,39 +155,18 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   autoComplete="off"
-                  sx={{
-                    '.MuiInputBase-input': {
-                      p: [0],
-                      height: 'auto'
-                    }
-                  }}
+                  sx={{ '.MuiInputBase-input': { p: 0, height: 'auto' } }}
                   InputProps={{
                     disableUnderline: true,
-                    sx: { p: 2, fontSize: '1.2rem', fontWeight: 500, lineHeight: 1, pr: 7 },
+                    sx: { p: 2, fontSize: '1.2rem', fontWeight: 500, pr: 7 },
                     endAdornment: (
                       <InputAdornment position="end" sx={{ position: 'absolute', right: 16 }}>
                         {topic ? (
-                          // Se tem texto no campo, mostra botão de limpar
-                          <IconButton
-                            size="small"
-                            onClick={handleClear}
-                            sx={{ 
-                              color: 'text.secondary',
-                              '&:hover': { color: 'error.main' }
-                            }}
-                          >
+                          <IconButton size="small" onClick={handleClear} sx={{ '&:hover': { color: 'error.main' } }}>
                             <Clear fontSize="small" />
                           </IconButton>
                         ) : (
-                          // Se o campo está vazio, mostra botão de usar prompt
-                          <IconButton
-                            size="small"
-                            onClick={handleUsePrompt}
-                            sx={{ 
-                              color: 'primary.main',
-                            }}
-                            title="Usar este prompt"
-                          >
+                          <IconButton size="small" onClick={handleUsePrompt} color="primary" title="Usar sugestão">
                             <ContentCopy fontSize="small" />
                           </IconButton>
                         )}
@@ -233,36 +175,43 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   }}
                 />
 
-                {/* BARRA DE AÇÕES EMBAIXO */}
                 <Box sx={{ 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'space-between',
                   borderTop: '1px solid', borderColor: 'divider',
-                  flexWrap: 'wrap', p: 2
+                  p: 1.5, px: 2
                 }}>
                   
-                  {/* SELETOR DE INTELIGÊNCIA */}
+                  {/* SELETOR DE PROVEDOR COM FEEDBACK DE COTA */}
                   <FormControl size="small">
                     <Select
                       color='secondary'
                       value={selectedProvider}
                       onChange={(e) => setSelectedProvider(e.target.value)}
+                      variant="outlined"
+                      sx={{ minWidth: 140, borderRadius: 1.5 }}
                     >
                       {providers.map((p) => (
                         <MenuItem key={p.id} value={p.id} disabled={!p.enabled}>
-                          {p.name}
+                          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                            <Typography variant="body2" fontWeight={600}>
+                              {p.name}
+                            </Typography>
+                            <Typography variant="caption" color={p.enabled ? "text.secondary" : "error"}>
+                              {p.quotaLabel}
+                            </Typography>
+                          </Box>
                         </MenuItem>
                       ))}
                     </Select>
                   </FormControl>
 
-                  {/* BOTÃO GERAR */}
                   <IconButton 
-                    color='secondary'
-                    variant="contained" 
+                    color='primary'
                     type="submit" 
                     disabled={!topic.trim()}
+                    sx={{ bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' }, '&.Mui-disabled': { bgcolor: 'action.disabledBackground' } }}
                   >
                     <Send />
                   </IconButton>

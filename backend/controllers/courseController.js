@@ -16,8 +16,8 @@ const generateCourse = async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no'); 
 
-  const sendProgress = (progress, message) => {
-    const payload = JSON.stringify({ progress, message });
+  const sendProgress = (progress, message, extra = {}) => {
+    const payload = JSON.stringify({ progress, message, ...extra });
     const padding = " ".repeat(1024);
     res.write(`:${padding}\n`); 
     res.write(`data: ${payload}\n\n`);
@@ -39,7 +39,7 @@ const generateCourse = async (req, res) => {
                     rawModules.reduce((acc, mod) => acc + (mod.content || ""), "");
     
     const wordCount = allText.split(/\s+/).filter(w => w.length > 0).length;
-    const readingMinutes = wordCount / 225; // 225 palavras por minuto
+    const readingMinutes = wordCount / 225; 
     const totalExercises = rawModules.reduce((acc, mod) => acc + (mod.exercises?.length || 0), 0);
     const activityMinutes = (totalExercises * 2) + (courseData.finalExam?.length || 10) * 1.5;
     
@@ -114,7 +114,20 @@ const generateCourse = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Erro no Controller:", error);
-    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+
+    // Trata erro de cota enviando um sinal claro para o Frontend
+    if (error.message === "QUOTA_EXCEEDED") {
+      const quotaPayload = JSON.stringify({ 
+        error: "QUOTA_EXCEEDED", 
+        provider: error.provider || provider,
+        message: "Limite de criação atingido para este provedor. Tente novamente em alguns minutos ou troque a IA."
+      });
+      res.write(`data: ${quotaPayload}\n\n`);
+    } else {
+      // Erro Genérico
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    }
+    
     res.end();
   }
 };

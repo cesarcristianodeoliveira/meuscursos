@@ -14,7 +14,7 @@ export const prompts = [
   "Curso de Python para iniciantes",
   "Como criar um site",
   "Aprender JavaScript rápido",
-  "Curso de Excel básico gratuito",
+  "Curso de Excel básico",
   "Como montar um computador",
   "Curso de marketing digital para iniciantes",
   

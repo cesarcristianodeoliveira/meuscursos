@@ -8,16 +8,16 @@ export const CourseProvider = ({ children }) => {
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
 
-  // --- GESTÃO DE PROVIDERS E "CRÉDITOS" (AutoAwesome) ---
+  // --- GESTÃO DINÂMICA DE PROVIDERS ---
   const [selectedProvider, setSelectedProvider] = useState('groq');
-  const [providers] = useState([
+  const [providers, setProviders] = useState([
     { 
       id: 'groq', 
       name: 'Groq', 
       model: 'Llama 3.3 70B', 
       enabled: true, 
       quotaLabel: 'Livre (Beta)',
-      cost: 3 // Representação visual dos créditos
+      cost: 3 
     },
     { 
       id: 'openai', 
@@ -43,9 +43,18 @@ export const CourseProvider = ({ children }) => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
+  // Função interna para desabilitar um provedor caso a cota estoure
+  const disableProvider = useCallback((providerId, message) => {
+    setProviders(prev => prev.map(p => 
+      p.id === providerId 
+        ? { ...p, enabled: false, quotaLabel: 'Limite Atingido' } 
+        : p
+    ));
+    setStatusMessage(message);
+  }, []);
+
   const fetchGlobalData = useCallback(async (force = false) => {
     if (initialDataLoaded && !force) return;
-    
     try {
       const query = `{
         "stats": {
@@ -87,7 +96,6 @@ export const CourseProvider = ({ children }) => {
       const response = await fetch(`${API_BASE_URL}/generate-course`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // AGORA ENVIAMOS O PROVIDER SELECIONADO PARA O BACKEND
         body: JSON.stringify({ 
           topic, 
           provider: selectedProvider 
@@ -117,11 +125,19 @@ export const CourseProvider = ({ children }) => {
               const jsonStr = trimmedLine.replace('data: ', '');
               const data = JSON.parse(jsonStr);
 
+              // CHECK DE COTA: Se o backend enviou QUOTA_EXCEEDED
+              if (data.error === "QUOTA_EXCEEDED") {
+                disableProvider(data.provider || selectedProvider, data.message);
+                // Interrompemos o loop de leitura
+                return; 
+              }
+
               if (data.progress !== undefined) setProgress(data.progress);
               if (data.message) setStatusMessage(data.message);
               if (data.error) throw new Error(data.error);
             } catch (e) {
-              console.warn("Processando dados de streaming...");
+              if (e.message === "QUOTA_EXCEEDED") throw e;
+              console.warn("Processando fragmentos...");
             }
           }
         }
@@ -129,21 +145,24 @@ export const CourseProvider = ({ children }) => {
 
       setProgress(100);
       setStatusMessage('Curso finalizado com sucesso!');
-      
       setInitialDataLoaded(false); 
       await fetchGlobalData(true);
-      
       if (callback) callback();
 
     } catch (error) {
       console.error("Erro na geração:", error);
-      setStatusMessage(error.message || 'Erro ao gerar curso.');
+      // Se não for o erro de cota (já tratado), mostra erro genérico
+      if (statusMessage !== 'Limite Atingido') {
+        setStatusMessage(error.message || 'Erro ao gerar curso.');
+      }
     } finally {
+      // Se for erro de cota, deixamos a mensagem na tela por mais tempo
+      const delay = statusMessage.includes('Limite') ? 6000 : 3500;
       setTimeout(() => {
         setIsGenerating(false);
         setProgress(0);
         setStatusMessage('');
-      }, 3500);
+      }, delay);
     }
   };
 
@@ -158,10 +177,9 @@ export const CourseProvider = ({ children }) => {
       categories, 
       fetchGlobalData, 
       initialDataLoaded,
-      // EXPORTANDO OS NOVOS ESTADOS PARA O HERO
       selectedProvider,
       setSelectedProvider,
-      providers
+      providers // Agora é um estado reativo
     }}>
       {children}
     </CourseContext.Provider>

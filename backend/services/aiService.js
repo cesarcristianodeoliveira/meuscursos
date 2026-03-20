@@ -3,7 +3,6 @@ require('dotenv').config();
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Centralizamos o Prompt para não repetir código se adicionar novos provedores
 const SYSTEM_PROMPT = `Você é um Designer Instrucional Sênior e Especialista em EAD. 
 Crie um curso online de alta retenção no formato JSON seguindo estas diretrizes:
 
@@ -35,10 +34,9 @@ ESTRUTURA JSON OBRIGATÓRIA:
 }`;
 
 const generateCourseContent = async (topic, provider = 'groq') => {
-  // Configuração de modelos
   const config = {
     groq: { name: 'Groq', model: 'llama-3.3-70b-versatile' },
-    openai: { name: 'OpenAI', model: 'gpt-4o' } // Exemplo para futuro
+    openai: { name: 'OpenAI', model: 'gpt-4o' }
   };
 
   const selected = config[provider] || config.groq;
@@ -47,6 +45,9 @@ const generateCourseContent = async (topic, provider = 'groq') => {
     let completion;
 
     if (provider === 'groq' || !provider) {
+      // Verificação de segurança da chave
+      if (!process.env.GROQ_API_KEY) throw new Error("API_KEY_MISSING");
+
       completion = await groq.chat.completions.create({
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -66,8 +67,24 @@ const generateCourseContent = async (topic, provider = 'groq') => {
       aiProvider: selected.name,
       aiModel: selected.model
     };
+
   } catch (error) {
-    console.error(`Erro no AI Service (${provider}):`, error);
+    // --- TRATAMENTO DE COTAS E ERROS ESPECÍFICOS ---
+    
+    // Erro 429: Too Many Requests (Limite de cota atingido)
+    if (error.status === 429 || (error.message && error.message.includes('rate_limit'))) {
+      const quotaError = new Error("QUOTA_EXCEEDED");
+      quotaError.status = 429;
+      quotaError.provider = provider;
+      throw quotaError;
+    }
+
+    // Erro de Autenticação
+    if (error.status === 401) {
+      throw new Error("AUTH_ERROR");
+    }
+
+    console.error(`Erro crítico no AI Service (${provider}):`, error.message);
     throw error;
   }
 };
