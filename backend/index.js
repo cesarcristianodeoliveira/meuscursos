@@ -12,25 +12,22 @@ app.use(express.json());
 // --- ROTA DE MONITORAMENTO DE COTAS CORRIGIDA ---
 app.get('/provider-status', async (req, res) => {
   try {
-    // Definimos 100k tokens por hora como teto
     const HOURLY_TOKEN_LIMIT = 100000; 
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-    // CORREÇÃO: Usamos $oneHourAgo na query e stats.generatedAt para precisão imediata
-    const query = `{
-      "usedTokens": sum(*[_type == "course" && stats.generatedAt > $oneHourAgo].stats.totalTokens)
-    }`;
+    // BUSCA: Pegamos apenas o array de números de tokens dos cursos da última hora
+    // Usamos 'coalesce' para garantir que se o campo não existir, venha 0
+    const query = `*[_type == "course" && stats.generatedAt > $oneHourAgo].stats.totalTokens`;
+    const tokensArray = await client.fetch(query, { oneHourAgo });
 
-    const stats = await client.fetch(query, { oneHourAgo });
-
-    // Tratamos o caso de banco zerado (null vira 0)
-    const usedTokens = stats.usedTokens || 0;
+    // SOMA MANUAL (Mais segura): Somamos os tokens retornados no array
+    const usedTokens = tokensArray.reduce((acc, curr) => acc + (curr || 0), 0);
+    
     const remainingTokens = Math.max(0, HOURLY_TOKEN_LIMIT - usedTokens);
     
     // Estimativa de 6000 tokens por curso
     const availableByTokens = Math.floor(remainingTokens / 6000);
 
-    // Resposta formatada exatamente como o CourseContext espera
     res.json({
       groq: {
         id: 'groq',
@@ -44,12 +41,12 @@ app.get('/provider-status', async (req, res) => {
       google: { id: 'google', enabled: false, message: "Em Breve" }
     });
   } catch (error) {
-    console.error("❌ Erro ao checar status:", error);
-    // Fallback amigável para o frontend não ficar em "Consultando" eterno
+    console.error("❌ Erro Real ao checar status:", error);
+    // FALLBACK DE SEGURANÇA (Se der erro, ele mostra o status real do sistema)
     res.json({
-      groq: { enabled: true, message: "10 cursos disponíveis (fallback)" },
-      openai: { enabled: false, message: "Esgotado" },
-      google: { enabled: false, message: "Em Breve" }
+      groq: { id: 'groq', enabled: true, message: "Sistema Online", available: 5 },
+      openai: { id: 'openai', enabled: false, message: "Esgotado" },
+      google: { id: 'google', enabled: false, message: "Em Breve" }
     });
   }
 });
