@@ -7,8 +7,9 @@ export const CourseProvider = ({ children }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
-
   const [selectedProvider, setSelectedProvider] = useState('groq');
+
+  // Estado inicial dos provedores
   const [providers, setProviders] = useState([
     { 
       id: 'groq', 
@@ -42,10 +43,13 @@ export const CourseProvider = ({ children }) => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
-  // --- SINCRONIZAÇÃO DE COTAS (O Coração da v1.2) ---
+  // --- SINCRONIZAÇÃO DE COTAS ---
   const checkQuotas = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/provider-status`);
+      // Adicionamos um timestamp para evitar cache do navegador
+      const response = await fetch(`${API_BASE_URL}/provider-status?t=${Date.now()}`);
+      if (!response.ok) throw new Error("Erro na rede");
+      
       const data = await response.json();
 
       setProviders(prev => prev.map(p => {
@@ -53,7 +57,6 @@ export const CourseProvider = ({ children }) => {
           return { 
             ...p, 
             enabled: data[p.id].enabled,
-            // Exibe a mensagem amigável vinda do backend (ex: "12 cursos disp.")
             quotaLabel: data[p.id].message 
           };
         }
@@ -61,25 +64,31 @@ export const CourseProvider = ({ children }) => {
       }));
     } catch (err) {
       console.error("Erro ao sincronizar cotas:", err);
+      // Fallback: Se o backend falhar, não deixa o usuário no "Consultando..."
+      setProviders(prev => prev.map(p => 
+        p.id === 'groq' ? { ...p, quotaLabel: 'Sistema Online' } : p
+      ));
     }
   }, [API_BASE_URL]);
 
   useEffect(() => {
     checkQuotas();
+    // Atualiza as cotas automaticamente a cada 5 minutos
+    const interval = setInterval(checkQuotas, 300000);
+    return () => clearInterval(interval);
   }, [checkQuotas]);
 
-  // Atualiza a cota EM TEMPO REAL durante ou após a geração
+  // Atualiza a cota EM TEMPO REAL (Streaming)
   const updateProviderQuota = useCallback((providerId, quotaInfo) => {
     if (!quotaInfo) return;
     
     setProviders(prev => prev.map(p => {
       if (p.id === providerId) {
-        const available = quotaInfo.estimatedCoursesLeft;
+        // O backend envia 'estimatedCoursesLeft', mas a rota de status envia 'available'
+        const available = quotaInfo.estimatedCoursesLeft ?? quotaInfo.available;
         
         return { 
           ...p, 
-          // Ajuste: Só desabilitamos se o backend confirmar 0 absoluto. 
-          // Caso contrário, mantemos habilitado para evitar "travas fantasmas".
           enabled: available > 0, 
           quotaLabel: available > 0 ? `${available} cursos disponíveis` : "Limite atingido"
         };
@@ -140,10 +149,7 @@ export const CourseProvider = ({ children }) => {
       const response = await fetch(`${API_BASE_URL}/generate-course`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          topic, 
-          provider: selectedProvider 
-        }),
+        body: JSON.stringify({ topic, provider: selectedProvider }),
       });
 
       if (!response.body) throw new Error("O navegador não suporta streaming.");
@@ -169,13 +175,12 @@ export const CourseProvider = ({ children }) => {
               const jsonStr = trimmedLine.replace('data: ', '');
               const data = JSON.parse(jsonStr);
 
-              // 1. Captura de erro real de cota (429)
               if (data.error === "QUOTA_EXCEEDED") {
                 disableProvider(data.provider || selectedProvider, data.message);
-                return; 
+                throw new Error("QUOTA_EXCEEDED"); 
               }
 
-              // 2. Atualização dinâmica durante o processo (40% e 100%)
+              // Atualização durante o streaming (Vem do Controller via quotaUpdate ou quotaInfo)
               if (data.quotaInfo || data.quotaUpdate) {
                 updateProviderQuota(selectedProvider, data.quotaInfo || data.quotaUpdate);
               }
@@ -185,7 +190,7 @@ export const CourseProvider = ({ children }) => {
               if (data.error) throw new Error(data.error);
             } catch (e) {
               if (e.message === "QUOTA_EXCEEDED") throw e;
-              console.warn("Processando dados de streaming...");
+              console.warn("Erro ao processar chunk de streaming", e);
             }
           }
         }
@@ -194,23 +199,20 @@ export const CourseProvider = ({ children }) => {
       setProgress(100);
       setStatusMessage('Curso finalizado com sucesso!');
       
-      // Resetamos o carregamento inicial para forçar o refresh das estatísticas
+      // Refresh total de dados
       setInitialDataLoaded(false); 
       await fetchGlobalData(true);
-      
-      // Sincroniza as cotas de novo após salvar no banco
-      await checkQuotas();
+      await checkQuotas(); // Sincroniza cotas finais após o curso ser salvo no Sanity
 
       if (callback) callback();
 
     } catch (error) {
       console.error("Erro na geração:", error);
-      if (!statusMessage.includes('Limite')) {
+      if (error.message !== "QUOTA_EXCEEDED") {
         setStatusMessage(error.message || 'Erro ao gerar curso.');
       }
     } finally {
-      // Delay maior se for erro de limite para o usuário conseguir ler
-      const delay = statusMessage.includes('Limite') ? 8000 : 3500;
+      const delay = statusMessage.includes('Limite') ? 6000 : 3000;
       setTimeout(() => {
         setIsGenerating(false);
         setProgress(0);

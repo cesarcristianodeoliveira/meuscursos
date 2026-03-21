@@ -11,7 +11,7 @@ import {
 import { Send, ContentCopy, Clear, WarningAmber } from '@mui/icons-material';
 import { useCourse } from '../contexts/CourseContext';
 import { useAppTheme } from '../contexts/ThemeContext';
-import { blue, grey, red } from '@mui/material/colors';
+import { blue, grey, red, orange } from '@mui/material/colors';
 import prompts from '../utils/prompts';
 
 function CircularProgressWithLabel({ value }) {
@@ -56,9 +56,9 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
   
   const { resolvedMode } = useAppTheme();
 
-  // Bloqueio visual se o provedor selecionado estiver sem cota
-  const currentProvider = providers.find(p => p.id === selectedProvider);
-  const isProviderDisabled = currentProvider ? !currentProvider.enabled : false;
+  // Encontra o provedor atual para aplicar regras de UI
+  const currentProvider = providers.find(p => p.id === selectedProvider) || providers[0];
+  const isProviderDisabled = !currentProvider?.enabled;
 
   const getRandomPrompt = () => {
     const randomIndex = Math.floor(Math.random() * prompts.length);
@@ -90,6 +90,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    // Bloqueia se estiver gerando ou se o provedor estiver sem cota
     if (topic.trim() && !isGenerating && !isProviderDisabled) {
       onGenerate();
     }
@@ -151,12 +152,12 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                 onSubmit={handleSubmit}
                 sx={{ 
                   border: '1px solid', 
-                  borderColor: isProviderDisabled ? red[300] : 'divider',
+                  borderColor: isProviderDisabled ? orange[300] : 'divider',
                   bgcolor: 'background.paper',
                   boxShadow: resolvedMode === 'light' ? '0 10px 40px rgba(0,0,0, 0.04)' : '0 10px 40px rgba(0,0,0, 0.4)',
                   overflow: 'hidden',
                   borderRadius: 3,
-                  transition: 'border-color 0.3s ease'
+                  transition: 'all 0.3s ease'
                 }}
               >
                 <TextField
@@ -166,6 +167,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   autoComplete="off"
+                  disabled={isGenerating}
                   sx={{ '.MuiInputBase-input': { p: 0, height: 'auto' } }}
                   InputProps={{
                     disableUnderline: true,
@@ -178,9 +180,11 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                           </IconButton>
                         ) : (
                           <Tooltip title="Usar sugestão">
-                            <IconButton size="small" onClick={handleUsePrompt} color="primary">
-                              <ContentCopy fontSize="small" />
-                            </IconButton>
+                            <span>
+                              <IconButton size="small" onClick={handleUsePrompt} color="primary">
+                                <ContentCopy fontSize="small" />
+                              </IconButton>
+                            </span>
                           </Tooltip>
                         )}
                       </InputAdornment>
@@ -204,7 +208,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                       onChange={(e) => setSelectedProvider(e.target.value)}
                       variant="outlined"
                       sx={{ 
-                        minWidth: 160, 
+                        minWidth: 165, 
                         borderRadius: 2,
                         bgcolor: 'background.paper',
                         '& .MuiSelect-select': { py: 0.5 }
@@ -212,17 +216,18 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                     >
                       {providers.map((p) => (
                         <MenuItem key={p.id} value={p.id}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.1 }}>
                             <Typography variant="body2" fontWeight={700} color={p.enabled ? "text.primary" : "text.disabled"}>
                               {p.name}
                             </Typography>
                             <Typography 
                               variant="caption" 
                               sx={{ 
-                                color: p.enabled ? blue[600] : red[400],
+                                color: p.enabled ? blue[600] : (p.quotaLabel.includes('Consultando') ? grey[500] : red[400]),
                                 fontSize: '0.65rem',
                                 fontWeight: 800,
-                                textTransform: 'uppercase'
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.02rem'
                               }}
                             >
                               {p.quotaLabel}
@@ -235,8 +240,8 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
 
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     {isProviderDisabled && (
-                       <Tooltip title="Este provedor atingiu o limite da hora. Troque de provedor ou aguarde.">
-                        <WarningAmber sx={{ color: red[400], mr: 1 }} fontSize="small" />
+                       <Tooltip title="Este provedor atingiu o limite. Troque de provedor ou aguarde o reset da cota.">
+                        <WarningAmber sx={{ color: orange[600], mr: 0.5 }} fontSize="small" />
                        </Tooltip>
                     )}
                     
@@ -250,7 +255,10 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                         width: 45, 
                         height: 45,
                         '&:hover': { bgcolor: 'primary.dark', transform: 'scale(1.05)' }, 
-                        '&.Mui-disabled': { bgcolor: 'action.disabledBackground' },
+                        '&.Mui-disabled': { 
+                          bgcolor: 'action.disabledBackground',
+                          color: 'action.disabled'
+                        },
                         transition: 'all 0.2s'
                       }}
                     >
@@ -280,15 +288,19 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                 </Typography>
                 
                 <Typography variant="body1" color="text.secondary" sx={{ mt: 1.5, maxWidth: 450, lineHeight: 1.6 }}>
-                  {progress < 100 
+                  {progress < 90 
                     ? "Isso pode levar até 2 minutos. Estamos gerando conteúdo técnico exaustivo." 
-                    : "Quase lá! Estamos salvando seu novo curso no banco de dados."}
+                    : "Quase lá! Estamos finalizando a identidade visual e salvando no banco de dados."}
                 </Typography>
 
                 <Paper elevation={0} sx={{ mt: 4, p: 2, borderRadius: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', animation: 'pulse 1.5s infinite' }} />
+                  <Box sx={{ 
+                    width: 8, height: 8, borderRadius: '50%', 
+                    bgcolor: 'primary.main', 
+                    animation: 'pulse 1.5s infinite' 
+                  }} />
                   <Typography variant="caption" fontWeight={600} color="text.secondary">
-                    {progress < 50 ? "SABIA? Nossos cursos usam Llama 3.3 para máxima precisão técnica." : "DICA: O certificado é gerado automaticamente ao final."}
+                    {progress < 50 ? "INFO: Cursos com módulos densos garantem maior retenção de aprendizado." : "DICA: Você poderá revisar os exercícios quantas vezes quiser."}
                   </Typography>
                 </Paper>
               </Box>

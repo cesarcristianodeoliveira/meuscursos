@@ -10,7 +10,7 @@ const generateCourse = async (req, res) => {
   const { topic, provider } = req.body;
   if (!topic) return res.status(400).json({ error: 'O tema é obrigatório' });
 
-  // --- CONFIGURAÇÃO SSE ---
+  // --- CONFIGURAÇÃO SSE (Streaming) ---
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -18,7 +18,7 @@ const generateCourse = async (req, res) => {
 
   const sendProgress = (progress, message, extra = {}) => {
     const payload = JSON.stringify({ progress, message, ...extra });
-    const padding = " ".repeat(1024);
+    const padding = " ".repeat(1024); // Preenchimento para forçar o flush em alguns navegadores
     res.write(`:${padding}\n`); 
     res.write(`data: ${payload}\n\n`);
   };
@@ -64,7 +64,9 @@ const generateCourse = async (req, res) => {
         courseData.searchQuery || topic, 
         courseData.pixabay_category || "education" 
       );
-    } catch (imgErr) { console.error("Erro Imagem:", imgErr); }
+    } catch (imgErr) { 
+      console.error("⚠️ Erro ao carregar imagem, prosseguindo sem ela:", imgErr.message); 
+    }
 
     sendProgress(85, "Finalizando montagem do material didático...");
 
@@ -79,11 +81,12 @@ const generateCourse = async (req, res) => {
       aiProvider: courseData.aiProvider,
       aiModel: courseData.aiModel,
       
-      // SALVANDO ESTATÍSTICAS DE TOKENS (Crucial para o novo index.js)
+      // SALVANDO ESTATÍSTICAS DE TOKENS (Sincronizado com backend/index.js)
       stats: {
-        promptTokens: courseData.usage?.prompt_tokens || 0,
-        completionTokens: courseData.usage?.completion_tokens || 0,
-        totalTokens: courseData.usage?.total_tokens || 0,
+        // CORREÇÃO v1.2: Agora usa camelCase para bater com o retorno do aiService revisado
+        promptTokens: courseData.usage?.promptTokens || 0,
+        completionTokens: courseData.usage?.completionTokens || 0,
+        totalTokens: courseData.usage?.totalTokens || 0,
         generatedAt: new Date().toISOString()
       },
 
@@ -121,7 +124,7 @@ const generateCourse = async (req, res) => {
       message: 'Curso pronto!', 
       courseId: result._id,
       slug: doc.slug.current,
-      quotaUpdate: currentAiLimits 
+      quotaUpdate: currentAiLimits // Atualiza o Hero no frontend imediatamente após salvar
     });
 
     res.write(`data: ${finalResult}\n\n`);

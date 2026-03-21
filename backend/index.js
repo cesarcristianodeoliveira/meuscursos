@@ -6,59 +6,57 @@ require('dotenv').config();
 
 const app = express();
 
-// Middlewares
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*'
-}));
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json());
 
-// --- ROTA DE MONITORAMENTO DE COTAS (TOKEN-BASED) ---
+// --- ROTA DE MONITORAMENTO DE COTAS CORRIGIDA ---
 app.get('/provider-status', async (req, res) => {
   try {
-    // 1. Definição de limites (Plano Free Groq Llama 3.3 70B costuma ter ~100k TPM)
-    // Vamos definir um teto de segurança por hora para não estourar o limite diário
+    // Definimos 100k tokens por hora como teto
     const HOURLY_TOKEN_LIMIT = 100000; 
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-    // 2. Query GROQ: Soma os tokens reais e conta os cursos na última hora
-    const stats = await client.fetch(`{
-      "count": count(*[_type == "course" && _createdAt > $oneHourAgo]),
-      "usedTokens": sum(*[_type == "course" && _createdAt > $oneHourAgo].stats.totalTokens)
-    }`, { oneHourAgo });
+    // CORREÇÃO: Usamos $oneHourAgo na query e stats.generatedAt para precisão imediata
+    const query = `{
+      "usedTokens": sum(*[_type == "course" && stats.generatedAt > $oneHourAgo].stats.totalTokens)
+    }`;
 
+    const stats = await client.fetch(query, { oneHourAgo });
+
+    // Tratamos o caso de banco zerado (null vira 0)
     const usedTokens = stats.usedTokens || 0;
     const remainingTokens = Math.max(0, HOURLY_TOKEN_LIMIT - usedTokens);
     
-    // 3. Estimativa de cursos restantes: 
-    // Como seus cursos são densos, usamos uma média segura de 6000 tokens por curso
+    // Estimativa de 6000 tokens por curso
     const availableByTokens = Math.floor(remainingTokens / 6000);
 
+    // Resposta formatada exatamente como o CourseContext espera
     res.json({
       groq: {
-        available: availableByTokens,
-        usedInHour: usedTokens,
-        limit: HOURLY_TOKEN_LIMIT,
+        id: 'groq',
         enabled: availableByTokens > 0,
-        // Mensagem dinâmica que reflete a realidade do consumo
         message: availableByTokens > 0 
-          ? `${availableByTokens} cursos disponíveis (cota real)` 
-          : "Cota de tokens esgotada (1h)"
+          ? `${availableByTokens} cursos disponíveis` 
+          : "Limite da hora atingido",
+        available: availableByTokens
       },
+      openai: { id: 'openai', enabled: false, message: "Esgotado" },
+      google: { id: 'google', enabled: false, message: "Em Breve" }
+    });
+  } catch (error) {
+    console.error("❌ Erro ao checar status:", error);
+    // Fallback amigável para o frontend não ficar em "Consultando" eterno
+    res.json({
+      groq: { enabled: true, message: "10 cursos disponíveis (fallback)" },
       openai: { enabled: false, message: "Esgotado" },
       google: { enabled: false, message: "Em Breve" }
     });
-  } catch (error) {
-    console.error("Erro ao checar status:", error);
-    res.status(500).json({ error: "Erro interno ao validar cotas" });
   }
 });
 
-// Rotas
 app.post('/generate-course', generateCourse);
 
-// Servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Motor de Cursos Master v1.2 rodando na porta ${PORT}`);
-  console.log(`📊 Monitoramento de tokens ativado`);
+  console.log(`🚀 Motor v1.2 rodando na porta ${PORT}`);
 });

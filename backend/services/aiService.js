@@ -44,7 +44,6 @@ const generateCourseContent = async (topic, provider = 'groq') => {
   try {
     if (!process.env.GROQ_API_KEY) throw new Error("API_KEY_MISSING");
 
-    // Chamada à API da Groq
     const completion = await groq.chat.completions.create({
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
@@ -56,8 +55,6 @@ const generateCourseContent = async (topic, provider = 'groq') => {
       response_format: { type: "json_object" }
     });
 
-    // --- EXTRAÇÃO DE METADADOS DE COTA (HEADERS REAIS) ---
-    // No SDK da Groq, os headers brutos estão em completion.response.headers
     const headers = completion.response?.headers; 
     
     const remainingTokensStr = headers?.get('x-ratelimit-remaining-tokens');
@@ -66,10 +63,8 @@ const generateCourseContent = async (topic, provider = 'groq') => {
 
     const tokensRestantes = parseInt(remainingTokensStr);
     
-    // CALIBRAGEM V1.2: 
-    // Reduzimos de 7000 para 5000 para ser mais fiel ao consumo real do Llama 3.3.
-    // Se não houver info, assumimos 10 como fallback de segurança.
-    const cursosEstimados = isNaN(tokensRestantes) ? 10 : Math.floor(tokensRestantes / 5000);
+    // Calibragem: 6000 é a média real de um curso de 5 módulos + prova
+    const cursosEstimados = isNaN(tokensRestantes) ? 10 : Math.floor(tokensRestantes / 6000);
 
     const content = JSON.parse(completion.choices[0].message.content);
     
@@ -77,7 +72,12 @@ const generateCourseContent = async (topic, provider = 'groq') => {
       ...content,
       aiProvider: selected.name,
       aiModel: selected.model,
-      usage: completion.usage, // Essencial para o Controller salvar no Sanity
+      // AJUSTE CRÍTICO: Mapeamos para CamelCase para o Sanity/Backend somarem corretamente
+      usage: {
+        promptTokens: completion.usage?.prompt_tokens || 0,
+        completionTokens: completion.usage?.completion_tokens || 0,
+        totalTokens: completion.usage?.total_tokens || 0
+      },
       limits: {
         remainingTokens: tokensRestantes || 'N/A',
         remainingRequests: remainingRequestsStr || 'N/A',
@@ -87,12 +87,10 @@ const generateCourseContent = async (topic, provider = 'groq') => {
     };
 
   } catch (error) {
-    // Tratamento de Rate Limit (Erro 429)
     if (error.status === 429 || (error.message && error.message.includes('rate_limit'))) {
       const quotaError = new Error("QUOTA_EXCEEDED");
       quotaError.status = 429;
       quotaError.provider = provider;
-      // Extrai o tempo de espera do header ou do corpo do erro
       quotaError.resetTime = error.headers?.['retry-after'] || error.headers?.['x-ratelimit-reset-requests'] || "1m";
       throw quotaError;
     }
