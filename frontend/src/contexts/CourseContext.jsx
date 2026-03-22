@@ -16,7 +16,7 @@ export const CourseProvider = ({ children }) => {
       name: 'Groq', 
       model: 'Llama 3.3 70B', 
       enabled: true, 
-      quotaLabel: 'Consultando...',
+      quotaLabel: 'Carregando',
       cost: 3 
     },
     { 
@@ -24,7 +24,7 @@ export const CourseProvider = ({ children }) => {
       name: 'ChatGPT', 
       model: 'GPT-4o', 
       enabled: false, 
-      quotaLabel: 'Esgotado',
+      quotaLabel: 'Em Breve',
       cost: 5
     },
     { 
@@ -66,7 +66,7 @@ export const CourseProvider = ({ children }) => {
       console.error("Erro ao sincronizar cotas:", err);
       // Fallback: Se o backend falhar, não deixa o usuário no "Consultando..."
       setProviders(prev => prev.map(p => 
-        p.id === 'groq' ? { ...p, quotaLabel: 'Sistema Online' } : p
+        p.id === 'groq' ? { ...p, quotaLabel: 'Online' } : p
       ));
     }
   }, [API_BASE_URL]);

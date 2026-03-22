@@ -11,7 +11,7 @@ import {
 import { Send, ContentCopy, Clear, WarningAmber } from '@mui/icons-material';
 import { useCourse } from '../contexts/CourseContext';
 import { useAppTheme } from '../contexts/ThemeContext';
-import { blue, grey, red, orange } from '@mui/material/colors';
+import { blue, grey, red, orange, green } from '@mui/material/colors';
 import prompts from '../utils/prompts';
 
 function CircularProgressWithLabel({ value }) {
@@ -113,7 +113,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
         {/* TITULOS */}
         <Box sx={{ textAlign: 'center', mb: 1.5 }}>
           <Typography variant="h3" sx={{ fontWeight: 600, display: 'inline-block', mr: 1, fontSize: { xs: '2rem', md: '3rem' } }}>
-            O que você quer
+            O que vamos
           </Typography>
           <Typography 
             variant="h3"
@@ -171,18 +171,18 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   sx={{ '.MuiInputBase-input': { p: 0, height: 'auto' } }}
                   InputProps={{
                     disableUnderline: true,
-                    sx: { p: 2.5, fontSize: '1.1rem', fontWeight: 500, pr: 7 },
+                    sx: { p: 2.5, fontSize: { xs: '1rem', md: '1.25rem' }, fontWeight: 400, pr: 8 },
                     endAdornment: (
                       <InputAdornment position="end" sx={{ position: 'absolute', right: 16 }}>
                         {topic ? (
-                          <IconButton size="small" onClick={handleClear} sx={{ '&:hover': { color: 'error.main' } }}>
-                            <Clear fontSize="small" />
+                          <IconButton onClick={handleClear} sx={{ '&:hover': { color: 'error.main' } }}>
+                            <Clear />
                           </IconButton>
                         ) : (
-                          <Tooltip title="Usar sugestão">
+                          <Tooltip placement='left' title="Usar sugestão">
                             <span>
-                              <IconButton size="small" onClick={handleUsePrompt} color="primary">
-                                <ContentCopy fontSize="small" />
+                              <IconButton onClick={handleUsePrompt} color="primary">
+                                <ContentCopy />
                               </IconButton>
                             </span>
                           </Tooltip>
@@ -208,7 +208,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                       onChange={(e) => setSelectedProvider(e.target.value)}
                       variant="outlined"
                       sx={{ 
-                        minWidth: 165, 
+                        minWidth: 128,
                         borderRadius: 2,
                         bgcolor: 'background.paper',
                         '& .MuiSelect-select': { py: 0.5 }
@@ -223,7 +223,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                             <Typography 
                               variant="caption" 
                               sx={{ 
-                                color: p.enabled ? blue[600] : (p.quotaLabel.includes('Consultando') ? grey[500] : red[400]),
+                                color: p.enabled ? green[600] : (p.quotaLabel.includes('Carregando') ? grey[500] : red[400]),
                                 fontSize: '0.65rem',
                                 fontWeight: 800,
                                 textTransform: 'uppercase',
@@ -246,20 +246,19 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                     )}
                     
                     <IconButton 
-                      color='primary'
+                      color='secondary'
                       type="submit" 
                       disabled={!topic.trim() || isGenerating || isProviderDisabled}
                       sx={{ 
-                        bgcolor: 'primary.main', 
+                        bgcolor: 'secondary.main', 
                         color: 'white', 
                         width: 45, 
                         height: 45,
-                        '&:hover': { bgcolor: 'primary.dark', transform: 'scale(1.05)' }, 
+                        '&:hover': { bgcolor: 'secondary.dark' }, 
                         '&.Mui-disabled': { 
                           bgcolor: 'action.disabledBackground',
                           color: 'action.disabled'
                         },
-                        transition: 'all 0.2s'
                       }}
                     >
                       <Send fontSize="small" />

@@ -8,7 +8,7 @@ import CategoryTabs from '../components/CategoryTabs';
 import Hero from '../components/Hero';
 import { useCourse } from '../contexts/CourseContext'; 
 import { 
-  Container, Box, Typography, Pagination, Stack, Skeleton, useTheme, useMediaQuery
+  Container, Box, Typography, Pagination, Stack, useTheme, useMediaQuery
 } from '@mui/material';
 import { MenuBook } from '@mui/icons-material';
 
@@ -135,24 +135,9 @@ const Dashboard = () => {
 
       <div id="tabs-scroll-point" style={{ scrollMarginTop: isMobile ? '104px' : '112px' }} />
 
-      <Container maxWidth="xl" sx={{ mt: 2 }}>
-        <Box sx={{ mb: 2, minHeight: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
-            {categoryFilter}
-          </Typography>
-          {fetchingCourses ? (
-            <Skeleton variant="text" width={80} height={20} sx={{ mt: 0.5 }} />
-          ) : (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              {totalCourses} {totalCourses === 1 ? 'curso encontrado' : 'cursos encontrados'}
-            </Typography>
-          )}
-        </Box>
-      </Container>
-
-      <Stack spacing={2} sx={{ mb: 4 }}>
+      <Stack spacing={2} sx={{ mb: 4, mt: 2 }}>
         {fetchingCourses ? (
-          [...Array(3)].map((_, i) => <CourseCardSkeleton key={i} />)
+          [...Array(1)].map((_, i) => <CourseCardSkeleton key={i} />)
         ) : (
           <>
             {courses.map((course) => (
