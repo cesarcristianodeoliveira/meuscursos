@@ -156,7 +156,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                             <Clear fontSize="small" />
                           </IconButton>
                         ) : (
-                          <Tooltip title="Usar sugestão">
+                          <Tooltip placement='left' title="Usar sugestão">
                             <IconButton onClick={() => setTopic(randomPlaceholder)} color="primary" size="small">
                               <ContentCopy fontSize="small" />
                             </IconButton>
@@ -215,9 +215,8 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                       type="submit" 
                       disabled={!topic.trim() || isGenerating || isProviderDisabled || isChecking}
                       sx={{ 
-                        bgcolor: 'primary.main', color: 'white', width: 48, height: 48,
-                        '&:hover': { bgcolor: 'primary.dark', transform: 'translateY(-2px)' },
-                        transition: 'all 0.2s',
+                        bgcolor: 'secondary.main', color: 'white', width: 48, height: 48,
+                        '&:hover': { bgcolor: 'secondary.dark' },
                         '&.Mui-disabled': { bgcolor: 'action.disabledBackground' }
                       }}
                     >
