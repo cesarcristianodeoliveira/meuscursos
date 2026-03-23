@@ -26,8 +26,7 @@ export default {
         { 
           name: 'slug', 
           title: 'Slug da Categoria', 
-          type: 'slug',
-          options: { source: 'category.name' }
+          type: 'string', // ALTERADO: De 'slug' para 'string' para evitar erros de validação
         },
       ]
     },
@@ -62,8 +61,6 @@ export default {
       title: 'Modelo da IA',
       type: 'string',
     },
-
-    // --- NOVO CAMPO: ESTATÍSTICAS DE CONSUMO ---
     {
       name: 'stats',
       title: 'Métricas de Geração',
@@ -75,7 +72,6 @@ export default {
         { name: 'generatedAt', title: 'Data de Geração', type: 'datetime' },
       ]
     },
-
     {
       name: 'modules',
       title: 'Módulos/Aulas',
@@ -86,11 +82,7 @@ export default {
           name: 'module',
           fields: [
             { name: 'title', type: 'string', title: 'Título da Aula' },
-            { 
-              name: 'content', 
-              type: 'text', 
-              title: 'Conteúdo (Markdown)' 
-            },
+            { name: 'content', type: 'text', title: 'Conteúdo (Markdown)' },
             {
               name: 'exercises',
               title: 'Exercícios de Fixação',

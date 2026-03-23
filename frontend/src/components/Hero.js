@@ -112,7 +112,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
       >
         {/* TITULOS */}
         <Box sx={{ textAlign: 'center', mb: 1.5 }}>
-          <Typography variant="h3" sx={{ fontWeight: 600, display: 'inline-block', mr: 1, fontSize: { xs: '2rem', md: '3rem' } }}>
+          <Typography variant="h3" sx={{ fontWeight: 600, display: 'inline-block', mr: 1.35, fontSize: { xs: '2rem', md: '3rem' } }}>
             O que vamos
           </Typography>
           <Typography 
