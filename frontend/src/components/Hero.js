@@ -117,7 +117,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
           color='text.secondary'
           sx={{ mb: 6, fontSize: { xs: '1rem', md: '1.4rem' }, fontWeight: 400, opacity: 0.8 }}
         >
-          Crie cursos completos em segundos usando IA especializada.
+          Crie ou estude cursos com inteligência artifical.
         </Typography>
 
         {/* FORMULÁRIO */}
