@@ -33,28 +33,32 @@ const Dashboard = () => {
   const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState('Recentes');
 
-  // 1. Carrega dados globais (Stats e Categorias)
+  // 1. Carrega Stats e Categorias apenas uma vez (no mount)
   useEffect(() => {
     fetchGlobalData();
   }, [fetchGlobalData]);
 
-  // 2. Função para buscar a lista de cursos
+  // 2. Busca de Cursos (Refatorada para o novo Schema de Categoria)
   const fetchCoursesList = useCallback(async () => {
     setFetchingCourses(true);
     try {
+      // Ajuste na Query: category.name agora é o que filtramos
       let conditions = ['_type == "course"'];
       if (categoryFilter !== 'Recentes') {
         conditions.push(`category.name == "${categoryFilter}"`);
       }
       const filter = `*[${conditions.join(' && ')}]`;
       
-      const [count, data] = await Promise.all([
-        client.fetch(`count(${filter})`),
-        client.fetch(`${filter} | order(_createdAt desc) [${(page - 1) * COURSES_PER_PAGE}...${page * COURSES_PER_PAGE - 1}]`)
-      ]);
+      // Busca otimizada: Contagem e Dados em paralelo
+      const query = `{
+        "total": count(${filter}),
+        "items": ${filter} | order(_createdAt desc) [${(page - 1) * COURSES_PER_PAGE}...${page * COURSES_PER_PAGE - 1}]
+      }`;
 
-      setTotalCourses(count);
-      setCourses(data || []);
+      const result = await client.fetch(query);
+
+      setTotalCourses(result.total);
+      setCourses(result.items || []);
     } catch (err) {
       console.error("Erro ao buscar cursos:", err);
       setCourses([]); 
@@ -63,31 +67,19 @@ const Dashboard = () => {
     }
   }, [page, categoryFilter]);
 
-  // 3. Efeito de Sincronia: Executa a busca se a página/filtro mudar OU se o sinal de 'dados carregados' for resetado
+  // 3. Gatilho de Sincronização
   useEffect(() => {
     fetchCoursesList();
-    // initialDataLoaded aqui é o segredo: quando o Context termina a geração, ele seta como false, 
-    // forçando este Dashboard a buscar os cursos novos automaticamente.
-  }, [fetchCoursesList, initialDataLoaded]);
+  }, [fetchCoursesList, initialDataLoaded]); // Recarrega se a página mudar OU se um novo curso for gerado
 
-  // 4. Lógica de Scroll suave
+  // 4. Scroll Suave Otimizado
   const scrollToTabs = useCallback(() => {
-    setTimeout(() => {
-      const anchor = document.querySelector('#tabs-scroll-point');
-      if (anchor) {
-        const navHeight = isMobile ? 56 : 64;
-        const tabsHeight = 48;
-        const bodyRect = document.body.getBoundingClientRect().top;
-        const elementRect = anchor.getBoundingClientRect().top;
-        window.scrollTo({
-          top: (elementRect - bodyRect) - (navHeight + tabsHeight), 
-          behavior: 'smooth'
-        });
-      }
-    }, 50);
-  }, [isMobile]);
+    const anchor = document.querySelector('#tabs-scroll-point');
+    if (anchor) {
+      anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
 
-  // 5. Handlers de Navegação
   const handlePageChange = (event, value) => {
     setPage(value);
     scrollToTabs();
@@ -99,77 +91,80 @@ const Dashboard = () => {
     scrollToTabs();
   };
 
-  // 6. LOGICA DE PÓS-GERAÇÃO LOCAL
   const onGenerateSuccess = useCallback(() => {
     setTopic('');
-    // Não precisamos chamar fetchCoursesList aqui manualmente, 
-    // pois o CourseContext vai setar initialDataLoaded como false, 
-    // disparando o useEffect principal (item 3) automaticamente.
+    setPage(1); // Volta para a página 1 para ver o novo curso
+    setCategoryFilter('Recentes'); // Limpa filtro para garantir que o novo apareça
   }, []);
 
-  const handleGenerateAction = () => {
-    if (!topic.trim()) return;
-    generateCourse(topic, onGenerateSuccess);
-  };
-
   return (
-    <>
-
+    <Box sx={{ pb: 10 }}>
+      {/* Hero agora recebe os providers do Context internamente via useCourse ou props se preferir */}
       <Hero 
         topic={topic} 
         setTopic={setTopic} 
-        onGenerate={handleGenerateAction} 
+        onGenerate={() => generateCourse(topic, onGenerateSuccess)} 
       />
 
-      <Container maxWidth="xl" sx={{ mt: 2 }}>
-        <Box sx={{ mb: 2 }}>
-          <StatsBanner stats={stats} fetching={!initialDataLoaded} />
-        </Box>
+      <Container maxWidth="xl" sx={{ mt: { xs: -2, md: -4 }, position: 'relative', zIndex: 2 }}>
+        <StatsBanner stats={stats} fetching={!initialDataLoaded} />
       </Container>
 
-      {!initialDataLoaded ? (
-        <CategoryTabsSkeleton />
-      ) : (
-        <CategoryTabs categories={categories} value={categoryFilter} onChange={handleTabChange} />
-      )}
-
-      <div id="tabs-scroll-point" style={{ scrollMarginTop: isMobile ? '104px' : '112px' }} />
-
-      <Stack spacing={2} sx={{ mb: 4, mt: 2 }}>
-        {fetchingCourses ? (
-          [...Array(1)].map((_, i) => <CourseCardSkeleton key={i} />)
+      <Box sx={{ mt: 4 }}>
+        {!initialDataLoaded ? (
+          <CategoryTabsSkeleton />
         ) : (
-          <>
-            {courses.map((course) => (
-              <CourseCard key={course._id} course={course} />
-            ))}
-            
-            {courses.length === 0 && (
-              <Box sx={{ textAlign: 'center', py: 10 }}>
-                <MenuBook sx={{ fontSize: 56, color: 'text.disabled', mb: 1 }} />
-                <Typography color="text.secondary">
-                  Nenhum curso encontrado.
-                </Typography>
-              </Box>
-            )}
-          </>
+          <CategoryTabs 
+            categories={categories} 
+            value={categoryFilter} 
+            onChange={handleTabChange} 
+          />
         )}
-      </Stack>
+      </Box>
 
-      <Container maxWidth="xl" sx={{ mt: 2 }}>
-        {!fetchingCourses && courses.length !== 0 && totalCourses > COURSES_PER_PAGE && (
-          <Stack sx={{ mt: 6, mb: 10, alignItems: 'center' }}>
+      {/* Ponto de ancoragem para o scroll */}
+      <div id="tabs-scroll-point" style={{ position: 'relative', top: isMobile ? '-80px' : '-100px' }} />
+
+      <Container maxWidth="xl">
+        <Stack spacing={3} sx={{ mt: 3 }}>
+          {fetchingCourses ? (
+            [...Array(3)].map((_, i) => <CourseCardSkeleton key={i} />)
+          ) : (
+            <>
+              {courses.map((course) => (
+                <CourseCard key={course._id} course={course} />
+              ))}
+              
+              {courses.length === 0 && (
+                <Box sx={{ textAlign: 'center', py: 10, opacity: 0.6 }}>
+                  <MenuBook sx={{ fontSize: 48, mb: 2 }} />
+                  <Typography variant="h6">
+                    Nenhum curso nesta categoria ainda.
+                  </Typography>
+                  <Typography variant="body2">
+                    Que tal ser o primeiro a gerar um?
+                  </Typography>
+                </Box>
+              )}
+            </>
+          )}
+        </Stack>
+
+        {!fetchingCourses && totalCourses > COURSES_PER_PAGE && (
+          <Stack sx={{ mt: 6, alignItems: 'center' }}>
             <Pagination 
               count={Math.ceil(totalCourses / COURSES_PER_PAGE)} 
               page={page} 
               onChange={handlePageChange} 
               color="primary"
+              variant="outlined"
+              shape="rounded"
               size={isMobile ? "medium" : "large"}
             />
           </Stack>
         )}
       </Container>
-    </>
+    </Box>
   );
 };
 

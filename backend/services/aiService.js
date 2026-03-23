@@ -13,24 +13,30 @@ REGRAS DE ESTRUTURA E PEDAGOGIA:
 4. PROVA FINAL: Crie uma seção 'finalExam' com no MÍNIMO 10 e no MÁXIMO 20 perguntas que cubram todo o curso.
 5. RESPOSTAS: O campo 'correctAnswer' deve ser o texto EXATAMENTE IDÊNTICO a uma das opções do array 'options'.
 6. RATING: Atribua uma nota de 0.0 a 5.0 (ex: 4.8).
-7. IMAGEM: 'searchQuery' deve conter 2 substantivos concretos em inglês para busca de fotos.
+7. IMAGEM: 'searchQuery' deve conter 2 substantivos concretos em inglês para busca de fotos em bancos de imagem.
 
-ESTRUTURA JSON OBRIGATÓRIA:
+ESTRUTURA JSON OBRIGATÓRIA (Siga rigorosamente os nomes das chaves):
 {
   "title": "string",
-  "categoryName": "string",
-  "pixabay_category": "string",
-  "searchQuery": "string",
+  "category": {
+    "name": "string",
+    "slug": "string-em-lowercase"
+  },
   "description": "string (+300 caracteres)",
   "rating": number,
+  "searchQuery": "string",
   "modules": [
     { 
       "title": "string", 
       "content": "Markdown...",
-      "exercises": [ { "question": "string", "options": [], "correctAnswer": "string" } ]
+      "exercises": [ 
+        { "question": "string", "options": ["opção A", "opção B", "opção C", "opção D"], "correctAnswer": "texto da opção correta" } 
+      ]
     }
   ],
-  "finalExam": [ { "question": "string", "options": [], "correctAnswer": "string" } ]
+  "finalExam": [ 
+    { "question": "string", "options": ["A", "B", "C", "D"], "correctAnswer": "texto da opção correta" } 
+  ]
 }`;
 
 const generateCourseContent = async (topic, provider = 'groq') => {
@@ -44,60 +50,51 @@ const generateCourseContent = async (topic, provider = 'groq') => {
   try {
     if (!process.env.GROQ_API_KEY) throw new Error("API_KEY_MISSING");
 
+    // Chamada à API
     const completion = await groq.chat.completions.create({
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Gere um curso técnico exaustivo sobre: "${topic}".` }
+        { role: 'user', content: `Gere um curso técnico exaustivo e profissional sobre o tema: "${topic}".` }
       ],
       model: selected.model,
-      temperature: 0.5, 
+      temperature: 0.6, // Leve aumento para evitar repetições em cursos técnicos
       max_tokens: 8000, 
       response_format: { type: "json_object" }
     });
 
-    const headers = completion.response?.headers; 
-    
-    const remainingTokensStr = headers?.get('x-ratelimit-remaining-tokens');
-    const remainingRequestsStr = headers?.get('x-ratelimit-remaining-requests');
-    const resetTime = headers?.get('x-ratelimit-reset-tokens') || '1m';
-
-    const tokensRestantes = parseInt(remainingTokensStr);
-    
-    // Calibragem: 6000 é a média real de um curso de 5 módulos + prova
-    const cursosEstimados = isNaN(tokensRestantes) ? 10 : Math.floor(tokensRestantes / 6000);
-
+    // Extração de metadados de limite (Rate Limits)
+    // Nota: Em algumas versões do SDK, os headers vêm no objeto bruto da resposta
+    const usage = completion.usage || {};
     const content = JSON.parse(completion.choices[0].message.content);
-    
+
     return {
       ...content,
       aiProvider: selected.name,
       aiModel: selected.model,
-      // AJUSTE CRÍTICO: Mapeamos para CamelCase para o Sanity/Backend somarem corretamente
+      // Mapeamento para o Schema do Sanity (CamelCase)
       usage: {
-        promptTokens: completion.usage?.prompt_tokens || 0,
-        completionTokens: completion.usage?.completion_tokens || 0,
-        totalTokens: completion.usage?.total_tokens || 0
+        promptTokens: usage.prompt_tokens || 0,
+        completionTokens: usage.completion_tokens || 0,
+        totalTokens: usage.total_tokens || 0
       },
-      limits: {
-        remainingTokens: tokensRestantes || 'N/A',
-        remainingRequests: remainingRequestsStr || 'N/A',
-        resetTime: resetTime,
-        estimatedCoursesLeft: Math.max(0, cursosEstimados)
-      }
+      // Metadados para controle interno do sistema
+      generatedAt: new Date().toISOString()
     };
 
   } catch (error) {
-    if (error.status === 429 || (error.message && error.message.includes('rate_limit'))) {
+    // Tratamento de Erro de Cota (Rate Limit)
+    if (error.status === 429 || error.message?.includes('rate_limit')) {
       const quotaError = new Error("QUOTA_EXCEEDED");
       quotaError.status = 429;
       quotaError.provider = provider;
-      quotaError.resetTime = error.headers?.['retry-after'] || error.headers?.['x-ratelimit-reset-requests'] || "1m";
+      // Tenta pegar o tempo de reset dos headers se disponível
+      quotaError.resetTime = error.headers?.['retry-after'] || "1m";
       throw quotaError;
     }
 
     if (error.status === 401) throw new Error("AUTH_ERROR");
 
-    console.error(`❌ Erro crítico no AI Service (${provider}):`, error.message);
+    console.error(`❌ Erro no AI Service (${provider}):`, error.message);
     throw error;
   }
 };

@@ -26,7 +26,7 @@ export default {
         { 
           name: 'slug', 
           title: 'Slug da Categoria', 
-          type: 'string', // ALTERADO: De 'slug' para 'string' para evitar erros de validação
+          type: 'string',
         },
       ]
     },
