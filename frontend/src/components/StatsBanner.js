@@ -61,7 +61,6 @@ const StatsBanner = ({ stats, fetching }) => {
     <Box 
       sx={{ 
         width: '100%',
-        bgcolor: 'background.paper',
         // Removidas as margens e paddings que causavam a assimetria
         // O respiro será controlado pelo Dashboard para ser idêntico em cima e embaixo
       }}

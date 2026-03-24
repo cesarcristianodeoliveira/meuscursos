@@ -87,23 +87,24 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
   return (
     <>
       <Toolbar />
-      <Box sx={{ alignItems: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', px: 2, py: { xs: 4, md: 8 }, width: '100%' }}>
+      <Box sx={{ alignItems: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', px: 2, py: 4, width: '100%' }}>
         
         {/* TITULOS */}
-        <Box sx={{ textAlign: 'center', mb: 1.5 }}>
-          <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-block', mr: 1.5, fontSize: { xs: '1.25rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
+        <Box sx={{ textAlign: 'center', mb: 1 }}>
+          <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-block', mr: 1.5, fontSize: { xs: '2rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
             O que vamos
           </Typography>
           <Typography 
             variant="h3"
             sx={{ 
               fontWeight: 800,
-              background: `linear-gradient(135deg, ${blue[400]} 0%, ${blue[700]} 100%)`,
+              // background: `linear-gradient(135deg, ${blue[400]} 0%, ${blue[700]} 100%)`,
+              background: `linear-gradient(135deg, ${blue[300]} 0%, ${blue[700]} 100%)`,
               backgroundClip: 'text',
               WebkitBackgroundClip: 'text',
               color: 'transparent',
               display: 'inline-block',
-              fontSize: { xs: '1.25rem', md: '3.5rem' },
+              fontSize: { xs: '2rem', md: '3.5rem' },
               letterSpacing: '-0.02em'
             }}
           >
@@ -115,7 +116,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
           align='center' 
           variant='h5' 
           color='text.secondary'
-          sx={{ mb: 6, fontSize: { xs: '1rem', md: '1.4rem' }, fontWeight: 400, opacity: 0.8 }}
+          sx={{ mb: 2, fontSize: { xs: '1.2rem', md: '1.4rem' }, fontWeight: 400, opacity: 0.8 }}
         >
           Cursos com Inteligência Artifical.
         </Typography>
@@ -148,17 +149,17 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   disabled={isGenerating}
                   InputProps={{
                     disableUnderline: true,
-                    sx: { p: 3, fontSize: { xs: '1rem', md: '1.25rem' }, pr: 8 },
+                    sx: { p: 3, fontSize: { xs: '1rem', md: '1.25rem' }, pr: 9, transition: 'none' },
                     endAdornment: (
-                      <InputAdornment position="end" sx={{ position: 'absolute', right: 16 }}>
+                      <InputAdornment position="end" sx={{ position: 'absolute', right: 16, ml: [0] }}>
                         {topic ? (
-                          <IconButton onClick={() => setTopic('')} size="small">
-                            <Clear fontSize="small" />
+                          <IconButton onClick={() => setTopic('')}>
+                            <Clear />
                           </IconButton>
                         ) : (
                           <Tooltip placement='left' title="Usar sugestão">
-                            <IconButton onClick={() => setTopic(randomPlaceholder)} color="primary" size="small">
-                              <ContentCopy fontSize="small" />
+                            <IconButton onClick={() => setTopic(randomPlaceholder)} color="primary">
+                              <ContentCopy />
                             </IconButton>
                           </Tooltip>
                         )}
@@ -179,7 +180,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                       onChange={(e) => setSelectedProvider(e.target.value)}
                       variant="outlined"
                       sx={{ 
-                        minWidth: 150, borderRadius: 2, bgcolor: 'background.paper',
+                        minWidth: 128, borderRadius: 2, bgcolor: 'background.paper',
                         '& .MuiSelect-select': { py: 1, display: 'flex', alignItems: 'center' }
                       }}
                     >
@@ -212,15 +213,17 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                     )}
                     
                     <IconButton 
+                      color='secondary'
                       type="submit" 
                       disabled={!topic.trim() || isGenerating || isProviderDisabled || isChecking}
                       sx={{ 
-                        bgcolor: 'secondary.main', color: 'white', width: 48, height: 48,
-                        '&:hover': { bgcolor: 'secondary.dark' },
-                        '&.Mui-disabled': { bgcolor: 'action.disabledBackground' }
+                        // bgcolor: 'secondary.main', color: 'white', 
+                        width: 48, height: 48,
+                        // '&:hover': { bgcolor: 'secondary.dark' },
+                        // '&.Mui-disabled': { bgcolor: 'action.disabledBackground' }
                       }}
                     >
-                      {isChecking ? <CircularProgress size={20} color="inherit" /> : <Send fontSize="small" />}
+                      {isChecking ? <CircularProgress size={20} color="inherit" /> : <Send />}
                     </IconButton>
                   </Box>
                 </Box>

@@ -106,7 +106,7 @@ const Dashboard = () => {
         onGenerate={() => generateCourse(topic, onGenerateSuccess)} 
       />
 
-      <Container maxWidth="xl" sx={{ mt: { xs: -2, md: -4 }, position: 'relative', zIndex: 2 }}>
+      <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 2 }}>
         <StatsBanner stats={stats} fetching={!initialDataLoaded} />
       </Container>
 
