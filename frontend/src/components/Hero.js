@@ -133,7 +133,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
             align='center' 
             variant='h5' 
             color='text.secondary'
-            sx={{ mb: 2, fontSize: { xs: '1.2rem', md: '1.4rem' }, fontWeight: 400, opacity: 0.8 }}
+            sx={{ mb: 2, fontSize: { xs: '1.25rem', md: '2.0243rem' }, fontWeight: 400, opacity: 0.8 }}
           >
             Cursos com Inteligência Artifical.
           </Typography>
