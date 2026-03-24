@@ -32,9 +32,7 @@ const generateCourse = async (req, res) => {
     const rawModules = courseData.modules || [];
     if (rawModules.length === 0) throw new Error('A IA falhou ao gerar os módulos.');
 
-    // --- Passo 2: Cálculos de Tempo e Rating (CORRIGIDOS) ---
-    
-    // 1. Somamos todo o conteúdo textual para um cálculo real
+    // --- Passo 2: Cálculos de Tempo e Rating ---
     const allText = [
       courseData.title || "",
       courseData.description || "",
@@ -42,24 +40,19 @@ const generateCourse = async (req, res) => {
     ].join(" ");
 
     const wordCount = allText.split(/\s+/).filter(w => w.length > 0).length;
-    
-    // Métrica: 180 palavras por minuto (leitura técnica/educacional)
     const readingMinutes = wordCount / 180; 
 
-    // Métrica: Exercícios dos módulos (2 min cada) + Prova final (3 min cada questão)
     const moduleExercisesCount = rawModules.reduce((acc, mod) => acc + (mod.exercises?.length || 0), 0);
     const finalExamCount = (courseData.finalExam?.length || 0);
     const activityMinutes = (moduleExercisesCount * 2) + (finalExamCount * 3);
 
-    // Tempo total com 10% de margem para navegação/reflexão
     const totalMinutes = (readingMinutes + activityMinutes) * 1.1;
 
-    // FORÇAR NUMBER COM PONTO: Number(value.toFixed(1)) garante o tipo numérico puro
+    // Persistindo como Number puro para evitar erros de localidade (ponto vs vírgula)
     const finalEstimatedTime = Number(Math.max(0.5, totalMinutes / 60).toFixed(1));
 
-    // RATING: Garantir que seja número entre 4 e 5 com ponto decimal
     let rawRating = Number(courseData.rating) || 4.5;
-    if (rawRating < 4) rawRating = 4.3; // Ajuste para cursos não ficarem com nota baixa
+    if (rawRating < 4) rawRating = 4.3;
     if (rawRating > 5) rawRating = 5.0;
     const finalRating = Number(rawRating.toFixed(1));
 
@@ -88,8 +81,8 @@ const generateCourse = async (req, res) => {
       title: finalTitle,
       slug: { _type: 'slug', current: slugCandidate },
       description: courseData.description,
-      estimatedTime: finalEstimatedTime, // Gravado como Number puro
-      rating: finalRating,               // Gravado como Number puro
+      estimatedTime: finalEstimatedTime, 
+      rating: finalRating,
       aiProvider: courseData.aiProvider || "Groq",
       aiModel: courseData.aiModel || "llama-3.3-70b",
 
@@ -125,15 +118,19 @@ const generateCourse = async (req, res) => {
       }))
     };
 
-    // Ajuste da estrutura da imagem para o Sanity
+    // CORREÇÃO: Extração segura do ID para o campo _ref (Evita o ClientError do log)
     if (imageAsset) {
-      doc.thumbnail = {
-        _type: 'image',
-        asset: {
-          _type: 'reference',
-          _ref: imageAsset._id || imageAsset
-        }
-      };
+      const assetId = typeof imageAsset === 'string' ? imageAsset : (imageAsset._id || imageAsset.id);
+      
+      if (assetId) {
+        doc.thumbnail = {
+          _type: 'image',
+          asset: {
+            _type: 'reference',
+            _ref: assetId
+          }
+        };
+      }
     }
 
     // --- Passo 6: Persistência ---
