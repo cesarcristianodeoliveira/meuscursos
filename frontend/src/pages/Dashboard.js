@@ -139,10 +139,10 @@ const Dashboard = () => {
                 <Box sx={{ textAlign: 'center', py: 10, opacity: 0.6 }}>
                   <MenuBook sx={{ fontSize: 48, mb: 2 }} />
                   <Typography variant="h6">
-                    Nenhum curso nesta categoria ainda.
+                    Nenhum curso encontrado.
                   </Typography>
                   <Typography variant="body2">
-                    Que tal ser o primeiro a gerar um?
+                    Seja o primeiro a criar!
                   </Typography>
                 </Box>
               )}

@@ -57,7 +57,7 @@ function ScrollTop() {
         role="presentation"
         sx={{ position: 'fixed', bottom: 16, right: 16, zIndex: 1000 }}
       >
-        <Fab color="primary" size="small" aria-label="voltar ao topo">
+        <Fab color="secondary" size="small" aria-label="voltar ao topo">
           <KeyboardArrowUp />
         </Fab>
       </Box>
