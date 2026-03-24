@@ -11,6 +11,7 @@ import {
 import { Send, ContentCopy, Clear, WarningAmber } from '@mui/icons-material';
 import { useCourse } from '../contexts/CourseContext';
 import { useAppTheme } from '../contexts/ThemeContext';
+import { useNavigate } from 'react-router-dom'; // Importado para o redirecionamento
 import { blue, grey, red, green } from '@mui/material/colors';
 import prompts from '../utils/prompts';
 
@@ -42,13 +43,15 @@ function CircularProgressWithLabel({ value }) {
   );
 }
 
-const Hero = ({ topic, setTopic, onGenerate }) => {
+const Hero = ({ topic, setTopic }) => {
   const [randomPlaceholder, setRandomPlaceholder] = useState('');
+  const navigate = useNavigate();
 
   const { 
     isGenerating, 
     progress, 
     statusMessage, 
+    generateCourse, // Pegando a função do contexto
     selectedProvider, 
     setSelectedProvider, 
     providers 
@@ -58,7 +61,6 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
 
   const currentProvider = providers.find(p => p.id === selectedProvider) || providers[0];
   
-  // Lógica de bloqueio aprimorada para o Render
   const isChecking = currentProvider?.quotaLabel.includes('Verificando') || currentProvider?.quotaLabel.includes('Consultando');
   const isProviderDisabled = !currentProvider?.enabled && !isChecking;
 
@@ -80,7 +82,13 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (topic.trim() && !isGenerating && !isProviderDisabled && !isChecking) {
-      onGenerate();
+      // Chama a geração e define o que acontece ao terminar
+      generateCourse(topic, (newSlug) => {
+        // Aguarda 2 segundos na tela de 100% para o usuário ler "Curso Pronto"
+        setTimeout(() => {
+          navigate(`/course/${newSlug}`);
+        }, 2000);
+      });
     }
   };
 
@@ -115,7 +123,6 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
               variant="h3"
               sx={{ 
                 fontWeight: 800,
-                // background: `linear-gradient(135deg, ${blue[400]} 0%, ${blue[700]} 100%)`,
                 background: `linear-gradient(135deg, ${blue[300]} 0%, ${blue[700]} 100%)`,
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
@@ -224,7 +231,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                       {isProviderDisabled && (
-                        <Tooltip placement='left' title="Limite atingido.">
+                        <Tooltip placement='left' title="Limite atingido">
                           <WarningAmber sx={{ color: red[500] }} />
                         </Tooltip>
                       )}
@@ -233,12 +240,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                         color='secondary'
                         type="submit" 
                         disabled={!topic.trim() || isGenerating || isProviderDisabled || isChecking}
-                        sx={{ 
-                          // bgcolor: 'secondary.main', color: 'white', 
-                          width: 48, height: 48,
-                          // '&:hover': { bgcolor: 'secondary.dark' },
-                          // '&.Mui-disabled': { bgcolor: 'action.disabledBackground' }
-                        }}
+                        sx={{ width: 48, height: 48 }}
                       >
                         {isChecking ? <CircularProgress size={20} color="inherit" /> : <Send />}
                       </IconButton>
