@@ -26,23 +26,42 @@ const generateCourse = async (req, res) => {
 
     // --- Passo 1: IA Gerando Conteúdo ---
     const courseData = await generateCourseContent(topic, provider);
-    
+
     sendProgress(40, "Conteúdo estruturado. Analisando métricas pedagógicas...");
 
     const rawModules = courseData.modules || [];
     if (rawModules.length === 0) throw new Error('A IA falhou ao gerar os módulos.');
 
-    // --- Passo 2: Cálculos de Tempo e Rating ---
-    const allText = (courseData.description || "") + 
-                    rawModules.reduce((acc, mod) => acc + (mod.content || ""), "");
+    // --- Passo 2: Cálculos de Tempo e Rating (CORRIGIDOS) ---
     
+    // 1. Somamos todo o conteúdo textual para um cálculo real
+    const allText = [
+      courseData.title || "",
+      courseData.description || "",
+      ...rawModules.map(m => (m.title || "") + " " + (m.content || ""))
+    ].join(" ");
+
     const wordCount = allText.split(/\s+/).filter(w => w.length > 0).length;
-    const readingMinutes = wordCount / 200; // 200 palavras/min para conteúdo técnico
-    const totalExercises = rawModules.reduce((acc, mod) => acc + (mod.exercises?.length || 0), 0);
-    const activityMinutes = (totalExercises * 2) + (courseData.finalExam?.length || 10) * 1.5;
     
-    const finalEstimatedTime = Math.max(0.5, parseFloat(((readingMinutes + activityMinutes) / 60).toFixed(1)));
-    const finalRating = Math.round((Number(courseData.rating) || 4.5) * 2) / 2;
+    // Métrica: 180 palavras por minuto (leitura técnica/educacional)
+    const readingMinutes = wordCount / 180; 
+
+    // Métrica: Exercícios dos módulos (2 min cada) + Prova final (3 min cada questão)
+    const moduleExercisesCount = rawModules.reduce((acc, mod) => acc + (mod.exercises?.length || 0), 0);
+    const finalExamCount = (courseData.finalExam?.length || 0);
+    const activityMinutes = (moduleExercisesCount * 2) + (finalExamCount * 3);
+
+    // Tempo total com 10% de margem para navegação/reflexão
+    const totalMinutes = (readingMinutes + activityMinutes) * 1.1;
+
+    // FORÇAR NUMBER COM PONTO: Number(value.toFixed(1)) garante o tipo numérico puro
+    const finalEstimatedTime = Number(Math.max(0.5, totalMinutes / 60).toFixed(1));
+
+    // RATING: Garantir que seja número entre 4 e 5 com ponto decimal
+    let rawRating = Number(courseData.rating) || 4.5;
+    if (rawRating < 4) rawRating = 4.3; // Ajuste para cursos não ficarem com nota baixa
+    if (rawRating > 5) rawRating = 5.0;
+    const finalRating = Number(rawRating.toFixed(1));
 
     // --- Passo 3: Tratamento de Slug e Título ---
     const finalTitle = courseData.title || topic;
@@ -53,7 +72,6 @@ const generateCourse = async (req, res) => {
     // --- Passo 4: Upload da Imagem ---
     let imageAsset = null;
     try {
-      // Usamos o searchQuery retornado pela IA para maior precisão na imagem
       imageAsset = await fetchAndUploadImage(
         courseData.searchQuery || topic, 
         "education" 
@@ -64,26 +82,24 @@ const generateCourse = async (req, res) => {
 
     sendProgress(85, "Finalizando montagem do material didático...");
 
-    // --- Passo 5: Montagem do Documento Sanity Corrigida ---
+    // --- Passo 5: Montagem do Documento Sanity ---
     const doc = {
       _type: 'course',
       title: finalTitle,
       slug: { _type: 'slug', current: slugCandidate },
       description: courseData.description,
-      estimatedTime: finalEstimatedTime, 
-      rating: finalRating,
-      aiProvider: courseData.aiProvider,
-      aiModel: courseData.aiModel,
-      
-      // Sincronizado com o Schema: stats.totalTokens
+      estimatedTime: finalEstimatedTime, // Gravado como Number puro
+      rating: finalRating,               // Gravado como Number puro
+      aiProvider: courseData.aiProvider || "Groq",
+      aiModel: courseData.aiModel || "llama-3.3-70b",
+
       stats: {
         promptTokens: courseData.usage?.promptTokens || 0,
         completionTokens: courseData.usage?.completionTokens || 0,
         totalTokens: courseData.usage?.totalTokens || 0,
-        generatedAt: courseData.generatedAt || new Date().toISOString()
+        generatedAt: new Date().toISOString()
       },
 
-      // CORREÇÃO: category.slug agora é STRING (conforme mudamos no Schema)
       category: {
         name: courseData.category?.name || "Geral",
         slug: formatSlug(courseData.category?.slug || courseData.category?.name || "geral")
@@ -109,12 +125,21 @@ const generateCourse = async (req, res) => {
       }))
     };
 
-    if (imageAsset) doc.thumbnail = imageAsset;
+    // Ajuste da estrutura da imagem para o Sanity
+    if (imageAsset) {
+      doc.thumbnail = {
+        _type: 'image',
+        asset: {
+          _type: 'reference',
+          _ref: imageAsset._id || imageAsset
+        }
+      };
+    }
 
     // --- Passo 6: Persistência ---
     sendProgress(95, "Salvando no banco de dados e gerando certificados...");
     const result = await client.create(doc);
-    
+
     const finalResult = JSON.stringify({ 
       progress: 100,
       message: 'Curso gerado com sucesso!', 
@@ -127,14 +152,10 @@ const generateCourse = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Erro no Controller:", error);
-
     const errorResponse = {
-      error: error.message === "QUOTA_EXCEEDED" ? "QUOTA_EXCEEDED" : "SERVER_ERROR",
-      message: error.message,
-      provider: error.provider || provider,
-      resetTime: error.resetTime || "1m"
+      error: "SERVER_ERROR",
+      message: error.message
     };
-
     res.write(`data: ${JSON.stringify(errorResponse)}\n\n`);
     res.end();
   }

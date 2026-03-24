@@ -91,7 +91,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
         
         {/* TITULOS */}
         <Box sx={{ textAlign: 'center', mb: 1.5 }}>
-          <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-block', mr: 1.5, fontSize: { xs: '2rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
+          <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-block', mr: 1.5, fontSize: { xs: '1rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
             O que vamos
           </Typography>
           <Typography 
@@ -103,7 +103,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
               WebkitBackgroundClip: 'text',
               color: 'transparent',
               display: 'inline-block',
-              fontSize: { xs: '2rem', md: '3.5rem' },
+              fontSize: { xs: '1rem', md: '3.5rem' },
               letterSpacing: '-0.02em'
             }}
           >
@@ -117,7 +117,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
           color='text.secondary'
           sx={{ mb: 6, fontSize: { xs: '1rem', md: '1.4rem' }, fontWeight: 400, opacity: 0.8 }}
         >
-          Crie ou estude cursos com inteligência artifical.
+          Cursos com Inteligência Artifical.
         </Typography>
 
         {/* FORMULÁRIO */}
