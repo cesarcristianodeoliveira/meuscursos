@@ -136,7 +136,7 @@ const Dashboard = () => {
               ))}
               
               {courses.length === 0 && (
-                <Box sx={{ textAlign: 'center', py: 10, opacity: 0.6 }}>
+                <Box sx={{ textAlign: 'center', opacity: 0.75 }}>
                   <MenuBook sx={{ fontSize: 48, mb: 2 }} />
                   <Typography variant="h6">
                     Nenhum curso encontrado.

@@ -24,6 +24,8 @@ const Navbar = forwardRef((props, ref) => {
       position="fixed" // Alterado de sticky para fixed para garantir que a barra de progresso flutue no topo
       elevation={0}
       sx={{ 
+        backgroundColor: resolvedMode === 'light' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(18, 18, 18, 0.6)',
+        backdropFilter: 'blur(8px)',
         zIndex: (theme) => theme.zIndex.drawer + 1 // Garante que fique acima de outros elementos
       }}
     >

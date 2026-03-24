@@ -224,7 +224,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                       {isProviderDisabled && (
-                        <Tooltip title="Limite atingido para este provedor.">
+                        <Tooltip placement='left' title="Limite atingido.">
                           <WarningAmber sx={{ color: red[500] }} />
                         </Tooltip>
                       )}
