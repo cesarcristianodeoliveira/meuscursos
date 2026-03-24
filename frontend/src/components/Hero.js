@@ -91,7 +91,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
         
         {/* TITULOS */}
         <Box sx={{ textAlign: 'center', mb: 1.5 }}>
-          <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-block', mr: 1.5, fontSize: { xs: '1rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
+          <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-block', mr: 1.5, fontSize: { xs: '1.25rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
             O que vamos
           </Typography>
           <Typography 
@@ -103,7 +103,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
               WebkitBackgroundClip: 'text',
               color: 'transparent',
               display: 'inline-block',
-              fontSize: { xs: '1rem', md: '3.5rem' },
+              fontSize: { xs: '1.25rem', md: '3.5rem' },
               letterSpacing: '-0.02em'
             }}
           >
@@ -148,7 +148,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   disabled={isGenerating}
                   InputProps={{
                     disableUnderline: true,
-                    sx: { p: 3, fontSize: { xs: '1.1rem', md: '1.3rem' }, pr: 8 },
+                    sx: { p: 3, fontSize: { xs: '1rem', md: '1.25rem' }, pr: 8 },
                     endAdornment: (
                       <InputAdornment position="end" sx={{ position: 'absolute', right: 16 }}>
                         {topic ? (
