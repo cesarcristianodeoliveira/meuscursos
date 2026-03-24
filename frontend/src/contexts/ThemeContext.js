@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import { createTheme, ThemeProvider, CssBaseline, responsiveFontSizes } from '@mui/material';
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
@@ -10,12 +10,10 @@ import { blue, grey } from '@mui/material/colors';
 const ThemeContext = createContext();
 
 export const ThemeProviderWrapper = ({ children }) => {
-  // 1. Inicia com o valor do localStorage ou 'system'
   const [mode, setMode] = useState(() => {
     return localStorage.getItem('themeMode') || 'system';
   });
 
-  // 2. Resolve qual é o tema real (considerando o sistema)
   const resolvedMode = useMemo(() => {
     if (mode === 'system') {
       return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -23,14 +21,12 @@ export const ThemeProviderWrapper = ({ children }) => {
     return mode;
   }, [mode]);
 
-  // 3. Função para alternar entre light e dark
   const toggleTheme = () => {
     const newMode = resolvedMode === 'light' ? 'dark' : 'light';
     setMode(newMode);
     localStorage.setItem('themeMode', newMode);
   };
 
-  // 4. Configuração do Objeto de Tema
   const theme = useMemo(() => {
     let baseTheme = createTheme({
       palette: {
@@ -43,7 +39,14 @@ export const ThemeProviderWrapper = ({ children }) => {
         mode: resolvedMode,
       },
       typography: {
-        fontFamily: 'Roboto, sans-serif'
+        fontFamily: [
+          'Roboto',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Segoe UI"',
+          'Arial',
+          'sans-serif',
+        ].join(','),
       },
       components: {
         MuiTypography: {
@@ -57,15 +60,35 @@ export const ThemeProviderWrapper = ({ children }) => {
       },
     });
 
-    // A mágica acontece aqui: 
-    // Esta função envolve o tema e torna todas as fontes responsivas
     return responsiveFontSizes(baseTheme);
   }, [resolvedMode]);
+
+  // 🔥 Adiciona CSS global para garantir font-display
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      /* Garante que todas as fontes usem swap */
+      @font-face {
+        font-family: 'Roboto';
+        font-display: swap;
+      }
+      
+      /* Aplica a fonte com fallback imediatamente */
+      body, h1, h2, h3, h4, h5, h6, button, input, textarea {
+        font-family: ${theme.typography.fontFamily};
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, [theme]);
 
   return (
     <ThemeContext.Provider value={{ mode, toggleTheme, resolvedMode }}>
       <ThemeProvider theme={theme} disableTransitionOnChange>
-        <CssBaseline />
+        <CssBaseline enableColorScheme />
         {children}
       </ThemeProvider>
     </ThemeContext.Provider>
