@@ -3,6 +3,9 @@ import { client } from '../client';
 
 const CourseContext = createContext();
 
+// Constante de paginação centralizada para consistência em todo o app
+export const COURSES_PER_PAGE = 6;
+
 export const CourseProvider = ({ children }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -18,6 +21,9 @@ export const CourseProvider = ({ children }) => {
   const [stats, setStats] = useState({ courses: 0, lessons: 0, quizzes: 0, categories: 0 });
   const [categories, setCategories] = useState(['Recentes']);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+
+  // Variável calculada para controlar o ScrollToTop inteligente no App.js
+  const hasPagination = stats.courses > COURSES_PER_PAGE;
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
@@ -145,14 +151,14 @@ export const CourseProvider = ({ children }) => {
       setProgress(100);
       setStatusMessage('Curso pronto! Preparando sua sala de aula...');
       
-      fetchGlobalData(true);
+      // Forçamos a atualização dos stats globais para que o 'hasPagination' seja recalculado
+      await fetchGlobalData(true);
       checkQuotas(); 
 
       if (onFinish && currentSlug) {
         onFinish(currentSlug);
       }
 
-      // Limpa os estados de progresso após o redirecionamento ter iniciado
       setTimeout(() => {
         setIsGenerating(false);
         setProgress(0);
@@ -176,7 +182,8 @@ export const CourseProvider = ({ children }) => {
       stats, categories, fetchGlobalData, 
       initialDataLoaded, selectedProvider, setSelectedProvider,
       providers, checkQuotas,
-      setIsGenerating
+      setIsGenerating,
+      hasPagination // Expondo para o ScrollTop no App.js
     }}>
       {children}
     </CourseContext.Provider>
