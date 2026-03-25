@@ -86,7 +86,7 @@ const Hero = ({ topic, setTopic }) => {
       generateCourse(topic, (newSlug) => {
         // Aguarda 2 segundos na tela de 100% para o usuário ler "Curso Pronto"
         setTimeout(() => {
-          navigate(`/course/${newSlug}`);
+          navigate(`/curso/${newSlug}`);
         }, 2000);
       });
     }
