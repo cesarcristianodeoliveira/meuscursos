@@ -33,30 +33,25 @@ const Dashboard = () => {
   const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState('Recentes');
 
-  // 1. Carrega Stats e Categorias apenas uma vez (no mount)
   useEffect(() => {
     fetchGlobalData();
   }, [fetchGlobalData]);
 
-  // 2. Busca de Cursos (Refatorada para o novo Schema de Categoria)
   const fetchCoursesList = useCallback(async () => {
     setFetchingCourses(true);
     try {
-      // Ajuste na Query: category.name agora é o que filtramos
       let conditions = ['_type == "course"'];
       if (categoryFilter !== 'Recentes') {
         conditions.push(`category.name == "${categoryFilter}"`);
       }
       const filter = `*[${conditions.join(' && ')}]`;
       
-      // Busca otimizada: Contagem e Dados em paralelo via GROQ
       const query = `{
         "total": count(${filter}),
         "items": ${filter} | order(_createdAt desc) [${(page - 1) * COURSES_PER_PAGE}...${page * COURSES_PER_PAGE - 1}]
       }`;
 
       const result = await client.fetch(query);
-
       setTotalCourses(result.total);
       setCourses(result.items || []);
     } catch (err) {
@@ -67,39 +62,51 @@ const Dashboard = () => {
     }
   }, [page, categoryFilter]);
 
-  // 3. Gatilho de Sincronização
   useEffect(() => {
     fetchCoursesList();
   }, [fetchCoursesList, initialDataLoaded]);
 
-  // 4. Scroll Suave Otimizado
+  // Função de Scroll revisada
   const scrollToTabs = useCallback(() => {
     const anchor = document.querySelector('#tabs-scroll-point');
     if (anchor) {
-      anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Offset para compensar a Navbar Fixa
+      const offset = isMobile ? 70 : 80; 
+      const bodyRect = document.body.getBoundingClientRect().top;
+      const elementRect = anchor.getBoundingClientRect().top;
+      const elementPosition = elementRect - bodyRect;
+      const offsetPosition = elementPosition - offset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
     }
-  }, []);
+  }, [isMobile]);
 
   const handlePageChange = (event, value) => {
     setPage(value);
-    scrollToTabs();
+    // REGRA SOLICITADA: Só faz scroll se houver mais de uma página (paginação ativa)
+    if (totalCourses > COURSES_PER_PAGE) {
+      scrollToTabs();
+    }
   };
 
   const handleTabChange = (event, newValue) => {
     setCategoryFilter(newValue);
     setPage(1);
+    // No caso de troca de aba, geralmente queremos voltar ao topo da lista
     scrollToTabs();
   };
 
   const onGenerateSuccess = useCallback(() => {
     setTopic('');
-    setPage(1); // Volta para a página 1 para ver o novo curso
-    setCategoryFilter('Recentes'); // Limpa filtro para garantir que o novo apareça
+    setPage(1);
+    setCategoryFilter('Recentes');
   }, []);
 
   return (
     <Box sx={{ pb: 10 }}>
-      {/* Hero mantendo seu layout original e recebendo as props de estado */}
       <Hero 
         topic={topic} 
         setTopic={setTopic} 
@@ -107,7 +114,6 @@ const Dashboard = () => {
       />
 
       <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 2 }}>
-        {/* Banner de estatísticas que você criou */}
         <StatsBanner stats={stats} fetching={!initialDataLoaded} />
       </Container>
 
@@ -123,9 +129,6 @@ const Dashboard = () => {
         )}
       </Box>
 
-      {/* Ponto de ancoragem para o scroll ao mudar de página/categoria */}
-      <div id="tabs-scroll-point" style={{ position: 'relative', top: isMobile ? '-80px' : '-100px' }} />
-
       <Container maxWidth="xl">
         <Stack spacing={3} sx={{ mt: 3 }}>
           {fetchingCourses ? (
@@ -137,13 +140,13 @@ const Dashboard = () => {
               ))}
               
               {courses.length === 0 && (
-                <Box sx={{ textAlign: 'center', opacity: 0.75, py: 8 }}>
-                  <MenuBook sx={{ fontSize: 32, mb: 1 }} />
-                  <Typography variant="h6">
-                    Nenhum curso encontrado.
+                <Box sx={{ textAlign: 'center', opacity: 0.75, py: 10 }}>
+                  <MenuBook sx={{ fontSize: 40, mb: 2, color: 'secondary.main' }} />
+                  <Typography variant="h6" fontWeight={700}>
+                    Nenhum curso nesta categoria ainda.
                   </Typography>
                   <Typography variant="body2">
-                    Seja o primeiro a criar!
+                    Que tal ser o primeiro a explorar este tema?
                   </Typography>
                 </Box>
               )}
@@ -152,12 +155,12 @@ const Dashboard = () => {
         </Stack>
 
         {!fetchingCourses && totalCourses > COURSES_PER_PAGE && (
-          <Stack sx={{ mt: 6, alignItems: 'center' }}>
+          <Stack sx={{ mt: 8, alignItems: 'center' }}>
             <Pagination 
               count={Math.ceil(totalCourses / COURSES_PER_PAGE)} 
               page={page} 
               onChange={handlePageChange} 
-              color="primary"
+              color="secondary" // Ajustado para combinar com seu tema
               variant="outlined"
               shape="rounded"
               size={isMobile ? "medium" : "large"}
