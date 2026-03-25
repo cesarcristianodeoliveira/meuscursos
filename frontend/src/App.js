@@ -69,10 +69,15 @@ const AppContent = () => {
   return (
     <Router>
       <ScrollToTop />
-      {/* Ponto zero absoluto da aplicação */}
       <div id="back-to-top-anchor" />
 
-      <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
+      {/* overflowX hidden evita quebras de layout em animações laterais */}
+      <Box sx={{ 
+        flexGrow: 1, 
+        minHeight: '100vh', 
+        bgcolor: 'background.default',
+        overflowX: 'hidden' 
+      }}>
         
         <Navbar />
         

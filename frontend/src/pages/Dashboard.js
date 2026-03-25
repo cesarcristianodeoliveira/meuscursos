@@ -49,7 +49,7 @@ const Dashboard = () => {
       }
       const filter = `*[${conditions.join(' && ')}]`;
       
-      // Busca otimizada: Contagem e Dados em paralelo
+      // Busca otimizada: Contagem e Dados em paralelo via GROQ
       const query = `{
         "total": count(${filter}),
         "items": ${filter} | order(_createdAt desc) [${(page - 1) * COURSES_PER_PAGE}...${page * COURSES_PER_PAGE - 1}]
@@ -70,7 +70,7 @@ const Dashboard = () => {
   // 3. Gatilho de Sincronização
   useEffect(() => {
     fetchCoursesList();
-  }, [fetchCoursesList, initialDataLoaded]); // Recarrega se a página mudar OU se um novo curso for gerado
+  }, [fetchCoursesList, initialDataLoaded]);
 
   // 4. Scroll Suave Otimizado
   const scrollToTabs = useCallback(() => {
@@ -99,7 +99,7 @@ const Dashboard = () => {
 
   return (
     <Box sx={{ pb: 10 }}>
-      {/* Hero agora recebe os providers do Context internamente via useCourse ou props se preferir */}
+      {/* Hero mantendo seu layout original e recebendo as props de estado */}
       <Hero 
         topic={topic} 
         setTopic={setTopic} 
@@ -107,6 +107,7 @@ const Dashboard = () => {
       />
 
       <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 2 }}>
+        {/* Banner de estatísticas que você criou */}
         <StatsBanner stats={stats} fetching={!initialDataLoaded} />
       </Container>
 
@@ -122,7 +123,7 @@ const Dashboard = () => {
         )}
       </Box>
 
-      {/* Ponto de ancoragem para o scroll */}
+      {/* Ponto de ancoragem para o scroll ao mudar de página/categoria */}
       <div id="tabs-scroll-point" style={{ position: 'relative', top: isMobile ? '-80px' : '-100px' }} />
 
       <Container maxWidth="xl">
@@ -136,7 +137,7 @@ const Dashboard = () => {
               ))}
               
               {courses.length === 0 && (
-                <Box sx={{ textAlign: 'center', opacity: 0.75 }}>
+                <Box sx={{ textAlign: 'center', opacity: 0.75, py: 8 }}>
                   <MenuBook sx={{ fontSize: 32, mb: 1 }} />
                   <Typography variant="h6">
                     Nenhum curso encontrado.

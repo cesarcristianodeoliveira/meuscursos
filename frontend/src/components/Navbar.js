@@ -21,7 +21,7 @@ const Navbar = forwardRef((props, ref) => {
       ref={ref} 
       {...props} 
       color="inherit" 
-      position="fixed" // Alterado de sticky para fixed para garantir que a barra de progresso flutue no topo
+      position="fixed" // Garante que a barra de progresso flutue no topo
       elevation={0}
       sx={{ 
         backgroundColor: resolvedMode === 'light' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(18, 18, 18, 0.6)',
@@ -42,11 +42,6 @@ const Navbar = forwardRef((props, ref) => {
             right: 0, 
             height: 4, // Um pouquinho mais grossa para visibilidade
             zIndex: 2000,
-            backgroundColor: 'transparent',
-            '& .MuiLinearProgress-bar': {
-              backgroundColor: 'primary.main', // Usa a cor principal da marca
-              boxShadow: '0 0 10px rgba(25, 118, 210, 0.5)', // Brilho suave
-            }
           }} 
         />
       )}
@@ -74,7 +69,7 @@ const Navbar = forwardRef((props, ref) => {
             sx={{ 
               fontWeight: 600,
               letterSpacing: '-0.02em',
-              display: { xs: 'none', sm: 'inherit' } // Ajustado para aparecer no mobile também se desejar
+              display: { xs: 'none', sm: 'inherit' } 
             }}
           >
             Meus Cursos

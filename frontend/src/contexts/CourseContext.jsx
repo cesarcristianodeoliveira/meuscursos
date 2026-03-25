@@ -132,14 +132,9 @@ export const CourseProvider = ({ children }) => {
 
             if (data.error) throw new Error(data.message || data.error);
             
-            // Atualização de UI
             if (data.progress !== undefined) setProgress(data.progress);
             if (data.message) setStatusMessage(data.message);
-            
-            // Captura o slug quando ele chegar no chunk final
-            if (data.slug) {
-                currentSlug = data.slug;
-            }
+            if (data.slug) currentSlug = data.slug;
             
           } catch (e) {
             console.warn("Falha ao processar chunk:", e);
@@ -147,27 +142,31 @@ export const CourseProvider = ({ children }) => {
         }
       }
 
-      // Finalização bem sucedida
       setProgress(100);
       setStatusMessage('Curso pronto! Preparando sua sala de aula...');
       
-      // Atualiza os dados globais em background
       fetchGlobalData(true);
       checkQuotas(); 
 
-      // Se tivermos o slug e o callback, dispara
       if (onFinish && currentSlug) {
         onFinish(currentSlug);
       }
 
+      // Limpa os estados de progresso após o redirecionamento ter iniciado
+      setTimeout(() => {
+        setIsGenerating(false);
+        setProgress(0);
+        setStatusMessage('');
+      }, 4000);
+
     } catch (error) {
       console.error("Erro na geração:", error);
       setStatusMessage(error.message || 'Erro inesperado ao gerar.');
-      // Em caso de erro, permitimos fechar o modal mais rápido
-      setTimeout(() => setIsGenerating(false), 4000);
+      setTimeout(() => {
+        setIsGenerating(false);
+        setProgress(0);
+      }, 4000);
     } 
-    // O reset do isGenerating agora é controlado pelo fluxo de sucesso ou erro,
-    // evitando que o modal feche antes do redirecionamento do Hero.
   };
 
   return (
@@ -177,7 +176,7 @@ export const CourseProvider = ({ children }) => {
       stats, categories, fetchGlobalData, 
       initialDataLoaded, selectedProvider, setSelectedProvider,
       providers, checkQuotas,
-      setIsGenerating // Exposto para caso precise forçar o fechamento
+      setIsGenerating
     }}>
       {children}
     </CourseContext.Provider>
