@@ -21,7 +21,6 @@ export const CourseProvider = ({ children }) => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
-  // --- CÁLCULO DE PROGRESSO (Resolve o erro do CourseCard) ---
   const getCourseProgress = useCallback((course) => {
     if (!course || !course._id) return 0;
     try {
@@ -37,7 +36,6 @@ export const CourseProvider = ({ children }) => {
     }
   }, []);
 
-  // --- SINCRONIZAÇÃO DE COTAS ---
   const checkQuotas = useCallback(async (retries = 3) => {
     try {
       const response = await fetch(`${API_BASE_URL}/provider-status?t=${Date.now()}`);
@@ -71,7 +69,6 @@ export const CourseProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, [checkQuotas]);
 
-  // --- BUSCA DE DADOS GLOBAIS ---
   const fetchGlobalData = useCallback(async (force = false) => {
     if (initialDataLoaded && !force) return;
     try {
@@ -96,13 +93,14 @@ export const CourseProvider = ({ children }) => {
     }
   }, [initialDataLoaded]);
 
-  // --- GERAÇÃO DE CURSO (Streaming) ---
   const generateCourse = async (topic, onFinish) => {
     if (isGenerating) return;
 
     setIsGenerating(true);
     setProgress(1); 
     setStatusMessage(`Iniciando motor de IA para: ${topic}...`);
+
+    let currentSlug = null;
 
     try {
       const response = await fetch(`${API_BASE_URL}/generate-course`, {
@@ -115,58 +113,61 @@ export const CourseProvider = ({ children }) => {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let leftover = '';
-      let generatedSlug = null;
+      let buffer = '';
 
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = (leftover + chunk).split('\n');
-        leftover = lines.pop() || '';
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
           const trimmedLine = line.trim();
           if (!trimmedLine.startsWith('data: ')) continue;
 
           try {
-            const jsonStr = trimmedLine.replace('data: ', '');
-            const data = JSON.parse(jsonStr);
+            const data = JSON.parse(trimmedLine.replace('data: ', ''));
 
             if (data.error) throw new Error(data.message || data.error);
+            
+            // Atualização de UI
             if (data.progress !== undefined) setProgress(data.progress);
             if (data.message) setStatusMessage(data.message);
-            if (data.slug) generatedSlug = data.slug;
+            
+            // Captura o slug quando ele chegar no chunk final
+            if (data.slug) {
+                currentSlug = data.slug;
+            }
             
           } catch (e) {
-            console.warn("Falha ao processar chunk de progresso", e);
+            console.warn("Falha ao processar chunk:", e);
           }
         }
       }
 
+      // Finalização bem sucedida
       setProgress(100);
-      setStatusMessage('Curso finalizado com sucesso!');
+      setStatusMessage('Curso pronto! Preparando sua sala de aula...');
       
-      // Atualiza dashboard antes do redirecionamento
-      await fetchGlobalData(true);
-      await checkQuotas(); 
+      // Atualiza os dados globais em background
+      fetchGlobalData(true);
+      checkQuotas(); 
 
-      // Se tivermos o slug, redireciona via callback do Hero
-      if (onFinish && generatedSlug) {
-        onFinish(generatedSlug);
+      // Se tivermos o slug e o callback, dispara
+      if (onFinish && currentSlug) {
+        onFinish(currentSlug);
       }
 
     } catch (error) {
       console.error("Erro na geração:", error);
       setStatusMessage(error.message || 'Erro inesperado ao gerar.');
-    } finally {
-      setTimeout(() => {
-        setIsGenerating(false);
-        setProgress(0);
-        setStatusMessage('');
-      }, 3000);
-    }
+      // Em caso de erro, permitimos fechar o modal mais rápido
+      setTimeout(() => setIsGenerating(false), 4000);
+    } 
+    // O reset do isGenerating agora é controlado pelo fluxo de sucesso ou erro,
+    // evitando que o modal feche antes do redirecionamento do Hero.
   };
 
   return (
@@ -175,7 +176,8 @@ export const CourseProvider = ({ children }) => {
       getCourseProgress,
       stats, categories, fetchGlobalData, 
       initialDataLoaded, selectedProvider, setSelectedProvider,
-      providers, checkQuotas 
+      providers, checkQuotas,
+      setIsGenerating // Exposto para caso precise forçar o fechamento
     }}>
       {children}
     </CourseContext.Provider>

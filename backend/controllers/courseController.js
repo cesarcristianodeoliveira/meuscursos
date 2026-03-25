@@ -4,13 +4,12 @@ const { fetchAndUploadImage } = require('../services/imageService');
 const { generateCourseContent } = require('../services/aiService');
 
 const generateCourse = async (req, res) => {
-  // Timeout de 10 min para processos pesados de IA
   req.setTimeout(600000); 
 
   const { topic, provider } = req.body;
   if (!topic) return res.status(400).json({ error: 'O tema é obrigatório' });
 
-  // --- CONFIGURAÇÃO SSE (Streaming) ---
+  // --- CONFIGURAÇÃO SSE ---
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -26,7 +25,6 @@ const generateCourse = async (req, res) => {
 
     // --- Passo 1: IA Gerando Conteúdo ---
     const courseData = await generateCourseContent(topic, provider);
-
     sendProgress(40, "Conteúdo estruturado. Analisando métricas pedagógicas...");
 
     const rawModules = courseData.modules || [];
@@ -41,20 +39,11 @@ const generateCourse = async (req, res) => {
 
     const wordCount = allText.split(/\s+/).filter(w => w.length > 0).length;
     const readingMinutes = wordCount / 180; 
+    const activityMinutes = (rawModules.reduce((acc, mod) => acc + (mod.exercises?.length || 0), 0) * 2) + 
+                            ((courseData.finalExam?.length || 0) * 3);
 
-    const moduleExercisesCount = rawModules.reduce((acc, mod) => acc + (mod.exercises?.length || 0), 0);
-    const finalExamCount = (courseData.finalExam?.length || 0);
-    const activityMinutes = (moduleExercisesCount * 2) + (finalExamCount * 3);
-
-    const totalMinutes = (readingMinutes + activityMinutes) * 1.1;
-
-    // Garantindo tipo Number para o Sanity
-    const finalEstimatedTime = Number(Math.max(0.5, totalMinutes / 60).toFixed(1));
-
-    let rawRating = Number(courseData.rating) || 4.5;
-    if (rawRating < 4) rawRating = 4.3;
-    if (rawRating > 5) rawRating = 5.0;
-    const finalRating = Number(rawRating.toFixed(1));
+    const finalEstimatedTime = Number(Math.max(0.5, ((readingMinutes + activityMinutes) * 1.1) / 60).toFixed(1));
+    const finalRating = Number((Math.max(4.3, Math.min(5.0, Number(courseData.rating) || 4.5))).toFixed(1));
 
     // --- Passo 3: Tratamento de Slug e Título ---
     const finalTitle = courseData.title || topic;
@@ -65,14 +54,13 @@ const generateCourse = async (req, res) => {
     // --- Passo 4: Upload da Imagem ---
     let imageAsset = null;
     try {
+      // Passamos a categoria vinda da IA ou fallback "education"
       imageAsset = await fetchAndUploadImage(
         courseData.searchQuery || topic, 
-        "education" 
+        courseData.category?.name || "education"
       );
-      // Log para depuração no Render
-      if (imageAsset) console.log("✅ Asset de imagem recebido:", imageAsset._id || imageAsset);
     } catch (imgErr) { 
-      console.error("⚠️ Erro ao carregar imagem:", imgErr.message); 
+      console.error("⚠️ Erro no processo de imagem:", imgErr.message); 
     }
 
     sendProgress(85, "Finalizando montagem do material didático...");
@@ -87,19 +75,16 @@ const generateCourse = async (req, res) => {
       rating: finalRating,
       aiProvider: courseData.aiProvider || "Groq",
       aiModel: courseData.aiModel || "llama-3.3-70b",
-
       stats: {
         promptTokens: courseData.usage?.promptTokens || 0,
         completionTokens: courseData.usage?.completionTokens || 0,
         totalTokens: courseData.usage?.totalTokens || 0,
         generatedAt: new Date().toISOString()
       },
-
       category: {
         name: courseData.category?.name || "Geral",
         slug: formatSlug(courseData.category?.slug || courseData.category?.name || "geral")
       },
-
       modules: rawModules.map(mod => ({
         _key: `mod_${Math.random().toString(36).substr(2, 9)}`,
         title: mod.title || "Módulo",
@@ -111,7 +96,6 @@ const generateCourse = async (req, res) => {
           correctAnswer: String(ex.correctAnswer).trim()
         }))
       })),
-
       finalExam: (courseData.finalExam || []).map(exam => ({
         _key: `exam_${Math.random().toString(36).substr(2, 9)}`,
         question: exam.question,
@@ -120,44 +104,32 @@ const generateCourse = async (req, res) => {
       }))
     };
 
-    // VINCULAÇÃO DA IMAGEM
-    if (imageAsset) {
-      // Tenta pegar o ID de várias formas comuns que o cliente Sanity retorna
-      const assetId = imageAsset._id || imageAsset.id || (typeof imageAsset === 'string' ? imageAsset : null);
-      
-      if (assetId) {
-        doc.thumbnail = {
-          _type: 'image',
-          asset: {
-            _type: 'reference',
-            _ref: assetId
-          }
-        };
-      }
+    // --- VINCULAÇÃO DA IMAGEM (CORRIGIDO) ---
+    if (imageAsset && imageAsset._id) {
+      doc.thumbnail = {
+        _type: 'image',
+        asset: {
+          _type: 'reference',
+          _ref: imageAsset._id
+        }
+      };
+      console.log("🔗 Thumbnail vinculada ao documento:", imageAsset._id);
     }
 
-    // --- Passo 6: Persistência ---
-    sendProgress(95, "Salvando no banco de dados e gerando certificados...");
+    sendProgress(95, "Salvando no banco de dados...");
     
     const result = await client.create(doc);
 
-    const finalResult = JSON.stringify({ 
-      progress: 100,
-      message: 'Curso gerado com sucesso!', 
+    sendProgress(100, 'Curso gerado com sucesso!', { 
       courseId: result._id,
       slug: doc.slug.current
     });
-
-    res.write(`data: ${finalResult}\n\n`);
+    
     res.end();
 
   } catch (error) {
     console.error("❌ Erro no Controller:", error);
-    const errorResponse = {
-      error: "SERVER_ERROR",
-      message: error.message
-    };
-    res.write(`data: ${JSON.stringify(errorResponse)}\n\n`);
+    res.write(`data: ${JSON.stringify({ error: "SERVER_ERROR", message: error.message })}\n\n`);
     res.end();
   }
 };
