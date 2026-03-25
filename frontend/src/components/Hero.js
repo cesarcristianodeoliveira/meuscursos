@@ -8,14 +8,15 @@ import {
   InputAdornment,
   Tooltip
 } from '@mui/material';
-import { Send, ContentCopy, Clear, WarningAmber } from '@mui/icons-material';
+import { Send, ContentCopy, Clear, WarningAmber, CheckCircleOutline } from '@mui/icons-material';
 import { useCourse } from '../contexts/CourseContext';
 import { useAppTheme } from '../contexts/ThemeContext';
-import { useNavigate } from 'react-router-dom'; // Importado para o redirecionamento
+import { useNavigate } from 'react-router-dom';
 import { blue, grey, red, green } from '@mui/material/colors';
 import prompts from '../utils/prompts';
 
 function CircularProgressWithLabel({ value }) {
+  const isDone = value >= 100;
   return (
     <Box sx={{ position: 'relative', display: 'inline-flex' }}>
       <CircularProgress 
@@ -24,8 +25,9 @@ function CircularProgressWithLabel({ value }) {
         thickness={4.5} 
         size={80}
         sx={{ 
-          color: 'primary.main',
-          filter: 'drop-shadow(0 0 8px rgba(25, 118, 210, 0.3))'
+          color: isDone ? green[500] : 'primary.main',
+          filter: isDone ? `drop-shadow(0 0 8px ${green[200]})` : 'drop-shadow(0 0 8px rgba(25, 118, 210, 0.3))',
+          transition: 'all 0.5s ease'
         }}
       />
       <Box
@@ -35,9 +37,13 @@ function CircularProgressWithLabel({ value }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
-        <Typography variant="h6" component="div" color="text.primary" fontWeight="bold">
-          {`${Math.round(value)}%`}
-        </Typography>
+        {isDone ? (
+          <CheckCircleOutline sx={{ fontSize: 40, color: green[500] }} />
+        ) : (
+          <Typography variant="h6" component="div" color="text.primary" fontWeight="bold">
+            {`${Math.round(value)}%`}
+          </Typography>
+        )}
       </Box>
     </Box>
   );
@@ -51,7 +57,7 @@ const Hero = ({ topic, setTopic }) => {
     isGenerating, 
     progress, 
     statusMessage, 
-    generateCourse, // Pegando a função do contexto
+    generateCourse, 
     selectedProvider, 
     setSelectedProvider, 
     providers 
@@ -60,7 +66,6 @@ const Hero = ({ topic, setTopic }) => {
   const { resolvedMode } = useAppTheme();
 
   const currentProvider = providers.find(p => p.id === selectedProvider) || providers[0];
-  
   const isChecking = currentProvider?.quotaLabel.includes('Verificando') || currentProvider?.quotaLabel.includes('Consultando');
   const isProviderDisabled = !currentProvider?.enabled && !isChecking;
 
@@ -82,12 +87,14 @@ const Hero = ({ topic, setTopic }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (topic.trim() && !isGenerating && !isProviderDisabled && !isChecking) {
-      // Chama a geração e define o que acontece ao terminar
       generateCourse(topic, (newSlug) => {
-        // Aguarda 2 segundos na tela de 100% para o usuário ler "Curso Pronto"
-        setTimeout(() => {
-          navigate(`/curso/${newSlug}`);
-        }, 2000);
+        if (newSlug) {
+          // Pequena pausa para o usuário ver o 100% e a mensagem de sucesso
+          setTimeout(() => {
+            window.scrollTo(0, 0);
+            navigate(`/curso/${newSlug}`);
+          }, 1500);
+        }
       });
     }
   };
@@ -114,7 +121,6 @@ const Hero = ({ topic, setTopic }) => {
             py: 4, 
           }}
         >
-          {/* TITULOS */}
           <Box sx={{ textAlign: 'center', mb: 1 }}>
             <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-block', mr: 1.5, fontSize: { xs: '2rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
               O que vamos
@@ -142,10 +148,9 @@ const Hero = ({ topic, setTopic }) => {
             color='text.secondary'
             sx={{ mb: 2, fontSize: { xs: '1.25rem', md: '2.0243rem' }, fontWeight: 400, opacity: 0.8 }}
           >
-            Cursos com Inteligência Artifical.
+            Cursos com Inteligência Artificial.
           </Typography>
 
-          {/* FORMULÁRIO */}
           <Container maxWidth='sm' sx={{ px: { xs: 0, sm: 2 } }}>
             {!isGenerating ? (
               <Zoom in={!isGenerating}>
@@ -175,7 +180,7 @@ const Hero = ({ topic, setTopic }) => {
                       disableUnderline: true,
                       sx: { p: 3, fontSize: { xs: '1rem', md: '1.25rem' }, pr: 9, transition: 'none' },
                       endAdornment: (
-                        <InputAdornment position="end" sx={{ position: 'absolute', right: 16, ml: [0] }}>
+                        <InputAdornment position="end" sx={{ position: 'absolute', right: 16 }}>
                           {topic ? (
                             <IconButton onClick={() => setTopic('')}>
                               <Clear />
@@ -258,13 +263,13 @@ const Hero = ({ topic, setTopic }) => {
                   boxShadow: '0 30px 90px rgba(0,0,0,0.1)'
                 }}>
                   <CircularProgressWithLabel value={progress} />
-                  <Typography variant="h5" sx={{ mt: 4, fontWeight: 800 }}>
+                  <Typography variant="h5" sx={{ mt: 4, fontWeight: 800, color: progress >= 100 ? green[600] : 'text.primary' }}>
                     {statusMessage}
                   </Typography>
                   <Typography variant="body1" color="text.secondary" sx={{ mt: 2, maxWidth: 400 }}>
-                    {progress < 90 
+                    {progress < 100 
                       ? "Nossa IA está estruturando os módulos e criando exercícios personalizados para você." 
-                      : "Finalizando! Estamos salvando seu curso e preparando o ambiente de estudo."}
+                      : "Tudo pronto! Estamos te levando para a sala de aula agora mesmo..."}
                   </Typography>
                 </Box>
               </Fade>
@@ -272,10 +277,6 @@ const Hero = ({ topic, setTopic }) => {
           </Container>
         </Box>
       </Box>
-
-      <style>
-        {`@keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }`}
-      </style>
     </>
   );
 };

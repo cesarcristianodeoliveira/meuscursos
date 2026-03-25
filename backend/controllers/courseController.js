@@ -48,7 +48,7 @@ const generateCourse = async (req, res) => {
 
     const totalMinutes = (readingMinutes + activityMinutes) * 1.1;
 
-    // Persistindo como Number puro para evitar erros de localidade (ponto vs vírgula)
+    // Garantindo tipo Number para o Sanity
     const finalEstimatedTime = Number(Math.max(0.5, totalMinutes / 60).toFixed(1));
 
     let rawRating = Number(courseData.rating) || 4.5;
@@ -69,6 +69,8 @@ const generateCourse = async (req, res) => {
         courseData.searchQuery || topic, 
         "education" 
       );
+      // Log para depuração no Render
+      if (imageAsset) console.log("✅ Asset de imagem recebido:", imageAsset._id || imageAsset);
     } catch (imgErr) { 
       console.error("⚠️ Erro ao carregar imagem:", imgErr.message); 
     }
@@ -118,9 +120,10 @@ const generateCourse = async (req, res) => {
       }))
     };
 
-    // CORREÇÃO: Extração segura do ID para o campo _ref (Evita o ClientError do log)
+    // VINCULAÇÃO DA IMAGEM
     if (imageAsset) {
-      const assetId = typeof imageAsset === 'string' ? imageAsset : (imageAsset._id || imageAsset.id);
+      // Tenta pegar o ID de várias formas comuns que o cliente Sanity retorna
+      const assetId = imageAsset._id || imageAsset.id || (typeof imageAsset === 'string' ? imageAsset : null);
       
       if (assetId) {
         doc.thumbnail = {
@@ -135,6 +138,7 @@ const generateCourse = async (req, res) => {
 
     // --- Passo 6: Persistência ---
     sendProgress(95, "Salvando no banco de dados e gerando certificados...");
+    
     const result = await client.create(doc);
 
     const finalResult = JSON.stringify({ 

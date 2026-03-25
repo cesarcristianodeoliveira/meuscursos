@@ -21,7 +21,23 @@ export const CourseProvider = ({ children }) => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
-  // --- SINCRONIZAÇÃO DE COTAS (Tratamento para Render Cold Start) ---
+  // --- CÁLCULO DE PROGRESSO (Resolve o erro do CourseCard) ---
+  const getCourseProgress = useCallback((course) => {
+    if (!course || !course._id) return 0;
+    try {
+      const saved = localStorage.getItem(`progress-${course._id}`);
+      const completedSteps = saved ? JSON.parse(saved) : [];
+      const totalSteps = (course.modules?.length || 0) + (course.finalExam?.length > 0 ? 1 : 0);
+      
+      if (totalSteps === 0) return 0;
+      const calc = Math.round((completedSteps.length / totalSteps) * 100);
+      return Math.min(calc, 100);
+    } catch (err) {
+      return 0;
+    }
+  }, []);
+
+  // --- SINCRONIZAÇÃO DE COTAS ---
   const checkQuotas = useCallback(async (retries = 3) => {
     try {
       const response = await fetch(`${API_BASE_URL}/provider-status?t=${Date.now()}`);
@@ -80,7 +96,7 @@ export const CourseProvider = ({ children }) => {
     }
   }, [initialDataLoaded]);
 
-  // --- GERAÇÃO DE CURSO (Streaming com Captura de Slug) ---
+  // --- GERAÇÃO DE CURSO (Streaming) ---
   const generateCourse = async (topic, onFinish) => {
     if (isGenerating) return;
 
@@ -115,32 +131,28 @@ export const CourseProvider = ({ children }) => {
           if (!trimmedLine.startsWith('data: ')) continue;
 
           try {
-            const data = JSON.parse(trimmedLine.replace('data: ', ''));
+            const jsonStr = trimmedLine.replace('data: ', '');
+            const data = JSON.parse(jsonStr);
 
             if (data.error) throw new Error(data.message || data.error);
             if (data.progress !== undefined) setProgress(data.progress);
             if (data.message) setStatusMessage(data.message);
-            
-            // PESCA O SLUG QUANDO ELE CHEGA DO BACKEND
-            if (data.slug) {
-              generatedSlug = data.slug;
-            }
+            if (data.slug) generatedSlug = data.slug;
             
           } catch (e) {
-            console.warn("Parsing chunk error", e);
+            console.warn("Falha ao processar chunk de progresso", e);
           }
         }
       }
 
-      // Finalização com sucesso
       setProgress(100);
       setStatusMessage('Curso finalizado com sucesso!');
       
-      // Forçamos a atualização das categorias e estatísticas no Dashboard
+      // Atualiza dashboard antes do redirecionamento
       await fetchGlobalData(true);
       await checkQuotas(); 
 
-      // Se o backend enviou o slug, avisamos o Hero para redirecionar
+      // Se tivermos o slug, redireciona via callback do Hero
       if (onFinish && generatedSlug) {
         onFinish(generatedSlug);
       }
@@ -148,20 +160,19 @@ export const CourseProvider = ({ children }) => {
     } catch (error) {
       console.error("Erro na geração:", error);
       setStatusMessage(error.message || 'Erro inesperado ao gerar.');
-      checkQuotas();
     } finally {
-      // Pequeno delay para o usuário ver o "100%" e a mensagem de sucesso
       setTimeout(() => {
         setIsGenerating(false);
         setProgress(0);
         setStatusMessage('');
-      }, 3500);
+      }, 3000);
     }
   };
 
   return (
     <CourseContext.Provider value={{ 
       isGenerating, progress, statusMessage, generateCourse,
+      getCourseProgress,
       stats, categories, fetchGlobalData, 
       initialDataLoaded, selectedProvider, setSelectedProvider,
       providers, checkQuotas 
