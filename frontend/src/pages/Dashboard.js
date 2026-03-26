@@ -106,7 +106,7 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <Box sx={{ pb: 10 }}>
+    <>
       <Hero 
         topic={topic} 
         setTopic={setTopic} 
@@ -130,7 +130,7 @@ const Dashboard = () => {
       </Box>
 
       <Container maxWidth="xl">
-        <Stack spacing={3} sx={{ mt: 3 }}>
+        <Stack spacing={2} sx={{ mt: 2 }}>
           {fetchingCourses ? (
             [...Array(3)].map((_, i) => <CourseCardSkeleton key={i} />)
           ) : (
@@ -140,13 +140,10 @@ const Dashboard = () => {
               ))}
               
               {courses.length === 0 && (
-                <Box sx={{ textAlign: 'center', opacity: 0.75, py: 10 }}>
-                  <MenuBook sx={{ fontSize: 40, mb: 2, color: 'secondary.main' }} />
-                  <Typography variant="h6" fontWeight={700}>
-                    Nenhum curso nesta categoria ainda.
-                  </Typography>
-                  <Typography variant="body2">
-                    Que tal ser o primeiro a explorar este tema?
+                <Box sx={{ display: 'flex', alignItems: 'center', flexDirection: 'column', justifyContent: 'center' }}>
+                  <MenuBook color='action' sx={{ fontSize: 32, mb: 2 }} />
+                  <Typography variant='subtitle2' color='text.secondary' lineHeight={1}>
+                    Nenhum curso encontrado
                   </Typography>
                 </Box>
               )}
@@ -168,7 +165,7 @@ const Dashboard = () => {
           </Stack>
         )}
       </Container>
-    </Box>
+    </>
   );
 };
 

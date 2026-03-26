@@ -115,7 +115,7 @@ const Hero = ({ topic, setTopic }) => {
         >
           {/* TITULOS */}
           <Box sx={{ textAlign: 'center', mb: 1 }}>
-            <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-block', mr: 1.5, fontSize: { xs: '2rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
+            <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-flex', mr: 1.5, fontSize: { xs: '2rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
               O que vamos
             </Typography>
             <Typography 
@@ -126,7 +126,7 @@ const Hero = ({ topic, setTopic }) => {
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
                 color: 'transparent',
-                display: 'inline-block',
+                display: 'inline-flex',
                 fontSize: { xs: '2rem', md: '3.5rem' },
                 letterSpacing: '-0.02em'
               }}
@@ -158,7 +158,7 @@ const Hero = ({ topic, setTopic }) => {
                     bgcolor: 'background.paper',
                     boxShadow: resolvedMode === 'light' ? '0 20px 60px rgba(0,0,0, 0.05)' : '0 20px 60px rgba(0,0,0, 0.3)',
                     overflow: 'hidden',
-                    borderRadius: 4,
+                    borderRadius: 2,
                     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                   }}
                 >
@@ -172,7 +172,7 @@ const Hero = ({ topic, setTopic }) => {
                     disabled={isGenerating}
                     InputProps={{
                       disableUnderline: true,
-                      sx: { p: 3, fontSize: { xs: '1rem', md: '1.25rem' }, pr: 9, transition: 'none' },
+                      sx: { p: 2, fontSize: { xs: '1rem', md: '1.25rem' }, pr: 9, transition: 'none' },
                       endAdornment: (
                         <InputAdornment position="end" sx={{ position: 'absolute', right: 16 }}>
                           {topic ? (
