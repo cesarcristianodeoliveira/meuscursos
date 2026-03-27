@@ -14,7 +14,15 @@ export default {
       type: 'slug',
       options: { source: 'title', maxLength: 96 },
     },
-    // --- CONTROLE DE IMAGEM E VÍDEO PRINCIPAL ---
+    // --- REFERÊNCIA DE PROPRIEDADE ---
+    {
+      name: 'author',
+      title: 'Autor/Criador',
+      type: 'reference',
+      to: [{ type: 'user' }], // Referência ao schema 'user' que criaremos
+      description: 'Usuário que gerou ou é dono deste curso.'
+    },
+    // --- MULTIMÍDIA PRINCIPAL (CURSO) ---
     { 
       name: 'externalImageId', 
       title: 'ID da Imagem de Capa (API)', 
@@ -32,6 +40,13 @@ export default {
       title: 'Arquivo de Vídeo do Curso (Upload)',
       type: 'file',
       options: { accept: 'video/*' }
+    },
+    {
+      name: 'audioFile',
+      title: 'Arquivo de Áudio do Curso (Upload)',
+      type: 'file',
+      options: { accept: 'audio/*' },
+      description: 'Pode ser usado para uma introdução em áudio ou versão podcast.'
     },
     {
       name: 'videoUrl',
@@ -75,7 +90,7 @@ export default {
       type: 'boolean',
       initialValue: true
     },
-    // --- DESCRIÇÃO E MÉTRICAS DE ALUNOS ---
+    // --- DESCRIÇÃO E MÉTRICAS ---
     {
       name: 'description',
       title: 'Descrição',
@@ -103,7 +118,7 @@ export default {
       title: 'Avaliação (Rating)',
       type: 'number',
     },
-    // --- DADOS DA IA ---
+    // --- DADOS DA IA (PRESERVANDO SUA ESTRUTURA ATUAL) ---
     {
       name: 'aiProvider',
       title: 'Provedor da IA',
@@ -125,7 +140,7 @@ export default {
         { name: 'generatedAt', title: 'Data de Geração', type: 'datetime' },
       ]
     },
-    // --- MÓDULOS (COM IMAGEM E VÍDEO POR AULA) ---
+    // --- MÓDULOS (AULAS) ---
     {
       name: 'modules',
       title: 'Módulos/Aulas',
@@ -154,6 +169,12 @@ export default {
               title: 'Vídeo da Aula (Upload)', 
               type: 'file', 
               options: { accept: 'video/*' } 
+            },
+            { 
+              name: 'moduleAudio', 
+              title: 'Áudio da Aula (Upload)', 
+              type: 'file', 
+              options: { accept: 'audio/*' } 
             },
             {
               name: 'exercises',

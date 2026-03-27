@@ -16,6 +16,7 @@ import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import Course from './pages/Course';
 import Search from './pages/Search';
+import { AuthProvider } from './contexts/AuthContext';
 
 function ScrollTop() {
   const theme = useTheme();
@@ -100,9 +101,11 @@ const AppContent = () => {
 function App() {
   return (
     <ThemeProviderWrapper>
-      <CourseProvider>
-        <AppContent />
-      </CourseProvider>
+      <AuthProvider>
+        <CourseProvider>
+          <AppContent />
+        </CourseProvider>
+      </AuthProvider>
     </ThemeProviderWrapper>
   );
 }

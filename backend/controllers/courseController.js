@@ -3,163 +3,141 @@ const { formatSlug } = require('../utils/formatter');
 const { fetchAndUploadImage } = require('../services/imageService');
 const { generateCourseContent } = require('../services/aiService');
 
+const ADMIN_ID = process.env.ADMIN_ID; // ID padrão para quem não está logado
+
 /**
- * Função Auxiliar para garantir Unicidade
- * Retorna o slug final e o número do sufixo (se houver)
+ * Lógica de Créditos: 
+ * Se passou 24h desde o último login/uso, reseta para 3.
  */
-const getUniqueSlugInfo = async (baseSlug) => {
-  let finalSlug = baseSlug;
-  let counter = 1;
-  let isUnique = false;
+const updateAndCheckCredits = async (user) => {
+  if (user.role === 'admin') return true;
 
-  while (!isUnique) {
-    // Consulta no Sanity se o slug já existe
-    const query = `count(*[_type == "course" && slug.current == $slug])`;
-    const count = await client.fetch(query, { slug: finalSlug });
+  const now = new Date();
+  const lastUpdate = user.stats?.lastLogin ? new Date(user.stats.lastLogin) : new Date(0);
+  const hoursPassed = (now - lastUpdate) / (1000 * 60 * 60);
 
-    if (count === 0) {
-      isUnique = true;
-    } else {
-      counter++;
-      finalSlug = `${baseSlug}-${counter}`;
+  // Se passou 24h e ele tem menos de 3, resetamos agora
+  if (hoursPassed >= 24) {
+    if (user.credits < 3) {
+      const updatedUser = await client.patch(user._id)
+        .set({ credits: 3, "stats.lastLogin": now.toISOString() })
+        .commit();
+      return updatedUser.credits > 0;
     }
+    // Se já tinha 3 ou mais, apenas atualiza o tempo para contar as próximas 24h
+    await client.patch(user._id).set({ "stats.lastLogin": now.toISOString() }).commit();
   }
-  return { finalSlug, counter };
+
+  return user.credits > 0;
 };
 
 const generateCourse = async (req, res) => {
   req.setTimeout(600000); 
 
-  const { topic, provider } = req.body;
-  if (!topic) return res.status(400).json({ error: 'O tema é obrigatório' });
+  const { topic, provider, userId } = req.body;
+  const targetUserId = userId || ADMIN_ID;
 
-  // --- CONFIGURAÇÃO SSE ---
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no'); 
 
   const sendProgress = (progress, message, extra = {}) => {
-    const payload = JSON.stringify({ progress, message, ...extra });
-    res.write(`data: ${payload}\n\n`);
+    res.write(`data: ${JSON.stringify({ progress, message, ...extra })}\n\n`);
   };
 
   try {
-    sendProgress(5, `Conectando ao provedor ${provider || 'Groq'}...`);
+    sendProgress(5, "Verificando conta e créditos...");
 
-    // --- Passo 1: IA Gerando Conteúdo ---
-    const courseData = await generateCourseContent(topic, provider);
-    sendProgress(40, "Conteúdo estruturado. Analisando métricas pedagógicas...");
+    // 1. Busca o usuário com os dados mais recentes
+    const user = await client.fetch(`*[_type == "user" && _id == $targetUserId][0]`, { targetUserId });
+    if (!user) throw new Error('Usuário não identificado.');
 
-    const rawModules = courseData.modules || [];
-    if (rawModules.length === 0) throw new Error('A IA falhou ao gerar os módulos.');
-
-    // --- Passo 2: Cálculos de Tempo e Rating ---
-    const allText = [
-      courseData.title || "",
-      courseData.description || "",
-      ...rawModules.map(m => (m.title || "") + " " + (m.content || ""))
-    ].join(" ");
-
-    const wordCount = allText.split(/\s+/).filter(w => w.length > 0).length;
-    const readingMinutes = wordCount / 180; 
-    const activityMinutes = (rawModules.reduce((acc, mod) => acc + (mod.exercises?.length || 0), 0) * 2) + 
-                            ((courseData.finalExam?.length || 0) * 3);
-
-    const finalEstimatedTime = Number(Math.max(0.5, ((readingMinutes + activityMinutes) * 1.1) / 60).toFixed(1));
-    const finalRating = Number((Math.max(4.3, Math.min(5.0, Number(courseData.rating) || 4.5))).toFixed(1));
-
-    // --- Passo 3: Tratamento de Slug e Título ÚNICOS ---
-    const rawTitle = courseData.title || topic;
-    const baseSlug = formatSlug(rawTitle);
-
-    sendProgress(55, "Verificando integridade e duplicidade...");
-    
-    // Chamada da verificação no Sanity
-    const { finalSlug, counter } = await getUniqueSlugInfo(baseSlug);
-
-    // Se o counter for maior que 1, adicionamos o (N) no título visual
-    const finalTitle = counter > 1 ? `${rawTitle} (${counter})` : rawTitle;
-
-    sendProgress(65, "Buscando imagens e gerando identidade visual...");
-
-    // --- Passo 4: Upload da Imagem ---
-    let imageAsset = null;
-    try {
-      imageAsset = await fetchAndUploadImage(
-        courseData.searchQuery || topic, 
-        courseData.category?.name || "education"
-      );
-    } catch (imgErr) { 
-      console.error("⚠️ Erro no processo de imagem:", imgErr.message); 
+    // 2. Sincroniza créditos (Refresh de 24h)
+    const canGenerate = await updateAndCheckCredits(user);
+    if (!canGenerate && user.role !== 'admin') {
+      throw new Error('Você não tem créditos suficientes. Renovação em 24h.');
     }
 
-    sendProgress(85, "Finalizando montagem do material didático...");
+    // --- MANIPULAÇÃO DOS 3 ESTADOS ---
+    // Estado A: Admin (Pode tudo, não gasta crédito)
+    // Estado B: Pro (Pode tudo, gasta crédito)
+    // Estado C: Grátis (Limitado, gasta crédito)
+    const isFullAccess = user.role === 'admin' || user.plan === 'pro';
 
-    // --- Passo 5: Montagem do Documento Sanity ---
+    sendProgress(20, `Preparando conteúdo (${isFullAccess ? 'Premium' : 'Básico'})...`);
+
+    // 3. IA Gera Conteúdo
+    // Passamos isFullAccess para o aiService decidir se gera o objeto de exercícios
+    const courseData = await generateCourseContent(topic, provider, { fullContent: isFullAccess });
+
+    // 4. Imagem de Capa (Independente de plano ou role, como você pediu)
+    sendProgress(50, "Gerando capa do curso...");
+    const coverAsset = await fetchAndUploadImage(topic, courseData.category?.name);
+
+    // 5. Processamento dos Módulos baseado no plano
+    const processedModules = (courseData.modules || []).map((mod, index) => ({
+      _key: `mod_${index}_${Date.now()}`,
+      title: mod.title,
+      content: mod.content,
+      // Se for Grátis, ignoramos exercícios
+      exercises: isFullAccess ? (mod.exercises || []).map(ex => ({
+        _key: `ex_${Math.random().toString(36).substr(2, 9)}`,
+        ...ex,
+        correctAnswer: String(ex.correctAnswer)
+      })) : []
+    }));
+
+    // 6. Montagem do Documento
     const doc = {
       _type: 'course',
-      title: finalTitle,
-      slug: { _type: 'slug', current: finalSlug },
+      title: courseData.title || topic,
+      slug: { _type: 'slug', current: formatSlug(courseData.title || topic) },
+      author: { _type: 'reference', _ref: targetUserId },
       description: courseData.description,
-      estimatedTime: finalEstimatedTime, 
-      rating: finalRating,
-      aiProvider: courseData.aiProvider || "Groq",
-      aiModel: courseData.aiModel || "llama-3.3-70b",
+      // Grátis sempre 'iniciante', Pro/Admin segue a IA
+      level: isFullAccess ? (courseData.level || 'intermediario') : 'iniciante',
+      isPublished: true,
+      enrolledCount: 0,
+      completedCount: 0,
+      category: {
+        name: courseData.category?.name || "Geral",
+        slug: formatSlug(courseData.category?.name || "geral")
+      },
       stats: {
-        promptTokens: courseData.usage?.promptTokens || 0,
-        completionTokens: courseData.usage?.completionTokens || 0,
         totalTokens: courseData.usage?.totalTokens || 0,
         generatedAt: new Date().toISOString()
       },
-      category: {
-        name: courseData.category?.name || "Geral",
-        slug: formatSlug(courseData.category?.slug || courseData.category?.name || "geral")
-      },
-      modules: rawModules.map(mod => ({
-        _key: `mod_${Math.random().toString(36).substr(2, 9)}`,
-        title: mod.title || "Módulo",
-        content: mod.content || "",
-        exercises: (mod.exercises || []).map(ex => ({
-          _key: `ex_${Math.random().toString(36).substr(2, 9)}`,
-          question: ex.question,
-          options: ex.options,
-          correctAnswer: String(ex.correctAnswer).trim()
-        }))
-      })),
+      modules: processedModules,
+      // Exame final sempre disponível para todos
       finalExam: (courseData.finalExam || []).map(exam => ({
         _key: `exam_${Math.random().toString(36).substr(2, 9)}`,
-        question: exam.question,
-        options: exam.options,
-        correctAnswer: String(exam.correctAnswer).trim()
+        ...exam,
+        correctAnswer: String(exam.correctAnswer)
       }))
     };
 
-    if (imageAsset && imageAsset._id) {
-      doc.thumbnail = {
-        _type: 'image',
-        asset: {
-          _type: 'reference',
-          _ref: imageAsset._id
-        }
-      };
-      console.log("🔗 Thumbnail vinculada:", imageAsset._id);
+    if (coverAsset?._id) {
+      doc.thumbnail = { _type: 'image', asset: { _type: 'reference', _ref: coverAsset._id } };
+      doc.externalImageId = coverAsset.externalId;
     }
 
-    sendProgress(95, "Salvando no banco de dados...");
-    
+    sendProgress(90, "Salvando curso...");
     const result = await client.create(doc);
 
-    sendProgress(100, 'Curso gerado com sucesso!', { 
-      courseId: result._id,
-      slug: finalSlug // Garantimos que o frontend redirecione para o novo slug único
-    });
-    
+    // 7. Consumo de Crédito (Apenas para não-admins)
+    if (user.role !== 'admin') {
+      await client.patch(targetUserId)
+        .dec({ credits: 1 })
+        .inc({ "stats.coursesCreated": 1 })
+        .commit();
+    }
+
+    sendProgress(100, 'Curso disponível!', { courseId: result._id, slug: doc.slug.current });
     res.end();
 
   } catch (error) {
-    console.error("❌ Erro no Controller:", error);
-    res.write(`data: ${JSON.stringify({ error: "SERVER_ERROR", message: error.message })}\n\n`);
+    console.error("❌ Erro no Controller:", error.message);
+    res.write(`data: ${JSON.stringify({ error: "ERROR", message: error.message })}\n\n`);
     res.end();
   }
 };
