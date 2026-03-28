@@ -8,9 +8,9 @@ const { formatSlug } = require('../utils/formatter');
  */
 const fetchAndUploadImage = async (query, pixabayCategory = 'education') => {
   try {
-    // 1. Limpeza da query
+    // 1. Limpeza profunda da query (evita palavras que "poluem" a busca técnica)
     const cleanQuery = query
-      .replace(/photography|photo|high quality|high definition|professional/gi, '')
+      .replace(/photography|photo|high quality|high definition|professional|course|lesson|education/gi, '')
       .trim();
 
     const category = (pixabayCategory || 'education').toLowerCase();
@@ -28,42 +28,57 @@ const fetchAndUploadImage = async (query, pixabayCategory = 'education') => {
       hits = fallbackRes.data.hits || [];
     }
 
-    if (hits.length === 0) return null;
+    if (!hits || hits.length === 0) {
+      console.log(`⚠️ Nenhuma imagem encontrada para: ${cleanQuery}`);
+      return null;
+    }
 
     // 3. Lógica de Ineditismo (Deduplicação)
     let selectedImage = null;
 
     for (const hit of hits) {
-      // Verifica se o ID do Pixabay já existe no campo externalImageId do Sanity
-      // Verificamos tanto na capa quanto dentro dos módulos
+      // Verificamos se o ID do Pixabay já existe no Sanity
       const queryCheck = `count(*[externalImageId == $id || modules[].externalImageId == $id])`;
       const alreadyUsed = await client.fetch(queryCheck, { id: String(hit.id) });
 
       if (alreadyUsed === 0) {
         selectedImage = hit;
-        break; // Encontramos uma imagem nunca usada!
+        break; 
       }
     }
 
-    // Se todas as imagens da primeira página já foram usadas, pegamos a primeira do array como último recurso
+    // Fallback caso todas as imagens já tenham sido usadas
     if (!selectedImage) {
-      selectedImage = hits[0];
-      console.log("⚠️ Nenhuma imagem inédita encontrada na página. Usando repetida como fallback.");
+      selectedImage = hits[Math.floor(Math.random() * hits.length)];
+      console.log("⚠️ Usando imagem repetida como fallback.");
     }
 
-    // 4. Download e Upload para o Sanity
-    const imageRes = await axios.get(selectedImage.largeImageURL, { responseType: 'arraybuffer' });
+    // 4. Download da imagem
+    const imageRes = await axios.get(selectedImage.largeImageURL, { 
+      responseType: 'arraybuffer',
+      timeout: 15000 // Timeout para evitar que o serviço trave
+    });
     
+    // 5. Upload para o Sanity Assets
+    // Usamos o prefixo 'image-' para garantir que o Sanity trate como asset de imagem
     const asset = await client.assets.upload('image', Buffer.from(imageRes.data), {
       filename: `${formatSlug(cleanQuery)}-${selectedImage.id}.jpg`,
-      contentType: 'image/jpeg'
+      contentType: 'image/jpeg',
+      label: cleanQuery // Ajuda na busca interna do Sanity Studio
     });
 
-    console.log(`📸 Imagem [ID: ${selectedImage.id}] carregada com sucesso.`);
+    if (!asset || !asset._id) {
+      throw new Error("Falha ao gerar Asset ID no Sanity");
+    }
 
-    // Retornamos o asset E o ID externo para o Controller salvar no documento
+    console.log(`📸 Imagem [Pixabay ID: ${selectedImage.id}] vinculada ao Asset: ${asset._id}`);
+
+    // Retornamos um objeto limpo para o Controller
     return {
-      asset: asset,
+      asset: {
+        _id: asset._id,
+        _type: 'reference'
+      },
       externalId: String(selectedImage.id)
     };
 

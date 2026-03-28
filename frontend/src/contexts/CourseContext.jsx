@@ -3,7 +3,6 @@ import { client } from '../client';
 
 const CourseContext = createContext();
 
-// Constante de paginação centralizada para consistência em todo o app
 export const COURSES_PER_PAGE = 6;
 
 export const CourseProvider = ({ children }) => {
@@ -22,9 +21,7 @@ export const CourseProvider = ({ children }) => {
   const [categories, setCategories] = useState(['Recentes']);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
-  // Variável calculada para controlar o ScrollToTop inteligente no App.js
   const hasPagination = stats.courses > COURSES_PER_PAGE;
-
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
   const getCourseProgress = useCallback((course) => {
@@ -35,8 +32,7 @@ export const CourseProvider = ({ children }) => {
       const totalSteps = (course.modules?.length || 0) + (course.finalExam?.length > 0 ? 1 : 0);
       
       if (totalSteps === 0) return 0;
-      const calc = Math.round((completedSteps.length / totalSteps) * 100);
-      return Math.min(calc, 100);
+      return Math.min(Math.round((completedSteps.length / totalSteps) * 100), 100);
     } catch (err) {
       return 0;
     }
@@ -48,23 +44,16 @@ export const CourseProvider = ({ children }) => {
       if (!response.ok) throw new Error("Servidor acordando...");
       const data = await response.json();
 
-      setProviders(prev => prev.map(p => {
-        if (data[p.id]) {
-          return { 
-            ...p, 
-            enabled: data[p.id].enabled,
-            quotaLabel: data[p.id].message 
-          };
-        }
-        return p;
-      }));
+      setProviders(prev => prev.map(p => data[p.id] ? { 
+        ...p, 
+        enabled: data[p.id].enabled,
+        quotaLabel: data[p.id].message 
+      } : p));
     } catch (err) {
       if (retries > 0) {
         setTimeout(() => checkQuotas(retries - 1), 5000);
       } else {
-        setProviders(prev => prev.map(p => 
-          p.id === 'groq' ? { ...p, quotaLabel: 'Servidor Offline' } : p
-        ));
+        setProviders(prev => prev.map(p => p.id === 'groq' ? { ...p, quotaLabel: 'Offline' } : p));
       }
     }
   }, [API_BASE_URL]);
@@ -99,12 +88,13 @@ export const CourseProvider = ({ children }) => {
     }
   }, [initialDataLoaded]);
 
-  const generateCourse = async (topic, onFinish) => {
+  // CORREÇÃO: Agora aceita o userId vindo do Hero/Dashboard
+  const generateCourse = async (topic, userId, onFinish) => {
     if (isGenerating) return;
 
     setIsGenerating(true);
     setProgress(1); 
-    setStatusMessage(`Iniciando motor de IA para: ${topic}...`);
+    setStatusMessage(`Solicitando criação de: ${topic}...`);
 
     let currentSlug = null;
 
@@ -112,7 +102,8 @@ export const CourseProvider = ({ children }) => {
       const response = await fetch(`${API_BASE_URL}/generate-course`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, provider: selectedProvider }),
+        // IMPORTANTE: Enviando userId para o backend
+        body: JSON.stringify({ topic, provider: selectedProvider, userId }),
       });
 
       if (!response.body) throw new Error("Seu navegador não suporta streaming.");
@@ -137,7 +128,6 @@ export const CourseProvider = ({ children }) => {
             const data = JSON.parse(trimmedLine.replace('data: ', ''));
 
             if (data.error) throw new Error(data.message || data.error);
-            
             if (data.progress !== undefined) setProgress(data.progress);
             if (data.message) setStatusMessage(data.message);
             if (data.slug) currentSlug = data.slug;
@@ -149,9 +139,8 @@ export const CourseProvider = ({ children }) => {
       }
 
       setProgress(100);
-      setStatusMessage('Curso pronto! Preparando sua sala de aula...');
+      setStatusMessage('Sucesso! Redirecionando...');
       
-      // Forçamos a atualização dos stats globais para que o 'hasPagination' seja recalculado
       await fetchGlobalData(true);
       checkQuotas(); 
 
@@ -163,11 +152,11 @@ export const CourseProvider = ({ children }) => {
         setIsGenerating(false);
         setProgress(0);
         setStatusMessage('');
-      }, 4000);
+      }, 3000);
 
     } catch (error) {
       console.error("Erro na geração:", error);
-      setStatusMessage(error.message || 'Erro inesperado ao gerar.');
+      setStatusMessage(error.message || 'Erro inesperado.');
       setTimeout(() => {
         setIsGenerating(false);
         setProgress(0);
@@ -183,7 +172,7 @@ export const CourseProvider = ({ children }) => {
       initialDataLoaded, selectedProvider, setSelectedProvider,
       providers, checkQuotas,
       setIsGenerating,
-      hasPagination // Expondo para o ScrollTop no App.js
+      hasPagination
     }}>
       {children}
     </CourseContext.Provider>

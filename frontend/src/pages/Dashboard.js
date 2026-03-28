@@ -7,6 +7,7 @@ import StatsBanner from '../components/StatsBanner';
 import CategoryTabs from '../components/CategoryTabs';
 import Hero from '../components/Hero';
 import { useCourse } from '../contexts/CourseContext'; 
+import { useAuth } from '../contexts/AuthContext'; // 1. Importamos o Auth
 import { 
   Container, Box, Typography, Pagination, Stack, useTheme, useMediaQuery
 } from '@mui/material';
@@ -18,6 +19,9 @@ const Dashboard = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
+  // Pegamos o usuário logado e a função de atualizar os dados dele
+  const { user, refreshUser } = useAuth(); 
+
   const { 
     generateCourse, 
     stats, 
@@ -66,11 +70,9 @@ const Dashboard = () => {
     fetchCoursesList();
   }, [fetchCoursesList, initialDataLoaded]);
 
-  // Função de Scroll revisada
   const scrollToTabs = useCallback(() => {
     const anchor = document.querySelector('#tabs-scroll-point');
     if (anchor) {
-      // Offset para compensar a Navbar Fixa
       const offset = isMobile ? 70 : 80; 
       const bodyRect = document.body.getBoundingClientRect().top;
       const elementRect = anchor.getBoundingClientRect().top;
@@ -86,7 +88,6 @@ const Dashboard = () => {
 
   const handlePageChange = (event, value) => {
     setPage(value);
-    // REGRA SOLICITADA: Só faz scroll se houver mais de uma página (paginação ativa)
     if (totalCourses > COURSES_PER_PAGE) {
       scrollToTabs();
     }
@@ -95,29 +96,33 @@ const Dashboard = () => {
   const handleTabChange = (event, newValue) => {
     setCategoryFilter(newValue);
     setPage(1);
-    // No caso de troca de aba, geralmente queremos voltar ao topo da lista
     scrollToTabs();
   };
 
+  // 2. Função de sucesso atualizada para resetar créditos na tela
   const onGenerateSuccess = useCallback(() => {
     setTopic('');
     setPage(1);
     setCategoryFilter('Recentes');
-  }, []);
+    fetchCoursesList(); // Atualiza a lista para o novo curso aparecer
+    if (refreshUser) refreshUser(); // Atualiza os créditos do usuário no AuthContext
+  }, [fetchCoursesList, refreshUser]);
 
   return (
     <>
       <Hero 
         topic={topic} 
         setTopic={setTopic} 
-        onGenerate={() => generateCourse(topic, onGenerateSuccess)} 
+        // 3. Passamos o ID do usuário para o gerador
+        onGenerate={() => generateCourse(topic, user?._id, onGenerateSuccess)} 
       />
 
       <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 2 }}>
-        <StatsBanner stats={stats} fetching={!initialDataLoaded} />
+        {/* Passamos o user para o banner se quisermos exibir créditos lá */}
+        <StatsBanner stats={stats} user={user} fetching={!initialDataLoaded} />
       </Container>
 
-      <Box sx={{ mt: 4 }}>
+      <Box sx={{ mt: 4 }} id="tabs-scroll-point">
         {!initialDataLoaded ? (
           <CategoryTabsSkeleton />
         ) : (
@@ -130,7 +135,7 @@ const Dashboard = () => {
       </Box>
 
       <Container maxWidth="xl">
-        <Stack spacing={2} sx={{ mt: 2 }}>
+        <Stack spacing={2} sx={{ mt: 2, mb: 4 }}>
           {fetchingCourses ? (
             [...Array(3)].map((_, i) => <CourseCardSkeleton key={i} />)
           ) : (
@@ -140,10 +145,10 @@ const Dashboard = () => {
               ))}
               
               {courses.length === 0 && (
-                <Box sx={{ display: 'flex', alignItems: 'center', flexDirection: 'column', justifyContent: 'center' }}>
-                  <MenuBook color='action' sx={{ fontSize: 32, mb: 2 }} />
-                  <Typography variant='subtitle2' color='text.secondary' lineHeight={1}>
-                    Nenhum curso encontrado
+                <Box sx={{ display: 'flex', alignItems: 'center', flexDirection: 'column', py: 8 }}>
+                  <MenuBook color='action' sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                  <Typography variant='subtitle1' color='text.secondary'>
+                    Nenhum curso encontrado nesta categoria.
                   </Typography>
                 </Box>
               )}
@@ -152,12 +157,12 @@ const Dashboard = () => {
         </Stack>
 
         {!fetchingCourses && totalCourses > COURSES_PER_PAGE && (
-          <Stack sx={{ mt: 8, alignItems: 'center' }}>
+          <Stack sx={{ pb: 8, alignItems: 'center' }}>
             <Pagination 
               count={Math.ceil(totalCourses / COURSES_PER_PAGE)} 
               page={page} 
               onChange={handlePageChange} 
-              color="secondary" // Ajustado para combinar com seu tema
+              color="secondary"
               variant="outlined"
               shape="rounded"
               size={isMobile ? "medium" : "large"}

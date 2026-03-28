@@ -8,11 +8,11 @@ import {
   InputAdornment,
   Tooltip
 } from '@mui/material';
-import { Send, ContentCopy, Clear, WarningAmber } from '@mui/icons-material';
+import { Send, ContentCopy, Clear, WarningAmber, Lock } from '@mui/icons-material'; // Adicionado Lock
 import { useCourse } from '../contexts/CourseContext';
+import { useAuth } from '../contexts/AuthContext'; // 1. Importamos Auth
 import { useAppTheme } from '../contexts/ThemeContext';
-import { useNavigate } from 'react-router-dom';
-import { blue, grey, red, green } from '@mui/material/colors';
+import { blue, grey, red, green, orange } from '@mui/material/colors';
 import prompts from '../utils/prompts';
 
 function CircularProgressWithLabel({ value }) {
@@ -43,15 +43,14 @@ function CircularProgressWithLabel({ value }) {
   );
 }
 
-const Hero = ({ topic, setTopic }) => {
+const Hero = ({ topic, setTopic, onGenerate }) => { // Recebe onGenerate do Dashboard
   const [randomPlaceholder, setRandomPlaceholder] = useState('');
-  const navigate = useNavigate();
+  const { user } = useAuth(); // 2. Pegamos o usuário e seus créditos
 
   const { 
     isGenerating, 
     progress, 
     statusMessage, 
-    generateCourse, 
     selectedProvider, 
     setSelectedProvider, 
     providers 
@@ -59,6 +58,9 @@ const Hero = ({ topic, setTopic }) => {
   
   const { resolvedMode } = useAppTheme();
 
+  // Regra de Créditos: Bloqueia se não for admin e tiver 0 créditos
+  const hasNoCredits = user?.role !== 'admin' && user?.credits <= 0;
+  
   const currentProvider = providers.find(p => p.id === selectedProvider) || providers[0];
   const isChecking = currentProvider?.quotaLabel.includes('Verificando') || currentProvider?.quotaLabel.includes('Consultando');
   const isProviderDisabled = !currentProvider?.enabled && !isChecking;
@@ -80,14 +82,9 @@ const Hero = ({ topic, setTopic }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (topic.trim() && !isGenerating && !isProviderDisabled && !isChecking) {
-      generateCourse(topic, (newSlug) => {
-        // Delay para o usuário processar o estado de "100%"
-        setTimeout(() => {
-          window.scrollTo(0, 0);
-          navigate(`/curso/${newSlug}`);
-        }, 2000);
-      });
+    // 3. Só permite se tiver créditos ou for admin
+    if (topic.trim() && !isGenerating && !isProviderDisabled && !isChecking && !hasNoCredits) {
+      onGenerate(); // Chama a função que passamos via Props do Dashboard
     }
   };
 
@@ -100,22 +97,13 @@ const Hero = ({ topic, setTopic }) => {
           flexDirection: 'column', 
           justifyContent: 'center', 
           width: '100%',
-          minHeight: '100vh' 
+          minHeight: '85vh' // Reduzi um pouco para não empurrar os cards muito para baixo
         }}
       >
-        <Box
-          sx={{
-            alignItems: 'center', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            width: '100%',
-            px: 2, 
-            py: 4, 
-          }}
-        >
+        <Box sx={{ alignItems: 'center', display: 'flex', flexDirection: 'column', width: '100%', px: 2, py: 4 }}>
           {/* TITULOS */}
           <Box sx={{ textAlign: 'center', mb: 1 }}>
-            <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-flex', mr: 1.5, fontSize: { xs: '2rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
+            <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-flex', mr: 1.5, fontSize: { xs: '2.2rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
               O que vamos
             </Typography>
             <Typography 
@@ -127,7 +115,7 @@ const Hero = ({ topic, setTopic }) => {
                 WebkitBackgroundClip: 'text',
                 color: 'transparent',
                 display: 'inline-flex',
-                fontSize: { xs: '2rem', md: '3.5rem' },
+                fontSize: { xs: '2.2rem', md: '3.5rem' },
                 letterSpacing: '-0.02em'
               }}
             >
@@ -139,9 +127,9 @@ const Hero = ({ topic, setTopic }) => {
             align='center' 
             variant='h5' 
             color='text.secondary'
-            sx={{ mb: 2, fontSize: { xs: '1.25rem', md: '2.0243rem' }, fontWeight: 400, opacity: 0.8 }}
+            sx={{ mb: 4, fontSize: { xs: '1.1rem', md: '1.5rem' }, fontWeight: 400, opacity: 0.8 }}
           >
-            Cursos com Inteligência Artifical.
+            Gere cursos completos com Inteligência Artificial.
           </Typography>
 
           {/* FORMULÁRIO */}
@@ -154,36 +142,42 @@ const Hero = ({ topic, setTopic }) => {
                   onSubmit={handleSubmit}
                   sx={{ 
                     border: '1px solid', 
-                    borderColor: isProviderDisabled ? red[200] : (isChecking ? blue[100] : 'divider'),
+                    borderColor: hasNoCredits ? orange[300] : (isProviderDisabled ? red[200] : 'divider'),
                     bgcolor: 'background.paper',
                     boxShadow: resolvedMode === 'light' ? '0 20px 60px rgba(0,0,0, 0.05)' : '0 20px 60px rgba(0,0,0, 0.3)',
                     overflow: 'hidden',
-                    borderRadius: 2,
+                    borderRadius: 3,
                     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                   }}
                 >
                   <TextField
                     fullWidth
                     variant="standard"
-                    placeholder={randomPlaceholder}
+                    placeholder={hasNoCredits ? "Renovação de créditos em 24h..." : randomPlaceholder}
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
                     autoComplete="off"
-                    disabled={isGenerating}
+                    disabled={isGenerating || hasNoCredits}
                     InputProps={{
                       disableUnderline: true,
-                      sx: { p: 2, fontSize: { xs: '1rem', md: '1.25rem' }, pr: 9, transition: 'none' },
+                      sx: { p: 2.5, fontSize: { xs: '1rem', md: '1.2rem' }, pr: 9 },
                       endAdornment: (
                         <InputAdornment position="end" sx={{ position: 'absolute', right: 16 }}>
                           {topic ? (
-                            <IconButton onClick={() => setTopic('')}>
+                            <IconButton onClick={() => setTopic('')} size="small">
                               <Clear />
                             </IconButton>
                           ) : (
-                            <Tooltip placement='left' title="Usar sugestão">
-                              <IconButton onClick={() => setTopic(randomPlaceholder)} color="primary">
-                                <ContentCopy fontSize="small" />
-                              </IconButton>
+                            <Tooltip placement='top' title={hasNoCredits ? "Sem créditos" : "Usar sugestão"}>
+                              <span>
+                                <IconButton 
+                                  onClick={() => setTopic(randomPlaceholder)} 
+                                  color="primary" 
+                                  disabled={hasNoCredits}
+                                >
+                                  <ContentCopy fontSize="small" />
+                                </IconButton>
+                              </span>
                             </Tooltip>
                           )}
                         </InputAdornment>
@@ -194,7 +188,7 @@ const Hero = ({ topic, setTopic }) => {
                   <Box sx={{ 
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     borderTop: '1px solid', borderColor: 'divider',
-                    p: 2, bgcolor: resolvedMode === 'light' ? grey[50] : 'rgba(255,255,255,0.01)'
+                    p: 2, bgcolor: resolvedMode === 'light' ? grey[50] : 'rgba(255,255,255,0.02)'
                   }}>
                     
                     <FormControl size="small">
@@ -202,8 +196,9 @@ const Hero = ({ topic, setTopic }) => {
                         value={selectedProvider}
                         onChange={(e) => setSelectedProvider(e.target.value)}
                         variant="outlined"
+                        disabled={hasNoCredits}
                         sx={{ 
-                          minWidth: 128, borderRadius: 2, bgcolor: 'background.paper',
+                          minWidth: 140, borderRadius: 2, bgcolor: 'background.paper',
                           '& .MuiSelect-select': { py: 1, display: 'flex', alignItems: 'center' }
                         }}
                       >
@@ -217,7 +212,7 @@ const Hero = ({ topic, setTopic }) => {
                                 variant="caption" 
                                 sx={{ 
                                   color: p.enabled ? green[600] : (p.quotaLabel.includes('Verificando') ? blue[500] : red[400]),
-                                  fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', mt: 0.5
+                                  fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', mt: 0.5
                                 }}
                               >
                                 {p.quotaLabel}
@@ -229,24 +224,25 @@ const Hero = ({ topic, setTopic }) => {
                     </FormControl>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      {isProviderDisabled && (
-                        <Tooltip placement='left' title="Limite atingido">
-                          <WarningAmber sx={{ color: red[500] }} />
+                      {(isProviderDisabled || hasNoCredits) && (
+                        <Tooltip placement='top' title={hasNoCredits ? "Você atingiu o limite diário de 3 cursos." : "Provedor instável"}>
+                          <WarningAmber sx={{ color: hasNoCredits ? orange[500] : red[500] }} />
                         </Tooltip>
                       )}
                       
                       <IconButton 
                         color='secondary'
                         type="submit" 
-                        disabled={!topic.trim() || isGenerating || isProviderDisabled || isChecking}
+                        disabled={!topic.trim() || isGenerating || isProviderDisabled || isChecking || hasNoCredits}
                         sx={{ 
                           width: 48, height: 48,
-                          bgcolor: topic.trim() && !isProviderDisabled ? 'secondary.main' : 'transparent',
-                          color: topic.trim() && !isProviderDisabled ? 'white' : 'inherit',
-                          '&:hover': { bgcolor: 'secondary.dark' }
+                          bgcolor: (topic.trim() && !isProviderDisabled && !hasNoCredits) ? 'secondary.main' : 'action.disabledBackground',
+                          color: (topic.trim() && !isProviderDisabled && !hasNoCredits) ? 'white' : 'action.disabled',
+                          '&:hover': { bgcolor: 'secondary.dark' },
+                          boxShadow: (topic.trim() && !hasNoCredits) ? '0 4px 14px rgba(156, 39, 176, 0.39)' : 'none'
                         }}
                       >
-                        {isChecking ? <CircularProgress size={20} color="inherit" /> : <Send />}
+                        {isChecking ? <CircularProgress size={24} color="inherit" /> : (hasNoCredits ? <Lock size={20} /> : <Send />)}
                       </IconButton>
                     </Box>
                   </Box>
@@ -256,8 +252,8 @@ const Hero = ({ topic, setTopic }) => {
               <Fade in={isGenerating}>
                 <Box sx={{ 
                   display: 'flex', flexDirection: 'column', alignItems: 'center', 
-                  p: { xs: 4, md: 8 }, borderRadius: 6, 
-                  bgcolor: resolvedMode === 'light' ? 'white' : 'rgba(255, 255, 255, 0.02)',
+                  p: { xs: 4, md: 6 }, borderRadius: 6, 
+                  bgcolor: 'background.paper',
                   border: '1px solid', borderColor: 'divider', textAlign: 'center',
                   boxShadow: '0 30px 90px rgba(0,0,0,0.1)'
                 }}>
@@ -265,10 +261,10 @@ const Hero = ({ topic, setTopic }) => {
                   <Typography variant="h5" sx={{ mt: 4, fontWeight: 800 }}>
                     {statusMessage}
                   </Typography>
-                  <Typography variant="body1" color="text.secondary" sx={{ mt: 2, maxWidth: 400 }}>
+                  <Typography variant="body1" color="text.secondary" sx={{ mt: 2, maxWidth: 420 }}>
                     {progress < 90 
-                      ? "Nossa IA está estruturando os módulos e criando exercícios personalizados para você." 
-                      : "Finalizando! Estamos salvando seu curso e preparando o ambiente de estudo."}
+                      ? "Nossa IA está estruturando o conteúdo técnico e gerando exercícios para você." 
+                      : "Quase lá! Estamos salvando as informações e preparando seu dashboard."}
                   </Typography>
                 </Box>
               </Fade>
@@ -276,10 +272,6 @@ const Hero = ({ topic, setTopic }) => {
           </Container>
         </Box>
       </Box>
-
-      <style>
-        {`@keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }`}
-      </style>
     </>
   );
 };
