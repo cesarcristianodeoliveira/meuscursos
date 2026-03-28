@@ -10,13 +10,13 @@ import {
 } from '@mui/material';
 import { KeyboardArrowUp } from '@mui/icons-material'; 
 import { ThemeProviderWrapper } from './contexts/ThemeContext';
+import { AuthProvider } from './contexts/AuthContext';
 import { CourseProvider, useCourse } from './contexts/CourseContext'; 
 import ScrollToTop from './components/ScrollToTop';
 import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import Course from './pages/Course';
 import Search from './pages/Search';
-import { AuthProvider } from './contexts/AuthContext';
 
 function ScrollTop() {
   const theme = useTheme();

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import client from '../sanityClient'; // Ajuste conforme o seu caminho do client sanity
+import { client } from '../client'; 
 
 const AuthContext = createContext();
 
