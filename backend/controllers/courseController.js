@@ -12,6 +12,7 @@ const updateAndCheckCredits = async (user) => {
   const hoursPassed = (now - lastUpdate) / (1000 * 60 * 60);
 
   if (hoursPassed >= 24) {
+    // Reset diário de créditos para usuários free
     if (user.credits < 3) {
       await client.patch(user._id).set({ credits: 3, "stats.lastLogin": now.toISOString() }).commit();
       return true;
@@ -22,7 +23,7 @@ const updateAndCheckCredits = async (user) => {
 };
 
 const generateCourse = async (req, res) => {
-  req.setTimeout(600000); 
+  req.setTimeout(600000); // 10 minutos para processos longos de IA
   const { topic, provider, userId } = req.body;
   const targetUserId = userId || ADMIN_ID;
 
@@ -49,13 +50,9 @@ const generateCourse = async (req, res) => {
     sendProgress(20, `IA gerando conteúdo ${isFullAccess ? 'Premium' : 'Básico'}...`);
     const courseData = await generateCourseContent(topic, provider, { fullContent: isFullAccess });
 
-    // --- CÁLCULO DE TEMPO ESTIMADO ---
-    const totalText = JSON.stringify(courseData.modules);
-    const words = totalText.split(/\s+/).length;
-    const estimatedTime = Number(Math.max(1, (words / 180) / 60).toFixed(1));
-
-    sendProgress(60, "Buscando identidade visual...");
-    const coverResult = await fetchAndUploadImage(topic, courseData.category?.name);
+    sendProgress(60, "Buscando identidade visual única...");
+    // Usamos a searchQuery vinda da IA para uma busca mais precisa no Pixabay
+    const coverResult = await fetchAndUploadImage(courseData.searchQuery || topic, courseData.category?.name);
 
     // --- PROCESSAMENTO DE MÓDULOS ---
     const processedModules = (courseData.modules || []).map((mod, index) => ({
@@ -69,28 +66,26 @@ const generateCourse = async (req, res) => {
       })) : []
     }));
 
-    // --- MONTAGEM DO DOCUMENTO (CORREÇÃO DE MAPEAMENTO) ---
+    // --- MONTAGEM DO DOCUMENTO FINAL ---
     const doc = {
       _type: 'course',
       title: courseData.title || topic,
       slug: { _type: 'slug', current: formatSlug(courseData.title || topic) },
       author: { _type: 'reference', _ref: targetUserId },
       description: courseData.description,
-      estimatedTime: estimatedTime,
+      // Usamos o tempo calculado pela IA (agora em horas realistas)
+      estimatedTime: parseInt(courseData.estimatedTime) || 1,
       rating: Number(courseData.rating) || 4.5,
-      level: isFullAccess ? (courseData.level || 'intermediario') : 'iniciante',
+      level: courseData.level || (isFullAccess ? 'intermediario' : 'iniciante'),
       isPublished: true,
-      aiProvider: courseData.aiProvider, // Adicionado
-      aiModel: courseData.aiModel,       // Adicionado
+      aiProvider: courseData.aiProvider,
+      aiModel: courseData.aiModel,
       category: {
         name: courseData.category?.name || "Geral",
         slug: formatSlug(courseData.category?.name || "geral")
       },
-      // EXTRAÇÃO DE TAGS (Baseado na categoria e título)
-      tags: [
-        courseData.category?.name,
-        ...(courseData.title?.split(' ').filter(w => w.length > 3) || [])
-      ].filter(Boolean).slice(0, 5),
+      // Usamos as tags limpas vindas do aiService
+      tags: courseData.tags || [courseData.category?.name].filter(Boolean),
 
       stats: {
         promptTokens: courseData.usage?.promptTokens || 0,
@@ -106,27 +101,31 @@ const generateCourse = async (req, res) => {
       }))
     };
 
-    // VINCULANDO A IMAGEM CORRETAMENTE
-    if (coverResult?.asset?._id) {
+    // Vinculando a imagem e o ID externo (Pixabay) para garantir ineditismo futuro
+    if (coverResult?.assetId) {
       doc.thumbnail = {
         _type: 'image',
-        asset: { _type: 'reference', _ref: coverResult.asset._id }
+        asset: { _type: 'reference', _ref: coverResult.assetId }
       };
-      doc.externalImageId = coverResult.externalId;
+      doc.externalImageId = coverResult.externalImageId;
     }
 
     sendProgress(95, "Salvando no Sanity...");
     const result = await client.create(doc);
 
+    // Debitar crédito e atualizar contador de cursos do usuário
     if (user.role !== 'admin') {
-      await client.patch(targetUserId).dec({ credits: 1 }).inc({ "stats.coursesCreated": 1 }).commit();
+      await client.patch(targetUserId)
+        .dec({ credits: 1 })
+        .inc({ "stats.coursesCreated": 1 })
+        .commit();
     }
 
-    sendProgress(100, 'Sucesso!', { courseId: result._id, slug: doc.slug.current });
+    sendProgress(100, 'Curso Finalizado!', { courseId: result._id, slug: doc.slug.current });
     res.end();
 
   } catch (error) {
-    console.error("❌ Erro:", error.message);
+    console.error("❌ Erro no Controller:", error.message);
     res.write(`data: ${JSON.stringify({ error: "ERROR", message: error.message })}\n\n`);
     res.end();
   }

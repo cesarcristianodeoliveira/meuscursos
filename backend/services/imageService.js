@@ -8,10 +8,15 @@ const { formatSlug } = require('../utils/formatter');
  */
 const fetchAndUploadImage = async (query, pixabayCategory = 'education') => {
   try {
-    // 1. Limpeza profunda da query (evita palavras que "poluem" a busca técnica)
+    // 1. Limpeza profunda da query
+    // Removemos termos genéricos e pontuações que a IA possa ter enviado
     const cleanQuery = query
+      .replace(/[:.;?!]/g, '') 
       .replace(/photography|photo|high quality|high definition|professional|course|lesson|education/gi, '')
-      .trim();
+      .trim()
+      .split(' ')
+      .slice(0, 3) // Focamos nos 3 primeiros termos para melhor precisão no Pixabay
+      .join(' ');
 
     const category = (pixabayCategory || 'education').toLowerCase();
     
@@ -21,7 +26,7 @@ const fetchAndUploadImage = async (query, pixabayCategory = 'education') => {
     let response = await axios.get(pixabayUrl);
     let hits = response.data.hits || [];
 
-    // 2. Fallback: Busca global se a categoria for restritiva demais
+    // 2. Fallback: Busca global se a categoria/query for restritiva demais
     if (hits.length === 0) {
       const fallbackUrl = `https://pixabay.com/api/?key=${process.env.PIXABAY_API_KEY}&q=${encodeURIComponent(cleanQuery)}&image_type=photo&safesearch=true&per_page=10`;
       const fallbackRes = await axios.get(fallbackUrl);
@@ -37,8 +42,8 @@ const fetchAndUploadImage = async (query, pixabayCategory = 'education') => {
     let selectedImage = null;
 
     for (const hit of hits) {
-      // Verificamos se o ID do Pixabay já existe no Sanity
-      const queryCheck = `count(*[externalImageId == $id || modules[].externalImageId == $id])`;
+      // Verificamos no Sanity se esse ID do Pixabay já foi usado em algum curso
+      const queryCheck = `count(*[_type == "course" && externalImageId == $id])`;
       const alreadyUsed = await client.fetch(queryCheck, { id: String(hit.id) });
 
       if (alreadyUsed === 0) {
@@ -47,24 +52,23 @@ const fetchAndUploadImage = async (query, pixabayCategory = 'education') => {
       }
     }
 
-    // Fallback caso todas as imagens já tenham sido usadas
+    // Fallback caso todas as 20 imagens da página já tenham sido usadas em outros cursos
     if (!selectedImage) {
       selectedImage = hits[Math.floor(Math.random() * hits.length)];
-      console.log("⚠️ Usando imagem repetida como fallback.");
+      console.log("⚠️ Usando imagem repetida (todas as opções da busca já foram usadas).");
     }
 
-    // 4. Download da imagem
+    // 4. Download da imagem com buffer
     const imageRes = await axios.get(selectedImage.largeImageURL, { 
       responseType: 'arraybuffer',
-      timeout: 15000 // Timeout para evitar que o serviço trave
+      timeout: 15000 
     });
     
     // 5. Upload para o Sanity Assets
-    // Usamos o prefixo 'image-' para garantir que o Sanity trate como asset de imagem
     const asset = await client.assets.upload('image', Buffer.from(imageRes.data), {
       filename: `${formatSlug(cleanQuery)}-${selectedImage.id}.jpg`,
       contentType: 'image/jpeg',
-      label: cleanQuery // Ajuda na busca interna do Sanity Studio
+      label: cleanQuery 
     });
 
     if (!asset || !asset._id) {
@@ -73,13 +77,10 @@ const fetchAndUploadImage = async (query, pixabayCategory = 'education') => {
 
     console.log(`📸 Imagem [Pixabay ID: ${selectedImage.id}] vinculada ao Asset: ${asset._id}`);
 
-    // Retornamos um objeto limpo para o Controller
+    // Retornamos a estrutura pronta para o Controller salvar no Sanity
     return {
-      asset: {
-        _id: asset._id,
-        _type: 'reference'
-      },
-      externalId: String(selectedImage.id)
+      assetId: asset._id,
+      externalImageId: String(selectedImage.id)
     };
 
   } catch (error) {

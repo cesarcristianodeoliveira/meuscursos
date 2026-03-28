@@ -16,16 +16,19 @@ REGRAS DE ESTRUTURA E PEDAGOGIA:
 2. DENSIDADE: Cada módulo deve ser exaustivo, com conteúdo técnico em Markdown.
 3. ${exerciseRule}
 4. PROVA FINAL: Crie a seção 'finalExam' com 10 a 20 perguntas.
-5. TAGS: Crie um array 'tags' com 5 palavras-chave relevantes (ex: ["Web", "HTML", "Frontend"]).
-6. RATING: Gere um número entre 4.0 e 5.0 para o campo 'rating'.
-7. IMAGEM: 'searchQuery' deve conter 2 substantivos concretos em inglês para busca de fotos.
+5. TAGS: Crie um array 'tags' com 5 palavras-chave. NUNCA use pontuação como ":" ou "." nas tags. Use apenas termos limpos (ex: ["React", "JavaScript"]).
+6. TEMPO ESTIMADO: Calcule o 'estimatedTime' em HORAS inteiras. 
+   - Regra: (Número de módulos * 0.75) + 0.5 para a prova final. Arredonde para cima.
+7. RATING: Gere um número entre 4.0 e 5.0 para o campo 'rating'.
+8. IMAGEM: 'searchQuery' deve conter 2 substantivos concretos em inglês para busca de fotos.
 
-ESTRUTURA JSON OBRIGATÓRIA (Siga exatamente):
+ESTRUTURA JSON OBRIGATÓRIA:
 {
   "title": "string",
   "category": { "name": "string", "slug": "string" },
   "description": "string (+300 caracteres)",
   "rating": number,
+  "estimatedTime": number,
   "level": "${isFullAccess ? 'intermediario ou avancado' : 'iniciante'}",
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
   "searchQuery": "string",
@@ -68,11 +71,29 @@ const generateCourseContent = async (topic, provider = 'groq', options = {}) => 
       response_format: { type: "json_object" }
     });
 
-    // Captura de Usage (Tokens)
     const usage = completion.usage || {};
     const content = JSON.parse(completion.choices[0].message.content);
 
-    // Retornamos os dados mapeados exatamente como o Controller espera
+    // --- PÓS-PROCESSAMENTO E LIMPEZA (Saneamento de Dados) ---
+    
+    // 1. Limpeza de Tags (Remove pontuação indesejada e espaços extras)
+    if (Array.isArray(content.tags)) {
+      content.tags = content.tags.map(tag => 
+        tag.replace(/[:.;?!]/g, '').trim()
+      ).filter(tag => tag.length > 0);
+    }
+
+    // 2. Validação de Tempo Estimado (Fallback caso a IA falhe na regra)
+    if (!content.estimatedTime || content.estimatedTime < 1) {
+      const moduleCount = content.modules?.length || 0;
+      content.estimatedTime = Math.ceil((moduleCount * 45 + 30) / 60); 
+    }
+
+    // 3. Garantia de Nível
+    if (!content.level) {
+      content.level = fullContent ? 'intermediario' : 'iniciante';
+    }
+
     return {
       ...content,
       aiProvider: selected.name,

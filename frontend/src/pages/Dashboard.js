@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom'; // IMPORTANTE: Para redirecionar
 import { client } from '../client';
 import CourseCard from '../components/CourseCard';
 import CourseCardSkeleton from '../components/CourseCardSkeleton';
@@ -7,7 +8,7 @@ import StatsBanner from '../components/StatsBanner';
 import CategoryTabs from '../components/CategoryTabs';
 import Hero from '../components/Hero';
 import { useCourse } from '../contexts/CourseContext'; 
-import { useAuth } from '../contexts/AuthContext'; // 1. Importamos o Auth
+import { useAuth } from '../contexts/AuthContext'; 
 import { 
   Container, Box, Typography, Pagination, Stack, useTheme, useMediaQuery
 } from '@mui/material';
@@ -17,9 +18,9 @@ const COURSES_PER_PAGE = 6;
 
 const Dashboard = () => {
   const theme = useTheme();
+  const navigate = useNavigate(); // Hook para navegação
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
-  // Pegamos o usuário logado e a função de atualizar os dados dele
   const { user, refreshUser } = useAuth(); 
 
   const { 
@@ -99,26 +100,30 @@ const Dashboard = () => {
     scrollToTabs();
   };
 
-  // 2. Função de sucesso atualizada para resetar créditos na tela
-  const onGenerateSuccess = useCallback(() => {
+  /**
+   * CORREÇÃO: Função de sucesso agora recebe o slug
+   * e redireciona o usuário para o curso recém-criado.
+   */
+  const onGenerateSuccess = useCallback((slug) => {
     setTopic('');
-    setPage(1);
-    setCategoryFilter('Recentes');
-    fetchCoursesList(); // Atualiza a lista para o novo curso aparecer
-    if (refreshUser) refreshUser(); // Atualiza os créditos do usuário no AuthContext
-  }, [fetchCoursesList, refreshUser]);
+    if (refreshUser) refreshUser(); // Atualiza créditos no AuthContext
+    
+    // Pequeno delay para garantir que o Sanity indexou (opcional mas recomendado)
+    setTimeout(() => {
+      navigate(`/curso/${slug}`);
+    }, 500);
+  }, [navigate, refreshUser]);
 
   return (
     <>
       <Hero 
         topic={topic} 
         setTopic={setTopic} 
-        // 3. Passamos o ID do usuário para o gerador
+        // Passamos a função generateCourse direto, o onGenerateSuccess cuidará do resto
         onGenerate={() => generateCourse(topic, user?._id, onGenerateSuccess)} 
       />
 
       <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 2 }}>
-        {/* Passamos o user para o banner se quisermos exibir créditos lá */}
         <StatsBanner stats={stats} user={user} fetching={!initialDataLoaded} />
       </Container>
 

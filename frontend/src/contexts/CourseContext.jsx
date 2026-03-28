@@ -21,7 +21,6 @@ export const CourseProvider = ({ children }) => {
   const [categories, setCategories] = useState(['Recentes']);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
-  const hasPagination = stats.courses > COURSES_PER_PAGE;
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
   const getCourseProgress = useCallback((course) => {
@@ -88,7 +87,6 @@ export const CourseProvider = ({ children }) => {
     }
   }, [initialDataLoaded]);
 
-  // CORREÇÃO: Agora aceita o userId vindo do Hero/Dashboard
   const generateCourse = async (topic, userId, onFinish) => {
     if (isGenerating) return;
 
@@ -96,13 +94,12 @@ export const CourseProvider = ({ children }) => {
     setProgress(1); 
     setStatusMessage(`Solicitando criação de: ${topic}...`);
 
-    let currentSlug = null;
+    let finalSlug = null;
 
     try {
       const response = await fetch(`${API_BASE_URL}/generate-course`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // IMPORTANTE: Enviando userId para o backend
         body: JSON.stringify({ topic, provider: selectedProvider, userId }),
       });
 
@@ -130,7 +127,11 @@ export const CourseProvider = ({ children }) => {
             if (data.error) throw new Error(data.message || data.error);
             if (data.progress !== undefined) setProgress(data.progress);
             if (data.message) setStatusMessage(data.message);
-            if (data.slug) currentSlug = data.slug;
+            
+            // Captura o slug quando o backend enviar o chunk final (100%)
+            if (data.slug) {
+              finalSlug = data.slug;
+            }
             
           } catch (e) {
             console.warn("Falha ao processar chunk:", e);
@@ -138,29 +139,31 @@ export const CourseProvider = ({ children }) => {
         }
       }
 
+      // Finalização do processo
       setProgress(100);
       setStatusMessage('Sucesso! Redirecionando...');
       
+      // Refresh nos dados globais (contador de cursos, categorias)
       await fetchGlobalData(true);
       checkQuotas(); 
 
-      if (onFinish && currentSlug) {
-        onFinish(currentSlug);
+      // Se temos o slug, disparamos o callback de navegação do Hero
+      if (onFinish && finalSlug) {
+        onFinish(finalSlug);
       }
 
+      // Limpa os estados após um tempo
       setTimeout(() => {
         setIsGenerating(false);
         setProgress(0);
         setStatusMessage('');
-      }, 3000);
+      }, 2000);
 
     } catch (error) {
       console.error("Erro na geração:", error);
       setStatusMessage(error.message || 'Erro inesperado.');
-      setTimeout(() => {
-        setIsGenerating(false);
-        setProgress(0);
-      }, 4000);
+      setIsGenerating(false);
+      setProgress(0);
     } 
   };
 
@@ -172,7 +175,7 @@ export const CourseProvider = ({ children }) => {
       initialDataLoaded, selectedProvider, setSelectedProvider,
       providers, checkQuotas,
       setIsGenerating,
-      hasPagination
+      hasPagination: stats.courses > COURSES_PER_PAGE
     }}>
       {children}
     </CourseContext.Provider>
