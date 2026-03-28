@@ -45,7 +45,7 @@ function CircularProgressWithLabel({ value }) {
 
 const Hero = ({ topic, setTopic, onGenerate }) => {
   const [randomPlaceholder, setRandomPlaceholder] = useState('');
-  const { user } = useAuth(); 
+  const { user, loading: authLoading } = useAuth(); 
 
   const { 
     isGenerating, 
@@ -58,8 +58,13 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
   
   const { resolvedMode } = useAppTheme();
 
-  // Regra de Créditos: Bloqueia se não for admin e tiver 0 ou menos créditos
-  const hasNoCredits = user?.role !== 'admin' && (user?.credits <= 0 || !user?.credits);
+  // --- LÓGICA DE CRÉDITOS REVISADA ---
+  // 1. Se estiver carregando o usuário, bloqueamos por segurança.
+  // 2. Se NÃO houver usuário (visitante), permitimos testar (ou você pode decidir bloquear).
+  // 3. Se houver usuário, apenas o admin ignora a trava.
+  const hasNoCredits = user 
+    ? (user.role !== 'admin' && (user.credits <= 0 || !user.credits)) 
+    : false; // Se for null (visitante), libera para teste inicial
   
   const currentProvider = providers.find(p => p.id === selectedProvider) || providers[0];
   const isChecking = currentProvider?.quotaLabel?.includes('Verificando') || currentProvider?.quotaLabel?.includes('Consultando');
@@ -82,7 +87,9 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Validação robusta antes de disparar a geração
+    // Impedir submit se estiver carregando auth
+    if (authLoading) return;
+
     if (topic.trim() && !isGenerating && !isProviderDisabled && !isChecking && !hasNoCredits) {
       onGenerate(); 
     }
@@ -101,7 +108,6 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
     >
       <Box sx={{ alignItems: 'center', display: 'flex', flexDirection: 'column', width: '100%', px: 2, py: 4 }}>
         
-        {/* TÍTULOS */}
         <Box sx={{ textAlign: 'center', mb: 1 }}>
           <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-flex', mr: 1.5, fontSize: { xs: '2.2rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
             O que vamos
@@ -132,7 +138,6 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
           Gere cursos completos com Inteligência Artificial.
         </Typography>
 
-        {/* FORMULÁRIO */}
         <Container maxWidth='sm' sx={{ px: { xs: 0, sm: 2 } }}>
           {!isGenerating ? (
             <Zoom in={!isGenerating}>
@@ -157,7 +162,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   autoComplete="off"
-                  disabled={isGenerating || hasNoCredits}
+                  disabled={isGenerating || hasNoCredits || authLoading}
                   InputProps={{
                     disableUnderline: true,
                     sx: { p: 2.5, fontSize: { xs: '1rem', md: '1.2rem' }, pr: 9 },
@@ -173,7 +178,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                               <IconButton 
                                 onClick={() => setTopic(randomPlaceholder)} 
                                 color="primary" 
-                                disabled={hasNoCredits || isGenerating}
+                                disabled={hasNoCredits || isGenerating || authLoading}
                               >
                                 <ContentCopy fontSize="small" />
                               </IconButton>
@@ -196,7 +201,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                       value={selectedProvider}
                       onChange={(e) => setSelectedProvider(e.target.value)}
                       variant="outlined"
-                      disabled={hasNoCredits || isGenerating}
+                      disabled={hasNoCredits || isGenerating || authLoading}
                       sx={{ 
                         minWidth: 140, borderRadius: 2, bgcolor: 'background.paper',
                         '& .MuiSelect-select': { py: 1, display: 'flex', alignItems: 'center' }
@@ -233,7 +238,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                     <IconButton 
                       color='secondary'
                       type="submit" 
-                      disabled={!topic.trim() || isGenerating || isProviderDisabled || isChecking || hasNoCredits}
+                      disabled={!topic.trim() || isGenerating || isProviderDisabled || isChecking || hasNoCredits || authLoading}
                       sx={{ 
                         width: 48, height: 48,
                         bgcolor: (topic.trim() && !isProviderDisabled && !hasNoCredits) ? 'secondary.main' : 'action.disabledBackground',
@@ -242,7 +247,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                         boxShadow: (topic.trim() && !hasNoCredits) ? '0 4px 14px rgba(156, 39, 176, 0.39)' : 'none'
                       }}
                     >
-                      {isChecking ? (
+                      {isChecking || authLoading ? (
                         <CircularProgress size={24} color="inherit" />
                       ) : hasNoCredits ? (
                         <Lock sx={{ fontSize: 20 }} />

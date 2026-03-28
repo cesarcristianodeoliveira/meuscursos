@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom'; // IMPORTANTE: Para redirecionar
+import { useNavigate } from 'react-router-dom';
 import { client } from '../client';
 import CourseCard from '../components/CourseCard';
 import CourseCardSkeleton from '../components/CourseCardSkeleton';
@@ -18,10 +18,10 @@ const COURSES_PER_PAGE = 6;
 
 const Dashboard = () => {
   const theme = useTheme();
-  const navigate = useNavigate(); // Hook para navegação
+  const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
-  const { user, refreshUser } = useAuth(); 
+  const { user, refreshUser, loading: authLoading } = useAuth(); 
 
   const { 
     generateCourse, 
@@ -38,10 +38,12 @@ const Dashboard = () => {
   const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState('Recentes');
 
+  // 1. Carrega dados globais (estatísticas e categorias)
   useEffect(() => {
     fetchGlobalData();
   }, [fetchGlobalData]);
 
+  // 2. Busca lista de cursos com paginação e filtro
   const fetchCoursesList = useCallback(async () => {
     setFetchingCourses(true);
     try {
@@ -57,7 +59,7 @@ const Dashboard = () => {
       }`;
 
       const result = await client.fetch(query);
-      setTotalCourses(result.total);
+      setTotalCourses(result.total || 0);
       setCourses(result.items || []);
     } catch (err) {
       console.error("Erro ao buscar cursos:", err);
@@ -67,6 +69,7 @@ const Dashboard = () => {
     }
   }, [page, categoryFilter]);
 
+  // Executa a busca sempre que a página, filtro ou carregamento inicial mudar
   useEffect(() => {
     fetchCoursesList();
   }, [fetchCoursesList, initialDataLoaded]);
@@ -89,29 +92,23 @@ const Dashboard = () => {
 
   const handlePageChange = (event, value) => {
     setPage(value);
-    if (totalCourses > COURSES_PER_PAGE) {
-      scrollToTabs();
-    }
+    scrollToTabs();
   };
 
   const handleTabChange = (event, newValue) => {
     setCategoryFilter(newValue);
-    setPage(1);
+    setPage(1); // Volta para a primeira página ao trocar categoria
     scrollToTabs();
   };
 
-  /**
-   * CORREÇÃO: Função de sucesso agora recebe o slug
-   * e redireciona o usuário para o curso recém-criado.
-   */
   const onGenerateSuccess = useCallback((slug) => {
     setTopic('');
-    if (refreshUser) refreshUser(); // Atualiza créditos no AuthContext
+    if (refreshUser) refreshUser(); 
     
-    // Pequeno delay para garantir que o Sanity indexou (opcional mas recomendado)
+    // Redireciona para o curso gerado
     setTimeout(() => {
       navigate(`/curso/${slug}`);
-    }, 500);
+    }, 600);
   }, [navigate, refreshUser]);
 
   return (
@@ -119,12 +116,15 @@ const Dashboard = () => {
       <Hero 
         topic={topic} 
         setTopic={setTopic} 
-        // Passamos a função generateCourse direto, o onGenerateSuccess cuidará do resto
         onGenerate={() => generateCourse(topic, user?._id, onGenerateSuccess)} 
       />
 
       <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 2 }}>
-        <StatsBanner stats={stats} user={user} fetching={!initialDataLoaded} />
+        <StatsBanner 
+          stats={stats} 
+          user={user} 
+          fetching={authLoading || !initialDataLoaded} 
+        />
       </Container>
 
       <Box sx={{ mt: 4 }} id="tabs-scroll-point">
