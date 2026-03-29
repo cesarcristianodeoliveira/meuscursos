@@ -7,7 +7,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Memoizamos a função para evitar re-renderizações infinitas no useEffect
+  // Função para buscar dados frescos do usuário
   const fetchUser = useCallback(async (userId) => {
     if (!userId) {
       setLoading(false);
@@ -15,16 +15,24 @@ export const AuthProvider = ({ children }) => {
     }
     
     try {
-      // Buscamos os campos atualizados do Sanity
+      // Buscamos campos vitais: créditos, stats (XP/Cursos) e plano
       const userData = await client.fetch(
-        `*[_type == "user" && _id == $userId][0]`, 
+        `*[_type == "user" && _id == $userId][0]{
+          ...,
+          stats {
+            ...,
+            totalXp,
+            coursesCreated,
+            level
+          }
+        }`, 
         { userId }
       );
       
       if (userData) {
         setUser(userData);
       } else {
-        // Se o ID no localStorage não existe mais no Sanity, limpamos
+        // Se o ID não existe mais (deletado no Sanity), limpa o local
         localStorage.removeItem('userId');
         setUser(null);
       }
@@ -38,8 +46,21 @@ export const AuthProvider = ({ children }) => {
   // Efeito para carregar o usuário ao iniciar o App
   useEffect(() => {
     const savedUserId = localStorage.getItem('userId');
+    
     if (savedUserId) {
       fetchUser(savedUserId);
+
+      // --- OPCIONAL: LISTEN REAL-TIME ---
+      // Se você quiser que o XP suba na tela "sozinho" assim que o backend terminar:
+      const subscription = client
+        .listen(`*[_type == "user" && _id == $userId]`, { userId: savedUserId })
+        .subscribe((update) => {
+          if (update.result) {
+            setUser(update.result);
+          }
+        });
+
+      return () => subscription.unsubscribe();
     } else {
       setLoading(false);
     }
@@ -54,12 +75,15 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('userId');
+    // Forçar reload pode ser útil para limpar outros contextos
+    window.location.reload(); 
   };
 
-  const refreshUser = useCallback(() => {
+  // Útil para chamar após a geração de um curso no frontend
+  const refreshUser = useCallback(async () => {
     const currentId = user?._id || localStorage.getItem('userId');
     if (currentId) {
-      fetchUser(currentId);
+      await fetchUser(currentId);
     }
   }, [user?._id, fetchUser]);
 
@@ -70,9 +94,14 @@ export const AuthProvider = ({ children }) => {
       loading, 
       login, 
       logout, 
-      refreshUser 
+      refreshUser,
+      isAuthenticated: !!user
     }}>
-      {!loading && children}
+      {/* Removi o {!loading && children} para permitir que o App renderize 
+         o esqueleto/loading state se necessário, mas você pode manter se preferir 
+         bloquear tudo até o fetch terminar.
+      */}
+      {children}
     </AuthContext.Provider>
   );
 };

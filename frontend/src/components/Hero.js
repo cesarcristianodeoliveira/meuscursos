@@ -15,6 +15,7 @@ import { useAppTheme } from '../contexts/ThemeContext';
 import { blue, grey, red, green, orange } from '@mui/material/colors';
 import prompts from '../utils/prompts';
 
+// Componente de Progresso Circular com Label Central
 function CircularProgressWithLabel({ value }) {
   return (
     <Box sx={{ position: 'relative', display: 'inline-flex' }}>
@@ -22,7 +23,7 @@ function CircularProgressWithLabel({ value }) {
         variant="determinate" 
         value={value} 
         thickness={4.5} 
-        size={80}
+        size={90}
         sx={{ 
           color: 'primary.main',
           filter: 'drop-shadow(0 0 8px rgba(25, 118, 210, 0.3))'
@@ -58,21 +59,20 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
   
   const { resolvedMode } = useAppTheme();
 
-  // --- LÓGICA DE CRÉDITOS REVISADA ---
-  // 1. Se estiver carregando o usuário, bloqueamos por segurança.
-  // 2. Se NÃO houver usuário (visitante), permitimos testar (ou você pode decidir bloquear).
-  // 3. Se houver usuário, apenas o admin ignora a trava.
-  const hasNoCredits = user 
-    ? (user.role !== 'admin' && (user.credits <= 0 || !user.credits)) 
-    : false; // Se for null (visitante), libera para teste inicial
+  // --- LÓGICA DE CRÉDITOS E TRAVAS ---
+  // Bloqueia se o usuário estiver logado, não for admin e tiver 0 créditos
+  const hasNoCredits = user && user.role !== 'admin' && (user.credits <= 0 || !user.credits);
   
   const currentProvider = providers.find(p => p.id === selectedProvider) || providers[0];
-  const isChecking = currentProvider?.quotaLabel?.includes('Verificando') || currentProvider?.quotaLabel?.includes('Consultando');
+  const isChecking = currentProvider?.quotaLabel?.toLowerCase().includes('verificando');
   const isProviderDisabled = !currentProvider?.enabled && !isChecking;
 
+  // Atualização dinâmica do placeholder (sugestões)
   const updatePlaceholder = useCallback(() => {
-    const randomIndex = Math.floor(Math.random() * prompts.length);
-    setRandomPlaceholder(prompts[randomIndex]);
+    if (prompts && prompts.length > 0) {
+      const randomIndex = Math.floor(Math.random() * prompts.length);
+      setRandomPlaceholder(prompts[randomIndex]);
+    }
   }, []);
 
   useEffect(() => {
@@ -87,10 +87,9 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Impedir submit se estiver carregando auth
-    if (authLoading) return;
+    if (authLoading || isGenerating) return;
 
-    if (topic.trim() && !isGenerating && !isProviderDisabled && !isChecking && !hasNoCredits) {
+    if (topic.trim() && !isProviderDisabled && !isChecking && !hasNoCredits) {
       onGenerate(); 
     }
   };
@@ -98,47 +97,49 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
   return (
     <Box 
       sx={{ 
-        alignItems: 'center', 
         display: 'flex', 
         flexDirection: 'column', 
+        alignItems: 'center',
         justifyContent: 'center', 
         width: '100%',
-        minHeight: '80vh' 
+        minHeight: '75vh',
+        py: { xs: 6, md: 10 }
       }}
     >
-      <Box sx={{ alignItems: 'center', display: 'flex', flexDirection: 'column', width: '100%', px: 2, py: 4 }}>
-        
-        <Box sx={{ textAlign: 'center', mb: 1 }}>
-          <Typography variant="h3" sx={{ fontWeight: 800, display: 'inline-flex', mr: 1.5, fontSize: { xs: '2.2rem', md: '3.5rem' }, letterSpacing: '-0.02em' }}>
-            O que vamos
-          </Typography>
+      <Container maxWidth="md">
+        {/* Cabeçalho */}
+        <Box sx={{ textAlign: 'center', mb: 6 }}>
           <Typography 
-            variant="h3"
+            variant="h3" 
             sx={{ 
-              fontWeight: 800,
-              background: `linear-gradient(135deg, ${blue[300]} 0%, ${blue[700]} 100%)`,
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              color: 'transparent',
-              display: 'inline-flex',
-              fontSize: { xs: '2.2rem', md: '3.5rem' },
-              letterSpacing: '-0.02em'
+              fontWeight: 800, 
+              fontSize: { xs: '2.5rem', md: '4rem' }, 
+              letterSpacing: '-0.03em',
+              mb: 1
             }}
           >
-            aprender?
+            O que vamos {' '}
+            <Box 
+              component="span" 
+              sx={{ 
+                background: `linear-gradient(135deg, ${blue[400]} 0%, ${blue[800]} 100%)`,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
+              aprender?
+            </Box>
+          </Typography>
+          <Typography 
+            variant='h6' 
+            color='text.secondary'
+            sx={{ fontWeight: 400, opacity: 0.8, maxWidth: 600, mx: 'auto' }}
+          >
+            Transforme qualquer tópico em um curso estruturado com lições e exercícios em segundos.
           </Typography>
         </Box>
 
-        <Typography 
-          align='center' 
-          variant='h5' 
-          color='text.secondary'
-          sx={{ mb: 4, fontSize: { xs: '1.1rem', md: '1.5rem' }, fontWeight: 400, opacity: 0.8 }}
-        >
-          Gere cursos completos com Inteligência Artificial.
-        </Typography>
-
-        <Container maxWidth='sm' sx={{ px: { xs: 0, sm: 2 } }}>
+        <Container maxWidth='sm' sx={{ p: 0 }}>
           {!isGenerating ? (
             <Zoom in={!isGenerating}>
               <Paper 
@@ -149,36 +150,43 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   border: '1px solid', 
                   borderColor: hasNoCredits ? orange[300] : (isProviderDisabled ? red[200] : 'divider'),
                   bgcolor: 'background.paper',
-                  boxShadow: resolvedMode === 'light' ? '0 20px 60px rgba(0,0,0, 0.05)' : '0 20px 60px rgba(0,0,0, 0.3)',
+                  boxShadow: resolvedMode === 'light' 
+                    ? '0 30px 60px rgba(0,0,0, 0.08)' 
+                    : '0 30px 60px rgba(0,0,0, 0.4)',
+                  borderRadius: 4,
                   overflow: 'hidden',
-                  borderRadius: 3,
-                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                  transition: 'transform 0.3s ease, border-color 0.3s ease',
+                  '&:focus-within': {
+                    borderColor: 'primary.main',
+                    transform: 'translateY(-2px)'
+                  }
                 }}
               >
+                {/* Input Principal */}
                 <TextField
                   fullWidth
                   variant="standard"
-                  placeholder={hasNoCredits ? "Renovação de créditos em 24h..." : randomPlaceholder}
+                  placeholder={hasNoCredits ? "Limite de créditos atingido..." : randomPlaceholder}
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   autoComplete="off"
-                  disabled={isGenerating || hasNoCredits || authLoading}
+                  disabled={hasNoCredits || authLoading}
                   InputProps={{
                     disableUnderline: true,
-                    sx: { p: 2.5, fontSize: { xs: '1rem', md: '1.2rem' }, pr: 9 },
+                    sx: { p: 3, fontSize: { xs: '1.1rem', md: '1.25rem' }, fontWeight: 500 },
                     endAdornment: (
-                      <InputAdornment position="end" sx={{ position: 'absolute', right: 16 }}>
+                      <InputAdornment position="end">
                         {topic ? (
-                          <IconButton onClick={() => setTopic('')} size="small" disabled={isGenerating}>
+                          <IconButton onClick={() => setTopic('')} size="small">
                             <Clear />
                           </IconButton>
                         ) : (
-                          <Tooltip placement='top' title={hasNoCredits ? "Sem créditos" : "Usar sugestão"}>
+                          <Tooltip title={hasNoCredits ? "Sem créditos" : "Usar exemplo"}>
                             <span>
                               <IconButton 
                                 onClick={() => setTopic(randomPlaceholder)} 
                                 color="primary" 
-                                disabled={hasNoCredits || isGenerating || authLoading}
+                                disabled={hasNoCredits || authLoading}
                               >
                                 <ContentCopy fontSize="small" />
                               </IconButton>
@@ -190,34 +198,36 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   }}
                 />
 
+                {/* Barra de Ações Inferior */}
                 <Box sx={{ 
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   borderTop: '1px solid', borderColor: 'divider',
-                  p: 2, bgcolor: resolvedMode === 'light' ? grey[50] : 'rgba(255,255,255,0.02)'
+                  p: 2, bgcolor: resolvedMode === 'light' ? grey[50] : 'rgba(255,255,255,0.03)'
                 }}>
                   
+                  {/* Seletor de Modelo */}
                   <FormControl size="small">
                     <Select
                       value={selectedProvider}
                       onChange={(e) => setSelectedProvider(e.target.value)}
+                      disabled={hasNoCredits || authLoading}
                       variant="outlined"
-                      disabled={hasNoCredits || isGenerating || authLoading}
                       sx={{ 
-                        minWidth: 140, borderRadius: 2, bgcolor: 'background.paper',
+                        minWidth: 150, borderRadius: 2, bgcolor: 'background.paper',
                         '& .MuiSelect-select': { py: 1, display: 'flex', alignItems: 'center' }
                       }}
                     >
                       {providers.map((p) => (
                         <MenuItem key={p.id} value={p.id}>
                           <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                            <Typography variant="caption" fontWeight={700} sx={{ lineHeight: 1 }}>
+                            <Typography variant="caption" fontWeight={700} sx={{ lineHeight: 1.2 }}>
                               {p.name}
                             </Typography>
                             <Typography 
                               variant="caption" 
                               sx={{ 
                                 color: p.enabled ? green[600] : (p.quotaLabel?.includes('Verificando') ? blue[500] : red[400]),
-                                fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', mt: 0.5
+                                fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase'
                               }}
                             >
                               {p.quotaLabel}
@@ -228,9 +238,10 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                     </Select>
                   </FormControl>
 
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  {/* Botão Gerar */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     {(isProviderDisabled || hasNoCredits) && (
-                      <Tooltip placement='top' title={hasNoCredits ? "Limite diário atingido (3 cursos)." : "Provedor indisponível"}>
+                      <Tooltip title={hasNoCredits ? "Você atingiu o limite de 3 cursos/dia" : "Este provedor está fora do ar"}>
                         <WarningAmber sx={{ color: hasNoCredits ? orange[500] : red[500] }} />
                       </Tooltip>
                     )}
@@ -238,16 +249,16 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                     <IconButton 
                       color='secondary'
                       type="submit" 
-                      disabled={!topic.trim() || isGenerating || isProviderDisabled || isChecking || hasNoCredits || authLoading}
+                      disabled={!topic.trim() || isProviderDisabled || isChecking || hasNoCredits || authLoading}
                       sx={{ 
-                        width: 48, height: 48,
+                        width: 52, height: 52,
                         bgcolor: (topic.trim() && !isProviderDisabled && !hasNoCredits) ? 'secondary.main' : 'action.disabledBackground',
-                        color: (topic.trim() && !isProviderDisabled && !hasNoCredits) ? 'white' : 'action.disabled',
+                        color: 'white',
                         '&:hover': { bgcolor: 'secondary.dark' },
-                        boxShadow: (topic.trim() && !hasNoCredits) ? '0 4px 14px rgba(156, 39, 176, 0.39)' : 'none'
+                        transition: 'all 0.2s'
                       }}
                     >
-                      {isChecking || authLoading ? (
+                      {authLoading ? (
                         <CircularProgress size={24} color="inherit" />
                       ) : hasNoCredits ? (
                         <Lock sx={{ fontSize: 20 }} />
@@ -260,28 +271,29 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
               </Paper>
             </Zoom>
           ) : (
+            /* Estado de Carregamento (Streaming) */
             <Fade in={isGenerating}>
               <Box sx={{ 
                 display: 'flex', flexDirection: 'column', alignItems: 'center', 
-                p: { xs: 4, md: 6 }, borderRadius: 6, 
+                p: { xs: 4, md: 8 }, borderRadius: 6, 
                 bgcolor: 'background.paper',
                 border: '1px solid', borderColor: 'divider', textAlign: 'center',
-                boxShadow: '0 30px 90px rgba(0,0,0,0.1)'
+                boxShadow: '0 40px 100px rgba(0,0,0,0.12)'
               }}>
                 <CircularProgressWithLabel value={progress} />
                 <Typography variant="h5" sx={{ mt: 4, fontWeight: 800 }}>
                   {statusMessage}
                 </Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mt: 2, maxWidth: 420 }}>
-                  {progress < 90 
-                    ? "Nossa IA está estruturando o conteúdo técnico e gerando exercícios para você." 
-                    : "Quase lá! Estamos salvando as informações e preparando seu curso."}
+                <Typography variant="body1" color="text.secondary" sx={{ mt: 2, maxWidth: 400 }}>
+                  {progress < 40 && "Estruturando módulos e lições..."}
+                  {progress >= 40 && progress < 80 && "Gerando conteúdo e exercícios práticos..."}
+                  {progress >= 80 && "Finalizando e salvando seu curso..."}
                 </Typography>
               </Box>
             </Fade>
           )}
         </Container>
-      </Box>
+      </Container>
     </Box>
   );
 };

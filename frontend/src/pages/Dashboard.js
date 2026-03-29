@@ -38,7 +38,7 @@ const Dashboard = () => {
   const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState('Recentes');
 
-  // 1. Carrega dados globais (estatísticas e categorias)
+  // 1. Carrega dados globais iniciais (estatísticas e categorias)
   useEffect(() => {
     fetchGlobalData();
   }, [fetchGlobalData]);
@@ -48,11 +48,15 @@ const Dashboard = () => {
     setFetchingCourses(true);
     try {
       let conditions = ['_type == "course"'];
+      
+      // Filtro por categoria (se não for "Recentes")
       if (categoryFilter !== 'Recentes') {
         conditions.push(`category.name == "${categoryFilter}"`);
       }
+      
       const filter = `*[${conditions.join(' && ')}]`;
       
+      // Query otimizada para buscar total e itens paginados
       const query = `{
         "total": count(${filter}),
         "items": ${filter} | order(_createdAt desc) [${(page - 1) * COURSES_PER_PAGE}...${page * COURSES_PER_PAGE - 1}]
@@ -62,25 +66,24 @@ const Dashboard = () => {
       setTotalCourses(result.total || 0);
       setCourses(result.items || []);
     } catch (err) {
-      console.error("Erro ao buscar cursos:", err);
+      console.error("Erro ao buscar cursos no Sanity:", err);
       setCourses([]); 
     } finally {
       setFetchingCourses(false);
     }
   }, [page, categoryFilter]);
 
-  // Executa a busca sempre que a página, filtro ou carregamento inicial mudar
+  // Executa a busca sempre que a página ou filtro mudarem
   useEffect(() => {
     fetchCoursesList();
-  }, [fetchCoursesList, initialDataLoaded]);
+  }, [fetchCoursesList]);
 
+  // Função para scroll suave até a seção de cursos
   const scrollToTabs = useCallback(() => {
     const anchor = document.querySelector('#tabs-scroll-point');
     if (anchor) {
-      const offset = isMobile ? 70 : 80; 
-      const bodyRect = document.body.getBoundingClientRect().top;
-      const elementRect = anchor.getBoundingClientRect().top;
-      const elementPosition = elementRect - bodyRect;
+      const offset = isMobile ? 70 : 90; 
+      const elementPosition = anchor.getBoundingClientRect().top + window.pageYOffset;
       const offsetPosition = elementPosition - offset;
 
       window.scrollTo({
@@ -97,26 +100,38 @@ const Dashboard = () => {
 
   const handleTabChange = (event, newValue) => {
     setCategoryFilter(newValue);
-    setPage(1); // Volta para a primeira página ao trocar categoria
+    setPage(1); // Reseta para a primeira página ao filtrar
     scrollToTabs();
   };
 
-  const onGenerateSuccess = useCallback((slug) => {
+  // Callback disparado quando a geração do curso termina com sucesso
+  const onGenerateSuccess = useCallback(async (slug) => {
     setTopic('');
-    if (refreshUser) refreshUser(); 
     
-    // Redireciona para o curso gerado
+    // Atualiza dados do usuário (XP, créditos)
+    if (refreshUser) await refreshUser(); 
+    
+    // Força atualização da lista de cursos e estatísticas globais
+    await fetchGlobalData(true);
+    await fetchCoursesList();
+    
+    // Redireciona para o curso recém-criado
     setTimeout(() => {
       navigate(`/curso/${slug}`);
-    }, 600);
-  }, [navigate, refreshUser]);
+    }, 800);
+  }, [navigate, refreshUser, fetchGlobalData, fetchCoursesList]);
+
+  const handleGenerate = () => {
+    if (!topic.trim()) return;
+    generateCourse(topic, user?._id, onGenerateSuccess);
+  };
 
   return (
     <>
       <Hero 
         topic={topic} 
         setTopic={setTopic} 
-        onGenerate={() => generateCourse(topic, user?._id, onGenerateSuccess)} 
+        onGenerate={handleGenerate} 
       />
 
       <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 2 }}>
@@ -127,6 +142,7 @@ const Dashboard = () => {
         />
       </Container>
 
+      {/* Ponto de ancoragem para scroll */}
       <Box sx={{ mt: 4 }} id="tabs-scroll-point">
         {!initialDataLoaded ? (
           <CategoryTabsSkeleton />
@@ -142,6 +158,7 @@ const Dashboard = () => {
       <Container maxWidth="xl">
         <Stack spacing={2} sx={{ mt: 2, mb: 4 }}>
           {fetchingCourses ? (
+            // Exibe 3 skeletons enquanto carrega
             [...Array(3)].map((_, i) => <CourseCardSkeleton key={i} />)
           ) : (
             <>
@@ -149,11 +166,21 @@ const Dashboard = () => {
                 <CourseCard key={course._id} course={course} />
               ))}
               
+              {/* Empty State */}
               {courses.length === 0 && (
-                <Box sx={{ display: 'flex', alignItems: 'center', flexDirection: 'column', py: 8 }}>
-                  <MenuBook color='action' sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
-                  <Typography variant='subtitle1' color='text.secondary'>
-                    Nenhum curso encontrado nesta categoria.
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  flexDirection: 'column', 
+                  py: 10,
+                  textAlign: 'center'
+                }}>
+                  <MenuBook color='action' sx={{ fontSize: 60, mb: 2, opacity: 0.3 }} />
+                  <Typography variant='h6' color='text.secondary'>
+                    Nenhum curso encontrado.
+                  </Typography>
+                  <Typography variant='body2' color='text.disabled'>
+                    Tente mudar a categoria ou gere um novo curso no topo.
                   </Typography>
                 </Box>
               )}
@@ -161,8 +188,9 @@ const Dashboard = () => {
           )}
         </Stack>
 
+        {/* Paginação */}
         {!fetchingCourses && totalCourses > COURSES_PER_PAGE && (
-          <Stack sx={{ pb: 8, alignItems: 'center' }}>
+          <Stack sx={{ pb: 10, alignItems: 'center' }}>
             <Pagination 
               count={Math.ceil(totalCourses / COURSES_PER_PAGE)} 
               page={page} 
