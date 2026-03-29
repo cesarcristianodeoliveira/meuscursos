@@ -1,25 +1,38 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import { createTheme, ThemeProvider, CssBaseline, responsiveFontSizes } from '@mui/material';
+// Fontes Roboto
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
-import '@fontsource/roboto/600.css';
 import '@fontsource/roboto/700.css';
-import { blue, grey } from '@mui/material/colors';
 
 const ThemeContext = createContext();
 
 export const ThemeProviderWrapper = ({ children }) => {
+  // Inicializa o modo vindo do localStorage ou padrão 'system'
   const [mode, setMode] = useState(() => {
     return localStorage.getItem('themeMode') || 'system';
   });
 
+  // Estado para capturar a preferência do sistema operacional em tempo real
+  const [systemDark, setSystemDark] = useState(
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+
+  // Listener para mudanças no tema do Sistema Operacional
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => setSystemDark(e.matches);
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  // Define se o tema final será dark ou light
   const resolvedMode = useMemo(() => {
-    if (mode === 'system') {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
+    if (mode === 'system') return systemDark ? 'dark' : 'light';
     return mode;
-  }, [mode]);
+  }, [mode, systemDark]);
 
   const toggleTheme = () => {
     const newMode = resolvedMode === 'light' ? 'dark' : 'light';
@@ -30,30 +43,61 @@ export const ThemeProviderWrapper = ({ children }) => {
   const theme = useMemo(() => {
     let baseTheme = createTheme({
       palette: {
+        mode: resolvedMode,
         primary: {
-          main: resolvedMode === 'light' ? grey[900] : grey[300]
+          // Azul Profundo no Dark, Slate no Light
+          main: resolvedMode === 'dark' ? '#38bdf8' : '#0f172a', 
         },
         secondary: {
-          main: resolvedMode === 'light' ? blue[500] : blue[300]
+          main: '#6366f1', // Indigo para botões de destaque (IA)
         },
-        mode: resolvedMode,
+        background: {
+          default: resolvedMode === 'dark' ? '#020617' : '#f8fafc',
+          paper: resolvedMode === 'dark' ? '#0f172a' : '#ffffff',
+        },
+        text: {
+          primary: resolvedMode === 'dark' ? '#f1f5f9' : '#1e293b',
+          secondary: '#64748b',
+        },
       },
       typography: {
-        fontFamily: [
-          'Roboto',
-          '-apple-system',
-          'BlinkMacSystemFont',
-          '"Segoe UI"',
-          'Arial',
-          'sans-serif',
-        ].join(','),
+        fontFamily: '"Roboto", "Inter", "Helvetica", "Arial", sans-serif',
+        h1: { fontWeight: 700 },
+        h2: { fontWeight: 700 },
+        button: { textTransform: 'none', fontWeight: 600 },
+      },
+      shape: {
+        borderRadius: 12, // Bordas mais arredondadas e modernas
       },
       components: {
-        MuiTypography: {
+        MuiCssBaseline: {
+          styleOverrides: `
+            * {
+              transition: background-color 0.3s ease, color 0.2s ease;
+            }
+            body {
+              scrollbar-width: thin;
+              scrollbar-color: ${resolvedMode === 'dark' ? '#334155 #020617' : '#cbd5e1 #f8fafc'};
+            }
+            /* Garante legibilidade em conteúdos Markdown */
+            .markdown-body {
+              word-break: break-word;
+              line-height: 1.6;
+            }
+          `,
+        },
+        MuiButton: {
           styleOverrides: {
             root: {
-              wordBreak: 'break-word',
-              overflowWrap: 'break-word',
+              borderRadius: 8,
+              padding: '8px 16px',
+            },
+          },
+        },
+        MuiPaper: {
+          styleOverrides: {
+            root: {
+              backgroundImage: 'none', // Remove o overlay cinza do MUI no Dark Mode
             },
           },
         },
@@ -62,28 +106,6 @@ export const ThemeProviderWrapper = ({ children }) => {
 
     return responsiveFontSizes(baseTheme);
   }, [resolvedMode]);
-
-  // 🔥 Adiciona CSS global para garantir font-display
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      /* Garante que todas as fontes usem swap */
-      @font-face {
-        font-family: 'Roboto';
-        font-display: swap;
-      }
-      
-      /* Aplica a fonte com fallback imediatamente */
-      body, h1, h2, h3, h4, h5, h6, button, input, textarea {
-        font-family: ${theme.typography.fontFamily};
-      }
-    `;
-    document.head.appendChild(style);
-    
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, [theme]);
 
   return (
     <ThemeContext.Provider value={{ mode, toggleTheme, resolvedMode }}>

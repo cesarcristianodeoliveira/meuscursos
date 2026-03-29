@@ -7,7 +7,10 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Função para buscar dados frescos do usuário
+  /**
+   * Busca dados frescos do usuário no Sanity
+   * Focado em XP, Créditos e Status do Plano
+   */
   const fetchUser = useCallback(async (userId) => {
     if (!userId) {
       setLoading(false);
@@ -15,15 +18,15 @@ export const AuthProvider = ({ children }) => {
     }
     
     try {
-      // Buscamos campos vitais: créditos, stats (XP/Cursos) e plano
+      // Buscamos a estrutura completa de stats para garantir o realismo na UI
       const userData = await client.fetch(
         `*[_type == "user" && _id == $userId][0]{
           ...,
-          stats {
-            ...,
-            totalXp,
-            coursesCreated,
-            level
+          "stats": {
+            "totalXp": coalesce(stats.totalXp, 0),
+            "coursesCreated": coalesce(stats.coursesCreated, 0),
+            "lastLogin": stats.lastLogin,
+            "level": coalesce(stats.level, "Iniciante")
           }
         }`, 
         { userId }
@@ -32,38 +35,44 @@ export const AuthProvider = ({ children }) => {
       if (userData) {
         setUser(userData);
       } else {
-        // Se o ID não existe mais (deletado no Sanity), limpa o local
+        // Se o usuário foi removido do banco, limpamos a sessão local
         localStorage.removeItem('userId');
         setUser(null);
       }
     } catch (error) {
-      console.error("❌ Erro ao carregar usuário do Sanity:", error);
+      console.error("❌ Erro AuthContext (fetchUser):", error);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Efeito para carregar o usuário ao iniciar o App
+  /**
+   * Efeito de Inicialização e Real-time Sync
+   */
   useEffect(() => {
     const savedUserId = localStorage.getItem('userId');
-    
+    let subscription = null;
+
     if (savedUserId) {
       fetchUser(savedUserId);
 
-      // --- OPCIONAL: LISTEN REAL-TIME ---
-      // Se você quiser que o XP suba na tela "sozinho" assim que o backend terminar:
-      const subscription = client
+      // --- LISTEN REAL-TIME ---
+      // Escuta mudanças no documento do usuário (XP, Créditos via Backend)
+      subscription = client
         .listen(`*[_type == "user" && _id == $userId]`, { userId: savedUserId })
         .subscribe((update) => {
+          // Se houver uma mutação (update), atualizamos o estado local na hora
           if (update.result) {
             setUser(update.result);
           }
         });
-
-      return () => subscription.unsubscribe();
     } else {
       setLoading(false);
     }
+
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
   }, [fetchUser]);
 
   const login = (userData) => {
@@ -75,11 +84,13 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('userId');
-    // Forçar reload pode ser útil para limpar outros contextos
-    window.location.reload(); 
+    // Limpamos o cache e estados para evitar conflito de dados de outro usuário
+    window.location.href = '/'; 
   };
 
-  // Útil para chamar após a geração de um curso no frontend
+  /**
+   * Função manual para forçar atualização (útil após ações críticas)
+   */
   const refreshUser = useCallback(async () => {
     const currentId = user?._id || localStorage.getItem('userId');
     if (currentId) {
@@ -95,11 +106,10 @@ export const AuthProvider = ({ children }) => {
       login, 
       logout, 
       refreshUser,
-      isAuthenticated: !!user
+      isAuthenticated: !!user && !loading
     }}>
-      {/* Removi o {!loading && children} para permitir que o App renderize 
-         o esqueleto/loading state se necessário, mas você pode manter se preferir 
-         bloquear tudo até o fetch terminar.
+      {/* DICA: Se quiser bloquear a tela enquanto carrega o user inicial:
+        {loading ? <SeuComponenteDeLoading /> : children}
       */}
       {children}
     </AuthContext.Provider>

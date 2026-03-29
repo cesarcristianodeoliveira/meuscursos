@@ -1,71 +1,74 @@
 const express = require('express');
 const cors = require('cors');
-const { generateCourse } = require('./controllers/courseController');
-const client = require('./config/sanity');
 require('dotenv').config();
+
+const { generateCourse } = require('./controllers/courseController');
+const statusRoutes = require('./routes/statusRoutes');
 
 const app = express();
 
-// Configuração de CORS
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
+// --- CONFIGURAÇÃO DE PORTA ---
+// Local usa 5000 (seu setup), Render usa process.env.PORT
+const PORT = process.env.PORT || 5000;
+
+// --- CONFIGURAÇÃO DE CORS HÍBRIDO ---
+const allowedOrigins = [
+  'http://localhost:3000',           // Seu Frontend Local
+  'https://meuscursos.onrender.com'  // Seu Frontend em Produção
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Permite requisições sem origin (como Insomnia/Postman) ou das URLs permitidas
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Bloqueado pelo CORS: Origem não permitida.'));
+    }
+  },
+  credentials: true
+}));
+
 app.use(express.json());
 
-// --- ROTA DE MONITORAMENTO DE COTAS ---
-app.get('/provider-status', async (req, res) => {
-  try {
-    // Limite de segurança baseado no plano gratuito da Groq (Tokens Per Minute/Hour)
-    const HOURLY_TOKEN_LIMIT = 100000; 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-
-    // BUSCA: Pegamos os tokens dos cursos gerados na última hora
-    // Adicionamos um filtro de segurança para garantir que stats.totalTokens exista
-    const query = `*[_type == "course" && stats.generatedAt > $oneHourAgo && defined(stats.totalTokens)].stats.totalTokens`;
-    const tokensArray = await client.fetch(query, { oneHourAgo });
-
-    // SOMA: Calculamos quanto da cota já foi consumida
-    const usedTokens = (tokensArray || []).reduce((acc, curr) => acc + (Number(curr) || 0), 0);
-    
-    const remainingTokens = Math.max(0, HOURLY_TOKEN_LIMIT - usedTokens);
-    
-    // Estimativa conservadora: 6500 tokens por curso completo (IA + Imagem + Processamento)
-    const availableByTokens = Math.floor(remainingTokens / 6500);
-
-    res.json({
-      groq: {
-        id: 'groq',
-        enabled: availableByTokens > 0,
-        message: availableByTokens > 0 
-          ? `${availableByTokens} gerações disponíveis` 
-          : "Limite atingido (aguarde 1h)",
-        available: availableByTokens
-      },
-      openai: { 
-        id: 'openai', 
-        enabled: false, 
-        message: "Em breve" 
-      },
-      google: { 
-        id: 'google', 
-        enabled: false, 
-        message: "Em breve" 
-      }
-    });
-  } catch (error) {
-    console.error("❌ Erro ao checar status de cotas:", error.message);
-    
-    // FALLBACK: Se o Sanity falhar, permitimos a tentativa de geração para não travar o app
-    res.json({
-      groq: { id: 'groq', enabled: true, message: "Sistema Online", available: 5 },
-      openai: { id: 'openai', enabled: false, message: "Offline" },
-      google: { id: 'google', enabled: false, message: "Offline" }
-    });
-  }
+// --- PÁGINA INICIAL (HTML SIMPLES) ---
+// Evita o erro "Cannot GET /" ao acessar a URL da API no navegador
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="pt-br">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Motor de IA | Status</title>
+      <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #0f172a; color: white; }
+        .container { text-align: center; border: 1px solid #1e293b; padding: 2rem; border-radius: 12px; background: #1e293b; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .status { color: #10b981; font-weight: bold; }
+        h1 { margin-bottom: 0.5rem; font-size: 1.5rem; }
+        p { color: #94a3b8; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>🚀 Motor de IA v1.2</h1>
+        <p>Status do Servidor: <span class="status">ONLINE</span></p>
+        <p>Acesse o painel do aluno para gerar cursos.</p>
+      </div>
+    </body>
+    </html>
+  `);
 });
 
-// Rota principal de geração
+// --- ROTAS DE API ---
+app.use('/', statusRoutes); // Endpoints como /provider-status
 app.post('/generate-course', generateCourse);
 
-const PORT = process.env.PORT || 3000;
+// --- INICIALIZAÇÃO ---
 app.listen(PORT, () => {
-  console.log(`🚀 Motor de IA v1.2 rodando na porta ${PORT}`);
+  console.log(`-----------------------------------------`);
+  console.log(`🚀 Servidor rodando na porta: ${PORT}`);
+  console.log(`🔗 Local: http://localhost:${PORT}`);
+  console.log(`🌍 Produção: https://meuscursos.onrender.com`);
+  console.log(`-----------------------------------------`);
 });

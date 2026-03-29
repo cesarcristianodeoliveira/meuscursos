@@ -2,59 +2,76 @@ export default {
   name: 'user',
   title: 'Usuários',
   type: 'document',
+  groups: [
+    { name: 'profile', title: 'Perfil' },
+    { name: 'gamification', title: 'Gamificação & Progresso' },
+    { name: 'settings', title: 'Configurações & Admin' },
+  ],
   fields: [
+    // --- INFORMAÇÕES BÁSICAS ---
     {
       name: 'name',
       title: 'Nome Completo',
       type: 'string',
+      group: 'profile',
     },
     {
       name: 'email',
       title: 'E-mail',
       type: 'string',
+      group: 'profile',
       validation: Rule => Rule.required().email(),
     },
     {
-      name: 'password', // Armazenar sempre como HASH no backend
+      name: 'password',
       title: 'Senha (Hash)',
       type: 'string',
-      hidden: true, 
-      description: 'Senha criptografada do usuário.'
+      hidden: true,
+      description: 'Armazenada via hash seguro.',
     },
-    // --- FUNÇÕES E PERMISSÕES ---
     {
-      name: 'role',
-      title: 'Papel (Role)',
-      type: 'string',
-      options: {
-        list: [
-          { title: 'Administrador', value: 'admin' },
-          { title: 'Moderador', value: 'moderator' },
-          { title: 'Usuário Padrão', value: 'user' },
-        ],
-        layout: 'radio',
-      },
-      initialValue: 'user',
-      description: 'Define o nível de acesso do usuário ao sistema.'
+      name: 'bio',
+      title: 'Biografia',
+      type: 'text',
+      group: 'profile',
     },
-    // --- AVATAR (HÍBRIDO) ---
+
+    // --- AVATAR ---
     {
       name: 'avatar',
       title: 'Avatar (Upload)',
       type: 'image',
+      group: 'profile',
       options: { hotspot: true },
     },
     {
       name: 'avatarURL',
       title: 'URL do Avatar Externo',
       type: 'url',
+      group: 'profile',
     },
-    
-    // --- MONETIZAÇÃO E CRÉDITOS ---
+
+    // --- PERMISSÕES E PLANOS ---
+    {
+      name: 'role',
+      title: 'Papel (Role)',
+      type: 'string',
+      group: 'settings',
+      options: {
+        list: [
+          { title: 'Administrador', value: 'admin' },
+          { title: 'Moderador', value: 'moderator' },
+          { title: 'Usuário', value: 'user' },
+        ],
+        layout: 'radio',
+      },
+      initialValue: 'user',
+    },
     {
       name: 'plan',
       title: 'Plano Atual',
       type: 'string',
+      group: 'settings',
       options: {
         list: [
           { title: 'Grátis (Free)', value: 'free' },
@@ -68,84 +85,71 @@ export default {
       name: 'credits',
       title: 'Créditos de Geração',
       type: 'number',
-      initialValue: 3,
-      validation: Rule => Rule.min(0)
+      group: 'settings',
+      initialValue: 1,
+      validation: Rule => Rule.min(0),
     },
 
-    // --- REDES SOCIAIS ---
-    {
-      name: 'socialLinks',
-      title: 'Redes Sociais',
-      type: 'object',
-      fields: [
-        { name: 'linkedin', title: 'LinkedIn', type: 'url' },
-        { name: 'github', title: 'GitHub', type: 'url' },
-        { name: 'twitter', title: 'Twitter/X', type: 'url' },
-        { name: 'website', title: 'Site Pessoal', type: 'url' },
-      ]
-    },
-
-    // --- CONQUISTAS E GAMIFICAÇÃO ---
-    {
-      name: 'achievements',
-      title: 'Conquistas / Medalhas',
-      type: 'array',
-      of: [
-        {
-          type: 'object',
-          fields: [
-            { name: 'title', title: 'Nome da Conquista', type: 'string' },
-            { name: 'icon', title: 'Ícone (Emoji ou Lucide)', type: 'string' },
-            { name: 'unlockedAt', title: 'Desbloqueado em', type: 'datetime' },
-            { name: 'description', title: 'Como foi ganho', type: 'string' }
-          ]
-        }
-      ]
-    },
-
-    // --- CURSOS E PROGRESSO ---
+    // --- PROGRESSO E CURSOS ---
     {
       name: 'enrolledCourses',
       title: 'Cursos Inscritos',
       type: 'array',
+      group: 'gamification',
       of: [{ type: 'reference', to: [{ type: 'course' }] }],
+      description: 'Cursos que o usuário iniciou.'
     },
     {
       name: 'completedCourses',
       title: 'Cursos Concluídos',
       type: 'array',
+      group: 'gamification',
       of: [{ type: 'reference', to: [{ type: 'course' }] }],
+      description: 'Cursos que o usuário finalizou 100%.'
     },
 
-    // --- BIO E IDENTIFICAÇÃO ---
-    {
-      name: 'bio',
-      title: 'Biografia',
-      type: 'text',
-    },
-    {
-      name: 'externalId',
-      title: 'ID Externo (Auth Provedores)',
-      type: 'string',
-    },
-
-    // --- MÉTRICAS ---
+    // --- GAMIFICAÇÃO (STATS) ---
     {
       name: 'stats',
-      title: 'Estatísticas do Usuário',
+      title: 'Estatísticas de Gamificação',
       type: 'object',
+      group: 'gamification',
       fields: [
-        { name: 'totalXp', title: 'XP', type: 'number', initialValue: 0 },
-        { name: 'coursesCreated', title: 'Cursos Criados', type: 'number', initialValue: 0 },
-        { name: 'level', title: 'Nível', type: 'number', initialValue: 1 },
-        { name: 'lastLogin', title: 'Último Login', type: 'datetime' },
+        { name: 'totalXp', title: 'XP Acumulado', type: 'number', initialValue: 0 },
+        { name: 'level', title: 'Nível Atual', type: 'number', initialValue: 1 },
+        { name: 'coursesCreated', title: 'Cursos Gerados por IA', type: 'number', initialValue: 0 },
+        { name: 'lastLogin', title: 'Última Atividade', type: 'datetime' },
+      ]
+    },
+    {
+      name: 'achievements',
+      title: 'Conquistas Desbloqueadas',
+      type: 'array',
+      group: 'gamification',
+      of: [
+        {
+          type: 'object',
+          fields: [
+            { name: 'title', title: 'Título', type: 'string' },
+            { name: 'icon', title: 'Ícone', type: 'string' },
+            { name: 'unlockedAt', title: 'Data', type: 'datetime' },
+          ]
+        }
       ]
     },
 
+    // --- INTEGRAÇÃO E STATUS ---
+    {
+      name: 'externalId',
+      title: 'ID de Autenticação Externa',
+      type: 'string',
+      group: 'settings',
+    },
     {
       name: 'isActive',
       title: 'Conta Ativa',
       type: 'boolean',
+      group: 'settings',
       initialValue: true,
     },
   ],

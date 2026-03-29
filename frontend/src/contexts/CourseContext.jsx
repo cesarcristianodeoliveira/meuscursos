@@ -21,14 +21,18 @@ export const CourseProvider = ({ children }) => {
   const [categories, setCategories] = useState(['Recentes']);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+  // Ajuste para bater na porta 5000 local conforme seu backend
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-  // Cálculo de progresso individual do curso baseado no localStorage
+  /**
+   * Cálculo de progresso do aluno no curso (Realismo Pedagógico)
+   */
   const getCourseProgress = useCallback((course) => {
     if (!course || !course._id) return 0;
     try {
       const saved = localStorage.getItem(`progress-${course._id}`);
       const completedSteps = saved ? JSON.parse(saved) : [];
+      // Passos = módulos + exame final
       const totalSteps = (course.modules?.length || 0) + (course.finalExam?.length > 0 ? 1 : 0);
       
       if (totalSteps === 0) return 0;
@@ -38,11 +42,13 @@ export const CourseProvider = ({ children }) => {
     }
   }, []);
 
-  // Verifica o status e cotas dos provedores de IA
-  const checkQuotas = useCallback(async (retries = 3) => {
+  /**
+   * Verifica status das APIs e limites de geração
+   */
+  const checkQuotas = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/provider-status?t=${Date.now()}`);
-      if (!response.ok) throw new Error("Servidor ocupado");
+      if (!response.ok) throw new Error("Status indisponível");
       const data = await response.json();
 
       setProviders(prev => prev.map(p => data[p.id] ? { 
@@ -51,28 +57,22 @@ export const CourseProvider = ({ children }) => {
         quotaLabel: data[p.id].message 
       } : p));
     } catch (err) {
-      if (retries > 0) {
-        setTimeout(() => checkQuotas(retries - 1), 5000);
-      } else {
-        setProviders(prev => prev.map(p => p.id === 'groq' ? { ...p, quotaLabel: 'Offline' } : p));
-      }
+      console.warn("⚠️ Não foi possível verificar cotas:", err.message);
+      // Fallback visual
+      setProviders(prev => prev.map(p => p.id === 'groq' ? { ...p, quotaLabel: 'Online' } : p));
     }
   }, [API_BASE_URL]);
 
-  useEffect(() => {
-    checkQuotas();
-    const interval = setInterval(checkQuotas, 300000); // 5 min
-    return () => clearInterval(interval);
-  }, [checkQuotas]);
-
-  // Busca estatísticas globais e categorias do Sanity
+  /**
+   * Busca categorias e números globais do Sanity para o Dashboard
+   */
   const fetchGlobalData = useCallback(async (force = false) => {
     if (initialDataLoaded && !force) return;
     try {
       const query = `{
         "stats": {
           "courses": count(*[_type == "course"]),
-          "categories": count(array::unique(*[_type == "course"].category.name)),
+          "categories": count(array::unique(*[_type == "course" && defined(category.name)].category.name)),
           "lessons": count(*[_type == "course"].modules[]),
           "quizzes": count(*[_type == "course"].modules[].exercises[])
         },
@@ -86,17 +86,26 @@ export const CourseProvider = ({ children }) => {
       setCategories(sortedCats);
       setInitialDataLoaded(true);
     } catch (err) {
-      console.error("Erro ao buscar dados do Sanity:", err);
+      console.error("❌ Erro Sanity fetchGlobalData:", err);
     }
   }, [initialDataLoaded]);
 
-  // Lógica principal de geração via Streaming (SSE)
+  useEffect(() => {
+    fetchGlobalData();
+    checkQuotas();
+    const interval = setInterval(checkQuotas, 300000); // 5 min
+    return () => clearInterval(interval);
+  }, [checkQuotas, fetchGlobalData]);
+
+  /**
+   * Gerador de Cursos com Suporte a Streaming (SSE)
+   */
   const generateCourse = async (topic, userId, onFinish) => {
     if (isGenerating) return;
 
     setIsGenerating(true);
-    setProgress(1); 
-    setStatusMessage(`Solicitando criação de: ${topic}...`);
+    setProgress(5); 
+    setStatusMessage(`O Professor IA está analisando: ${topic}...`);
 
     let finalSlug = null;
 
@@ -108,11 +117,17 @@ export const CourseProvider = ({ children }) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Erro no servidor: ${response.status}`);
+        const errorText = await response.text();
+        let errorMsg = "Erro ao conectar com o servidor.";
+        try {
+          const parsedError = JSON.parse(errorText);
+          errorMsg = parsedError.message || errorMsg;
+        } catch (e) {
+            // Se não for JSON, usa o texto bruto ou status
+            errorMsg = `Erro ${response.status}: Limite atingido ou servidor offline.`;
+        }
+        throw new Error(errorMsg);
       }
-
-      if (!response.body) throw new Error("Seu navegador não suporta streaming.");
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -124,55 +139,51 @@ export const CourseProvider = ({ children }) => {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        
-        // Mantém a última linha incompleta no buffer
-        buffer = lines.pop() || '';
+        buffer = lines.pop() || ''; // Mantém fragmentos no buffer
 
         for (const line of lines) {
-          const trimmedLine = line.trim();
-          if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+          const cleanLine = line.trim();
+          if (!cleanLine.startsWith('data: ')) continue;
 
           try {
-            const rawData = trimmedLine.replace('data: ', '');
-            const data = JSON.parse(rawData);
+            const data = JSON.parse(cleanLine.replace('data: ', ''));
 
-            if (data.error) throw new Error(data.message || data.error);
+            if (data.error) throw new Error(data.message || "Erro na geração.");
             if (data.progress !== undefined) setProgress(data.progress);
             if (data.message) setStatusMessage(data.message);
             if (data.slug) finalSlug = data.slug;
             
           } catch (e) {
-            console.warn("Falha ao processar chunk de dados:", e);
+            console.error("Erro ao ler chunk:", e);
           }
         }
       }
 
-      // Conclusão com sucesso
+      // Finalização com sucesso
       setProgress(100);
-      setStatusMessage('Sucesso! Redirecionando...');
+      setStatusMessage('Curso criado com sucesso! Preparando sala de aula...');
       
+      // Atualiza dados locais para refletir o novo curso e créditos usados
       await fetchGlobalData(true);
       checkQuotas(); 
 
-      if (onFinish && finalSlug) {
-        onFinish(finalSlug);
-      }
-
-      // Reset suave da UI
+      // Pequeno delay para o usuário ver o "100%"
       setTimeout(() => {
+        if (onFinish && finalSlug) {
+          onFinish(finalSlug);
+        }
         setIsGenerating(false);
         setProgress(0);
-        setStatusMessage('');
-      }, 3000);
+      }, 2000);
 
     } catch (error) {
-      console.error("Erro na geração:", error);
-      setStatusMessage(`Erro: ${error.message}`);
-      // Em caso de erro, permitimos nova tentativa após 4 segundos
+      console.error("❌ Erro GenerateCourse:", error);
+      setStatusMessage(error.message);
+      
       setTimeout(() => {
         setIsGenerating(false);
         setProgress(0);
-      }, 4000);
+      }, 5000);
     } 
   };
 

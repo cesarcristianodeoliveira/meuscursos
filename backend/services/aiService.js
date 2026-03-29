@@ -6,48 +6,46 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const getSystemPrompt = (level) => {
   const isBeginner = level === 'iniciante';
 
-  // Regras Dinâmicas baseadas no nível
+  // Regras Dinâmicas baseadas no nível para garantir realismo
   const moduleCount = isBeginner ? "EXATAMENTE 3 módulos" : "entre 4 a 6 módulos densos";
   const exerciseRule = isBeginner 
-    ? "EXERCÍCIOS: Cada módulo deve conter EXATAMENTE 1 exercício de múltipla escolha."
-    : "EXERCÍCIOS: Cada módulo deve conter EXATAMENTE 3 exercícios de múltipla escolha.";
+    ? "Cada módulo deve conter EXATAMENTE 1 exercício de múltipla escolha."
+    : "Cada módulo deve conter EXATAMENTE 3 exercícios de múltipla escolha.";
   
-  const examRule = isBeginner ? "5 perguntas" : "10 a 15 perguntas";
-  const tagRule = isBeginner ? "entre 1 a 3 palavras-chave" : "EXATAMENTE 5 palavras-chave";
+  const examRule = isBeginner ? "5 perguntas" : "10 perguntas";
+  const tagRule = isBeginner ? "1 a 3 tags" : "EXATAMENTE 5 tags";
 
-  return `Você é um Designer Instrucional Sênior e Especialista em EAD. 
-Crie um curso online de alta retenção no formato JSON seguindo estas diretrizes:
+  return `Você é um Designer Instrucional Especialista. Crie um curso técnico no formato JSON seguindo estas diretrizes:
 
-REGRAS DE ESTRUTURA E PEDAGOGIA:
-1. QUANTIDADE: Gere ${moduleCount}.
-2. DENSIDADE: Conteúdo técnico em Markdown, focado em clareza e exemplos práticos.
-3. ${exerciseRule}
-4. PROVA FINAL: Crie a seção 'finalExam' com ${examRule}.
-5. TAGS: Crie um array 'tags' com ${tagRule}. NUNCA use pontuação. Use apenas termos limpos (ex: ["Marcenaria", "Design"]).
-6. RATING: O campo 'rating' deve ser sempre 0 (zero), pois o curso é novo.
-7. IMAGEM: 'searchQuery' deve conter de 1 a 2 termos em INGLÊS que representem o objeto físico ou a ação principal do curso para busca de fotos (ex: "woodworking tools", "web coding"). Evite termos abstratos como "learning" ou "education".
+DIRETRIZES PEDAGÓGICAS:
+1. ESTRUTURA: Gere ${moduleCount}.
+2. EXERCÍCIOS: ${exerciseRule}
+3. EXAME FINAL: Crie a seção 'finalExam' com ${examRule}.
+4. TAGS: Array 'tags' com ${tagRule}. NUNCA use pontuação ou hashtags.
+5. BUSCA DE IMAGEM: O campo 'searchQuery' deve conter 1 ou 2 termos em INGLÊS que representem visualmente o tópico (ex: "server hardware", "coding laptop").
+6. TEMPO: 'estimatedTime' deve refletir a carga horária real (ex: Iniciante = 1 a 2h, Avançado = 5 a 10h).
 
-ESTRUTURA JSON OBRIGATÓRIA:
+JSON SCHEMA OBRIGATÓRIO:
 {
   "title": "string",
   "category": { "name": "string", "slug": "string" },
-  "description": "string (+300 caracteres)",
+  "description": "string (mínimo 300 caracteres)",
   "rating": 0,
-  "estimatedTime": 1,
+  "estimatedTime": number,
   "level": "${level}",
   "tags": [],
   "searchQuery": "string",
   "modules": [
     { 
       "title": "string", 
-      "content": "Markdown...",
+      "content": "Markdown detalhado...",
       "exercises": [ 
-        { "question": "string", "options": ["A", "B", "C", "D"], "correctAnswer": "texto exato da opção correta" } 
+        { "question": "string", "options": ["A", "B", "C", "D"], "correctAnswer": "texto exato da opção" } 
       ]
     }
   ],
   "finalExam": [ 
-    { "question": "string", "options": ["A", "B", "C", "D"], "correctAnswer": "texto exato da opção correta" } 
+    { "question": "string", "options": ["A", "B", "C", "D"], "correctAnswer": "texto exato da opção" } 
   ]
 }`;
 };
@@ -68,43 +66,47 @@ const generateCourseContent = async (topic, provider = 'groq', options = {}) => 
     const completion = await groq.chat.completions.create({
       messages: [
         { role: 'system', content: getSystemPrompt(level) },
-        { role: 'user', content: `Gere um curso técnico de nível ${level} sobre o tópico: "${topic}".` }
+        { role: 'user', content: `Gere um curso completo sobre o tópico: "${topic}" para nível ${level}.` }
       ],
       model: selected.model,
-      temperature: 0.5, // Reduzi levemente a temperatura para maior aderência ao JSON
+      temperature: 0.6,
       max_tokens: 8000, 
       response_format: { type: "json_object" }
     });
 
     const usage = completion.usage || {};
-    const content = JSON.parse(completion.choices[0].message.content);
+    let content = JSON.parse(completion.choices[0].message.content);
 
-    // --- PÓS-PROCESSAMENTO E LIMPEZA ---
+    // --- PÓS-PROCESSAMENTO E HIGIENIZAÇÃO ---
     
-    // 1. Limpeza e Validação de Tags
+    // 1. Limpeza de Tags (Garante a regra do iniciante ter no máximo 3)
     if (Array.isArray(content.tags)) {
       content.tags = content.tags
-        .map(tag => tag.replace(/[:.;?!]/g, '').trim())
+        .map(tag => tag.replace(/[#.:.;?!]/g, '').trim())
         .filter(tag => tag.length > 0);
       
-      // Garante o limite físico no código além do prompt
       if (level === 'iniciante' && content.tags.length > 3) {
         content.tags = content.tags.slice(0, 3);
       }
     }
 
-    // 2. Fallback de Rating (Realismo)
+    // 2. Ajuste de Realismo no Tempo (Se a IA falhar no cálculo)
+    if (!content.estimatedTime || content.estimatedTime < 1) {
+      content.estimatedTime = level === 'iniciante' ? 2 : 5;
+    }
+
+    // 3. Garantia de Rating Zero para cursos novos
     content.rating = 0;
 
     return {
       ...content,
       aiProvider: selected.name,
       aiModel: selected.model,
-      level: level, // Garante que o nível vindo do Controller seja respeitado
       usage: {
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: usage.completion_tokens || 0,
-        totalTokens: usage.total_tokens || 0
+        totalTokens: usage.total_tokens || 0,
+        generatedAt: new Date().toISOString()
       }
     };
 

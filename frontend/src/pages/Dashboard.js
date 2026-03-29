@@ -7,14 +7,12 @@ import CategoryTabsSkeleton from '../components/CategoryTabsSkeleton';
 import StatsBanner from '../components/StatsBanner';
 import CategoryTabs from '../components/CategoryTabs';
 import Hero from '../components/Hero';
-import { useCourse } from '../contexts/CourseContext'; 
+import { useCourse, COURSES_PER_PAGE } from '../contexts/CourseContext'; 
 import { useAuth } from '../contexts/AuthContext'; 
 import { 
   Container, Box, Typography, Pagination, Stack, useTheme, useMediaQuery
 } from '@mui/material';
 import { MenuBook } from '@mui/icons-material';
-
-const COURSES_PER_PAGE = 6;
 
 const Dashboard = () => {
   const theme = useTheme();
@@ -38,56 +36,63 @@ const Dashboard = () => {
   const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState('Recentes');
 
-  // 1. Carrega dados globais iniciais (estatísticas e categorias)
+  /**
+   * 1. Carrega estatísticas globais ao montar
+   */
   useEffect(() => {
     fetchGlobalData();
   }, [fetchGlobalData]);
 
-  // 2. Busca lista de cursos com paginação e filtro
+  /**
+   * 2. Busca lista de cursos com paginação e filtro de categoria
+   */
   const fetchCoursesList = useCallback(async () => {
     setFetchingCourses(true);
     try {
-      let conditions = ['_type == "course"'];
+      let filterConditions = ['_type == "course"'];
       
-      // Filtro por categoria (se não for "Recentes")
       if (categoryFilter !== 'Recentes') {
-        conditions.push(`category.name == "${categoryFilter}"`);
+        filterConditions.push(`category.name == "${categoryFilter}"`);
       }
       
-      const filter = `*[${conditions.join(' && ')}]`;
+      const filter = `*[${filterConditions.join(' && ')}]`;
       
-      // Query otimizada para buscar total e itens paginados
+      // Query que traz o total de itens para paginação e os cursos da página atual
       const query = `{
         "total": count(${filter}),
-        "items": ${filter} | order(_createdAt desc) [${(page - 1) * COURSES_PER_PAGE}...${page * COURSES_PER_PAGE - 1}]
+        "items": ${filter} | order(_createdAt desc) [${(page - 1) * COURSES_PER_PAGE}...${page * COURSES_PER_PAGE - 1}] {
+          ...,
+          "authorName": author->name,
+          "thumbnailUrl": thumbnail.asset->url
+        }
       }`;
 
       const result = await client.fetch(query);
       setTotalCourses(result.total || 0);
       setCourses(result.items || []);
     } catch (err) {
-      console.error("Erro ao buscar cursos no Sanity:", err);
+      console.error("❌ Erro Dashboard (fetchCoursesList):", err);
       setCourses([]); 
     } finally {
       setFetchingCourses(false);
     }
   }, [page, categoryFilter]);
 
-  // Executa a busca sempre que a página ou filtro mudarem
   useEffect(() => {
     fetchCoursesList();
   }, [fetchCoursesList]);
 
-  // Função para scroll suave até a seção de cursos
+  /**
+   * 3. UX: Scroll suave para a lista de cursos
+   */
   const scrollToTabs = useCallback(() => {
     const anchor = document.querySelector('#tabs-scroll-point');
     if (anchor) {
-      const offset = isMobile ? 70 : 90; 
+      const navHeight = isMobile ? 64 : 80; 
       const elementPosition = anchor.getBoundingClientRect().top + window.pageYOffset;
-      const offsetPosition = elementPosition - offset;
-
+      
       window.scrollTo({
-        top: offsetPosition,
+        top: elementPosition - navHeight,
         behavior: 'smooth'
       });
     }
@@ -100,34 +105,39 @@ const Dashboard = () => {
 
   const handleTabChange = (event, newValue) => {
     setCategoryFilter(newValue);
-    setPage(1); // Reseta para a primeira página ao filtrar
-    scrollToTabs();
+    setPage(1); 
+    // Pequeno delay para o scroll não conflitar com a renderização
+    setTimeout(scrollToTabs, 50);
   };
 
-  // Callback disparado quando a geração do curso termina com sucesso
+  /**
+   * 4. Ação do Professor IA: Gera o curso e orquestra as atualizações
+   */
   const onGenerateSuccess = useCallback(async (slug) => {
     setTopic('');
     
-    // Atualiza dados do usuário (XP, créditos)
+    // Atualiza XP e créditos do usuário imediatamente
     if (refreshUser) await refreshUser(); 
     
-    // Força atualização da lista de cursos e estatísticas globais
+    // Atualiza a lista de cursos para o novo curso aparecer no topo
     await fetchGlobalData(true);
     await fetchCoursesList();
     
-    // Redireciona para o curso recém-criado
+    // Redireciona para o curso após um breve feedback visual
     setTimeout(() => {
       navigate(`/curso/${slug}`);
-    }, 800);
+    }, 1200);
   }, [navigate, refreshUser, fetchGlobalData, fetchCoursesList]);
 
   const handleGenerate = () => {
     if (!topic.trim()) return;
+    // O generateCourse vem do Context e já lida com o progresso/SSE
     generateCourse(topic, user?._id, onGenerateSuccess);
   };
 
   return (
     <>
+      {/* Hero: Entrada do Tópico e Trigger da IA */}
       <Hero 
         topic={topic} 
         setTopic={setTopic} 
@@ -135,6 +145,7 @@ const Dashboard = () => {
       />
 
       <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 2 }}>
+        {/* Banner de Estatísticas: Mostra XP, Cursos Totais e Créditos */}
         <StatsBanner 
           stats={stats} 
           user={user} 
@@ -142,7 +153,7 @@ const Dashboard = () => {
         />
       </Container>
 
-      {/* Ponto de ancoragem para scroll */}
+      {/* Navegação por Categorias */}
       <Box sx={{ mt: 4 }} id="tabs-scroll-point">
         {!initialDataLoaded ? (
           <CategoryTabsSkeleton />
@@ -158,7 +169,6 @@ const Dashboard = () => {
       <Container maxWidth="xl">
         <Stack spacing={2} sx={{ mt: 2, mb: 4 }}>
           {fetchingCourses ? (
-            // Exibe 3 skeletons enquanto carrega
             [...Array(3)].map((_, i) => <CourseCardSkeleton key={i} />)
           ) : (
             <>
@@ -166,21 +176,21 @@ const Dashboard = () => {
                 <CourseCard key={course._id} course={course} />
               ))}
               
-              {/* Empty State */}
+              {/* Fallback caso não existam cursos */}
               {courses.length === 0 && (
                 <Box sx={{ 
                   display: 'flex', 
                   alignItems: 'center', 
                   flexDirection: 'column', 
-                  py: 10,
+                  py: 12,
                   textAlign: 'center'
                 }}>
-                  <MenuBook color='action' sx={{ fontSize: 60, mb: 2, opacity: 0.3 }} />
+                  <MenuBook sx={{ fontSize: 60, mb: 2, opacity: 0.2, color: 'text.primary' }} />
                   <Typography variant='h6' color='text.secondary'>
-                    Nenhum curso encontrado.
+                    A biblioteca está esperando por você.
                   </Typography>
                   <Typography variant='body2' color='text.disabled'>
-                    Tente mudar a categoria ou gere um novo curso no topo.
+                    Gere um curso acima ou explore outras categorias.
                   </Typography>
                 </Box>
               )}
@@ -188,14 +198,14 @@ const Dashboard = () => {
           )}
         </Stack>
 
-        {/* Paginação */}
+        {/* Paginação Inteligente */}
         {!fetchingCourses && totalCourses > COURSES_PER_PAGE && (
           <Stack sx={{ pb: 10, alignItems: 'center' }}>
             <Pagination 
               count={Math.ceil(totalCourses / COURSES_PER_PAGE)} 
               page={page} 
               onChange={handlePageChange} 
-              color="secondary"
+              color="primary"
               variant="outlined"
               shape="rounded"
               size={isMobile ? "medium" : "large"}
