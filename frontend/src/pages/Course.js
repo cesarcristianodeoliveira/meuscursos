@@ -151,7 +151,14 @@ function Course() {
             <LinearProgress 
               variant="determinate" 
               value={progressPercentage} 
-              sx={{ height: 3 }} 
+              sx={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                height: 4, // Um pouquinho mais grossa para visibilidade
+                zIndex: 2000,
+              }} 
             />
           </Box>
         </>
