@@ -137,7 +137,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
                   boxShadow: resolvedMode === 'light' 
                     ? '0 25px 50px -12px rgba(0,0,0, 0.08)' 
                     : '0 25px 50px -12px rgba(0,0,0, 0.5)',
-                  borderRadius: 5,
+                  borderRadius: 2,
                   overflow: 'hidden',
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   '&:focus-within': { borderColor: 'primary.main', transform: 'scale(1.01)' }
