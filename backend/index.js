@@ -8,31 +8,37 @@ const statusRoutes = require('./routes/statusRoutes');
 const app = express();
 
 // --- CONFIGURAÇÃO DE PORTA ---
-// Local usa 5000 (seu setup), Render usa process.env.PORT
 const PORT = process.env.PORT || 5000;
 
-// --- CONFIGURAÇÃO DE CORS HÍBRIDO ---
+// --- CONFIGURAÇÃO DE CORS (CORRIGIDA) ---
 const allowedOrigins = [
-  'http://localhost:3000',           // Seu Frontend Local
-  'https://meuscursos.onrender.com'  // Seu Frontend em Produção
+  'http://localhost:3000',           // Frontend Local
+  'https://meuscursos.netlify.app',  // SEU FRONTEND REAL NO NETLIFY (Ajustado)
+  'https://meuscursos.onrender.com'  // URL da própria API (útil para testes)
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Permite requisições sem origin (como Insomnia/Postman) ou das URLs permitidas
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    // 1. Permite requisições sem 'origin' (como apps mobile, Insomnia ou Postman)
+    if (!origin) return callback(null, true);
+
+    // 2. Verifica se a origem está na nossa lista branca
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      // Log para você ver no console do Render qual URL está sendo bloqueada
+      console.error(`🚫 Bloqueio de CORS para a origem: ${origin}`);
       callback(new Error('Bloqueado pelo CORS: Origem não permitida.'));
     }
   },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 
 app.use(express.json());
 
 // --- PÁGINA INICIAL (HTML SIMPLES) ---
-// Evita o erro "Cannot GET /" ao acessar a URL da API no navegador
 app.get('/', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -53,7 +59,7 @@ app.get('/', (req, res) => {
       <div class="container">
         <h1>🚀 Motor de IA v1.2</h1>
         <p>Status do Servidor: <span class="status">ONLINE</span></p>
-        <p>Acesse o painel do aluno para gerar cursos.</p>
+        <p>Acesse o painel do Netlify para gerar cursos.</p>
       </div>
     </body>
     </html>
@@ -61,14 +67,13 @@ app.get('/', (req, res) => {
 });
 
 // --- ROTAS DE API ---
-app.use('/', statusRoutes); // Endpoints como /provider-status
+app.use('/', statusRoutes); 
 app.post('/generate-course', generateCourse);
 
 // --- INICIALIZAÇÃO ---
 app.listen(PORT, () => {
   console.log(`-----------------------------------------`);
   console.log(`🚀 Servidor rodando na porta: ${PORT}`);
-  console.log(`🔗 Local: http://localhost:${PORT}`);
-  console.log(`🌍 Produção: https://meuscursos.onrender.com`);
+  console.log(`🌍 Origens permitidas: ${allowedOrigins.join(', ')}`);
   console.log(`-----------------------------------------`);
 });

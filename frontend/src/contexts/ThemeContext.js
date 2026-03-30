@@ -72,9 +72,6 @@ export const ThemeProviderWrapper = ({ children }) => {
       components: {
         MuiCssBaseline: {
           styleOverrides: `
-            * {
-              transition: background-color 0.3s ease, color 0.2s ease;
-            }
             body {
               scrollbar-width: thin;
               scrollbar-color: ${resolvedMode === 'dark' ? '#334155 #020617' : '#cbd5e1 #f8fafc'};
