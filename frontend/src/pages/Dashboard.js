@@ -10,7 +10,7 @@ import Hero from '../components/Hero';
 import { useCourse, COURSES_PER_PAGE } from '../contexts/CourseContext'; 
 import { useAuth } from '../contexts/AuthContext'; 
 import { 
-  Container, Box, Typography, Pagination, Stack, useTheme, useMediaQuery
+  Toolbar, Container, Box, Typography, Pagination, Stack, useTheme, useMediaQuery
 } from '@mui/material';
 import { MenuBook } from '@mui/icons-material';
 
@@ -138,6 +138,7 @@ const Dashboard = () => {
   return (
     <>
       {/* Hero: Entrada do Tópico e Trigger da IA */}
+      <Toolbar />
       <Hero 
         topic={topic} 
         setTopic={setTopic} 
