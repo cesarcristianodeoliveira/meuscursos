@@ -119,7 +119,7 @@ const Hero = ({ topic, setTopic, onGenerate }) => {
             </Box>
           </Typography>
           <Typography variant='h6' color='text.secondary' sx={{ opacity: 0.7, maxWidth: 500, mx: 'auto' }}>
-            Crie cursos completos com lições, exercícios e certificados.
+            Crie cursos com lições, exercícios e certificados.
           </Typography>
         </Box>
 

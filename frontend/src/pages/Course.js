@@ -152,7 +152,7 @@ function Course() {
               variant="determinate" 
               value={progressPercentage} 
               sx={{ 
-                position: 'absolute', 
+                position: 'fixed', 
                 top: 0, 
                 left: 0, 
                 right: 0, 
