@@ -1,7 +1,17 @@
-import user from './user.js'
-import course from './course.js'
+import user from './user'
+import category from './category'
+import badge from './badge'
+import course from './course'
+import enrollment from './enrollment'
+import certificate from './certificate'
+import review from './review'
 
 export const schemaTypes = [
   user,
-  course
+  category,
+  badge,
+  course,
+  enrollment,
+  certificate,
+  review
 ]

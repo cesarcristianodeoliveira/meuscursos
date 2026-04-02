@@ -1,119 +1,116 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { client } from '../client'; 
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import api from '../services/api';
 
-const AuthContext = createContext();
+const AuthContext = createContext({});
 
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   /**
-   * Busca dados frescos do usuário no Sanity
-   * Focado em XP, Créditos e Status do Plano
+   * 1. REIDRATAÇÃO DA SESSÃO
+   * Roda assim que o App abre. Verifica se há um token e busca os 
+   * dados atualizados (XP, Nível, Créditos) no Backend.
    */
-  const fetchUser = useCallback(async (userId) => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-    
-    try {
-      // Buscamos a estrutura completa de stats para garantir o realismo na UI
-      const userData = await client.fetch(
-        `*[_type == "user" && _id == $userId][0]{
-          ...,
-          "stats": {
-            "totalXp": coalesce(stats.totalXp, 0),
-            "coursesCreated": coalesce(stats.coursesCreated, 0),
-            "lastLogin": stats.lastLogin,
-            "level": coalesce(stats.level, "Iniciante")
-          }
-        }`, 
-        { userId }
-      );
-      
-      if (userData) {
-        setUser(userData);
-      } else {
-        // Se o usuário foi removido do banco, limpamos a sessão local
-        localStorage.removeItem('userId');
-        setUser(null);
+  useEffect(() => {
+    async function loadStorageData() {
+      const storageToken = localStorage.getItem('token');
+
+      if (storageToken) {
+        try {
+          // Rota /auth/me que revisamos no Backend
+          const response = await api.get('/auth/me');
+          setUser(response.data);
+        } catch (error) {
+          console.error("Sessão expirada ou inválida.");
+          localStorage.removeItem('token');
+          setUser(null);
+        }
       }
-    } catch (error) {
-      console.error("❌ Erro AuthContext (fetchUser):", error);
-    } finally {
+      // O loading só vira false após a resposta da API ou falha
       setLoading(false);
     }
+
+    loadStorageData();
   }, []);
 
   /**
-   * Efeito de Inicialização e Real-time Sync
+   * 2. LOGIN (SignIn)
+   * Envia as credenciais e armazena o token e o usuário.
    */
-  useEffect(() => {
-    const savedUserId = localStorage.getItem('userId');
-    let subscription = null;
+  const signIn = async (email, password) => {
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      const { token, user: userData } = response.data;
 
-    if (savedUserId) {
-      fetchUser(savedUserId);
-
-      // --- LISTEN REAL-TIME ---
-      // Escuta mudanças no documento do usuário (XP, Créditos via Backend)
-      subscription = client
-        .listen(`*[_type == "user" && _id == $userId]`, { userId: savedUserId })
-        .subscribe((update) => {
-          // Se houver uma mutação (update), atualizamos o estado local na hora
-          if (update.result) {
-            setUser(update.result);
-          }
-        });
-    } else {
-      setLoading(false);
+      localStorage.setItem('token', token);
+      setUser(userData);
+      
+      return { success: true };
+    } catch (error) {
+      const message = error.response?.data?.error || "Erro ao realizar login.";
+      return { success: false, error: message };
     }
-
-    return () => {
-      if (subscription) subscription.unsubscribe();
-    };
-  }, [fetchUser]);
-
-  const login = (userData) => {
-    if (!userData?._id) return;
-    setUser(userData);
-    localStorage.setItem('userId', userData._id);
-  };
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('userId');
-    // Limpamos o cache e estados para evitar conflito de dados de outro usuário
-    window.location.href = '/'; 
   };
 
   /**
-   * Função manual para forçar atualização (útil após ações críticas)
+   * 3. REGISTRO (SignUp)
+   * Cria a conta e já loga o usuário automaticamente.
    */
-  const refreshUser = useCallback(async () => {
-    const currentId = user?._id || localStorage.getItem('userId');
-    if (currentId) {
-      await fetchUser(currentId);
+  const signUp = async (name, email, password) => {
+    try {
+      const response = await api.post('/auth/register', { name, email, password });
+      const { token, user: userData } = response.data;
+
+      localStorage.setItem('token', token);
+      setUser(userData);
+
+      return { success: true };
+    } catch (error) {
+      const message = error.response?.data?.error || "Erro ao criar conta.";
+      return { success: false, error: message };
     }
-  }, [user?._id, fetchUser]);
+  };
+
+  /**
+   * 4. LOGOUT (SignOut)
+   * Limpa tudo e volta o estado para nulo.
+   */
+  const signOut = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+  };
+
+  /**
+   * 5. ATUALIZAÇÃO MANUAL DE STATUS
+   * Útil para atualizar XP e Créditos após gerar um curso sem dar F5.
+   */
+  const updateStats = (newStats) => {
+    setUser(prev => prev ? { ...prev, stats: { ...prev.stats, ...newStats } } : null);
+  };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      setUser, 
-      loading, 
-      login, 
-      logout, 
-      refreshUser,
-      isAuthenticated: !!user && !loading
-    }}>
-      {/* DICA: Se quiser bloquear a tela enquanto carrega o user inicial:
-        {loading ? <SeuComponenteDeLoading /> : children}
-      */}
+    <AuthContext.Provider 
+      value={{ 
+        signed: !!user, 
+        user, 
+        loading, 
+        signIn, 
+        signUp, 
+        signOut,
+        updateStats 
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => useContext(AuthContext);
+// Hook personalizado para usar o Auth em qualquer componente
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  }
+  return context;
+}
