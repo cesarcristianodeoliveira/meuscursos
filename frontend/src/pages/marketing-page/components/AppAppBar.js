@@ -11,6 +11,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Drawer from '@mui/material/Drawer';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import { Link as RouterLink } from 'react-router-dom'; // Importado para navegação
 import ColorModeIconDropdown from '../../../theme/shared-theme/ColorModeIconDropdown';
 import Sitemark from './SitemarkIcon';
 
@@ -37,6 +38,15 @@ export default function AppAppBar() {
     setOpen(newOpen);
   };
 
+  // Função para scroll suave nas seções da Landing Page
+  const scrollToSection = (sectionId) => {
+    const section = document.getElementById(sectionId);
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth' });
+      setOpen(false);
+    }
+  };
+
   return (
     <AppBar
       position="fixed"
@@ -53,22 +63,54 @@ export default function AppAppBar() {
           <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', px: 0 }}>
             <Sitemark />
             <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
-              <Button variant="text" color="info" size="small">
-                Features
+              <Button 
+                variant="text" 
+                color="info" 
+                size="small" 
+                onClick={() => scrollToSection('features')}
+              >
+                Como funciona
               </Button>
-              <Button variant="text" color="info" size="small">
-                Testimonials
+              <Button 
+                variant="text" 
+                color="info" 
+                size="small"
+                onClick={() => scrollToSection('testimonials')}
+              >
+                Depoimentos
               </Button>
-              <Button variant="text" color="info" size="small">
-                Highlights
+              <Button 
+                variant="text" 
+                color="info" 
+                size="small"
+                onClick={() => scrollToSection('highlights')}
+              >
+                Destaques
               </Button>
-              <Button variant="text" color="info" size="small">
-                Pricing
+              <Button 
+                variant="text" 
+                color="info" 
+                size="small"
+                onClick={() => scrollToSection('pricing')}
+              >
+                Preços
               </Button>
-              <Button variant="text" color="info" size="small" sx={{ minWidth: 0 }}>
+              <Button 
+                variant="text" 
+                color="info" 
+                size="small" 
+                sx={{ minWidth: 0 }}
+                onClick={() => scrollToSection('faq')}
+              >
                 FAQ
               </Button>
-              <Button variant="text" color="info" size="small" sx={{ minWidth: 0 }}>
+              <Button 
+                variant="text" 
+                color="info" 
+                size="small" 
+                sx={{ minWidth: 0 }}
+                onClick={() => scrollToSection('faq')}
+              >
                 Blog
               </Button>
             </Box>
@@ -80,11 +122,23 @@ export default function AppAppBar() {
               alignItems: 'center',
             }}
           >
-            <Button color="primary" variant="text" size="small">
-              Sign in
+            <Button 
+              color="primary" 
+              variant="text" 
+              size="small"
+              component={RouterLink}
+              to="/login"
+            >
+              Entrar
             </Button>
-            <Button color="primary" variant="contained" size="small">
-              Sign up
+            <Button 
+              color="primary" 
+              variant="contained" 
+              size="small"
+              component={RouterLink}
+              to="/register"
+            >
+              Cadastrar
             </Button>
             <ColorModeIconDropdown />
           </Box>
@@ -115,21 +169,33 @@ export default function AppAppBar() {
                   </IconButton>
                 </Box>
 
-                <MenuItem>Features</MenuItem>
-                <MenuItem>Testimonials</MenuItem>
-                <MenuItem>Highlights</MenuItem>
-                <MenuItem>Pricing</MenuItem>
-                <MenuItem>FAQ</MenuItem>
-                <MenuItem>Blog</MenuItem>
+                <MenuItem onClick={() => scrollToSection('features')}>Como funciona</MenuItem>
+                <MenuItem onClick={() => scrollToSection('testimonials')}>Depoimentos</MenuItem>
+                <MenuItem onClick={() => scrollToSection('highlights')}>Vantagens</MenuItem>
+                <MenuItem onClick={() => scrollToSection('pricing')}>Preços</MenuItem>
+                <MenuItem onClick={() => scrollToSection('faq')}>FAQ</MenuItem>
+                <MenuItem onClick={() => scrollToSection('faq')}>Blog</MenuItem>
                 <Divider sx={{ my: 3 }} />
                 <MenuItem>
-                  <Button color="primary" variant="contained" fullWidth>
-                    Sign up
+                  <Button 
+                    color="primary" 
+                    variant="contained" 
+                    fullWidth
+                    component={RouterLink}
+                    to="/register"
+                  >
+                    Cadastrar
                   </Button>
                 </MenuItem>
                 <MenuItem>
-                  <Button color="primary" variant="outlined" fullWidth>
-                    Sign in
+                  <Button 
+                    color="primary" 
+                    variant="outlined" 
+                    fullWidth
+                    component={RouterLink}
+                    to="/login"
+                  >
+                    Entrar
                   </Button>
                 </MenuItem>
               </Box>

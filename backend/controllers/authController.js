@@ -4,38 +4,62 @@ const jwt = require('jsonwebtoken');
 const { formatSlug } = require('../utils/formatter');
 
 /**
+ * Função Auxiliar: Gera um slug único de forma sequencial.
+ */
+const generateUniqueSlug = async (name) => {
+  const baseSlug = formatSlug(name);
+  let uniqueSlug = baseSlug;
+  let counter = 1;
+  let exists = true;
+
+  while (exists) {
+    const query = `*[_type == "user" && slug.current == $slug][0]`;
+    const user = await client.fetch(query, { slug: uniqueSlug });
+
+    if (!user) {
+      exists = false;
+    } else {
+      counter++;
+      uniqueSlug = `${baseSlug}-${counter}`;
+    }
+  }
+  return uniqueSlug;
+};
+
+/**
  * REGISTRO DE USUÁRIO
- * Cria o perfil com suporte a Gamificação e Slugs únicos.
  */
 const register = async (req, res) => {
-  const { name, email, password } = req.body;
+  // Agora recebemos o 'newsletter' (boolean) em vez do 'plan'
+  const { name, email, password, newsletter } = req.body;
 
   try {
     if (!name || !email || !password) {
       return res.status(400).json({ error: "Preencha todos os campos corretamente." });
     }
 
-    // Verifica se o e-mail já existe
     const userExists = await client.fetch(`*[_type == "user" && email == $email][0]`, { email });
     if (userExists) {
       return res.status(400).json({ error: "Este e-mail já está em uso." });
     }
 
-    // Criptografia e Slug único (Nome + sufixo aleatório para evitar duplicatas)
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    const userSlug = `${formatSlug(name)}-${Math.random().toString(36).substring(2, 6)}`;
+    const finalSlug = await generateUniqueSlug(name);
 
-    // Montagem do documento seguindo o Schema v1.3
     const newUser = {
       _type: 'user',
       name,
       email,
       password: hashedPassword,
-      slug: { _type: 'slug', current: userSlug },
+      slug: { _type: 'slug', current: finalSlug },
+      authProvider: 'credentials',
       role: 'user', 
-      credits: 1, // Crédito inicial para o primeiro curso
+      plan: 'free',      // Forçado: Todo cadastro começa no Grátis
+      credits: 1,       // 1 Crédito inicial padrão
+      newsletter: !!newsletter, // Salva se aceitou assinar (true/false)
       stats: {
+        _type: 'object',
         totalXp: 0,
         level: 1,
         coursesCreated: 0,
@@ -48,7 +72,7 @@ const register = async (req, res) => {
     const result = await client.create(newUser);
 
     const token = jwt.sign(
-      { id: result._id, role: result.role },
+      { id: result._id, role: result.role, plan: result.plan },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -60,8 +84,11 @@ const register = async (req, res) => {
         name: result.name,
         email: result.email,
         role: result.role,
+        plan: result.plan,
+        credits: result.credits,
         slug: result.slug.current,
-        stats: result.stats
+        stats: result.stats,
+        newsletter: result.newsletter
       }
     });
 
@@ -84,16 +111,23 @@ const login = async (req, res) => {
       return res.status(401).json({ error: "E-mail ou senha inválidos." });
     }
 
+    if (user.authProvider !== 'credentials' && !user.password) {
+      return res.status(401).json({ error: `Esta conta foi criada via ${user.authProvider}. Entre usando esse método.` });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ error: "E-mail ou senha inválidos." });
     }
 
-    // Atualiza o timestamp de login silenciosamente
-    await client.patch(user._id).set({ "stats.lastLogin": new Date().toISOString() }).commit();
+    // Atualiza o lastLogin
+    await client
+      .patch(user._id)
+      .set({ "stats.lastLogin": new Date().toISOString() })
+      .commit();
 
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id, role: user.role, plan: user.plan },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -105,8 +139,11 @@ const login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        plan: user.plan,
+        credits: user.credits,
         slug: user.slug?.current,
-        stats: user.stats
+        stats: user.stats,
+        newsletter: user.newsletter
       }
     });
 
@@ -118,7 +155,6 @@ const login = async (req, res) => {
 
 /**
  * ROTA /ME (Sessão)
- * Essencial para o "Zero Pisca" do Frontend
  */
 const getMe = async (req, res) => {
   try {
@@ -131,8 +167,12 @@ const getMe = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      plan: user.plan,
+      credits: user.credits,
       slug: user.slug?.current,
-      stats: user.stats
+      stats: user.stats,
+      avatar: user.avatar,
+      newsletter: user.newsletter
     });
   } catch (error) {
     res.status(500).json({ error: "Erro ao validar sessão." });

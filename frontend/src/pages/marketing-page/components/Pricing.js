@@ -13,46 +13,34 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 
 const tiers = [
   {
-    title: 'Free',
+    title: 'Grátis',
     price: '0',
     description: [
-      '10 users included',
-      '2 GB of storage',
-      'Help center access',
-      'Email support',
+      '1 crédito por hora',
+      'Motores Groq e ChatGPT',
+      'Nível iniciante',
+      'Capa do curso inclusa',
+      'Acesso à comunidade',
     ],
-    buttonText: 'Sign up for free',
+    buttonText: 'Começar agora',
     buttonVariant: 'outlined',
     buttonColor: 'primary',
   },
   {
-    title: 'Professional',
-    subheader: 'Recommended',
-    price: '15',
+    title: 'Pro',
+    subheader: 'Recomendado',
+    price: '29',
     description: [
-      '20 users included',
-      '10 GB of storage',
-      'Help center access',
-      'Priority email support',
-      'Dedicated team',
-      'Best deals',
+      '3 créditos por hora',
+      'Motores Groq, ChatGPT e Gemini',
+      'Níveis: Iniciante ao Avançado',
+      'Multimídia (Áudio e Vídeo)',
+      'Certificados inclusos',
+      'Suporte prioritário',
     ],
-    buttonText: 'Start now',
+    buttonText: 'Assinar Plano Pro',
     buttonVariant: 'contained',
     buttonColor: 'secondary',
-  },
-  {
-    title: 'Enterprise',
-    price: '30',
-    description: [
-      '50 users included',
-      '30 GB of storage',
-      'Help center access',
-      'Phone & email support',
-    ],
-    buttonText: 'Contact us',
-    buttonVariant: 'outlined',
-    buttonColor: 'primary',
   },
 ];
 
@@ -82,13 +70,11 @@ export default function Pricing() {
           gutterBottom
           sx={{ color: 'text.primary' }}
         >
-          Pricing
+          Planos e Preços
         </Typography>
         <Typography variant="body1" sx={{ color: 'text.secondary' }}>
-          Quickly build an effective pricing table for your potential customers with
-          this layout. <br />
-          It&apos;s built with default Material UI components with little
-          customization.
+          Escolha o plano ideal para transformar qualquer tema em conhecimento real. <br />
+          Acesse recursos exclusivos e gerencie seus créditos de forma simples e eficiente.
         </Typography>
       </Box>
       <Grid
@@ -98,7 +84,7 @@ export default function Pricing() {
       >
         {tiers.map((tier) => (
           <Grid
-            size={{ xs: 12, sm: tier.title === 'Enterprise' ? 12 : 6, md: 4 }}
+            size={{ xs: 12, sm: 6, md: 4 }}
             key={tier.title}
           >
             <Card
@@ -109,7 +95,7 @@ export default function Pricing() {
                   flexDirection: 'column',
                   gap: 4,
                 },
-                tier.title === 'Professional' &&
+                tier.title === 'Pro' &&
                   ((theme) => ({
                     border: 'none',
                     background:
@@ -133,7 +119,7 @@ export default function Pricing() {
                       alignItems: 'center',
                       gap: 2,
                     },
-                    tier.title === 'Professional'
+                    tier.title === 'Pro'
                       ? { color: 'grey.100' }
                       : { color: '' },
                   ]}
@@ -141,7 +127,7 @@ export default function Pricing() {
                   <Typography component="h3" variant="h6">
                     {tier.title}
                   </Typography>
-                  {tier.title === 'Professional' && (
+                  {tier.title === 'Pro' && (
                     <Chip icon={<AutoAwesomeIcon />} label={tier.subheader} />
                   )}
                 </Box>
@@ -151,16 +137,16 @@ export default function Pricing() {
                       display: 'flex',
                       alignItems: 'baseline',
                     },
-                    tier.title === 'Professional'
+                    tier.title === 'Pro'
                       ? { color: 'grey.50' }
                       : { color: null },
                   ]}
                 >
                   <Typography component="h3" variant="h2">
-                    ${tier.price}
+                    R$ {tier.price}
                   </Typography>
                   <Typography component="h3" variant="h6">
-                    &nbsp; per month
+                    &nbsp; {tier.title === 'Grátis' ? 'pra sempre' : 'por mês'}
                   </Typography>
                 </Box>
                 <Divider sx={{ my: 2, opacity: 0.8, borderColor: 'divider' }} />
@@ -174,7 +160,7 @@ export default function Pricing() {
                         {
                           width: 20,
                         },
-                        tier.title === 'Professional'
+                        tier.title === 'Pro'
                           ? { color: 'primary.light' }
                           : { color: 'primary.main' },
                       ]}
@@ -183,7 +169,7 @@ export default function Pricing() {
                       variant="subtitle2"
                       component={'span'}
                       sx={[
-                        tier.title === 'Professional'
+                        tier.title === 'Pro'
                           ? { color: 'grey.50' }
                           : { color: null },
                       ]}

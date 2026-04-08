@@ -15,25 +15,25 @@ import ViewQuiltRoundedIcon from '@mui/icons-material/ViewQuiltRounded';
 const items = [
   {
     icon: <ViewQuiltRoundedIcon />,
-    title: 'Dashboard',
+    title: 'Painel Inteligente',
     description:
-      'This item could provide a snapshot of the most important metrics or data points related to the product.',
+      'Uma visão completa e simplificada das suas métricas e progresso em tempo real.',
     imageLight: `url("${process.env.TEMPLATE_IMAGE_URL || 'https://mui.com'}/static/images/templates/templates-images/dash-light.png")`,
     imageDark: `url("${process.env.TEMPLATE_IMAGE_URL || 'https://mui.com'}/static/images/templates/templates-images/dash-dark.png")`,
   },
   {
     icon: <EdgesensorHighRoundedIcon />,
-    title: 'Mobile integration',
+    title: 'Integração Mobile',
     description:
-      'This item could provide information about the mobile app version of the product.',
+      'Acesse seus cursos e ferramentas de qualquer lugar com nossa plataforma responsiva.',
     imageLight: `url("${process.env.TEMPLATE_IMAGE_URL || 'https://mui.com'}/static/images/templates/templates-images/mobile-light.png")`,
     imageDark: `url("${process.env.TEMPLATE_IMAGE_URL || 'https://mui.com'}/static/images/templates/templates-images/mobile-dark.png")`,
   },
   {
     icon: <DevicesRoundedIcon />,
-    title: 'Available on all platforms',
+    title: 'Multiplataforma',
     description:
-      'This item could let users know the product is available on all platforms, such as web, mobile, and desktop.',
+      'Sincronização perfeita entre web, desktop e dispositivos móveis para seu fluxo de trabalho.',
     imageLight: `url("${process.env.TEMPLATE_IMAGE_URL || 'https://mui.com'}/static/images/templates/templates-images/devices-light.png")`,
     imageDark: `url("${process.env.TEMPLATE_IMAGE_URL || 'https://mui.com'}/static/images/templates/templates-images/devices-dark.png")`,
   },
@@ -95,14 +95,10 @@ function MobileLayout({ selectedItemIndex, handleItemClick, selectedFeature }) {
               backgroundImage: 'var(--items-imageDark)',
             }),
           })}
-          style={
-            items[selectedItemIndex]
-              ? {
-                  '--items-imageLight': items[selectedItemIndex].imageLight,
-                  '--items-imageDark': items[selectedItemIndex].imageDark,
-                }
-              : {}
-          }
+          style={{
+            '--items-imageLight': items[selectedItemIndex].imageLight,
+            '--items-imageDark': items[selectedItemIndex].imageDark,
+          }}
         />
         <Box sx={{ px: 2, pb: 2 }}>
           <Typography
@@ -145,22 +141,21 @@ export default function Features() {
 
   return (
     <Container id="features" sx={{ py: { xs: 8, sm: 16 } }}>
-      <Box sx={{ width: { sm: '100%', md: '60%' } }}>
+      <Box sx={{ width: '100%' }}>
         <Typography
           component="h2"
           variant="h4"
           gutterBottom
           sx={{ color: 'text.primary' }}
         >
-          Product features
+          Funcionalidades do Produto
         </Typography>
         <Typography
           variant="body1"
           sx={{ color: 'text.secondary', mb: { xs: 2, sm: 4 } }}
         >
-          Provide a brief overview of the key features of the product. For example,
-          you could list the number of features, their types or benefits, and
-          add-ons.
+          Explore as principais ferramentas desenvolvidas para acelerar seu aprendizado 
+          e organizar seus projetos com eficiência tecnológica.
         </Typography>
       </Box>
       <Box
@@ -216,7 +211,6 @@ export default function Features() {
                   ]}
                 >
                   {icon}
-
                   <Typography variant="h6">{title}</Typography>
                   <Typography variant="body2">{description}</Typography>
                 </Box>
@@ -233,7 +227,7 @@ export default function Features() {
           sx={{
             display: { xs: 'none', sm: 'flex' },
             width: { xs: '100%', md: '70%' },
-            height: 'var(--items-image-height)',
+            height: { sm: 'auto', md: '500px' },
           }}
         >
           <Card
@@ -251,19 +245,17 @@ export default function Features() {
                 width: 420,
                 height: 500,
                 backgroundSize: 'contain',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
                 backgroundImage: 'var(--items-imageLight)',
                 ...theme.applyStyles('dark', {
                   backgroundImage: 'var(--items-imageDark)',
                 }),
               })}
-              style={
-                items[selectedItemIndex]
-                  ? {
-                      '--items-imageLight': items[selectedItemIndex].imageLight,
-                      '--items-imageDark': items[selectedItemIndex].imageDark,
-                    }
-                  : {}
-              }
+              style={{
+                '--items-imageLight': items[selectedItemIndex].imageLight,
+                '--items-imageDark': items[selectedItemIndex].imageDark,
+              }}
             />
           </Card>
         </Box>

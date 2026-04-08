@@ -8,26 +8,37 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   /**
+   * CONFIGURAÇÃO GLOBAL DO TOKEN
+   * Garante que todas as chamadas à API levem o token se ele existir.
+   */
+  const setSession = (token) => {
+    if (token) {
+      localStorage.setItem('token', token);
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      localStorage.removeItem('token');
+      delete api.defaults.headers.common['Authorization'];
+    }
+  };
+
+  /**
    * 1. REIDRATAÇÃO DA SESSÃO
-   * Roda assim que o App abre. Verifica se há um token e busca os 
-   * dados atualizados (XP, Nível, Créditos) no Backend.
    */
   useEffect(() => {
     async function loadStorageData() {
       const storageToken = localStorage.getItem('token');
 
       if (storageToken) {
+        setSession(storageToken); // Configura o cabeçalho da API
         try {
-          // Rota /auth/me que revisamos no Backend
           const response = await api.get('/auth/me');
           setUser(response.data);
         } catch (error) {
           console.error("Sessão expirada ou inválida.");
-          localStorage.removeItem('token');
+          setSession(null);
           setUser(null);
         }
       }
-      // O loading só vira false após a resposta da API ou falha
       setLoading(false);
     }
 
@@ -36,16 +47,15 @@ export function AuthProvider({ children }) {
 
   /**
    * 2. LOGIN (SignIn)
-   * Envia as credenciais e armazena o token e o usuário.
    */
   const signIn = async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
       const { token, user: userData } = response.data;
 
-      localStorage.setItem('token', token);
+      setSession(token);
       setUser(userData);
-      
+
       return { success: true };
     } catch (error) {
       const message = error.response?.data?.error || "Erro ao realizar login.";
@@ -55,14 +65,15 @@ export function AuthProvider({ children }) {
 
   /**
    * 3. REGISTRO (SignUp)
-   * Cria a conta e já loga o usuário automaticamente.
+   * Agora recebe o 'plan' vindo do formulário.
    */
-  const signUp = async (name, email, password) => {
+  const signUp = async (name, email, password, plan) => {
     try {
-      const response = await api.post('/auth/register', { name, email, password });
+      // Enviando o plano escolhido para o Backend
+      const response = await api.post('/auth/register', { name, email, password, plan });
       const { token, user: userData } = response.data;
 
-      localStorage.setItem('token', token);
+      setSession(token);
       setUser(userData);
 
       return { success: true };
@@ -74,19 +85,25 @@ export function AuthProvider({ children }) {
 
   /**
    * 4. LOGOUT (SignOut)
-   * Limpa tudo e volta o estado para nulo.
    */
   const signOut = () => {
-    localStorage.removeItem('token');
+    setSession(null);
     setUser(null);
   };
 
   /**
    * 5. ATUALIZAÇÃO MANUAL DE STATUS
-   * Útil para atualizar XP e Créditos após gerar um curso sem dar F5.
+   * Atualiza créditos ou XP sem precisar de novo login.
    */
-  const updateStats = (newStats) => {
-    setUser(prev => prev ? { ...prev, stats: { ...prev.stats, ...newStats } } : null);
+  const updateStats = (newData) => {
+    setUser(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        ...newData, // Atualiza créditos/plano se vierem na raiz
+        stats: { ...prev.stats, ...(newData.stats || {}) } // Atualiza XP/Level
+      };
+    });
   };
 
   return (
@@ -106,7 +123,6 @@ export function AuthProvider({ children }) {
   );
 }
 
-// Hook personalizado para usar o Auth em qualquer componente
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

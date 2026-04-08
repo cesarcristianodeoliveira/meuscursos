@@ -1,3 +1,4 @@
+import * as React from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Container from '@mui/material/Container';
@@ -13,40 +14,40 @@ import ThumbUpAltRoundedIcon from '@mui/icons-material/ThumbUpAltRounded';
 
 const items = [
   {
-    icon: <SettingsSuggestRoundedIcon />,
-    title: 'Adaptable performance',
+    icon: <AutoFixHighRoundedIcon />,
+    title: 'IA de Ponta',
     description:
-      'Our product effortlessly adjusts to your needs, boosting efficiency and simplifying your tasks.',
+      'Gere cursos completos sobre qualquer tema instantaneamente usando os motores Groq, ChatGPT e Gemini.',
   },
   {
-    icon: <ConstructionRoundedIcon />,
-    title: 'Built to last',
+    icon: <SettingsSuggestRoundedIcon />,
+    title: 'Personalização Total',
     description:
-      'Experience unmatched durability that goes above and beyond with lasting investment.',
+      'Escolha o nível de dificuldade, do iniciante ao avançado, e adapte o conteúdo ao seu ritmo de aprendizado.',
   },
   {
     icon: <ThumbUpAltRoundedIcon />,
-    title: 'Great user experience',
+    title: 'Experiência Intuitiva',
     description:
-      'Integrate our product into your routine with an intuitive and easy-to-use interface.',
-  },
-  {
-    icon: <AutoFixHighRoundedIcon />,
-    title: 'Innovative functionality',
-    description:
-      'Stay ahead with features that set new standards, addressing your evolving needs better than the rest.',
-  },
-  {
-    icon: <SupportAgentRoundedIcon />,
-    title: 'Reliable support',
-    description:
-      'Count on our responsive customer support, offering assistance that goes beyond the purchase.',
+      'Uma interface limpa e moderna, focada no que importa: o seu aprendizado livre de distrações.',
   },
   {
     icon: <QueryStatsRoundedIcon />,
-    title: 'Precision in every detail',
+    title: 'Gamificação Real',
     description:
-      'Enjoy a meticulously crafted product where small touches make a significant impact on your overall experience.',
+      'Ganhe XP, suba de nível e conquiste badges enquanto domina novos conhecimentos na plataforma.',
+  },
+  {
+    icon: <ConstructionRoundedIcon />,
+    title: 'Conteúdo Multimídia',
+    description:
+      'Acesse aulas enriquecidas com imagens, áudio e vídeo para uma imersão completa em cada módulo.',
+  },
+  {
+    icon: <SupportAgentRoundedIcon />,
+    title: 'Aprendizado para Todos',
+    description:
+      'Uma plataforma democrática feita para quem quer ensinar ou aprender sem barreiras técnicas.',
   },
 ];
 
@@ -77,12 +78,12 @@ export default function Highlights() {
           }}
         >
           <Typography component="h2" variant="h4" gutterBottom>
-            Highlights
+            Destaques
           </Typography>
           <Typography variant="body1" sx={{ color: 'grey.400' }}>
-            Explore why our product stands out: adaptability, durability,
-            user-friendly design, and innovation. Enjoy reliable customer support and
-            precision in every detail.
+            Descubra por que nossa plataforma é a escolha ideal: inteligência artificial avançada, 
+            liberdade temática, design focado no usuário e um sistema de progressão que 
+            valoriza cada conquista sua.
           </Typography>
         </Box>
         <Grid container spacing={2}>

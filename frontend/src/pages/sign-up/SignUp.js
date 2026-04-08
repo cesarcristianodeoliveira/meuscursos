@@ -1,8 +1,8 @@
 import * as React from 'react';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
-import CssBaseline from '@mui/material/CssBaseline';
 import Divider from '@mui/material/Divider';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormLabel from '@mui/material/FormLabel';
@@ -13,9 +13,12 @@ import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import MuiCard from '@mui/material/Card';
 import { styled } from '@mui/material/styles';
-import AppTheme from '../../theme/shared-theme/AppTheme';
-import ColorModeSelect from '../../theme/shared-theme/ColorModeSelect';
-import { GoogleIcon, FacebookIcon, SitemarkIcon } from './components/CustomIcons';
+import { 
+  // GoogleIcon, 
+  // FacebookIcon, 
+  SitemarkIcon 
+} from './components/CustomIcons';
+import { useAuth } from '../../contexts/AuthContext'; // Integrando seu contexto
 
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
@@ -37,8 +40,8 @@ const Card = styled(MuiCard)(({ theme }) => ({
 }));
 
 const SignUpContainer = styled(Stack)(({ theme }) => ({
-  height: 'calc((1 - var(--template-frame-height, 0)) * 100dvh)',
-  minHeight: '100%',
+  // height: 'calc((1 - var(--template-frame-height, 0)) * 100dvh)',
+  // minHeight: '100%',
   padding: theme.spacing(2),
   [theme.breakpoints.up('sm')]: {
     padding: theme.spacing(4),
@@ -60,12 +63,16 @@ const SignUpContainer = styled(Stack)(({ theme }) => ({
 }));
 
 export default function SignUp(props) {
+  const navigate = useNavigate();
+  const { signUp } = useAuth();
+
   const [emailError, setEmailError] = React.useState(false);
   const [emailErrorMessage, setEmailErrorMessage] = React.useState('');
   const [passwordError, setPasswordError] = React.useState(false);
   const [passwordErrorMessage, setPasswordErrorMessage] = React.useState('');
   const [nameError, setNameError] = React.useState(false);
   const [nameErrorMessage, setNameErrorMessage] = React.useState('');
+  const [backendError, setBackendError] = React.useState('');
 
   const validateInputs = () => {
     const email = document.getElementById('email');
@@ -76,7 +83,7 @@ export default function SignUp(props) {
 
     if (!email.value || !/\S+@\S+\.\S+/.test(email.value)) {
       setEmailError(true);
-      setEmailErrorMessage('Please enter a valid email address.');
+      setEmailErrorMessage('Por favor, insira um e-mail válido.');
       isValid = false;
     } else {
       setEmailError(false);
@@ -85,7 +92,7 @@ export default function SignUp(props) {
 
     if (!password.value || password.value.length < 6) {
       setPasswordError(true);
-      setPasswordErrorMessage('Password must be at least 6 characters long.');
+      setPasswordErrorMessage('A senha deve ter pelo menos 6 caracteres.');
       isValid = false;
     } else {
       setPasswordError(false);
@@ -94,7 +101,7 @@ export default function SignUp(props) {
 
     if (!name.value || name.value.length < 1) {
       setNameError(true);
-      setNameErrorMessage('Name is required.');
+      setNameErrorMessage('O nome é obrigatório.');
       isValid = false;
     } else {
       setNameError(false);
@@ -104,130 +111,143 @@ export default function SignUp(props) {
     return isValid;
   };
 
-  const handleSubmit = (event) => {
-    if (nameError || emailError || passwordError) {
-      event.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setBackendError('');
+
+    if (!validateInputs()) {
       return;
     }
+
     const data = new FormData(event.currentTarget);
-    console.log({
-      name: data.get('name'),
-      lastName: data.get('lastName'),
-      email: data.get('email'),
-      password: data.get('password'),
-    });
+    
+    const result = await signUp(
+      data.get('name'),
+      data.get('email'),
+      data.get('password'),
+      data.get('newsletter') === 'on' // Valor do checkbox de newsletter
+    );
+
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      setBackendError(result.error);
+    }
   };
 
   return (
-    <AppTheme {...props}>
-      <CssBaseline enableColorScheme />
-      <ColorModeSelect sx={{ position: 'fixed', top: '1rem', right: '1rem' }} />
-      <SignUpContainer direction="column" justifyContent="space-between">
-        <Card variant="outlined">
-          <SitemarkIcon />
-          <Typography
-            component="h1"
-            variant="h4"
-            sx={{ width: '100%', fontSize: 'clamp(2rem, 10vw, 2.15rem)' }}
-          >
-            Sign up
+    <SignUpContainer direction="column" justifyContent="space-between">
+      <Card variant="outlined">
+        <SitemarkIcon />
+        <Typography
+          component="h1"
+          variant="h4"
+          sx={{ width: '100%', fontSize: 'clamp(2rem, 10vw, 2.15rem)' }}
+        >
+          Cadastrar
+        </Typography>
+
+        {backendError && (
+          <Typography color="error" variant="body2" sx={{ textAlign: 'center' }}>
+            {backendError}
           </Typography>
-          <Box
-            component="form"
-            onSubmit={handleSubmit}
-            sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
-          >
-            <FormControl>
-              <FormLabel htmlFor="name">Full name</FormLabel>
-              <TextField
-                autoComplete="name"
-                name="name"
-                required
-                fullWidth
-                id="name"
-                placeholder="Jon Snow"
-                error={nameError}
-                helperText={nameErrorMessage}
-                color={nameError ? 'error' : 'primary'}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel htmlFor="email">Email</FormLabel>
-              <TextField
-                required
-                fullWidth
-                id="email"
-                placeholder="your@email.com"
-                name="email"
-                autoComplete="email"
-                variant="outlined"
-                error={emailError}
-                helperText={emailErrorMessage}
-                color={passwordError ? 'error' : 'primary'}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel htmlFor="password">Password</FormLabel>
-              <TextField
-                required
-                fullWidth
-                name="password"
-                placeholder="••••••"
-                type="password"
-                id="password"
-                autoComplete="new-password"
-                variant="outlined"
-                error={passwordError}
-                helperText={passwordErrorMessage}
-                color={passwordError ? 'error' : 'primary'}
-              />
-            </FormControl>
-            <FormControlLabel
-              control={<Checkbox value="allowExtraEmails" color="primary" />}
-              label="I want to receive updates via email."
+        )}
+
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+        >
+          <FormControl>
+            <FormLabel htmlFor="name">Nome completo</FormLabel>
+            <TextField
+              autoComplete="name"
+              name="name"
+              required
+              fullWidth
+              id="name"
+              placeholder="Ex: João Silva"
+              error={nameError}
+              helperText={nameErrorMessage}
+              color={nameError ? 'error' : 'primary'}
             />
-            <Button
-              type="submit"
+          </FormControl>
+          <FormControl>
+            <FormLabel htmlFor="email">E-mail</FormLabel>
+            <TextField
+              required
               fullWidth
-              variant="contained"
-              onClick={validateInputs}
-            >
-              Sign up
-            </Button>
-          </Box>
-          <Divider>
-            <Typography sx={{ color: 'text.secondary' }}>or</Typography>
-          </Divider>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Button
-              fullWidth
+              id="email"
+              placeholder="seu@email.com"
+              name="email"
+              autoComplete="email"
               variant="outlined"
-              onClick={() => alert('Sign up with Google')}
-              startIcon={<GoogleIcon />}
-            >
-              Sign up with Google
-            </Button>
-            <Button
+              error={emailError}
+              helperText={emailErrorMessage}
+              color={emailError ? 'error' : 'primary'}
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel htmlFor="password">Senha</FormLabel>
+            <TextField
+              required
               fullWidth
+              name="password"
+              placeholder="••••••"
+              type="password"
+              id="password"
+              autoComplete="new-password"
               variant="outlined"
-              onClick={() => alert('Sign up with Facebook')}
-              startIcon={<FacebookIcon />}
+              error={passwordError}
+              helperText={passwordErrorMessage}
+              color={passwordError ? 'error' : 'primary'}
+            />
+          </FormControl>
+          <FormControlLabel
+            control={<Checkbox name="newsletter" value="on" color="primary" defaultChecked />}
+            label="Quero receber novidades por e-mail."
+          />
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+          >
+            Cadastrar
+          </Button>
+        </Box>
+        <Divider>
+          <Typography sx={{ color: 'text.secondary' }}>ou</Typography>
+        </Divider>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* <Button
+            fullWidth
+            variant="outlined"
+            onClick={() => alert('Entrar com Google em breve')}
+            startIcon={<GoogleIcon />}
+          >
+            Cadastrar com Google
+          </Button>
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={() => alert('Entrar com Facebook em breve')}
+            startIcon={<FacebookIcon />}
+          >
+            Cadastrar com Facebook
+          </Button> */}
+          <Typography sx={{ textAlign: 'center' }}>
+            Já tem uma conta?{' '}
+            <Link
+              component={RouterLink}
+              to="/login"
+              variant="body2"
+              sx={{ alignSelf: 'center' }}
             >
-              Sign up with Facebook
-            </Button>
-            <Typography sx={{ textAlign: 'center' }}>
-              Already have an account?{' '}
-              <Link
-                href="/material-ui/getting-started/templates/sign-in/"
-                variant="body2"
-                sx={{ alignSelf: 'center' }}
-              >
-                Sign in
-              </Link>
-            </Typography>
-          </Box>
-        </Card>
-      </SignUpContainer>
-    </AppTheme>
+              Entrar
+            </Link>
+          </Typography>
+        </Box>
+      </Card>
+    </SignUpContainer>
   );
 }

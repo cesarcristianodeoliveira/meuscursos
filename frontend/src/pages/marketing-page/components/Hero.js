@@ -1,3 +1,5 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
@@ -8,6 +10,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import visuallyHidden from '@mui/utils/visuallyHidden';
 import { styled } from '@mui/material/styles';
+import { prompts } from '../../../utils/prompts';
 
 const StyledBox = styled('div')(({ theme }) => ({
   alignSelf: 'center',
@@ -35,6 +38,27 @@ const StyledBox = styled('div')(({ theme }) => ({
 }));
 
 export default function Hero() {
+  const [topic, setTopic] = useState('');
+  const [placeholder, setPlaceholder] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const shufflePrompts = [...prompts].sort(() => Math.random() - 0.5);
+    let index = 0;
+    const interval = setInterval(() => {
+      setPlaceholder(`Ex: ${shufflePrompts[index]}`);
+      index = (index + 1) % shufflePrompts.length;
+    }, 3000);
+    setPlaceholder(`Ex: ${shufflePrompts[0]}`);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleStart = () => {
+    if (!topic.trim()) return;
+    localStorage.setItem('pending_course_topic', topic);
+    navigate('/register');
+  };
+
   return (
     <Box
       id="hero"
@@ -72,7 +96,7 @@ export default function Hero() {
               fontSize: 'clamp(3rem, 10vw, 3.5rem)',
             }}
           >
-            Our&nbsp;latest&nbsp;
+            Vamos&nbsp;
             <Typography
               component="span"
               variant="h1"
@@ -84,7 +108,7 @@ export default function Hero() {
                 }),
               })}
             >
-              products
+              estudar?
             </Typography>
           </Typography>
           <Typography
@@ -94,31 +118,31 @@ export default function Hero() {
               width: { sm: '100%', md: '80%' },
             }}
           >
-            Explore our cutting-edge dashboard, delivering high-quality solutions
-            tailored to your needs. Elevate your experience with top-tier features
-            and services.
+            Crie ou explore temas sobre o que você deseja aprender. Junte-se à nossa comunidade de usuários. Faça parte da plataforma e contribua para o conhecimento de todos.
           </Typography>
           <Stack
-            direction={{ xs: 'column', sm: 'row' }}
+            direction={{ xs: 'column', lg: 'row' }}
             spacing={1}
             useFlexGap
-            sx={{ pt: 2, width: { xs: '100%', sm: '350px' } }}
+            sx={{ pt: 2, width: { xs: '100%', lg: '50%' } }}
           >
-            <InputLabel htmlFor="email-hero" sx={visuallyHidden}>
-              Email
+            <InputLabel htmlFor="course-topic" sx={visuallyHidden}>
+              O que deseja aprender?
             </InputLabel>
             <TextField
-              id="email-hero"
+              id="course-topic"
               hiddenLabel
               size="small"
               variant="outlined"
-              aria-label="Enter your email address"
-              placeholder="Your email address"
+              placeholder={placeholder}
               fullWidth
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleStart()}
               slotProps={{
                 htmlInput: {
                   autoComplete: 'off',
-                  'aria-label': 'Enter your email address',
+                  'aria-label': 'Digite o tema do curso',
                 },
               }}
             />
@@ -127,8 +151,9 @@ export default function Hero() {
               color="primary"
               size="small"
               sx={{ minWidth: 'fit-content' }}
+              onClick={handleStart}
             >
-              Start now
+              Criar curso
             </Button>
           </Stack>
           <Typography
@@ -136,9 +161,9 @@ export default function Hero() {
             color="text.secondary"
             sx={{ textAlign: 'center' }}
           >
-            By clicking &quot;Start now&quot; you agree to our&nbsp;
+            Ao clicar em &quot;Criar curso&quot; você concorda com nossos&nbsp;
             <Link href="#" color="primary">
-              Terms & Conditions
+              Termos e Condições
             </Link>
             .
           </Typography>

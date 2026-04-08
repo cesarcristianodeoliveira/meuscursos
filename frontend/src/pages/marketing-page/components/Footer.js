@@ -1,3 +1,5 @@
+import * as React from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
@@ -12,14 +14,20 @@ import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import TwitterIcon from '@mui/icons-material/X';
 import SitemarkIcon from './SitemarkIcon';
 
+const scrollToSection = (sectionId) => {
+  const section = document.getElementById(sectionId);
+  if (section) {
+    section.scrollIntoView({ behavior: 'smooth' });
+  }
+};
+
 function Copyright() {
   return (
     <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
-      {'Copyright © '}
-      <Link color="text.secondary" href="https://mui.com/">
-        Sitemark
+      <Link component={RouterLink} color="text.secondary" to="/">
+        Meus Cursos
       </Link>
-      &nbsp;
+      {' © '}
       {new Date().getFullYear()}
     </Typography>
   );
@@ -56,12 +64,12 @@ export default function Footer() {
           <Box sx={{ width: { xs: '100%', sm: '60%' } }}>
             <SitemarkIcon />
             <Typography variant="body2" gutterBottom sx={{ fontWeight: 600, mt: 2 }}>
-              Join the newsletter
+              Fique por dentro das novidades
             </Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-              Subscribe for weekly updates. No spams ever!
+              Receba atualizações semanais e dicas de cursos.
             </Typography>
-            <InputLabel htmlFor="email-newsletter">Email</InputLabel>
+            <InputLabel htmlFor="email-newsletter">E-mail</InputLabel>
             <Stack direction="row" spacing={1} useFlexGap>
               <TextField
                 id="email-newsletter"
@@ -69,12 +77,12 @@ export default function Footer() {
                 size="small"
                 variant="outlined"
                 fullWidth
-                aria-label="Enter your email address"
-                placeholder="Your email address"
+                aria-label="Digite seu e-mail"
+                placeholder="Digite seu e-mail"
                 slotProps={{
                   htmlInput: {
                     autoComplete: 'off',
-                    'aria-label': 'Enter your email address',
+                    'aria-label': 'Digite seu e-mail',
                   },
                 }}
                 sx={{ width: '250px' }}
@@ -85,7 +93,7 @@ export default function Footer() {
                 size="small"
                 sx={{ flexShrink: 0 }}
               >
-                Subscribe
+                Inscrever
               </Button>
             </Stack>
           </Box>
@@ -98,22 +106,22 @@ export default function Footer() {
           }}
         >
           <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-            Product
+            Plataforma
           </Typography>
-          <Link color="text.secondary" variant="body2" href="#">
-            Features
+          <Link onClick={() => scrollToSection('features')} color="text.secondary" variant="body2" sx={{ cursor: 'pointer' }}>
+            Como funciona
           </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            Testimonials
+          <Link onClick={() => scrollToSection('testimonials')} color="text.secondary" variant="body2" sx={{ cursor: 'pointer' }}>
+            Depoimentos
           </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            Highlights
+          <Link onClick={() => scrollToSection('highlights')} color="text.secondary" variant="body2" sx={{ cursor: 'pointer' }}>
+            Destaques
           </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            Pricing
+          <Link onClick={() => scrollToSection('pricing')} color="text.secondary" variant="body2" sx={{ cursor: 'pointer' }}>
+            Preços
           </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            FAQs
+          <Link onClick={() => scrollToSection('faq')} color="text.secondary" variant="body2" sx={{ cursor: 'pointer' }}>
+            FAQ
           </Link>
         </Box>
         <Box
@@ -124,16 +132,13 @@ export default function Footer() {
           }}
         >
           <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-            Company
+            Empresa
           </Typography>
-          <Link color="text.secondary" variant="body2" href="#">
-            About us
+          <Link component={RouterLink} color="text.secondary" variant="body2" to="/sobre">
+            Sobre
           </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            Careers
-          </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            Press
+          <Link component={RouterLink} color="text.secondary" variant="body2" to="/blog">
+            Blog
           </Link>
         </Box>
         <Box
@@ -144,16 +149,16 @@ export default function Footer() {
           }}
         >
           <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-            Legal
+            Jurídico
           </Typography>
-          <Link color="text.secondary" variant="body2" href="#">
-            Terms
+          <Link component={RouterLink} color="text.secondary" variant="body2" to="/termos">
+            Termos
           </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            Privacy
+          <Link component={RouterLink} color="text.secondary" variant="body2" to="/privacidade">
+            Privacidade
           </Link>
-          <Link color="text.secondary" variant="body2" href="#">
-            Contact
+          <Link component={RouterLink} color="text.secondary" variant="body2" to="/contato">
+            Contato
           </Link>
         </Box>
       </Box>
@@ -168,14 +173,14 @@ export default function Footer() {
         }}
       >
         <div>
-          <Link color="text.secondary" variant="body2" href="#">
-            Privacy Policy
+          <Link component={RouterLink} color="text.secondary" variant="body2" to="/privacidade">
+            Privacidade
           </Link>
           <Typography sx={{ display: 'inline', mx: 0.5, opacity: 0.5 }}>
             &nbsp;•&nbsp;
           </Typography>
-          <Link color="text.secondary" variant="body2" href="#">
-            Terms of Service
+          <Link component={RouterLink} color="text.secondary" variant="body2" to="/termos">
+            Termos
           </Link>
           <Copyright />
         </div>
@@ -188,7 +193,7 @@ export default function Footer() {
           <IconButton
             color="inherit"
             size="small"
-            href="https://github.com/mui"
+            href="https://github.com"
             aria-label="GitHub"
             sx={{ alignSelf: 'center' }}
           >
@@ -197,7 +202,7 @@ export default function Footer() {
           <IconButton
             color="inherit"
             size="small"
-            href="https://x.com/MaterialUI"
+            href="https://x.com"
             aria-label="X"
             sx={{ alignSelf: 'center' }}
           >
@@ -206,7 +211,7 @@ export default function Footer() {
           <IconButton
             color="inherit"
             size="small"
-            href="https://www.linkedin.com/company/mui/"
+            href="https://www.linkedin.com"
             aria-label="LinkedIn"
             sx={{ alignSelf: 'center' }}
           >

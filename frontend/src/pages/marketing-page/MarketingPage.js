@@ -1,6 +1,5 @@
-import CssBaseline from '@mui/material/CssBaseline';
+import React from 'react';
 import Divider from '@mui/material/Divider';
-import AppTheme from '../../theme/shared-theme/AppTheme';
 import AppAppBar from './components/AppAppBar';
 import Hero from './components/Hero';
 import LogoCollection from './components/LogoCollection';
@@ -11,10 +10,9 @@ import Testimonials from './components/Testimonials';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 
-export default function MarketingPage(props) {
+export default function MarketingPage() {
   return (
-    <AppTheme {...props}>
-      <CssBaseline enableColorScheme />
+    <>
       <AppAppBar />
       <Hero />
       <div>
@@ -31,6 +29,6 @@ export default function MarketingPage(props) {
         <Divider />
         <Footer />
       </div>
-    </AppTheme>
+    </>
   );
 }
