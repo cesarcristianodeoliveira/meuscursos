@@ -9,7 +9,6 @@ export function AuthProvider({ children }) {
 
   /**
    * CONFIGURAÇÃO GLOBAL DO TOKEN
-   * Garante que todas as chamadas à API levem o token se ele existir.
    */
   const setSession = (token) => {
     if (token) {
@@ -29,10 +28,11 @@ export function AuthProvider({ children }) {
       const storageToken = localStorage.getItem('token');
 
       if (storageToken) {
-        setSession(storageToken); // Configura o cabeçalho da API
+        setSession(storageToken);
         try {
           const response = await api.get('/auth/me');
-          setUser(response.data);
+          // O backend agora retorna success: true e os dados
+          setUser(response.data); 
         } catch (error) {
           console.error("Sessão expirada ou inválida.");
           setSession(null);
@@ -51,12 +51,15 @@ export function AuthProvider({ children }) {
   const signIn = async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
-      const { token, user: userData } = response.data;
-
-      setSession(token);
-      setUser(userData);
-
-      return { success: true };
+      
+      if (response.data.success) {
+        const { token, user: userData } = response.data;
+        setSession(token);
+        setUser(userData);
+        return { success: true };
+      }
+      
+      return { success: false, error: "Falha na autenticação." };
     } catch (error) {
       const message = error.response?.data?.error || "Erro ao realizar login.";
       return { success: false, error: message };
@@ -65,18 +68,25 @@ export function AuthProvider({ children }) {
 
   /**
    * 3. REGISTRO (SignUp)
-   * Agora recebe o 'plan' vindo do formulário.
+   * Alterado: Agora recebe 'newsletter' em vez de 'plan'
    */
-  const signUp = async (name, email, password, plan) => {
+  const signUp = async (name, email, password, newsletter) => {
     try {
-      // Enviando o plano escolhido para o Backend
-      const response = await api.post('/auth/register', { name, email, password, plan });
-      const { token, user: userData } = response.data;
+      const response = await api.post('/auth/register', { 
+        name, 
+        email, 
+        password, 
+        newsletter // Enviando booleano para o backend
+      });
 
-      setSession(token);
-      setUser(userData);
+      if (response.data.success) {
+        const { token, user: userData } = response.data;
+        setSession(token);
+        setUser(userData);
+        return { success: true };
+      }
 
-      return { success: true };
+      return { success: false, error: "Erro ao processar cadastro." };
     } catch (error) {
       const message = error.response?.data?.error || "Erro ao criar conta.";
       return { success: false, error: message };
@@ -93,15 +103,14 @@ export function AuthProvider({ children }) {
 
   /**
    * 5. ATUALIZAÇÃO MANUAL DE STATUS
-   * Atualiza créditos ou XP sem precisar de novo login.
    */
   const updateStats = (newData) => {
     setUser(prev => {
       if (!prev) return null;
       return {
         ...prev,
-        ...newData, // Atualiza créditos/plano se vierem na raiz
-        stats: { ...prev.stats, ...(newData.stats || {}) } // Atualiza XP/Level
+        ...newData,
+        stats: { ...prev.stats, ...(newData.stats || {}) }
       };
     });
   };

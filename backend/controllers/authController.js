@@ -30,7 +30,6 @@ const generateUniqueSlug = async (name) => {
  * REGISTRO DE USUÁRIO
  */
 const register = async (req, res) => {
-  // Agora recebemos o 'newsletter' (boolean) em vez do 'plan'
   const { name, email, password, newsletter } = req.body;
 
   try {
@@ -38,6 +37,7 @@ const register = async (req, res) => {
       return res.status(400).json({ error: "Preencha todos os campos corretamente." });
     }
 
+    // Verificar se e-mail já existe
     const userExists = await client.fetch(`*[_type == "user" && email == $email][0]`, { email });
     if (userExists) {
       return res.status(400).json({ error: "Este e-mail já está em uso." });
@@ -47,6 +47,7 @@ const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
     const finalSlug = await generateUniqueSlug(name);
 
+    // Documento do Usuário
     const newUser = {
       _type: 'user',
       name,
@@ -55,9 +56,9 @@ const register = async (req, res) => {
       slug: { _type: 'slug', current: finalSlug },
       authProvider: 'credentials',
       role: 'user', 
-      plan: 'free',      // Forçado: Todo cadastro começa no Grátis
-      credits: 1,       // 1 Crédito inicial padrão
-      newsletter: !!newsletter, // Salva se aceitou assinar (true/false)
+      plan: 'free',
+      credits: 1, 
+      newsletter: !!newsletter, 
       stats: {
         _type: 'object',
         totalXp: 0,
@@ -71,6 +72,19 @@ const register = async (req, res) => {
 
     const result = await client.create(newUser);
 
+    // CRIAÇÃO DO DOCUMENTO NEWSLETTER (com referência)
+    if (newsletter) {
+      await client.create({
+        _type: 'newsletter',
+        user: {
+          _type: 'reference',
+          _ref: result._id // Referência para o documento do usuário
+        },
+        email: result.email,
+        subscribedAt: new Date().toISOString()
+      });
+    }
+
     const token = jwt.sign(
       { id: result._id, role: result.role, plan: result.plan },
       process.env.JWT_SECRET,
@@ -78,6 +92,7 @@ const register = async (req, res) => {
     );
 
     res.status(201).json({
+      success: true, // Adicionado para facilitar o check no AuthContext
       token,
       user: {
         id: result._id,
@@ -120,7 +135,6 @@ const login = async (req, res) => {
       return res.status(401).json({ error: "E-mail ou senha inválidos." });
     }
 
-    // Atualiza o lastLogin
     await client
       .patch(user._id)
       .set({ "stats.lastLogin": new Date().toISOString() })
@@ -133,6 +147,7 @@ const login = async (req, res) => {
     );
 
     res.status(200).json({
+      success: true,
       token,
       user: {
         id: user._id,
@@ -163,6 +178,7 @@ const getMe = async (req, res) => {
     if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
 
     res.status(200).json({
+      success: true,
       id: user._id,
       name: user.name,
       email: user.email,
