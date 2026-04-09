@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { styled } from '@mui/material/styles';
 import Avatar from '@mui/material/Avatar';
 import MuiDrawer, { drawerClasses } from '@mui/material/Drawer';
@@ -5,10 +6,13 @@ import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import { Link as RouterLink } from 'react-router-dom';
 import SelectContent from './SelectContent';
 import MenuContent from './MenuContent';
 import CardAlert from './CardAlert';
 import OptionsMenu from './OptionsMenu';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const drawerWidth = 240;
 
@@ -24,6 +28,8 @@ const Drawer = styled(MuiDrawer)({
 });
 
 export default function SideMenu() {
+  const { user, signed } = useAuth();
+
   return (
     <Drawer
       variant="permanent"
@@ -55,6 +61,8 @@ export default function SideMenu() {
         <MenuContent />
         <CardAlert />
       </Box>
+
+      {/* ÁREA DE USUÁRIO / AUTENTICAÇÃO */}
       <Stack
         direction="row"
         sx={{
@@ -65,21 +73,46 @@ export default function SideMenu() {
           borderColor: 'divider',
         }}
       >
-        <Avatar
-          sizes="small"
-          alt="Riley Carter"
-          src="/static/images/avatar/7.jpg"
-          sx={{ width: 36, height: 36 }}
-        />
-        <Box sx={{ mr: 'auto' }}>
-          <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: '16px' }}>
-            Riley Carter
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            riley@email.com
-          </Typography>
-        </Box>
-        <OptionsMenu />
+        {signed ? (
+          <>
+            <Avatar
+              sizes="small"
+              alt={user?.name}
+              src={user?.avatar || ""} // Avatar do Sanity ou vazio
+              sx={{ width: 36, height: 36 }}
+            />
+            <Box sx={{ mr: 'auto' }}>
+              <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: '16px' }}>
+                {user?.name}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {user?.email}
+              </Typography>
+            </Box>
+            <OptionsMenu />
+          </>
+        ) : (
+          <Stack spacing={1} sx={{ width: '100%' }}>
+            <Button
+              component={RouterLink}
+              to="/login"
+              variant="outlined"
+              fullWidth
+              size="small"
+            >
+              Entrar
+            </Button>
+            <Button
+              component={RouterLink}
+              to="/signup"
+              variant="contained"
+              fullWidth
+              size="small"
+            >
+              Cadastrar
+            </Button>
+          </Stack>
+        )}
       </Stack>
     </Drawer>
   );
