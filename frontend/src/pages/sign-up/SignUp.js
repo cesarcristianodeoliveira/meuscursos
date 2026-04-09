@@ -136,16 +136,17 @@ export default function SignUp(props) {
     const name = data.get('name');
     const email = data.get('email');
     const password = data.get('password');
+    // Coleta o booleano da newsletter
     const newsletter = data.get('newsletter') === 'on';
 
     try {
       const result = await signUp(name, email, password, newsletter);
 
       if (result.success) {
-        // Sucesso: Limpar campos e navegar
         event.target.reset();
         navigate('/');
       } else {
+        // Exibe o erro específico enviado pelo backend (ex: "E-mail já existe")
         setBackendError(result.error || 'Erro ao criar conta.');
       }
     } catch (err) {
@@ -213,7 +214,7 @@ export default function SignUp(props) {
             </FormControl>
 
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
                   <FormLabel htmlFor="password">Senha</FormLabel>
                   <TextField
@@ -232,7 +233,7 @@ export default function SignUp(props) {
                   />
                 </FormControl>
               </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
                   <FormLabel htmlFor="confirmPassword">Confirmar Senha</FormLabel>
                   <TextField
@@ -253,7 +254,7 @@ export default function SignUp(props) {
             </Grid>
 
             <FormControlLabel
-              control={<Checkbox name="newsletter" value="on" color="primary" />}
+              control={<Checkbox name="newsletter" color="primary" />}
               label="Assinar boletim informativo."
               disabled={loading}
             />

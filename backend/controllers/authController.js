@@ -34,20 +34,20 @@ const register = async (req, res) => {
 
   try {
     if (!name || !email || !password) {
-      return res.status(400).json({ error: "Preencha todos os campos corretamente." });
+      return res.status(400).json({ success: false, error: "Preencha todos os campos corretamente." });
     }
 
-    // Verificar se e-mail já existe
+    // 1. Verificar se e-mail já existe
     const userExists = await client.fetch(`*[_type == "user" && email == $email][0]`, { email });
     if (userExists) {
-      return res.status(400).json({ error: "Este e-mail já está em uso." });
+      return res.status(400).json({ success: false, error: "Este e-mail já está em uso." });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const finalSlug = await generateUniqueSlug(name);
 
-    // Documento do Usuário
+    // 2. Criar Objeto do Usuário
     const newUser = {
       _type: 'user',
       name,
@@ -72,27 +72,34 @@ const register = async (req, res) => {
 
     const result = await client.create(newUser);
 
-    // CRIAÇÃO DO DOCUMENTO NEWSLETTER (com referência)
-    if (newsletter) {
-      await client.create({
-        _type: 'newsletter',
-        user: {
-          _type: 'reference',
-          _ref: result._id // Referência para o documento do usuário
-        },
-        email: result.email,
-        subscribedAt: new Date().toISOString()
-      });
+    // 3. CRIAÇÃO DA NEWSLETTER (Com Try/Catch isolado)
+    if (newsletter && result._id) {
+      try {
+        await client.create({
+          _type: 'newsletter',
+          user: {
+            _type: 'reference',
+            _ref: result._id
+          },
+          email: result.email,
+          subscribedAt: new Date().toISOString()
+        });
+      } catch (newsErr) {
+        // Se falhar a newsletter, apenas logamos, mas não barramos o registro do user
+        console.error("⚠️ Falha ao registrar na newsletter:", newsErr.message);
+      }
     }
 
+    // 4. Geração do Token
     const token = jwt.sign(
       { id: result._id, role: result.role, plan: result.plan },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    res.status(201).json({
-      success: true, // Adicionado para facilitar o check no AuthContext
+    // 5. Resposta Sucesso
+    return res.status(201).json({
+      success: true,
       token,
       user: {
         id: result._id,
@@ -109,7 +116,7 @@ const register = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Erro no Registro:", error.message);
-    res.status(500).json({ error: "Erro interno ao criar conta." });
+    return res.status(500).json({ success: false, error: "Erro interno ao criar conta." });
   }
 };
 
@@ -123,22 +130,19 @@ const login = async (req, res) => {
     const user = await client.fetch(`*[_type == "user" && email == $email][0]`, { email });
 
     if (!user) {
-      return res.status(401).json({ error: "E-mail ou senha inválidos." });
+      return res.status(401).json({ success: false, error: "E-mail ou senha inválidos." });
     }
 
     if (user.authProvider !== 'credentials' && !user.password) {
-      return res.status(401).json({ error: `Esta conta foi criada via ${user.authProvider}. Entre usando esse método.` });
+      return res.status(401).json({ success: false, error: `Conta via ${user.authProvider}. Entre por lá.` });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ error: "E-mail ou senha inválidos." });
+      return res.status(401).json({ success: false, error: "E-mail ou senha inválidos." });
     }
 
-    await client
-      .patch(user._id)
-      .set({ "stats.lastLogin": new Date().toISOString() })
-      .commit();
+    await client.patch(user._id).set({ "stats.lastLogin": new Date().toISOString() }).commit();
 
     const token = jwt.sign(
       { id: user._id, role: user.role, plan: user.plan },
@@ -146,7 +150,7 @@ const login = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       token,
       user: {
@@ -163,21 +167,19 @@ const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Erro no Login:", error.message);
-    res.status(500).json({ error: "Erro interno ao realizar login." });
+    return res.status(500).json({ success: false, error: "Erro interno no servidor." });
   }
 };
 
 /**
- * ROTA /ME (Sessão)
+ * ROTA /ME
  */
 const getMe = async (req, res) => {
   try {
     const user = await client.fetch(`*[_id == $id][0]`, { id: req.userId });
+    if (!user) return res.status(404).json({ success: false, error: "Usuário não encontrado." });
 
-    if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       id: user._id,
       name: user.name,
@@ -191,7 +193,7 @@ const getMe = async (req, res) => {
       newsletter: user.newsletter
     });
   } catch (error) {
-    res.status(500).json({ error: "Erro ao validar sessão." });
+    return res.status(500).json({ success: false, error: "Erro ao validar sessão." });
   }
 };
 

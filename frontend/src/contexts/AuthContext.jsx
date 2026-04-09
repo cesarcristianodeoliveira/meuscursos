@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
 
   /**
    * CONFIGURAÇÃO GLOBAL DO TOKEN
+   * Salva no localStorage e injeta o header no Axios para todas as futuras requisições.
    */
   const setSession = (token) => {
     if (token) {
@@ -22,6 +23,7 @@ export function AuthProvider({ children }) {
 
   /**
    * 1. REIDRATAÇÃO DA SESSÃO
+   * Executa ao carregar o app para verificar se o token guardado ainda é válido.
    */
   useEffect(() => {
     async function loadStorageData() {
@@ -31,8 +33,13 @@ export function AuthProvider({ children }) {
         setSession(storageToken);
         try {
           const response = await api.get('/auth/me');
-          // O backend agora retorna success: true e os dados
-          setUser(response.data); 
+          
+          // O backend agora retorna { success: true, ...userData }
+          if (response.data.success) {
+            setUser(response.data); 
+          } else {
+            setSession(null);
+          }
         } catch (error) {
           console.error("Sessão expirada ou inválida.");
           setSession(null);
@@ -61,14 +68,14 @@ export function AuthProvider({ children }) {
       
       return { success: false, error: "Falha na autenticação." };
     } catch (error) {
-      const message = error.response?.data?.error || "Erro ao realizar login.";
+      // Captura a mensagem amigável enviada pelo seu authController
+      const message = error.response?.data?.error || "E-mail ou senha incorretos.";
       return { success: false, error: message };
     }
   };
 
   /**
    * 3. REGISTRO (SignUp)
-   * Alterado: Agora recebe 'newsletter' em vez de 'plan'
    */
   const signUp = async (name, email, password, newsletter) => {
     try {
@@ -76,7 +83,7 @@ export function AuthProvider({ children }) {
         name, 
         email, 
         password, 
-        newsletter // Enviando booleano para o backend
+        newsletter 
       });
 
       if (response.data.success) {
@@ -86,9 +93,10 @@ export function AuthProvider({ children }) {
         return { success: true };
       }
 
-      return { success: false, error: "Erro ao processar cadastro." };
+      return { success: false, error: "Não foi possível completar o cadastro." };
     } catch (error) {
-      const message = error.response?.data?.error || "Erro ao criar conta.";
+      // Captura o erro específico (ex: "E-mail já cadastrado") do backend
+      const message = error.response?.data?.error || "Erro ao criar conta. Tente novamente.";
       return { success: false, error: message };
     }
   };
@@ -103,6 +111,7 @@ export function AuthProvider({ children }) {
 
   /**
    * 5. ATUALIZAÇÃO MANUAL DE STATUS
+   * Útil para atualizar XP, Créditos ou Nível sem precisar deslogar/logar.
    */
   const updateStats = (newData) => {
     setUser(prev => {
