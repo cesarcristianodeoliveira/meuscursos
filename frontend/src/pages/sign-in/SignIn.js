@@ -1,8 +1,8 @@
 import * as React from 'react';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
-import CssBaseline from '@mui/material/CssBaseline';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Divider from '@mui/material/Divider';
 import FormLabel from '@mui/material/FormLabel';
@@ -12,11 +12,11 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import MuiCard from '@mui/material/Card';
+import CircularProgress from '@mui/material/CircularProgress';
 import { styled } from '@mui/material/styles';
 import ForgotPassword from './components/ForgotPassword';
-import AppTheme from '../../theme/shared-theme/AppTheme';
-import ColorModeSelect from '../../theme/shared-theme/ColorModeSelect';
-import { GoogleIcon, FacebookIcon, SitemarkIcon } from './components/CustomIcons';
+import { SitemarkIcon } from './components/CustomIcons';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
@@ -61,11 +61,18 @@ const SignInContainer = styled(Stack)(({ theme }) => ({
 }));
 
 export default function SignIn(props) {
+  const navigate = useNavigate();
+  const { signIn } = useAuth();
+
   const [emailError, setEmailError] = React.useState(false);
   const [emailErrorMessage, setEmailErrorMessage] = React.useState('');
   const [passwordError, setPasswordError] = React.useState(false);
   const [passwordErrorMessage, setPasswordErrorMessage] = React.useState('');
   const [open, setOpen] = React.useState(false);
+
+  // Erros do Backend e Loading
+  const [backendError, setBackendError] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
 
   const handleClickOpen = () => {
     setOpen(true);
@@ -73,18 +80,6 @@ export default function SignIn(props) {
 
   const handleClose = () => {
     setOpen(false);
-  };
-
-  const handleSubmit = (event) => {
-    if (emailError || passwordError) {
-      event.preventDefault();
-      return;
-    }
-    const data = new FormData(event.currentTarget);
-    console.log({
-      email: data.get('email'),
-      password: data.get('password'),
-    });
   };
 
   const validateInputs = () => {
@@ -95,7 +90,7 @@ export default function SignIn(props) {
 
     if (!email.value || !/\S+@\S+\.\S+/.test(email.value)) {
       setEmailError(true);
-      setEmailErrorMessage('Please enter a valid email address.');
+      setEmailErrorMessage('Por favor, insira um e-mail válido.');
       isValid = false;
     } else {
       setEmailError(false);
@@ -104,7 +99,7 @@ export default function SignIn(props) {
 
     if (!password.value || password.value.length < 6) {
       setPasswordError(true);
-      setPasswordErrorMessage('Password must be at least 6 characters long.');
+      setPasswordErrorMessage('A senha deve ter pelo menos 6 caracteres.');
       isValid = false;
     } else {
       setPasswordError(false);
@@ -114,11 +109,38 @@ export default function SignIn(props) {
     return isValid;
   };
 
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setBackendError('');
+
+    if (!validateInputs()) {
+      return;
+    }
+
+    setLoading(true);
+
+    const data = new FormData(event.currentTarget);
+    const email = data.get('email');
+    const password = data.get('password');
+
+    try {
+      const result = await signIn(email, password);
+
+      if (result.success) {
+        navigate('/');
+      } else {
+        setBackendError(result.error || 'Falha ao entrar.');
+      }
+    } catch (err) {
+      setBackendError('Não foi possível conectar ao servidor.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <AppTheme {...props}>
-      <CssBaseline enableColorScheme />
+    <>
       <SignInContainer direction="column" justifyContent="space-between">
-        <ColorModeSelect sx={{ position: 'fixed', top: '1rem', right: '1rem' }} />
         <Card variant="outlined">
           <SitemarkIcon />
           <Typography
@@ -126,8 +148,15 @@ export default function SignIn(props) {
             variant="h4"
             sx={{ width: '100%', fontSize: 'clamp(2rem, 10vw, 2.15rem)' }}
           >
-            Sign in
+            Entrar
           </Typography>
+
+          {backendError && (
+            <Typography color="error" variant="body2" sx={{ textAlign: 'center', fontWeight: 'bold' }}>
+              {backendError}
+            </Typography>
+          )}
+
           <Box
             component="form"
             onSubmit={handleSubmit}
@@ -140,24 +169,24 @@ export default function SignIn(props) {
             }}
           >
             <FormControl>
-              <FormLabel htmlFor="email">Email</FormLabel>
+              <FormLabel htmlFor="email">E-mail</FormLabel>
               <TextField
                 error={emailError}
                 helperText={emailErrorMessage}
                 id="email"
                 type="email"
                 name="email"
-                placeholder="your@email.com"
+                placeholder="seu@email.com"
                 autoComplete="email"
-                autoFocus
                 required
                 fullWidth
                 variant="outlined"
+                disabled={loading}
                 color={emailError ? 'error' : 'primary'}
               />
             </FormControl>
             <FormControl>
-              <FormLabel htmlFor="password">Password</FormLabel>
+              <FormLabel htmlFor="password">Senha</FormLabel>
               <TextField
                 error={passwordError}
                 helperText={passwordErrorMessage}
@@ -166,25 +195,27 @@ export default function SignIn(props) {
                 type="password"
                 id="password"
                 autoComplete="current-password"
-                autoFocus
                 required
                 fullWidth
                 variant="outlined"
+                disabled={loading}
                 color={passwordError ? 'error' : 'primary'}
               />
             </FormControl>
             <FormControlLabel
               control={<Checkbox value="remember" color="primary" />}
-              label="Remember me"
+              label="Lembrar de mim"
+              disabled={loading}
             />
             <ForgotPassword open={open} handleClose={handleClose} />
             <Button
               type="submit"
               fullWidth
               variant="contained"
-              onClick={validateInputs}
+              disabled={loading}
+              startIcon={loading && <CircularProgress size={20} color="inherit" />}
             >
-              Sign in
+              {loading ? 'Entrando...' : 'Entrar'}
             </Button>
             <Link
               component="button"
@@ -193,40 +224,25 @@ export default function SignIn(props) {
               variant="body2"
               sx={{ alignSelf: 'center' }}
             >
-              Forgot your password?
+              Esqueceu sua senha?
             </Link>
           </Box>
-          <Divider>or</Divider>
+          <Divider>ou</Divider>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={() => alert('Sign in with Google')}
-              startIcon={<GoogleIcon />}
-            >
-              Sign in with Google
-            </Button>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={() => alert('Sign in with Facebook')}
-              startIcon={<FacebookIcon />}
-            >
-              Sign in with Facebook
-            </Button>
             <Typography sx={{ textAlign: 'center' }}>
-              Don&apos;t have an account?{' '}
+              Ainda não tem uma conta?{' '}
               <Link
-                href="/material-ui/getting-started/templates/sign-in/"
+                component={RouterLink}
+                to="/signup"
                 variant="body2"
-                sx={{ alignSelf: 'center' }}
+                sx={{ alignSelf: 'center', fontWeight: 'bold' }}
               >
-                Sign up
+                Cadastre-se
               </Link>
             </Typography>
           </Box>
         </Card>
       </SignInContainer>
-    </AppTheme>
+    </>
   );
 }
