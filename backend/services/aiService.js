@@ -3,85 +3,93 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 /**
  * SERVIÇO DE INTELIGÊNCIA ARTIFICIAL (AI Service)
- * Responsável por estruturar o curso, gerar conteúdos e exercícios.
+ * Utiliza o modelo Llama 3.3 via Groq para estruturar cursos completos.
  */
 
 const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile', options = {}) => {
   const { level = 'iniciante' } = options;
 
-  // 1. Configuração de Regras Pedagógicas (Baseado na nossa discussão de realismo)
+  // Configuração Dinâmica baseada no nível
   const isBeginner = level === 'iniciante';
   const moduleCount = isBeginner ? 3 : 5;
   const exercisesPerModule = isBeginner ? 1 : 2;
 
-  const prompt = `
-    Você é um Professor Expert em Educação Online. Sua missão é criar um curso COMPLETO sobre: "${topic}".
-    Nível do Aluno: ${level}.
+  const systemPrompt = `Você é um Professor Expert em Educação Online e Design Instrucional.
+    Sua tarefa é estruturar um curso pedagógico, rico em detalhes e pronto para publicação.
+    Você deve responder estritamente com um objeto JSON válido.
     
-    ESTRUTURA OBRIGATÓRIA (JSON estrito):
+    REGRAS DE CONTEÚDO:
+    - O campo "content" de cada módulo deve ser longo (mínimo 500 palavras), didático e formatado em Markdown rico (use ## para subtítulos, listas, tabelas e blocos de código).
+    - As "correctAnswer" devem ser a string exata de uma das opções.
+    - Gere exatamente ${moduleCount} módulos.
+    - Cada módulo deve ter ${exercisesPerModule} exercício(s).
+    - O exame final deve ter 5 questões de nível avançado.`;
+
+  const userPrompt = `Crie um curso completo sobre: "${topic}". 
+    O nível do curso é: ${level}.
+    
+    Estrutura do JSON:
     {
-      "title": "Título chamativo do curso",
-      "description": "Uma introdução de 2 parágrafos motivadores",
-      "categoryName": "Uma categoria curta (ex: Programação, Design)",
-      "tags": ["Tag1", "Tag2"],
+      "title": "Título impactante",
+      "description": "Sinopse motivadora de 2 parágrafos",
+      "categoryName": "Nome da Categoria (ex: Tecnologia, Negócios)",
+      "tags": ["tag1", "tag2"],
       "modules": [
         {
           "title": "Título do Módulo",
-          "content": "Conteúdo denso em Markdown (mínimo 500 palavras) explicando conceitos, exemplos e práticas",
+          "content": "Conteúdo em Markdown...",
           "exercises": [
             {
-              "question": "Pergunta de múltipla escolha",
-              "options": ["A", "B", "C", "D"],
-              "correctAnswer": "A frase exata da opção correta"
+              "question": "Pergunta?",
+              "options": ["Opção 1", "Opção 2", "Opção 3", "Opção 4"],
+              "correctAnswer": "Opção 1"
             }
           ]
         }
       ],
       "finalExam": [
         {
-          "question": "Pergunta desafiadora",
-          "options": ["A", "B", "C", "D"],
-          "correctAnswer": "A frase exata da opção correta"
+          "question": "Pergunta Final?",
+          "options": ["O1", "O2", "O3", "O4"],
+          "correctAnswer": "O1"
         }
       ]
-    }
-
-    REGRAS CRÍTICAS:
-    - Gere exatamente ${moduleCount} módulos.
-    - Cada módulo deve ter ${exercisesPerModule} exercício(s).
-    - O exame final deve ter 5 questões.
-    - O conteúdo deve ser rico, usando negrito, listas e blocos de código se necessário.
-    - Responda APENAS o JSON, sem textos extras antes ou depois.
-  `;
+    }`;
 
   try {
     const chatCompletion = await groq.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
       model: provider,
-      temperature: 0.7,
+      temperature: 0.6, // Reduzido levemente para maior consistência no JSON
       response_format: { type: "json_object" }
     });
 
-    const rawData = JSON.parse(chatCompletion.choices[0].message.content);
+    const content = chatCompletion.choices[0].message.content;
+    const rawData = JSON.parse(content);
 
-    // 2. LÓGICA DE PÓS-PROCESSAMENTO (O Toque de Mestre)
-    // Calculamos o tempo e XP baseados no conteúdo REAL gerado, não em chutes da IA.
+    // --- PÓS-PROCESSAMENTO DE MÉTRICAS ---
     
     let totalWordCount = 0;
     rawData.modules.forEach(mod => {
-      totalWordCount += mod.content.split(/\s+/).length;
+      // Conta palavras reais no conteúdo gerado
+      totalWordCount += (mod.content || "").split(/\s+/).length;
     });
 
-    // Velocidade média de leitura: 200 palavras por minuto
-    // Adicionamos 2 minutos por exercício
+    // Velocidade de leitura: 200 ppm + 3 min por exercício/questão
     const readingTime = Math.ceil(totalWordCount / 200);
-    const exerciseTime = (rawData.modules.length * exercisesPerModule * 2) + 10; // +10 do exame final
+    const totalQuestions = (rawData.modules.length * exercisesPerModule) + 5; // Módulos + Final
+    const exerciseTime = totalQuestions * 3; 
+    
     const finalEstimatedTime = readingTime + exerciseTime;
 
-    // Cálculo de XP: 10 XP por minuto de curso + 500 XP base de conclusão
-    const finalXpReward = (finalEstimatedTime * 10) + 500;
+    // Gamificação: 10 XP por minuto de curso + bônus de nível
+    const levelBonus = level === 'avancado' ? 1000 : (level === 'intermediario' ? 750 : 500);
+    const finalXpReward = (finalEstimatedTime * 10) + levelBonus;
 
-    // 3. Montagem do Objeto Final para o Sanity
+    // Retorno estruturado para o Controller
     return {
       ...rawData,
       estimatedTime: finalEstimatedTime,
@@ -89,16 +97,14 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
       aiMetadata: {
         provider: 'Groq',
         model: provider,
-        promptTokens: chatCompletion.usage?.prompt_tokens || 0,
-        completionTokens: chatCompletion.usage?.completion_tokens || 0,
         totalTokens: chatCompletion.usage?.total_tokens || 0,
         generatedAt: new Date().toISOString()
       }
     };
 
   } catch (error) {
-    console.error("❌ Erro na Geração da IA:", error.message);
-    throw new Error("A IA falhou em estruturar o curso. Tente novamente.");
+    console.error("❌ Erro na Geração da IA (Groq):", error.message);
+    throw new Error("A IA falhou em estruturar o curso. Verifique sua conexão ou cota da Groq.");
   }
 };
 

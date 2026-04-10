@@ -2,12 +2,11 @@ const client = require('../config/sanity');
 
 /**
  * SERVIÇO DE COTAS E CRÉDITOS (QuotaService)
- * Gerencia o saldo de gerações e previne gastos excessivos.
+ * Gerencia o saldo de gerações, recuperações automáticas e limites globais.
  */
 
 /**
  * 1. Verifica se o usuário tem permissão para gerar.
- * Regra: Se tiver crédito > 0, pode. Se crédito === 0, verifica se já passou 1h do último gasto.
  */
 const checkUserQuota = async (userId) => {
   try {
@@ -18,42 +17,45 @@ const checkUserQuota = async (userId) => {
     // Regra para ADMIN: Sempre liberado
     if (user.role === 'admin') return { canGenerate: true };
 
-    // Se ele já tem crédito disponível (não gastou o da hora atual), libera.
+    // 1. Se ele tem crédito disponível no campo direto, libera.
     if (user.credits > 0) return { canGenerate: true };
 
-    // Se ele NÃO tem crédito, verificamos o timestamp do último gasto
+    // 2. Lógica de recuperação por tempo (1 crédito por hora)
     const now = new Date();
-    // Usaremos um campo específico 'lastGenerationAt' para precisão total
-    const lastGen = user.stats?.lastGenerationAt ? new Date(user.stats.lastGenerationAt) : new Date(0);
-    
+    const lastGen = user.stats?.lastGenerationAt 
+      ? new Date(user.stats.lastGenerationAt) 
+      : new Date(0);
+
     const msPassed = now - lastGen;
     const minutesPassed = msPassed / (1000 * 60);
     const hoursPassed = minutesPassed / 60;
 
-    // Se já passou 1 hora desde o ÚLTIMO GASTO, ele recupera o direito de gerar
+    // Se já passou 1 hora desde o último gasto, ele recupera o direito.
     if (hoursPassed >= 1) {
       return { canGenerate: true, autoRefill: true };
     }
 
+    // Caso contrário, informa quanto tempo falta
     const timeLeft = Math.ceil(60 - minutesPassed);
     return { 
       canGenerate: false, 
-      reason: `Você já gerou um curso recentemente. Novo crédito em ${timeLeft} minutos.`,
+      reason: `Você atingiu seu limite de geração. Novo crédito disponível em ${timeLeft} minutos.`,
       timeLeft 
     };
 
   } catch (error) {
     console.error("❌ Erro ao verificar cota:", error.message);
-    return { canGenerate: false, reason: "Erro ao validar créditos." };
+    return { canGenerate: false, reason: "Erro ao validar créditos no servidor." };
   }
 };
 
 /**
- * 2. Verifica a cota GLOBAL (Segurança de custos da API)
+ * 2. Verifica a cota GLOBAL (Segurança de custos da sua API Key)
  */
 const checkGlobalQuota = async () => {
   try {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    // Contagem de cursos gerados por IA na última hora
     const query = `count(*[_type == "course" && aiMetadata.generatedAt > $oneHourAgo])`;
     const coursesInLastHour = await client.fetch(query, { oneHourAgo });
 
@@ -63,6 +65,7 @@ const checkGlobalQuota = async () => {
       isOk: coursesInLastHour < GLOBAL_LIMIT
     };
   } catch (error) {
+    console.error("❌ Erro na cota global:", error.message);
     return { isOk: false };
   }
 };
@@ -74,6 +77,7 @@ const consumeCredit = async (userId) => {
   try {
     await client
       .patch(userId)
+      .setIfMissing({ stats: { coursesCreated: 0 } }) // Garante que stats existe
       .set({ 
         credits: 0, 
         "stats.lastGenerationAt": new Date().toISOString() 
@@ -88,11 +92,10 @@ const consumeCredit = async (userId) => {
 };
 
 /**
- * 4. Reembolsa o crédito em caso de erro na API de IA.
+ * 4. Reembolsa o crédito em caso de falha crítica na IA.
  */
 const refundCredit = async (userId) => {
   try {
-    // Ao reembolsar, limpamos o timestamp para que ele possa tentar de novo IMEDIATAMENTE
     await client
       .patch(userId)
       .set({ 
@@ -102,6 +105,7 @@ const refundCredit = async (userId) => {
       .commit();
     return true;
   } catch (error) {
+    console.error("❌ Erro ao reembolsar crédito:", error.message);
     return false;
   }
 };
