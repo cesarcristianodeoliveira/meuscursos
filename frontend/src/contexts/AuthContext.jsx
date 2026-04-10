@@ -7,9 +7,6 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  /**
-   * CONFIGURAÇÃO GLOBAL DO TOKEN
-   */
   const setSession = (token) => {
     if (token) {
       localStorage.setItem('token', token);
@@ -20,9 +17,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  /**
-   * 1. REIDRATAÇÃO DA SESSÃO
-   */
   useEffect(() => {
     async function loadStorageData() {
       const storageToken = localStorage.getItem('token');
@@ -31,12 +25,11 @@ export function AuthProvider({ children }) {
         setSession(storageToken);
         try {
           const response = await api.get('/auth/me');
-          
-          // No backend, o user vem dentro de response.data.user
           if (response.data.success) {
             setUser(response.data.user); 
           } else {
             setSession(null);
+            setUser(null);
           }
         } catch (error) {
           console.error("Sessão expirada ou inválida.");
@@ -44,19 +37,17 @@ export function AuthProvider({ children }) {
           setUser(null);
         }
       }
+      
+      // Essencial: O loading só vira false aqui!
       setLoading(false);
     }
 
     loadStorageData();
   }, []);
 
-  /**
-   * 2. LOGIN (SignIn)
-   */
   const signIn = async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
-      
       if (response.data.success) {
         const { token, user: userData } = response.data;
         setSession(token);
@@ -70,18 +61,9 @@ export function AuthProvider({ children }) {
     }
   };
 
-  /**
-   * 3. REGISTRO (SignUp)
-   */
   const signUp = async (name, email, password, newsletter) => {
     try {
-      const response = await api.post('/auth/register', { 
-        name, 
-        email, 
-        password, 
-        newsletter 
-      });
-
+      const response = await api.post('/auth/register', { name, email, password, newsletter });
       if (response.data.success) {
         const { token, user: userData } = response.data;
         setSession(token);
@@ -95,44 +77,25 @@ export function AuthProvider({ children }) {
     }
   };
 
-  /**
-   * 4. LOGOUT (SignOut)
-   */
   const signOut = () => {
     setSession(null);
     setUser(null);
   };
 
-  /**
-   * 5. ATUALIZAÇÃO MANUAL DE STATUS (XP e Créditos)
-   * Corrigido para lidar com a estrutura profunda de stats do Sanity
-   */
   const updateStats = (newData) => {
     setUser(prev => {
       if (!prev) return null;
       return {
         ...prev,
         ...newData,
-        // Garante que o objeto stats (XP, cursosCriados) seja mesclado corretamente
-        stats: { 
-          ...(prev.stats || {}), 
-          ...(newData.stats || {}) 
-        }
+        stats: { ...(prev.stats || {}), ...(newData.stats || {}) }
       };
     });
   };
 
   return (
     <AuthContext.Provider 
-      value={{ 
-        signed: !!user, 
-        user, 
-        loading, 
-        signIn, 
-        signUp, 
-        signOut,
-        updateStats 
-      }}
+      value={{ signed: !!user, user, loading, signIn, signUp, signOut, updateStats }}
     >
       {children}
     </AuthContext.Provider>
@@ -141,8 +104,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
-  }
+  if (!context) throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   return context;
 }
