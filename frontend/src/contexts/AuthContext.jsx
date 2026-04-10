@@ -7,7 +7,12 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Função para configurar o token no Axios
+  // Injeção imediata para evitar falha no primeiro request após F5
+  const storageToken = localStorage.getItem('token');
+  if (storageToken && !api.defaults.headers.common['Authorization']) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${storageToken}`;
+  }
+
   const setSession = useCallback((token) => {
     if (token) {
       localStorage.setItem('token', token);
@@ -20,10 +25,8 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     async function loadStorageData() {
-      const storageToken = localStorage.getItem('token');
-
-      if (storageToken) {
-        setSession(storageToken);
+      const token = localStorage.getItem('token');
+      if (token) {
         try {
           const response = await api.get('/auth/me');
           if (response.data.success) {
@@ -32,8 +35,8 @@ export function AuthProvider({ children }) {
             setSession(null);
           }
         } catch (error) {
+          console.error("Erro ao validar sessão:", error);
           setSession(null);
-          setUser(null);
         }
       }
       setLoading(false);
@@ -50,16 +53,15 @@ export function AuthProvider({ children }) {
         setUser(userData);
         return { success: true };
       }
-      return { success: false, error: "Credenciais inválidas" };
+      return { success: false, error: "Verifique suas credenciais." };
     } catch (error) {
-      return { success: false, error: error.response?.data?.error || "Erro no login" };
+      return { success: false, error: error.response?.data?.error || "Erro no servidor." };
     }
   };
 
   const signOut = () => {
     setSession(null);
     setUser(null);
-    window.location.href = '/'; // Garante o reset total da rota "/"
   };
 
   return (

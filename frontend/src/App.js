@@ -11,38 +11,46 @@ import Dashboard from './pages/dashboard/Dashboard';
 import SignIn from './pages/sign-in/SignIn';
 import SignUp from './pages/sign-up/SignUp';
 
+function LoadingScreen() {
+  return (
+    <Box 
+      sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh', 
+        bgcolor: 'background.default' 
+      }}
+    >
+      <CircularProgress size={40} thickness={4} />
+    </Box>
+  );
+}
+
 function Home() {
   const { signed, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', bgcolor: 'background.default' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  if (loading) return <LoadingScreen />;
 
-  // O pulo do gato: Se estiver logado, renderiza o Dashboard, se não, Marketing.
+  // Se logado, renderiza o template Dashboard. Se não, Marketing.
+  // Ambos respondem pela URL "/"
   return signed ? <Dashboard /> : <MarketingPage />;
 }
 
 export default function App(props) {
   return (
     <AppTheme {...props}>
-      {/* CssBaseline aqui remove as margens brancas do body em todas as telas */}
       <CssBaseline enableColorScheme />
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* Usamos o signed como chave para forçar a troca de template na mesma rota */}
-            <Route path="/" element={<Home />} />
+            {/* O "/*" é a correção para o erro do console e permite sub-rotas no Dashboard */}
+            <Route path="/*" element={<Home />} />
             
             <Route path="/login" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
-            
-            {/* Caso o usuário navegue manualmente para /dashboard */}
-            <Route path="/dashboard/*" element={<Dashboard />} />
 
+            {/* Fallback para rotas não encontradas */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </BrowserRouter>
