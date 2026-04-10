@@ -9,7 +9,6 @@ export function AuthProvider({ children }) {
 
   /**
    * CONFIGURAÇÃO GLOBAL DO TOKEN
-   * Salva no localStorage e injeta o header no Axios para todas as futuras requisições.
    */
   const setSession = (token) => {
     if (token) {
@@ -23,7 +22,6 @@ export function AuthProvider({ children }) {
 
   /**
    * 1. REIDRATAÇÃO DA SESSÃO
-   * Executa ao carregar o app para verificar se o token guardado ainda é válido.
    */
   useEffect(() => {
     async function loadStorageData() {
@@ -34,9 +32,9 @@ export function AuthProvider({ children }) {
         try {
           const response = await api.get('/auth/me');
           
-          // O backend agora retorna { success: true, ...userData }
+          // No backend, o user vem dentro de response.data.user
           if (response.data.success) {
-            setUser(response.data); 
+            setUser(response.data.user); 
           } else {
             setSession(null);
           }
@@ -65,10 +63,8 @@ export function AuthProvider({ children }) {
         setUser(userData);
         return { success: true };
       }
-      
       return { success: false, error: "Falha na autenticação." };
     } catch (error) {
-      // Captura a mensagem amigável enviada pelo seu authController
       const message = error.response?.data?.error || "E-mail ou senha incorretos.";
       return { success: false, error: message };
     }
@@ -92,11 +88,9 @@ export function AuthProvider({ children }) {
         setUser(userData);
         return { success: true };
       }
-
-      return { success: false, error: "Não foi possível completar o cadastro." };
+      return { success: false, error: "Erro ao completar o cadastro." };
     } catch (error) {
-      // Captura o erro específico (ex: "E-mail já cadastrado") do backend
-      const message = error.response?.data?.error || "Erro ao criar conta. Tente novamente.";
+      const message = error.response?.data?.error || "Erro ao criar conta.";
       return { success: false, error: message };
     }
   };
@@ -110,8 +104,8 @@ export function AuthProvider({ children }) {
   };
 
   /**
-   * 5. ATUALIZAÇÃO MANUAL DE STATUS
-   * Útil para atualizar XP, Créditos ou Nível sem precisar deslogar/logar.
+   * 5. ATUALIZAÇÃO MANUAL DE STATUS (XP e Créditos)
+   * Corrigido para lidar com a estrutura profunda de stats do Sanity
    */
   const updateStats = (newData) => {
     setUser(prev => {
@@ -119,7 +113,11 @@ export function AuthProvider({ children }) {
       return {
         ...prev,
         ...newData,
-        stats: { ...prev.stats, ...(newData.stats || {}) }
+        // Garante que o objeto stats (XP, cursosCriados) seja mesclado corretamente
+        stats: { 
+          ...(prev.stats || {}), 
+          ...(newData.stats || {}) 
+        }
       };
     });
   };
