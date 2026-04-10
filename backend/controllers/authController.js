@@ -94,7 +94,7 @@ const register = async (req, res) => {
     const token = jwt.sign(
       { id: result._id, role: result.role, plan: result.plan },
       process.env.JWT_SECRET,
-      { expiresIn: '1d' }
+      { expiresIn: '7d' }
     );
 
     // 5. Resposta Sucesso
@@ -147,7 +147,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       { id: user._id, role: user.role, plan: user.plan },
       process.env.JWT_SECRET,
-      { expiresIn: '1d' }
+      { expiresIn: '7d' }
     );
 
     return res.status(200).json({
