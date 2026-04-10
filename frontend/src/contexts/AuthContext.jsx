@@ -5,9 +5,8 @@ const AuthContext = createContext({});
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Começa travado
 
-  // Memoizamos a sessão para evitar re-renderizações infinitas
   const setSession = useCallback((token) => {
     if (token) {
       localStorage.setItem('token', token);
@@ -32,11 +31,13 @@ export function AuthProvider({ children }) {
             setSession(null);
           }
         } catch (error) {
-          console.error("Erro ao validar sessão:", error);
+          console.error("Erro na reidratação de sessão:", error);
           setSession(null);
+          setUser(null);
         }
       }
-      // O loading só vira false após a tentativa de validar o token
+      
+      // CRÍTICO: O loading só é liberado aqui, após a resposta da API
       setLoading(false);
     }
 
@@ -61,7 +62,6 @@ export function AuthProvider({ children }) {
   const signOut = useCallback(() => {
     setSession(null);
     setUser(null);
-    // Não usamos window.location aqui para manter a SPA viva
   }, [setSession]);
 
   return (

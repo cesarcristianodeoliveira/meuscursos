@@ -12,19 +12,30 @@ import Dashboard from './pages/dashboard/Dashboard';
 import SignIn from './pages/sign-in/SignIn';
 import SignUp from './pages/sign-up/SignUp';
 
+// Componente de carregamento para evitar o "flash" da Marketing Page
+function LoadingScreen() {
+  return (
+    <Box 
+      sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh', 
+        bgcolor: 'background.default' 
+      }}
+    >
+      <CircularProgress size={40} thickness={4} />
+    </Box>
+  );
+}
+
 function Home() {
   const { signed, loading } = useAuth();
 
-  // Trava de segurança: enquanto carrega o token, mostra o spinner
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  // Se o AuthContext ainda está validando o token, NÃO decida a rota ainda.
+  if (loading) return <LoadingScreen />;
 
-  // Se logado, renderiza Dashboard na rota "/". Se não, Marketing na rota "/".
+  // Somente após o loading=false, mostramos o template correto na rota "/"
   return signed ? <Dashboard /> : <MarketingPage />;
 }
 
@@ -35,7 +46,7 @@ export default function App(props) {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* A rota "/*" permite que o Dashboard tenha suas sub-rotas internas */}
+            {/* O "/*" permite que as sub-rotas do Dashboard funcionem internamente */}
             <Route path="/*" element={<Home />} />
             
             <Route path="/login" element={<SignIn />} />
