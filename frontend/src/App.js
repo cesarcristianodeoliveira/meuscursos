@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import CssBaseline from '@mui/material/CssBaseline';
 import CircularProgress from '@mui/material/CircularProgress';
+
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AppTheme from './theme/shared-theme/AppTheme';
 
@@ -11,22 +12,19 @@ import Dashboard from './pages/dashboard/Dashboard';
 import SignIn from './pages/sign-in/SignIn';
 import SignUp from './pages/sign-up/SignUp';
 
-function LoadingScreen() {
-  return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <CircularProgress size={40} thickness={4} />
-    </Box>
-  );
-}
-
 function Home() {
   const { signed, loading } = useAuth();
 
-  // TRAVA DE SEGURANÇA: 
-  // Se o contexto está carregando, NÃO mostramos Marketing nem Dashboard.
-  if (loading) return <LoadingScreen />;
+  // Trava de segurança: enquanto carrega o token, mostra o spinner
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
-  // Somente após o loading ser false, decidimos.
+  // Se logado, renderiza Dashboard na rota "/". Se não, Marketing na rota "/".
   return signed ? <Dashboard /> : <MarketingPage />;
 }
 
@@ -37,7 +35,7 @@ export default function App(props) {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* O path "/*" garante que o Dashboard possa ter sub-rotas internas */}
+            {/* A rota "/*" permite que o Dashboard tenha suas sub-rotas internas */}
             <Route path="/*" element={<Home />} />
             
             <Route path="/login" element={<SignIn />} />

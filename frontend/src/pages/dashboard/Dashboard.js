@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
+
 import AppNavbar from './components/AppNavbar';
 import Header from './components/Header';
 import MainGrid from './components/MainGrid';
@@ -34,8 +35,8 @@ export default function Dashboard() {
         >
           <Header />
           <Routes>
+            {/* Como o Dashboard já está em "/*", esta rota "/" corresponde ao topo do Dashboard */}
             <Route path="/" element={<MainGrid />} />
-            {/* Outras rotas do dashboard aqui */}
           </Routes>
         </Stack>
       </Box>
