@@ -3,7 +3,6 @@ import { Routes, Route } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
-
 import AppNavbar from './components/AppNavbar';
 import Header from './components/Header';
 import MainGrid from './components/MainGrid';
@@ -11,7 +10,7 @@ import SideMenu from './components/SideMenu';
 
 export default function Dashboard() {
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <SideMenu />
       <AppNavbar />
       <Box
@@ -22,7 +21,6 @@ export default function Dashboard() {
             ? `rgba(${theme.vars.palette.background.defaultChannel} / 1)`
             : alpha(theme.palette.background.default, 1),
           overflow: 'auto',
-          minHeight: '100vh',
         })}
       >
         <Stack
@@ -36,10 +34,8 @@ export default function Dashboard() {
         >
           <Header />
           <Routes>
-            {/* Miolo principal do Dashboard */}
             <Route path="/" element={<MainGrid />} />
-            
-            {/* Futuras páginas internas como /dashboard/gerar */}
+            {/* Outras rotas do dashboard aqui */}
           </Routes>
         </Stack>
       </Box>

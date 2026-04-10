@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import api from '../services/api';
 
 const AuthContext = createContext({});
@@ -7,54 +7,59 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Injetar o token no axios assim que o Provider for instanciado
-  // Isso ajuda a evitar falhas na primeira requisição após o F5
-  const storageToken = localStorage.getItem('token');
-  if (storageToken) {
-    api.defaults.headers.common['Authorization'] = `Bearer ${storageToken}`;
-  }
+  // Função para configurar o token no Axios
+  const setSession = useCallback((token) => {
+    if (token) {
+      localStorage.setItem('token', token);
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      localStorage.removeItem('token');
+      delete api.defaults.headers.common['Authorization'];
+    }
+  }, []);
 
   useEffect(() => {
     async function loadStorageData() {
+      const storageToken = localStorage.getItem('token');
+
       if (storageToken) {
+        setSession(storageToken);
         try {
           const response = await api.get('/auth/me');
           if (response.data.success) {
             setUser(response.data.user);
           } else {
-            localStorage.removeItem('token');
+            setSession(null);
           }
         } catch (error) {
-          console.error("Erro na reidratação:", error.message);
-          localStorage.removeItem('token');
+          setSession(null);
           setUser(null);
         }
       }
-      setLoading(false); // Só libera o App após tentar validar
+      setLoading(false);
     }
     loadStorageData();
-  }, [storageToken]);
+  }, [setSession]);
 
   const signIn = async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
       if (response.data.success) {
         const { token, user: userData } = response.data;
-        localStorage.setItem('token', token);
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        setSession(token);
         setUser(userData);
         return { success: true };
       }
-      return { success: false };
+      return { success: false, error: "Credenciais inválidas" };
     } catch (error) {
-      return { success: false, error: error.response?.data?.error };
+      return { success: false, error: error.response?.data?.error || "Erro no login" };
     }
   };
 
   const signOut = () => {
-    localStorage.removeItem('token');
-    delete api.defaults.headers.common['Authorization'];
+    setSession(null);
     setUser(null);
+    window.location.href = '/'; // Garante o reset total da rota "/"
   };
 
   return (
