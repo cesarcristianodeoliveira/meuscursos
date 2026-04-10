@@ -7,12 +7,6 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Injeção imediata para evitar falha no primeiro request após F5
-  const storageToken = localStorage.getItem('token');
-  if (storageToken && !api.defaults.headers.common['Authorization']) {
-    api.defaults.headers.common['Authorization'] = `Bearer ${storageToken}`;
-  }
-
   const setSession = useCallback((token) => {
     if (token) {
       localStorage.setItem('token', token);
@@ -25,8 +19,10 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     async function loadStorageData() {
-      const token = localStorage.getItem('token');
-      if (token) {
+      const storageToken = localStorage.getItem('token');
+
+      if (storageToken) {
+        setSession(storageToken);
         try {
           const response = await api.get('/auth/me');
           if (response.data.success) {
@@ -35,12 +31,16 @@ export function AuthProvider({ children }) {
             setSession(null);
           }
         } catch (error) {
-          console.error("Erro ao validar sessão:", error);
+          console.error("Erro na validação do token:", error);
           setSession(null);
         }
       }
+      
+      // GARANTIA: O loading vira false apenas aqui, 
+      // após todas as tentativas de reidratação.
       setLoading(false);
     }
+
     loadStorageData();
   }, [setSession]);
 
@@ -53,15 +53,16 @@ export function AuthProvider({ children }) {
         setUser(userData);
         return { success: true };
       }
-      return { success: false, error: "Verifique suas credenciais." };
+      return { success: false, error: "Credenciais inválidas" };
     } catch (error) {
-      return { success: false, error: error.response?.data?.error || "Erro no servidor." };
+      return { success: false, error: error.response?.data?.error || "Erro no servidor" };
     }
   };
 
   const signOut = () => {
     setSession(null);
     setUser(null);
+    window.location.href = '/';
   };
 
   return (

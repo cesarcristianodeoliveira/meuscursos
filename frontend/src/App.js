@@ -13,15 +13,7 @@ import SignUp from './pages/sign-up/SignUp';
 
 function LoadingScreen() {
   return (
-    <Box 
-      sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        minHeight: '100vh', 
-        bgcolor: 'background.default' 
-      }}
-    >
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', bgcolor: 'background.default' }}>
       <CircularProgress size={40} thickness={4} />
     </Box>
   );
@@ -30,10 +22,11 @@ function LoadingScreen() {
 function Home() {
   const { signed, loading } = useAuth();
 
+  // TRAVA DE SEGURANÇA: 
+  // Se o contexto está carregando, NÃO mostramos Marketing nem Dashboard.
   if (loading) return <LoadingScreen />;
 
-  // Se logado, renderiza o template Dashboard. Se não, Marketing.
-  // Ambos respondem pela URL "/"
+  // Somente após o loading ser false, decidimos.
   return signed ? <Dashboard /> : <MarketingPage />;
 }
 
@@ -44,13 +37,12 @@ export default function App(props) {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* O "/*" é a correção para o erro do console e permite sub-rotas no Dashboard */}
+            {/* O path "/*" garante que o Dashboard possa ter sub-rotas internas */}
             <Route path="/*" element={<Home />} />
             
             <Route path="/login" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
 
-            {/* Fallback para rotas não encontradas */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </BrowserRouter>
