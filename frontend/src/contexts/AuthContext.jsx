@@ -5,7 +5,7 @@ const AuthContext = createContext({});
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // Começa travado
+  const [loading, setLoading] = useState(true);
 
   const setSession = useCallback((token) => {
     if (token) {
@@ -25,22 +25,21 @@ export function AuthProvider({ children }) {
         setSession(storageToken);
         try {
           const response = await api.get('/auth/me');
+          
+          // Se o backend enviar dentro de .user ou na raiz (resiliência)
           if (response.data.success) {
-            setUser(response.data.user);
+            const userData = response.data.user || response.data;
+            setUser(userData);
           } else {
             setSession(null);
           }
         } catch (error) {
-          console.error("Erro na reidratação de sessão:", error);
+          console.error("Erro no refresh:", error);
           setSession(null);
-          setUser(null);
         }
       }
-      
-      // CRÍTICO: O loading só é liberado aqui, após a resposta da API
       setLoading(false);
     }
-
     loadStorageData();
   }, [setSession]);
 
@@ -48,30 +47,23 @@ export function AuthProvider({ children }) {
     try {
       const response = await api.post('/auth/login', { email, password });
       if (response.data.success) {
-        const { token, user: userData } = response.data;
-        setSession(token);
-        setUser(userData);
+        setSession(response.data.token);
+        setUser(response.data.user);
         return { success: true };
       }
-      return { success: false, error: "Credenciais inválidas" };
+      return { success: false, error: "Dados inválidos." };
     } catch (error) {
-      return { success: false, error: error.response?.data?.error || "Erro no servidor" };
+      return { success: false, error: error.response?.data?.error || "Erro de conexão." };
     }
   };
 
-  const signOut = useCallback(() => {
+  const signOut = () => {
     setSession(null);
     setUser(null);
-  }, [setSession]);
+  };
 
   return (
-    <AuthContext.Provider value={{ 
-      signed: !!user, 
-      user, 
-      loading, 
-      signIn, 
-      signOut 
-    }}>
+    <AuthContext.Provider value={{ signed: !!user, user, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

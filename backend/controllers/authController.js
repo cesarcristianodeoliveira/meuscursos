@@ -181,16 +181,18 @@ const getMe = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      plan: user.plan,
-      credits: user.credits,
-      slug: user.slug?.current,
-      stats: user.stats,
-      avatar: user.avatar,
-      newsletter: user.newsletter
+      user: { // ADICIONE ESTA CHAVE PARA PADRONIZAR
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        plan: user.plan,
+        credits: user.credits,
+        slug: user.slug?.current,
+        stats: user.stats,
+        avatar: user.avatar,
+        newsletter: user.newsletter
+      }
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: "Erro ao validar sessão." });

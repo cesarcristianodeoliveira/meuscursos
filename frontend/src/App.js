@@ -24,7 +24,7 @@ function LoadingScreen() {
         bgcolor: 'background.default' 
       }}
     >
-      <CircularProgress size={40} thickness={4} />
+      <CircularProgress />
     </Box>
   );
 }
