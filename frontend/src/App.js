@@ -49,8 +49,8 @@ export default function App(props) {
             {/* O "/*" permite que as sub-rotas do Dashboard funcionem internamente */}
             <Route path="/*" element={<Home />} />
             
-            <Route path="/login" element={<SignIn />} />
-            <Route path="/signup" element={<SignUp />} />
+            <Route path="/sign-in" element={<SignIn />} />
+            <Route path="/sign-up" element={<SignUp />} />
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

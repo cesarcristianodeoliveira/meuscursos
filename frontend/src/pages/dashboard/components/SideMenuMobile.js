@@ -1,3 +1,4 @@
+import * as React from 'react';
 import Avatar from '@mui/material/Avatar';
 import PropTypes from 'prop-types';
 import Button from '@mui/material/Button';
@@ -10,8 +11,11 @@ import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
 import MenuButton from './MenuButton';
 import MenuContent from './MenuContent';
 import CardAlert from './CardAlert';
+import { useAuth } from '../../../contexts/AuthContext';
 
 function SideMenuMobile({ open, toggleDrawer }) {
+  const { user, signOut, signed } = useAuth();
+
   return (
     <Drawer
       anchor="right"
@@ -38,12 +42,12 @@ function SideMenuMobile({ open, toggleDrawer }) {
           >
             <Avatar
               sizes="small"
-              alt="Riley Carter"
-              src="/static/images/avatar/7.jpg"
+              alt={user?.name || "Usuário"}
+              src={user?.avatar || ""}
               sx={{ width: 24, height: 24 }}
             />
             <Typography component="p" variant="h6">
-              Riley Carter
+              {user?.name || "Convidado"}
             </Typography>
           </Stack>
           <MenuButton showBadge>
@@ -56,10 +60,26 @@ function SideMenuMobile({ open, toggleDrawer }) {
           <Divider />
         </Stack>
         <CardAlert />
+        
         <Stack sx={{ p: 2 }}>
-          <Button variant="outlined" fullWidth startIcon={<LogoutRoundedIcon />}>
-            Logout
-          </Button>
+          {signed ? (
+            <Button 
+              variant="outlined" 
+              fullWidth 
+              startIcon={<LogoutRoundedIcon />}
+              onClick={signOut}
+            >
+              Sair
+            </Button>
+          ) : (
+            <Button 
+              variant="contained" 
+              fullWidth 
+              href="/login"
+            >
+              Entrar
+            </Button>
+          )}
         </Stack>
       </Stack>
     </Drawer>

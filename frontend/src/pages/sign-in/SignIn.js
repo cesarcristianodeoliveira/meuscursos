@@ -233,7 +233,7 @@ export default function SignIn(props) {
               Ainda não tem uma conta?{' '}
               <Link
                 component={RouterLink}
-                to="/register"
+                to="/sign-up"
                 variant="body2"
                 sx={{ alignSelf: 'center', fontWeight: 'bold' }}
               >

@@ -127,7 +127,7 @@ export default function AppAppBar() {
               variant="text" 
               size="small"
               component={RouterLink}
-              to="/login"
+              to="/sign-in"
             >
               Entrar
             </Button>
@@ -136,7 +136,7 @@ export default function AppAppBar() {
               variant="contained" 
               size="small"
               component={RouterLink}
-              to="/register"
+              to="/sign-up"
             >
               Cadastrar
             </Button>
@@ -182,7 +182,7 @@ export default function AppAppBar() {
                     variant="contained" 
                     fullWidth
                     component={RouterLink}
-                    to="/register"
+                    to="/sign-up"
                   >
                     Cadastrar
                   </Button>
@@ -193,7 +193,7 @@ export default function AppAppBar() {
                     variant="outlined" 
                     fullWidth
                     component={RouterLink}
-                    to="/login"
+                    to="sign-in"
                   >
                     Entrar
                   </Button>

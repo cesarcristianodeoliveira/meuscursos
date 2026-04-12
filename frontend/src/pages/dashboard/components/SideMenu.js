@@ -78,7 +78,7 @@ export default function SideMenu() {
             <Avatar
               sizes="small"
               alt={user?.name}
-              src={user?.avatar || ""} // Avatar do Sanity ou vazio
+              src={user?.avatar || ""}
               sx={{ width: 36, height: 36 }}
             />
             <Box sx={{ mr: 'auto' }}>
