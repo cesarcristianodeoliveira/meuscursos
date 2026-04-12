@@ -9,6 +9,9 @@ import Header from './components/Header';
 import MainGrid from './components/MainGrid';
 import SideMenu from './components/SideMenu';
 
+// Esta é a página que vamos criar a seguir
+import CreateCourse from './pages/CreateCourse'; 
+
 export default function Dashboard() {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -33,10 +36,18 @@ export default function Dashboard() {
             mt: { xs: 8, md: 0 },
           }}
         >
+          {/* O Header pode ser dinâmico ou fixo, dependendo se você quer que 
+              ele mude o título conforme a página */}
           <Header />
+
           <Routes>
-            {/* Como o Dashboard já está em "/*", esta rota "/" corresponde ao topo do Dashboard */}
+            {/* Rota Raiz do Dashboard: Mostra as estatísticas e cursos recentes */}
             <Route path="/" element={<MainGrid />} />
+
+            {/* Rota de Geração: Renderiza o formulário da IA */}
+            <Route path="/gerar" element={<CreateCourse />} />
+
+            {/* Futuras rotas podem ser adicionadas aqui, ex: /perfil, /meus-cursos */}
           </Routes>
         </Stack>
       </Box>

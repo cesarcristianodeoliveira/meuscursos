@@ -3,7 +3,7 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 /**
  * SERVIÇO DE INTELIGÊNCIA ARTIFICIAL (AI Service)
- * Utiliza o modelo Llama 3.3 via Groq para estruturar cursos completos.
+ * Utiliza o modelo Llama 3.3 via Groq para estruturar cursos completos v1.3.
  */
 
 const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile', options = {}) => {
@@ -12,37 +12,44 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
   // Configuração Dinâmica baseada no nível
   const isBeginner = level === 'iniciante';
   const moduleCount = isBeginner ? 3 : 5;
-  const exercisesPerModule = isBeginner ? 1 : 2;
+  const lessonsPerModule = isBeginner ? 3 : 4; // Agora dividimos em aulas
+  const exercisesPerModule = 1;
 
   const systemPrompt = `Você é um Professor Expert em Educação Online e Design Instrucional.
-    Sua tarefa é estruturar um curso pedagógico, rico em detalhes e pronto para publicação.
+    Sua tarefa é estruturar um curso pedagógico completo, dividido em módulos e aulas.
     Você deve responder estritamente com um objeto JSON válido.
     
     REGRAS DE CONTEÚDO:
-    - O campo "content" de cada módulo deve ser longo (mínimo 500 palavras), didático e formatado em Markdown rico (use ## para subtítulos, listas, tabelas e blocos de código).
+    - Divida cada módulo em pelo menos ${lessonsPerModule} aulas.
+    - Cada aula deve ter conteúdo em Markdown rico (use ##, blocos de código, listas).
+    - O tom deve ser didático e envolvente.
     - As "correctAnswer" devem ser a string exata de uma das opções.
-    - Gere exatamente ${moduleCount} módulos.
-    - Cada módulo deve ter ${exercisesPerModule} exercício(s).
-    - O exame final deve ter 5 questões de nível avançado.`;
+    - O exame final deve abranger todo o conteúdo do curso.`;
 
   const userPrompt = `Crie um curso completo sobre: "${topic}". 
     O nível do curso é: ${level}.
+    Gere exatamente ${moduleCount} módulos.
     
-    Estrutura do JSON:
+    Estrutura do JSON esperada:
     {
       "title": "Título impactante",
       "description": "Sinopse motivadora de 2 parágrafos",
-      "categoryName": "Nome da Categoria (ex: Tecnologia, Negócios)",
+      "categoryName": "Nome da Categoria",
       "tags": ["tag1", "tag2"],
       "modules": [
         {
           "title": "Título do Módulo",
-          "content": "Conteúdo em Markdown...",
+          "lessons": [
+            {
+              "title": "Título da Aula",
+              "content": "Conteúdo detalhado da aula em Markdown..."
+            }
+          ],
           "exercises": [
             {
               "question": "Pergunta?",
-              "options": ["Opção 1", "Opção 2", "Opção 3", "Opção 4"],
-              "correctAnswer": "Opção 1"
+              "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
+              "correctAnswer": "Opção A"
             }
           ]
         }
@@ -50,8 +57,8 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
       "finalExam": [
         {
           "question": "Pergunta Final?",
-          "options": ["O1", "O2", "O3", "O4"],
-          "correctAnswer": "O1"
+          "options": ["A", "B", "C", "D"],
+          "correctAnswer": "A"
         }
       ]
     }`;
@@ -63,33 +70,36 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
         { role: 'user', content: userPrompt }
       ],
       model: provider,
-      temperature: 0.6, // Reduzido levemente para maior consistência no JSON
+      temperature: 0.6,
       response_format: { type: "json_object" }
     });
 
     const content = chatCompletion.choices[0].message.content;
     const rawData = JSON.parse(content);
 
-    // --- PÓS-PROCESSAMENTO DE MÉTRICAS ---
-    
+    // --- PÓS-PROCESSAMENTO DE MÉTRICAS (Ajustado para Lessons) ---
+
     let totalWordCount = 0;
+    let totalLessons = 0;
+
     rawData.modules.forEach(mod => {
-      // Conta palavras reais no conteúdo gerado
-      totalWordCount += (mod.content || "").split(/\s+/).length;
+      mod.lessons.forEach(lesson => {
+        totalWordCount += (lesson.content || "").split(/\s+/).length;
+        totalLessons++;
+      });
     });
 
     // Velocidade de leitura: 200 ppm + 3 min por exercício/questão
     const readingTime = Math.ceil(totalWordCount / 200);
-    const totalQuestions = (rawData.modules.length * exercisesPerModule) + 5; // Módulos + Final
+    const totalQuestions = (rawData.modules.length * exercisesPerModule) + 5;
     const exerciseTime = totalQuestions * 3; 
-    
+
     const finalEstimatedTime = readingTime + exerciseTime;
 
-    // Gamificação: 10 XP por minuto de curso + bônus de nível
+    // Gamificação: Baseada no tempo e na complexidade das aulas
     const levelBonus = level === 'avancado' ? 1000 : (level === 'intermediario' ? 750 : 500);
-    const finalXpReward = (finalEstimatedTime * 10) + levelBonus;
+    const finalXpReward = (finalEstimatedTime * 10) + (totalLessons * 20) + levelBonus;
 
-    // Retorno estruturado para o Controller
     return {
       ...rawData,
       estimatedTime: finalEstimatedTime,
