@@ -88,7 +88,7 @@ export default function CreateCourse() {
       </Stack>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} md={7}>
+        <Grid size={{ xs: 12, md: 7 }}>
           <Card variant="outlined">
             <CardContent sx={{ p: 3 }}>
               <Box component="form" onSubmit={handleGenerate} noValidate>
@@ -163,7 +163,7 @@ export default function CreateCourse() {
                       startIcon={!isGenerating && <AutoAwesomeIcon />}
                       sx={{ py: 1.8, fontWeight: 'bold' }}
                     >
-                      {isGenerating ? 'Processando conteúdo...' : 'Gerar Curso Agora'}
+                      {isGenerating ? 'Processando conteúdo...' : 'Gerar Curso'}
                     </Button>
 
                     {statusMessage && (
@@ -187,7 +187,7 @@ export default function CreateCourse() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={5}>
+        <Grid size={{ xs: 12, md: 5 }}>
           <Stack spacing={2}>
             <Card variant="outlined" sx={{ bgcolor: 'action.hover' }}>
               <CardContent>

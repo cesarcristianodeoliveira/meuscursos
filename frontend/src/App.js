@@ -4,15 +4,23 @@ import Box from '@mui/material/Box';
 import CssBaseline from '@mui/material/CssBaseline';
 import CircularProgress from '@mui/material/CircularProgress';
 
+// Contextos
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { CourseProvider } from './contexts/CourseContext'; // Importando o cérebro dos cursos
+
+// Tema
 import AppTheme from './theme/shared-theme/AppTheme';
 
+// Páginas
 import MarketingPage from './pages/marketing-page/MarketingPage';
 import Dashboard from './pages/dashboard/Dashboard';
 import SignIn from './pages/sign-in/SignIn';
 import SignUp from './pages/sign-up/SignUp';
 
-// Componente de carregamento para evitar o "flash" da Marketing Page
+/**
+ * Tela de carregamento persistente para evitar transições bruscas 
+ * enquanto o Firebase/API valida o token do usuário.
+ */
 function LoadingScreen() {
   return (
     <Box 
@@ -29,13 +37,15 @@ function LoadingScreen() {
   );
 }
 
+/**
+ * Componente Home: Decide se o usuário vê a Landing Page 
+ * ou o Dashboard administrativo.
+ */
 function Home() {
   const { signed, loading } = useAuth();
 
-  // Se o AuthContext ainda está validando o token, NÃO decida a rota ainda.
   if (loading) return <LoadingScreen />;
 
-  // Somente após o loading=false, mostramos o template correto na rota "/"
   return signed ? <Dashboard /> : <MarketingPage />;
 }
 
@@ -44,17 +54,24 @@ export default function App(props) {
     <AppTheme {...props}>
       <CssBaseline enableColorScheme />
       <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* O "/*" permite que as sub-rotas do Dashboard funcionem internamente */}
-            <Route path="/*" element={<Home />} />
-            
-            <Route path="/sign-in" element={<SignIn />} />
-            <Route path="/sign-up" element={<SignUp />} />
+        {/* O CourseProvider fica aqui dentro pois ele usa dados do useAuth() */}
+        <CourseProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* A rota principal "/*" lida com a lógica de Home/Dashboard.
+                  O Dashboard internamente gerencia rotas como /gerar e /cursos.
+              */}
+              <Route path="/*" element={<Home />} />
+              
+              {/* Rotas de Autenticação */}
+              <Route path="/login" element={<SignIn />} />
+              <Route path="/signup" element={<SignUp />} />
 
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </BrowserRouter>
+              {/* Redirecionamento de segurança para rotas inexistentes */}
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </BrowserRouter>
+        </CourseProvider>
       </AuthProvider>
     </AppTheme>
   );
