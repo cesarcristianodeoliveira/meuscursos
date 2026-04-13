@@ -153,7 +153,7 @@ export default function Hero() {
               sx={{ minWidth: 'fit-content' }}
               onClick={handleStart}
             >
-              Criar curso
+              Gerar curso
             </Button>
           </Stack>
           <Typography
@@ -161,7 +161,7 @@ export default function Hero() {
             color="text.secondary"
             sx={{ textAlign: 'center' }}
           >
-            Ao clicar em &quot;Criar curso&quot; você concorda com nossos&nbsp;
+            Ao clicar em &quot;Gerar curso&quot; você concorda com nossos&nbsp;
             <Link href="#" color="primary">
               Termos e Condições
             </Link>

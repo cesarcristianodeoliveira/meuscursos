@@ -64,8 +64,8 @@ export default function App(props) {
               <Route path="/*" element={<Home />} />
               
               {/* Rotas de Autenticação */}
-              <Route path="/login" element={<SignIn />} />
-              <Route path="/signup" element={<SignUp />} />
+              <Route path="/entrar" element={<SignIn />} />
+              <Route path="/cadastrar" element={<SignUp />} />
 
               {/* Redirecionamento de segurança para rotas inexistentes */}
               <Route path="*" element={<Navigate to="/" />} />
