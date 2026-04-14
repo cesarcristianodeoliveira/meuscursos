@@ -73,7 +73,7 @@ export default function CreateCourse() {
     if (result.success) {
       // Redireciona para a visualização do curso usando o slug retornado pelo Sanity
       setTimeout(() => {
-        navigate(`/dashboard/curso/${result.slug}`);
+        navigate(`/curso/${result.slug}`);
       }, 1500);
     } else {
       setError(result.error);
