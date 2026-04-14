@@ -10,6 +10,7 @@ import MainGrid from './components/MainGrid';
 import SideMenu from './components/SideMenu';
 
 // Importação das novas páginas
+import MyCourses from './pages/MyCourses'
 import CreateCourse from './pages/CreateCourse'; 
 import CourseView from './pages/CourseView';
 import FinalExam from './pages/FinalExam';
@@ -64,7 +65,7 @@ export default function Dashboard() {
               <Route path="/curso/:slug/exame" element={<FinalExam />} />
 
               {/* Rota para Listagem Geral (Opcional) */}
-              <Route path="/meus-cursos" element={<MainGrid />} />
+              <Route path="/meus-cursos" element={<MyCourses />} />
             </Routes>
           </Box>
         </Stack>

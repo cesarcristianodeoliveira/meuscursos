@@ -19,7 +19,7 @@ import HelpRoundedIcon from '@mui/icons-material/HelpRounded';
 const mainListItems = [
   { text: 'Home', icon: <HomeRoundedIcon />, path: '/' },
   { text: 'Gerar Curso', icon: <AutoAwesomeIcon />, path: '/gerar' },
-  { text: 'Meus Cursos', icon: <LibraryBooksIcon />, path: '/cursos' },
+  { text: 'Meus Cursos', icon: <LibraryBooksIcon />, path: '/meus-cursos' },
 ];
 
 // Itens Secundários
