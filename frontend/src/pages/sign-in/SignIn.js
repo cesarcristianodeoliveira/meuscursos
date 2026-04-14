@@ -128,7 +128,7 @@ export default function SignIn(props) {
 
       if (result.success) {
         // Redireciona para o Dashboard após login bem-sucedido
-        navigate('/dashboard');
+        navigate('/');
       } else {
         setBackendError(result.error || 'Falha ao entrar.');
       }
