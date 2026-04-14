@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -9,19 +9,13 @@ import Header from './components/Header';
 import MainGrid from './components/MainGrid';
 import SideMenu from './components/SideMenu';
 
-// Importação das novas páginas
-import MyCourses from './pages/MyCourses'
+// Esta é a página que vamos criar a seguir
 import CreateCourse from './pages/CreateCourse'; 
 import CourseView from './pages/CourseView';
 import FinalExam from './pages/FinalExam';
+import MyCourses from './pages/MyCourses';
 
 export default function Dashboard() {
-  const location = useLocation();
-
-  // Verificamos se o usuário está "dentro" de uma aula ou exame
-  // para talvez ajustar o layout (ex: remover o Header para foco total)
-  const isStudyMode = location.pathname.includes('/curso/');
-
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <SideMenu />
@@ -43,17 +37,15 @@ export default function Dashboard() {
             mx: 3,
             pb: 5,
             mt: { xs: 8, md: 0 },
-            // Se estiver em modo de estudo, ocupamos 100% da largura
-            width: '100%',
           }}
         >
-          {/* Ocultamos o Header comum se estivermos visualizando um curso */}
-          {!isStudyMode && <Header />}
+          {/* O Header pode ser dinâmico ou fixo, dependendo se você quer que 
+              ele mude o título conforme a página */}
+          <Header />
 
-          <Box sx={{ width: '100%', maxWidth: isStudyMode ? '100%' : '1200px' }}>
-            <Routes>
-              {/* Home do Dashboard: Stats e Grid de Cursos */}
-              <Route path="/" element={<MainGrid />} />
+          <Routes>
+            {/* Rota Raiz do Dashboard: Mostra as estatísticas e cursos recentes */}
+            <Route path="/" element={<MainGrid />} />
 
               {/* Formulário de Geração de Curso */}
               <Route path="/gerar" element={<CreateCourse />} />
@@ -66,8 +58,9 @@ export default function Dashboard() {
 
               {/* Rota para Listagem Geral (Opcional) */}
               <Route path="/meus-cursos" element={<MyCourses />} />
-            </Routes>
-          </Box>
+
+            {/* Futuras rotas podem ser adicionadas aqui, ex: /perfil, /meus-cursos */}
+          </Routes>
         </Stack>
       </Box>
     </Box>
