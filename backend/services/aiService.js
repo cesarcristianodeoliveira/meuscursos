@@ -2,61 +2,64 @@ const Groq = require('groq-sdk');
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 /**
- * SERVIÇO DE INTELIGÊNCIA ARTIFICIAL (AI Service)
- * Utiliza o modelo Llama 3.3 via Groq para estruturar cursos completos v1.3.
+ * SERVIÇO DE INTELIGÊNCIA ARTIFICIAL (AI Service) v1.3
+ * Utiliza Llama 3.3 via Groq para gerar cursos estruturados com Aulas e Módulos.
  */
 
 const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile', options = {}) => {
   const { level = 'iniciante' } = options;
 
-  // Configuração Dinâmica baseada no nível
+  // Configuração Dinâmica: quanto maior o nível, mais denso o curso
   const isBeginner = level === 'iniciante';
-  const moduleCount = isBeginner ? 3 : 5;
-  const lessonsPerModule = isBeginner ? 3 : 4; // Agora dividimos em aulas
-  const exercisesPerModule = 1;
+  const isIntermediate = level === 'intermediario';
+  
+  const moduleCount = isBeginner ? 3 : (isIntermediate ? 4 : 5);
+  const lessonsPerModule = isBeginner ? 3 : 4;
 
-  const systemPrompt = `Você é um Professor Expert em Educação Online e Design Instrucional.
-    Sua tarefa é estruturar um curso pedagógico completo, dividido em módulos e aulas.
-    Você deve responder estritamente com um objeto JSON válido.
+  const systemPrompt = `Você é um Professor Expert em Design Instrucional.
+    Sua tarefa é estruturar um curso pedagógico completo e profissional.
+    Responda EXCLUSIVAMENTE com um objeto JSON válido, sem textos antes ou depois.
     
-    REGRAS DE CONTEÚDO:
-    - Divida cada módulo em pelo menos ${lessonsPerModule} aulas.
-    - Cada aula deve ter conteúdo em Markdown rico (use ##, blocos de código, listas).
-    - O tom deve ser didático e envolvente.
-    - As "correctAnswer" devem ser a string exata de uma das opções.
-    - O exame final deve abranger todo o conteúdo do curso.`;
+    DIRETRIZES DE QUALIDADE:
+    - O curso deve ser dividido em módulos, e cada módulo deve conter uma lista de aulas (lessons).
+    - Cada aula (lesson) deve ter um conteúdo em Markdown rico, incluindo subtítulos (##), listas e exemplos práticos.
+    - Se houver código, use blocos de código com a linguagem específica (ex: \`\`\`javascript).
+    - Os títulos das aulas devem ser curtos e diretos (máximo 50 caracteres).
+    - As opções de exercícios devem ser plausíveis, e a "correctAnswer" deve ser identica a uma das opções.`;
 
-  const userPrompt = `Crie um curso completo sobre: "${topic}". 
-    O nível do curso é: ${level}.
-    Gere exatamente ${moduleCount} módulos.
-    
-    Estrutura do JSON esperada:
+  const userPrompt = `Gere um curso completo sobre o tema: "${topic}".
+    Nível: ${level}.
+    Quantidade de módulos: ${moduleCount}.
+    Cada módulo deve ter exatamente ${lessonsPerModule} aulas.
+
+    Estrutura JSON obrigatória:
     {
-      "title": "Título impactante",
-      "description": "Sinopse motivadora de 2 parágrafos",
-      "categoryName": "Nome da Categoria",
-      "tags": ["tag1", "tag2"],
+      "title": "Título do Curso",
+      "description": "Uma sinopse envolvente de 2 parágrafos",
+      "categoryName": "Categoria Principal",
+      "tags": ["tag1", "tag2", "tag3"],
       "modules": [
         {
-          "title": "Título do Módulo",
+          "title": "Nome do Módulo",
           "lessons": [
             {
               "title": "Título da Aula",
-              "content": "Conteúdo detalhado da aula em Markdown..."
+              "content": "Conteúdo Markdown detalhado",
+              "duration": 5
             }
           ],
           "exercises": [
             {
-              "question": "Pergunta?",
-              "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
-              "correctAnswer": "Opção A"
+              "question": "Pergunta do quiz?",
+              "options": ["A", "B", "C", "D"],
+              "correctAnswer": "Opção correta aqui"
             }
           ]
         }
       ],
       "finalExam": [
         {
-          "question": "Pergunta Final?",
+          "question": "Pergunta de certificação?",
           "options": ["A", "B", "C", "D"],
           "correctAnswer": "A"
         }
@@ -70,40 +73,40 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
         { role: 'user', content: userPrompt }
       ],
       model: provider,
-      temperature: 0.6,
+      temperature: 0.6, // Balanço entre criatividade e estrutura
       response_format: { type: "json_object" }
     });
 
     const content = chatCompletion.choices[0].message.content;
     const rawData = JSON.parse(content);
 
-    // --- PÓS-PROCESSAMENTO DE MÉTRICAS (Ajustado para Lessons) ---
+    // --- PÓS-PROCESSAMENTO DE MÉTRICAS (Gamificação v1.3) ---
 
     let totalWordCount = 0;
     let totalLessons = 0;
+    let totalExercises = 0;
 
     rawData.modules.forEach(mod => {
+      totalExercises += (mod.exercises?.length || 0);
       mod.lessons.forEach(lesson => {
         totalWordCount += (lesson.content || "").split(/\s+/).length;
         totalLessons++;
       });
     });
 
-    // Velocidade de leitura: 200 ppm + 3 min por exercício/questão
-    const readingTime = Math.ceil(totalWordCount / 200);
-    const totalQuestions = (rawData.modules.length * exercisesPerModule) + 5;
-    const exerciseTime = totalQuestions * 3; 
-
+    // Estimativa de tempo: 180 palavras por minuto + 4 min por exercício
+    const readingTime = Math.ceil(totalWordCount / 180);
+    const exerciseTime = (totalExercises + (rawData.finalExam?.length || 0)) * 4;
     const finalEstimatedTime = readingTime + exerciseTime;
 
-    // Gamificação: Baseada no tempo e na complexidade das aulas
-    const levelBonus = level === 'avancado' ? 1000 : (level === 'intermediario' ? 750 : 500);
-    const finalXpReward = (finalEstimatedTime * 10) + (totalLessons * 20) + levelBonus;
+    // Cálculo de XP: Complexidade + Extensão
+    const baseXP = level === 'avancado' ? 1200 : (level === 'intermediario' ? 800 : 500);
+    const finalXpReward = baseXP + (totalLessons * 30) + (finalEstimatedTime * 5);
 
     return {
       ...rawData,
       estimatedTime: finalEstimatedTime,
-      xpReward: finalXpReward,
+      xpReward: Math.round(finalXpReward),
       aiMetadata: {
         provider: 'Groq',
         model: provider,
@@ -114,7 +117,7 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
 
   } catch (error) {
     console.error("❌ Erro na Geração da IA (Groq):", error.message);
-    throw new Error("A IA falhou em estruturar o curso. Verifique sua conexão ou cota da Groq.");
+    throw new Error("A IA falhou ao estruturar o curso. Tente novamente em alguns instantes.");
   }
 };
 

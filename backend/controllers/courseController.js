@@ -3,10 +3,11 @@ const aiService = require('../services/aiService');
 const imageService = require('../services/imageService');
 const quotaService = require('../services/quotaService');
 const { formatSlug } = require('../utils/formatter');
+const crypto = require('crypto'); // Para gerar as _key únicas
 
 /**
- * CONTROLADOR DE CURSOS (CourseController)
- * Orquestra Quota, IA, Imagem e Persistência no Sanity v1.3.
+ * CONTROLADOR DE CURSOS (CourseController) v1.3
+ * Orquestra Quota, IA, Imagem e Persistência com chaves únicas.
  */
 
 const createCourse = async (req, res) => {
@@ -26,17 +27,16 @@ const createCourse = async (req, res) => {
 
     const globalQuota = await quotaService.checkGlobalQuota();
     if (!globalQuota.isOk) {
-      return res.status(503).json({ error: "O servidor de IA está com alta carga. Tente novamente em breve." });
+      return res.status(503).json({ error: "Servidor de IA sobrecarregado. Tente logo mais." });
     }
 
     // 2. CÉREBRO: Chama o serviço de IA
-    // Importante: O aiService deve retornar o JSON no novo formato (com lessons dentro de modules)
     const aiData = await aiService.generateCourseContent(topic, 'llama-3.3-70b-versatile', { level });
 
     // 3. ESTÉTICA: Busca e faz upload da imagem
     const imageData = await imageService.fetchAndUploadImage(aiData);
 
-    // 4. CATEGORIA: Busca ou Cria de forma dinâmica
+    // 4. CATEGORIA: Busca ou Cria
     const categoryName = aiData.categoryName || 'Geral';
     const categorySlug = formatSlug(categoryName);
 
@@ -53,10 +53,9 @@ const createCourse = async (req, res) => {
       });
     }
 
-    // 5. SALVAMENTO: Mapeamento para o Schema v1.3
+    // 5. SALVAMENTO: Mapeamento v1.3 com _key obrigatórias
     const courseTitle = aiData.title;
-    // Slug: titulo-da-ia + sufixo aleatório para evitar duplicidade
-    const finalSlug = `${formatSlug(courseTitle)}-${Math.random().toString(36).substring(2, 7)}`;
+    const finalSlug = `${formatSlug(courseTitle)}-${crypto.randomBytes(3).toString('hex')}`;
 
     const newCourse = {
       _type: 'course',
@@ -67,22 +66,25 @@ const createCourse = async (req, res) => {
       category: { _type: 'reference', _ref: category._id },
       level: level || 'iniciante',
       estimatedTime: aiData.estimatedTime || 0,
-      xpReward: aiData.xpReward || 100, // Recompensa padrão
+      xpReward: aiData.xpReward || 100,
       tags: aiData.tags || [],
       isPublished: true,
 
-      // Estrutura hierárquica atualizada: Módulos -> Aulas -> Exercícios
+      // Mapeamento de Módulos com Chaves Únicas (RESOLVE O WARNING DO SANITY)
       modules: aiData.modules.map(module => ({
-        _type: 'module', // Importante para o Sanity identificar o objeto
+        _key: crypto.randomUUID(),
+        _type: 'courseModule', // Batendo com o Schema v1.3
         title: module.title,
         lessons: module.lessons.map(lesson => ({
-          _type: 'object',
+          _key: crypto.randomUUID(),
+          _type: 'lesson',
           title: lesson.title,
           content: lesson.content,
           duration: lesson.duration || 5
         })),
         exercises: module.exercises.map(ex => ({
-          _type: 'object',
+          _key: crypto.randomUUID(),
+          _type: 'exercise',
           question: ex.question,
           options: ex.options,
           correctAnswer: ex.correctAnswer
@@ -90,13 +92,13 @@ const createCourse = async (req, res) => {
       })),
 
       finalExam: aiData.finalExam.map(ex => ({
-        _type: 'object',
+        _key: crypto.randomUUID(),
+        _type: 'examQuestion',
         question: ex.question,
         options: ex.options,
         correctAnswer: ex.correctAnswer
       })),
 
-      // Thumbnail vinda do Sanity Assets
       thumbnail: imageData?.assetId ? {
         _type: 'image',
         asset: { _type: 'reference', _ref: imageData.assetId }
@@ -115,33 +117,23 @@ const createCourse = async (req, res) => {
 
     const result = await client.create(newCourse);
 
-    // 6. CONSUMO: Só desconta o crédito do usuário após o Sanity confirmar o registro
+    // 6. CONSUMO: Atualiza créditos e stats.lastGenerationAt
     await quotaService.consumeCredit(userId);
 
     return res.status(201).json({
       success: true,
-      message: "Curso gerado e salvo com sucesso!",
       course: {
         id: result._id,
         slug: result.slug.current,
-        title: result.title,
-        xpReward: result.xpReward
+        title: result.title
       }
     });
 
   } catch (error) {
-    console.error("❌ Erro Crítico no CourseController:", error.message);
-
-    // Tenta reverter o crédito se algo falhou no meio do caminho
-    try {
-      await quotaService.refundCredit(userId);
-    } catch (refundError) {
-      console.error("⚠️ Falha crítica: Erro ao reembolsar crédito do usuário.");
-    }
-
+    console.error("❌ Erro no CourseController:", error.message);
     return res.status(500).json({ 
       success: false,
-      error: "Falha na geração do curso. Seus créditos foram preservados." 
+      error: "Falha na geração do curso." 
     });
   }
 };

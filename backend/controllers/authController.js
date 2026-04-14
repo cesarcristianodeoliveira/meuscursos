@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const { formatSlug } = require('../utils/formatter');
 
 /**
- * Função Auxiliar: Gera um slug único de forma sequencial.
+ * Função Auxiliar: Gera um slug único de forma sequencial para evitar duplicatas.
  */
 const generateUniqueSlug = async (name) => {
   const baseSlug = formatSlug(name);
@@ -27,7 +27,7 @@ const generateUniqueSlug = async (name) => {
 };
 
 /**
- * REGISTRO DE USUÁRIO
+ * REGISTRO DE USUÁRIO (v1.3)
  */
 const register = async (req, res) => {
   const { name, email, password, newsletter } = req.body;
@@ -47,7 +47,7 @@ const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
     const finalSlug = await generateUniqueSlug(name);
 
-    // 2. Criar Objeto do Usuário
+    // 2. Criar Objeto do Usuário com estrutura v1.3
     const newUser = {
       _type: 'user',
       name,
@@ -65,39 +65,35 @@ const register = async (req, res) => {
         level: 1,
         coursesCreated: 0,
         coursesCompleted: 0,
-        lastLogin: new Date().toISOString()
+        lastLogin: new Date().toISOString(),
+        lastGenerationAt: new Date().toISOString() // Vital para regra de 1h
       },
       achievements: []
     };
 
     const result = await client.create(newUser);
 
-    // 3. CRIAÇÃO DA NEWSLETTER (Com Try/Catch isolado)
+    // 3. Newsletter (Opcional)
     if (newsletter && result._id) {
       try {
         await client.create({
           _type: 'newsletter',
-          user: {
-            _type: 'reference',
-            _ref: result._id
-          },
+          user: { _type: 'reference', _ref: result._id },
           email: result.email,
           subscribedAt: new Date().toISOString()
         });
       } catch (newsErr) {
-        // Se falhar a newsletter, apenas logamos, mas não barramos o registro do user
-        console.error("⚠️ Falha ao registrar na newsletter:", newsErr.message);
+        console.error("⚠️ Falha na newsletter:", newsErr.message);
       }
     }
 
-    // 4. Geração do Token
+    // 4. Token JWT
     const token = jwt.sign(
       { id: result._id, role: result.role, plan: result.plan },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    // 5. Resposta Sucesso
     return res.status(201).json({
       success: true,
       token,
@@ -133,15 +129,12 @@ const login = async (req, res) => {
       return res.status(401).json({ success: false, error: "E-mail ou senha inválidos." });
     }
 
-    if (user.authProvider !== 'credentials' && !user.password) {
-      return res.status(401).json({ success: false, error: `Conta via ${user.authProvider}. Entre por lá.` });
-    }
-
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, error: "E-mail ou senha inválidos." });
     }
 
+    // Atualiza apenas o lastLogin
     await client.patch(user._id).set({ "stats.lastLogin": new Date().toISOString() }).commit();
 
     const token = jwt.sign(
@@ -162,6 +155,7 @@ const login = async (req, res) => {
         credits: user.credits,
         slug: user.slug?.current,
         stats: user.stats,
+        avatar: user.avatar,
         newsletter: user.newsletter
       }
     });
@@ -172,7 +166,7 @@ const login = async (req, res) => {
 };
 
 /**
- * ROTA /ME
+ * ROTA /ME (Sessão atual)
  */
 const getMe = async (req, res) => {
   try {
@@ -181,7 +175,7 @@ const getMe = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      user: { // ADICIONE ESTA CHAVE PARA PADRONIZAR
+      user: { 
         id: user._id,
         name: user.name,
         email: user.email,

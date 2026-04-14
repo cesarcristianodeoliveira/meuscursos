@@ -17,6 +17,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { styled } from '@mui/material/styles';
 import { SitemarkIcon } from './components/CustomIcons';
 import { useAuth } from '../../contexts/AuthContext';
+import api from '../services/api';
 
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
@@ -60,7 +61,7 @@ const SignUpContainer = styled(Stack)(({ theme }) => ({
 
 export default function SignUp(props) {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { signIn } = useAuth(); // Usamos o signIn para logar automaticamente após o registro
 
   // Estados de erro
   const [nameError, setNameError] = React.useState(false);
@@ -136,21 +137,30 @@ export default function SignUp(props) {
     const name = data.get('name');
     const email = data.get('email');
     const password = data.get('password');
-    // Coleta o booleano da newsletter
     const newsletter = data.get('newsletter') === 'on';
 
     try {
-      const result = await signUp(name, email, password, newsletter);
+      // Chamada direta para o endpoint de registro do nosso backend
+      const response = await api.post('/auth/register', {
+        name,
+        email,
+        password,
+        newsletter
+      });
 
-      if (result.success) {
-        event.target.reset();
-        navigate('/');
+      if (response.data.success) {
+        // Loga automaticamente para melhorar a UX
+        const loginResult = await signIn(email, password);
+        if (loginResult.success) {
+          navigate('/'); 
+        } else {
+          navigate('/entrar'); // Fallback caso o login automático falhe
+        }
       } else {
-        // Exibe o erro específico enviado pelo backend (ex: "E-mail já existe")
-        setBackendError(result.error || 'Erro ao criar conta.');
+        setBackendError(response.data.error || 'Erro ao criar conta.');
       }
     } catch (err) {
-      setBackendError('Falha na comunicação com o servidor.');
+      setBackendError(err.response?.data?.error || 'Falha na comunicação com o servidor.');
     } finally {
       setLoading(false);
     }
@@ -214,7 +224,7 @@ export default function SignUp(props) {
             </FormControl>
 
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
                   <FormLabel htmlFor="password">Senha</FormLabel>
                   <TextField
@@ -233,7 +243,7 @@ export default function SignUp(props) {
                   />
                 </FormControl>
               </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
                   <FormLabel htmlFor="confirmPassword">Confirmar Senha</FormLabel>
                   <TextField
@@ -277,7 +287,7 @@ export default function SignUp(props) {
               Já tem uma conta?{' '}
               <Link
                 component={RouterLink}
-                to="/sign-in"
+                to="/entrar"
                 variant="body2"
                 sx={{ alignSelf: 'center' }}
               >

@@ -1,14 +1,14 @@
 import React, { createContext, useState, useContext, useCallback, useEffect } from 'react';
 import { client } from '../client'; 
 import api from '../services/api';     
-import { useAuth } from '../contexts/AuthContext'; // Importante para atualizar créditos
+import { useAuth } from '../contexts/AuthContext';
 
 const CourseContext = createContext();
 
 export const COURSES_PER_PAGE = 6;
 
 export const CourseProvider = ({ children }) => {
-  const { setUser } = useAuth(); // Acessamos o AuthContext
+  const { refreshUser } = useAuth(); // Usamos o refreshUser que criamos na revisão anterior
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [stats, setStats] = useState({ courses: 0, lessons: 0, quizzes: 0, categories: 0 });
@@ -21,11 +21,12 @@ export const CourseProvider = ({ children }) => {
   const fetchGlobalData = useCallback(async (force = false) => {
     if (initialDataLoaded && !force) return;
     try {
+      // Query otimizada para contar sub-itens na v1.3
       const query = `{
         "stats": {
           "courses": count(*[_type == "course"]),
           "categories": count(*[_type == "category"]),
-          "lessons": count(*[_type == "course"].modules[].lessons[]), // Caminho atualizado
+          "lessons": count(*[_type == "course"].modules[].lessons[]),
           "quizzes": count(*[_type == "course"].modules[].exercises[])
         },
         "cats": *[_type == "category"].title
@@ -47,7 +48,7 @@ export const CourseProvider = ({ children }) => {
   }, [fetchGlobalData]);
 
   /**
-   * 2. Gerador de Cursos (Chamada ao Backend + Refresh de Créditos)
+   * 2. Gerador de Cursos (Chamada ao Backend + Refresh de Dados)
    */
   const generateCourse = async (topic, level = 'iniciante') => {
     if (isGenerating) return;
@@ -63,15 +64,11 @@ export const CourseProvider = ({ children }) => {
 
       const { course, message } = response.data;
 
-      // 1. Atualizar as estatísticas do Dashboard
+      // 1. Atualizar as estatísticas globais (contador de cursos no dashboard)
       await fetchGlobalData(true);
 
-      // 2. IMPORTANTE: Atualizar o perfil do usuário logado (créditos e contador)
-      // Fazemos uma chamada ao /me para pegar o novo saldo de créditos e stats
-      const userRes = await api.get('/auth/me');
-      if (userRes.data.success) {
-        setUser(userRes.data.user);
-      }
+      // 2. Atualizar créditos e XP do usuário logado via AuthContext
+      await refreshUser();
 
       setStatusMessage(message || 'Curso criado com sucesso!');
       return { success: true, slug: course.slug };
@@ -81,6 +78,7 @@ export const CourseProvider = ({ children }) => {
       setStatusMessage(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
+      // Mantemos o feedback por 3 segundos antes de resetar o estado de geração
       setTimeout(() => {
         setIsGenerating(false);
         setStatusMessage('');
@@ -89,7 +87,7 @@ export const CourseProvider = ({ children }) => {
   };
 
   /**
-   * 3. Progresso do Aluno (Ajustado para Lessons)
+   * 3. Progresso do Aluno (Ajustado para Lessons v1.3)
    */
   const getCourseProgress = useCallback((course) => {
     if (!course || !course._id) return 0;
@@ -97,12 +95,15 @@ export const CourseProvider = ({ children }) => {
       const saved = localStorage.getItem(`progress-${course._id}`);
       const completedSteps = saved ? JSON.parse(saved) : [];
       
-      // Passos agora são o total de AULAS + Exame Final
+      // Total de passos = Todas as lições de todos os módulos + Exame Final (se houver)
       const totalLessons = course.modules?.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0) || 0;
-      const totalSteps = totalLessons + (course.finalExam?.length > 0 ? 1 : 0);
+      const hasFinalExam = course.finalExam && course.finalExam.length > 0;
+      const totalSteps = totalLessons + (hasFinalExam ? 1 : 0);
 
       if (totalSteps === 0) return 0;
-      return Math.min(Math.round((completedSteps.length / totalSteps) * 100), 100);
+      
+      const percentage = (completedSteps.length / totalSteps) * 100;
+      return Math.min(Math.round(percentage), 100);
     } catch (err) {
       return 0;
     }
@@ -125,4 +126,10 @@ export const CourseProvider = ({ children }) => {
   );
 };
 
-export const useCourse = () => useContext(CourseContext);
+export const useCourse = () => {
+  const context = useContext(CourseContext);
+  if (!context) {
+    throw new Error('useCourse deve ser usado dentro de um CourseProvider');
+  }
+  return context;
+};

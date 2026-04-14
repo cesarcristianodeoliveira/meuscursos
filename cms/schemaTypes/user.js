@@ -91,7 +91,7 @@ export default {
       initialValue: false
     },
 
-    // Gamificação e Progresso
+    // Gamificação e Progresso - Atualizado v1.3
     { 
       name: 'stats', 
       title: 'Estatísticas de Progresso',
@@ -101,7 +101,13 @@ export default {
         { name: 'level', title: 'Nível Atual', type: 'number' },
         { name: 'coursesCreated', title: 'Cursos Gerados', type: 'number' },
         { name: 'coursesCompleted', title: 'Cursos Concluídos', type: 'number' },
-        { name: 'lastLogin', title: 'Último Acesso', type: 'datetime' }
+        { name: 'lastLogin', title: 'Último Acesso', type: 'datetime' },
+        { 
+          name: 'lastGenerationAt', 
+          title: 'Última Geração de Curso', 
+          type: 'datetime',
+          description: 'Data/hora da última vez que um curso foi gerado com sucesso'
+        }
       ],
       initialValue: {
         totalXp: 0,
@@ -128,7 +134,7 @@ export default {
     prepare({ title, subtitle, media, plan, news }) {
       return {
         title,
-        subtitle: `[${plan.toUpperCase()}] ${news ? '📧' : ''} - ${subtitle}`,
+        subtitle: `[${plan ? plan.toUpperCase() : 'FREE'}] ${news ? '📧' : ''} - ${subtitle}`,
         media
       }
     }

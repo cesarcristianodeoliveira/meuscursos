@@ -48,7 +48,7 @@ export default function CreateCourse() {
   const { user } = useAuth(); 
   const { generateCourse, isGenerating, statusMessage } = useCourse();
 
-  // Verifica se o usuário é PRO (Baseado na role ou no campo plan do seu authController)
+  // Verifica se o usuário é PRO ou ADMIN para desbloquear níveis
   const isPro = user?.role === 'admin' || user?.plan === 'pro';
 
   const [topic, setTopic] = React.useState('');
@@ -64,13 +64,17 @@ export default function CreateCourse() {
       return;
     }
 
+    // Se não for PRO, forçamos o nível iniciante no envio, mesmo que o estado mude
+    const selectedLevel = isPro ? level : 'iniciante';
+
     // Chamada ao contexto para gerar o curso
-    const result = await generateCourse(topic, isPro ? level : 'iniciante');
+    const result = await generateCourse(topic, selectedLevel);
 
     if (result.success) {
+      // Redireciona para a visualização do curso usando o slug retornado pelo Sanity
       setTimeout(() => {
-        navigate(`/curso/${result.slug}`);
-      }, 2000);
+        navigate(`/dashboard/curso/${result.slug}`);
+      }, 1500);
     } else {
       setError(result.error);
     }
@@ -88,7 +92,7 @@ export default function CreateCourse() {
       </Stack>
 
       <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 7 }}>
+        <Grid item xs={12} md={7}>
           <Card variant="outlined">
             <CardContent sx={{ p: 3 }}>
               <Box component="form" onSubmit={handleGenerate} noValidate>
@@ -125,9 +129,9 @@ export default function CreateCourse() {
                     <TextField
                       select
                       fullWidth
-                      value={isPro ? level : 'iniciante'}
+                      value={level}
                       onChange={(e) => setLevel(e.target.value)}
-                      disabled={isGenerating || !isPro}
+                      disabled={isGenerating}
                       helperText={!isPro ? "Faça upgrade para desbloquear níveis Intermediário e Avançado." : "Escolha a complexidade do conteúdo."}
                       InputProps={{
                         startAdornment: (
@@ -187,7 +191,7 @@ export default function CreateCourse() {
           </Card>
         </Grid>
 
-        <Grid size={{ xs: 12, md: 5 }}>
+        <Grid item xs={12} md={5}>
           <Stack spacing={2}>
             <Card variant="outlined" sx={{ bgcolor: 'action.hover' }}>
               <CardContent>
@@ -198,10 +202,10 @@ export default function CreateCourse() {
                   Plano Atual: <strong>{user?.plan?.toUpperCase() || 'GRÁTIS'}</strong>
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  • {isPro ? 'Gerações ilimitadas e níveis avançados.' : 'Geração de 3 módulos (Nível Iniciante).'}
+                  • {isPro ? 'Gerações ilimitadas e níveis avançados.' : 'Cursos iniciais focados em fundamentos.'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • {isPro ? 'Prioridade no processamento.' : '1 crédito recuperado a cada 1 hora.'}
+                  • Créditos Disponíveis: <strong>{user?.stats?.credits || 0}</strong>
                 </Typography>
               </CardContent>
             </Card>
@@ -212,7 +216,7 @@ export default function CreateCourse() {
                   Como funciona?
                 </Typography>
                 <Typography variant="caption" color="text.secondary" component="p">
-                  Nossa IA irá estruturar o conteúdo, buscar uma imagem de capa relevante e criar um exame final para testar seus conhecimentos. Tudo isso será salvo no seu perfil automaticamente.
+                  Nossa IA irá estruturar módulos, lições e exercícios baseados no tema escolhido. O processo leva entre 10 a 20 segundos dependendo da complexidade.
                 </Typography>
               </CardContent>
             </Card>

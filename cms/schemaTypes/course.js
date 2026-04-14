@@ -41,7 +41,7 @@ export default {
       name: 'externalImageId', 
       title: 'ID da Imagem Externa', 
       type: 'string',
-      description: 'URL da imagem gerada por IA'
+      description: 'URL ou ID da imagem gerada por IA'
     },
 
     { name: 'description', title: 'Descrição Curta', type: 'text', rows: 3 },
@@ -66,14 +66,14 @@ export default {
     { name: 'tags', title: 'Tags', type: 'array', of: [{ type: 'string' }] },
     { name: 'isPublished', title: 'Publicado', type: 'boolean', initialValue: true },
 
-    // CONTEÚDO ESTRUTURADO (Melhoria: Módulos contêm Aulas)
+    // CONTEÚDO ESTRUTURADO (v1.3 Otimizado)
     {
       name: 'modules',
       title: 'Módulos do Curso',
       type: 'array',
       of: [{
         type: 'object',
-        name: 'module',
+        name: 'courseModule', // Nome único para evitar conflitos de chaves
         fields: [
           { name: 'title', title: 'Título do Módulo', type: 'string' },
           {
@@ -82,6 +82,7 @@ export default {
             type: 'array',
             of: [{
               type: 'object',
+              name: 'lesson', // Definir o 'name' ajuda o Sanity a gerenciar chaves
               fields: [
                 { name: 'title', title: 'Título da Aula', type: 'string' },
                 { name: 'content', title: 'Conteúdo (Markdown)', type: 'text' },
@@ -95,10 +96,11 @@ export default {
             type: 'array',
             of: [{
               type: 'object',
+              name: 'exercise', // Definir o 'name' ajuda o Sanity a gerenciar chaves
               fields: [
                 { name: 'question', title: 'Pergunta', type: 'string' },
                 { name: 'options', title: 'Opções', type: 'array', of: [{ type: 'string' }] },
-                { name: 'correctAnswer', title: 'Resposta Correta', type: 'string', description: 'Deve ser idêntica a uma das opções' }
+                { name: 'correctAnswer', title: 'Resposta Correta', type: 'string' }
               ]
             }]
           }
@@ -112,6 +114,7 @@ export default {
       type: 'array',
       of: [{
         type: 'object',
+        name: 'examQuestion', // Nome único
         fields: [
           { name: 'question', title: 'Pergunta', type: 'string' },
           { name: 'options', title: 'Opções', type: 'array', of: [{ type: 'string' }] },
@@ -129,8 +132,22 @@ export default {
         { name: 'provider', title: 'Provedor', type: 'string' },
         { name: 'model', title: 'Modelo', type: 'string' },
         { name: 'totalTokens', title: 'Total de Tokens', type: 'number' },
-        { name: 'generatedAt', title: 'Gerado em', type: 'datetime', initialValue: (new Date()).toISOString() }
+        { name: 'generatedAt', title: 'Gerado em', type: 'datetime' }
       ]
     }
-  ]
+  ],
+  preview: {
+    select: {
+      title: 'title',
+      author: 'author.name',
+      media: 'thumbnail'
+    },
+    prepare({ title, author, media }) {
+      return {
+        title,
+        subtitle: author ? `Por: ${author}` : 'Sem autor',
+        media
+      }
+    }
+  }
 }

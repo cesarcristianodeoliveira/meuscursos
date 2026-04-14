@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Memoização para configurar o token no Axios e LocalStorage
   const setSession = useCallback((token) => {
     if (token) {
       localStorage.setItem('token', token);
@@ -17,31 +18,35 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Função para buscar dados atualizados do usuário (Vital para v1.3)
+  const refreshUser = useCallback(async () => {
+    try {
+      const response = await api.get('/auth/me');
+      if (response.data.success) {
+        setUser(response.data.user);
+        return response.data.user;
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar dados do usuário:", error);
+      // Se o erro for 401 (não autorizado), desloga
+      if (error.response?.status === 401) signOut();
+    }
+    return null;
+  }, []);
+
   useEffect(() => {
     async function loadStorageData() {
       const storageToken = localStorage.getItem('token');
 
       if (storageToken) {
         setSession(storageToken);
-        try {
-          const response = await api.get('/auth/me');
-          
-          // Se o backend enviar dentro de .user ou na raiz (resiliência)
-          if (response.data.success) {
-            const userData = response.data.user || response.data;
-            setUser(userData);
-          } else {
-            setSession(null);
-          }
-        } catch (error) {
-          console.error("Erro no refresh:", error);
-          setSession(null);
-        }
+        await refreshUser(); // Usa a função de refresh para carregar o perfil inicial
       }
+      
       setLoading(false);
     }
     loadStorageData();
-  }, [setSession]);
+  }, [setSession, refreshUser]);
 
   const signIn = async (email, password) => {
     try {
@@ -51,22 +56,40 @@ export function AuthProvider({ children }) {
         setUser(response.data.user);
         return { success: true };
       }
-      return { success: false, error: "Dados inválidos." };
+      return { success: false, error: response.data.error || "Dados inválidos." };
     } catch (error) {
-      return { success: false, error: error.response?.data?.error || "Erro de conexão." };
+      return { 
+        success: false, 
+        error: error.response?.data?.error || "Erro ao conectar com o servidor." 
+      };
     }
   };
 
-  const signOut = () => {
+  const signOut = useCallback(() => {
     setSession(null);
     setUser(null);
-  };
+  }, [setSession]);
 
   return (
-    <AuthContext.Provider value={{ signed: !!user, user, loading, signIn, signOut }}>
+    <AuthContext.Provider 
+      value={{ 
+        signed: !!user, 
+        user, 
+        loading, 
+        signIn, 
+        signOut, 
+        refreshUser // Exportado para atualizar XP/Créditos após gerar cursos
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  }
+  return context;
+};

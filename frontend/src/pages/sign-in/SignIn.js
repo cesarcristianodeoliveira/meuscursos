@@ -127,7 +127,8 @@ export default function SignIn(props) {
       const result = await signIn(email, password);
 
       if (result.success) {
-        navigate('/');
+        // Redireciona para o Dashboard após login bem-sucedido
+        navigate('/dashboard');
       } else {
         setBackendError(result.error || 'Falha ao entrar.');
       }
@@ -233,7 +234,7 @@ export default function SignIn(props) {
               Ainda não tem uma conta?{' '}
               <Link
                 component={RouterLink}
-                to="/sign-up"
+                to="/cadastrar"
                 variant="body2"
                 sx={{ alignSelf: 'center', fontWeight: 'bold' }}
               >
