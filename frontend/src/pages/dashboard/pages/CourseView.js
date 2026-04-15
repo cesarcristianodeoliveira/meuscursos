@@ -1,11 +1,13 @@
 import * as React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { client } from '../../../client';
+import api from '../../../services/api'; // Importante para salvar no MongoDB
+import { useAuth } from '../../../contexts/AuthContext';
 import { 
   Box, Typography, Stack, Grid, Card, CardContent, 
   List, ListItem, ListItemButton, ListItemIcon, ListItemText,
   Divider, Button, CircularProgress, Chip, Accordion, 
-  AccordionSummary, AccordionDetails 
+  AccordionSummary, AccordionDetails, Alert
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 
@@ -34,15 +36,17 @@ const ContentContainer = styled(Box)(({ theme }) => ({
 export default function CourseView() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  
+  const { user } = useAuth();
+
   const [course, setCourse] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [activeLesson, setActiveLesson] = React.useState(null);
   const [completedLessons, setCompletedLessons] = React.useState([]);
+  const [saveError, setSaveError] = React.useState(null);
 
-  // 1. Busca os detalhes do curso no Sanity
+  // 1. Busca os detalhes do curso e o progresso real do banco
   React.useEffect(() => {
-    const fetchCourse = async () => {
+    const fetchCourseAndProgress = async () => {
       try {
         const query = `*[_type == "course" && slug.current == $slug][0]{
           _id,
@@ -50,36 +54,47 @@ export default function CourseView() {
           description,
           level,
           modules[]{
+            _key,
             title,
             lessons[]{
+              _key,
               title,
               content,
               duration
             },
             exercises[]{
+              _key,
               question,
               options,
               correctAnswer
             }
           },
           finalExam[]{
+            _key,
             question,
             options,
             correctAnswer
           }
         }`;
         const data = await client.fetch(query, { slug });
-        
+
         if (data) {
           setCourse(data);
-          // Define a primeira lição do primeiro módulo como ativa por padrão
           if (data.modules?.[0]?.lessons?.[0]) {
             setActiveLesson(data.modules[0].lessons[0]);
           }
-          
-          // Carrega progresso do localStorage
-          const saved = localStorage.getItem(`progress-${data._id}`);
-          if (saved) setCompletedLessons(JSON.parse(saved));
+
+          // BUSCA PROGRESSO DO BACKEND (MongoDB)
+          try {
+            const res = await api.get(`/courses/${data._id}/progress`);
+            if (res.data.success) {
+              setCompletedLessons(res.data.completedLessons || []);
+            }
+          } catch (err) {
+            console.log("Sem progresso prévio no servidor, usando local.");
+            const saved = localStorage.getItem(`progress-${data._id}`);
+            if (saved) setCompletedLessons(JSON.parse(saved));
+          }
         }
         setLoading(false);
       } catch (err) {
@@ -88,16 +103,33 @@ export default function CourseView() {
       }
     };
 
-    fetchCourse();
+    fetchCourseAndProgress();
   }, [slug]);
 
-  const toggleLessonComplete = (lessonTitle) => {
-    const updated = completedLessons.includes(lessonTitle)
-      ? completedLessons.filter(l => l !== lessonTitle)
-      : [...completedLessons, lessonTitle];
+  // 2. Função para salvar progresso no MongoDB e LocalStorage
+  const toggleLessonComplete = async (lesson) => {
+    const lessonId = lesson._key || lesson.title;
+    const isCompleted = completedLessons.includes(lessonId);
     
+    const updated = isCompleted
+      ? completedLessons.filter(l => l !== lessonId)
+      : [...completedLessons, lessonId];
+
+    // Atualiza estado local para resposta instantânea na UI
     setCompletedLessons(updated);
     localStorage.setItem(`progress-${course._id}`, JSON.stringify(updated));
+
+    try {
+      setSaveError(null);
+      // ENVIA PARA O BACKEND
+      await api.post(`/courses/${course._id}/progress`, {
+        lessonId: lessonId,
+        completed: !isCompleted
+      });
+    } catch (err) {
+      console.error("Erro ao salvar progresso no servidor:", err);
+      setSaveError("Progresso salvo apenas localmente. Verifique sua conexão.");
+    }
   };
 
   if (loading) {
@@ -108,34 +140,26 @@ export default function CourseView() {
     );
   }
 
-  if (!course) {
-    return (
-      <Box sx={{ p: 4, textAlign: 'center' }}>
-        <Typography variant="h6">Curso não encontrado.</Typography>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')}>
-          Voltar para o Painel
-        </Button>
-      </Box>
-    );
-  }
+  if (!course) return <Typography>Curso não encontrado.</Typography>;
 
   return (
     <Box sx={{ flexGrow: 1, mt: -2 }}>
+      {saveError && (
+        <Alert severity="warning" onClose={() => setSaveError(null)} sx={{ borderRadius: 0 }}>
+          {saveError}
+        </Alert>
+      )}
+      
       <Grid container>
-        {/* SIDEBAR DE NAVEGAÇÃO */}
+        {/* SIDEBAR */}
         <Grid item xs={12} md={4} lg={3}>
           <SidebarContainer>
             <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle2" color="primary" fontWeight="bold" gutterBottom>
-                CONTEÚDO DO CURSO
-              </Typography>
-              <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-                {course.title}
-              </Typography>
-              <Chip label={course.level} size="small" color="secondary" sx={{ mb: 2 }} />
+              <Typography variant="h6" fontWeight="bold">{course.title}</Typography>
+              <Chip label={course.level} size="small" color="primary" sx={{ mt: 1 }} />
             </Box>
             <Divider />
-            
+
             {course.modules?.map((module, mIdx) => (
               <Accordion key={mIdx} defaultExpanded={mIdx === 0} elevation={0} square>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -152,25 +176,29 @@ export default function CourseView() {
                           onClick={() => setActiveLesson(lesson)}
                         >
                           <ListItemIcon sx={{ minWidth: 36 }}>
-                            {completedLessons.includes(lesson.title) ? (
+                            {completedLessons.includes(lesson._key || lesson.title) ? (
                               <CheckCircleIcon color="success" fontSize="small" />
                             ) : (
                               <RadioButtonUncheckedIcon fontSize="small" />
                             )}
                           </ListItemIcon>
-                          <ListItemText 
-                            primary={lesson.title} 
-                            primaryTypographyProps={{ variant: 'body2' }}
-                          />
+                          <ListItemText primary={lesson.title} primaryTypographyProps={{ variant: 'body2' }} />
                         </ListItemButton>
                       </ListItem>
                     ))}
-                    {/* Link para Quiz do Módulo se houver */}
+                    
+                    {/* Botão de Quiz Ativo */}
                     {module.exercises?.length > 0 && (
                       <ListItem disablePadding>
-                        <ListItemButton sx={{ bgcolor: 'action.hover' }}>
-                          <ListItemIcon sx={{ minWidth: 36 }}><QuizIcon fontSize="small" /></ListItemIcon>
-                          <ListItemText primary="Quiz do Módulo" primaryTypographyProps={{ variant: 'body2', fontWeight: 'bold' }} />
+                        <ListItemButton 
+                          sx={{ bgcolor: 'action.hover' }}
+                          onClick={() => navigate(`/curso/${slug}/quiz/${module._key || mIdx}`)}
+                        >
+                          <ListItemIcon sx={{ minWidth: 36 }}><QuizIcon color="primary" fontSize="small" /></ListItemIcon>
+                          <ListItemText 
+                            primary="Fazer Quiz do Módulo" 
+                            primaryTypographyProps={{ variant: 'body2', fontWeight: 'bold' }} 
+                          />
                         </ListItemButton>
                       </ListItem>
                     )}
@@ -178,77 +206,35 @@ export default function CourseView() {
                 </AccordionDetails>
               </Accordion>
             ))}
-
-            {/* Link para Exame Final */}
-            {course.finalExam?.length > 0 && (
-              <Box sx={{ p: 2 }}>
-                <Button 
-                  fullWidth 
-                  variant="outlined" 
-                  color="secondary" 
-                  startIcon={<SchoolIcon />}
-                  onClick={() => navigate(`/curso/${slug}/exame`)}
-                >
-                  Exame Final
-                </Button>
-              </Box>
-            )}
           </SidebarContainer>
         </Grid>
 
-        {/* ÁREA DE CONTEÚDO */}
+        {/* CONTEÚDO */}
         <Grid item xs={12} md={8} lg={9}>
           <ContentContainer>
             {activeLesson ? (
               <Stack spacing={3}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="h4" fontWeight="bold">
-                    {activeLesson.title}
-                  </Typography>
+                  <Typography variant="h4" fontWeight="bold">{activeLesson.title}</Typography>
                   <Button 
-                    variant={completedLessons.includes(activeLesson.title) ? "outlined" : "contained"}
+                    variant={completedLessons.includes(activeLesson._key || activeLesson.title) ? "outlined" : "contained"}
                     color="success"
-                    startIcon={<CheckCircleIcon />}
-                    onClick={() => toggleLessonComplete(activeLesson.title)}
+                    onClick={() => toggleLessonComplete(activeLesson)}
                   >
-                    {completedLessons.includes(activeLesson.title) ? "Concluída" : "Marcar como lida"}
+                    {completedLessons.includes(activeLesson._key || activeLesson.title) ? "Concluída" : "Concluir Aula"}
                   </Button>
                 </Box>
-                
                 <Divider />
-
-                <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                  <CardContent sx={{ p: 4 }}>
-                    {/* Renderização do conteúdo (Markdown ou Texto Simples) */}
-                    <Typography 
-                      variant="body1" 
-                      sx={{ 
-                        lineHeight: 1.8, 
-                        whiteSpace: 'pre-line',
-                        fontSize: '1.1rem' 
-                      }}
-                    >
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
                       {activeLesson.content}
                     </Typography>
                   </CardContent>
                 </Card>
-
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                   <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/dashboard')}>
-                     Sair da Aula
-                   </Button>
-                   <Typography variant="caption" color="text.secondary">
-                     Tempo estimado: {activeLesson.duration || '5 min'}
-                   </Typography>
-                </Box>
               </Stack>
             ) : (
-              <Box sx={{ textAlign: 'center', mt: 10 }}>
-                <PlayLessonIcon sx={{ fontSize: 60, color: 'action.disabled', mb: 2 }} />
-                <Typography variant="h5" color="text.secondary">
-                  Selecione uma lição para começar a estudar.
-                </Typography>
-              </Box>
+              <Typography>Selecione uma aula.</Typography>
             )}
           </ContentContainer>
         </Grid>

@@ -4,8 +4,29 @@ const jwt = require('jsonwebtoken');
 const { formatSlug } = require('../utils/formatter');
 
 /**
- * Função Auxiliar: Gera um slug único de forma sequencial para evitar duplicatas.
+ * FUNÇÃO AUXILIAR: Verifica e reseta créditos baseada no tempo (v1.3)
+ * Regra: Se o crédito for 0 e já passou 1 hora desde a última geração, devolve 1 crédito.
  */
+const checkAndResetCredits = async (user) => {
+  if (user.credits > 0) return user;
+
+  const lastGen = new Date(user.stats?.lastGenerationAt);
+  const now = new Date();
+  const diffInHours = (now - lastGen) / (1000 * 60 * 60);
+
+  if (diffInHours >= 1) {
+    // Atualiza no Sanity e retorna o usuário atualizado
+    const updatedUser = await client
+      .patch(user._id)
+      .set({ credits: 1 })
+      .commit();
+    console.log(`✅ Crédito resetado para o usuário: ${user.email}`);
+    return updatedUser;
+  }
+
+  return user;
+};
+
 const generateUniqueSlug = async (name) => {
   const baseSlug = formatSlug(name);
   let uniqueSlug = baseSlug;
@@ -15,7 +36,6 @@ const generateUniqueSlug = async (name) => {
   while (exists) {
     const query = `*[_type == "user" && slug.current == $slug][0]`;
     const user = await client.fetch(query, { slug: uniqueSlug });
-
     if (!user) {
       exists = false;
     } else {
@@ -27,17 +47,16 @@ const generateUniqueSlug = async (name) => {
 };
 
 /**
- * REGISTRO DE USUÁRIO (v1.3)
+ * REGISTRO
  */
 const register = async (req, res) => {
   const { name, email, password, newsletter } = req.body;
 
   try {
     if (!name || !email || !password) {
-      return res.status(400).json({ success: false, error: "Preencha todos os campos corretamente." });
+      return res.status(400).json({ success: false, error: "Preencha todos os campos." });
     }
 
-    // 1. Verificar se e-mail já existe
     const userExists = await client.fetch(`*[_type == "user" && email == $email][0]`, { email });
     if (userExists) {
       return res.status(400).json({ success: false, error: "Este e-mail já está em uso." });
@@ -47,7 +66,6 @@ const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
     const finalSlug = await generateUniqueSlug(name);
 
-    // 2. Criar Objeto do Usuário com estrutura v1.3
     const newUser = {
       _type: 'user',
       name,
@@ -60,34 +78,17 @@ const register = async (req, res) => {
       credits: 1, 
       newsletter: !!newsletter, 
       stats: {
-        _type: 'object',
         totalXp: 0,
         level: 1,
         coursesCreated: 0,
         coursesCompleted: 0,
         lastLogin: new Date().toISOString(),
-        lastGenerationAt: new Date().toISOString() // Vital para regra de 1h
-      },
-      achievements: []
+        lastGenerationAt: new Date(Date.now() - 3600000).toISOString() // Registra como "usado há 1 hora" para já começar podendo usar
+      }
     };
 
     const result = await client.create(newUser);
 
-    // 3. Newsletter (Opcional)
-    if (newsletter && result._id) {
-      try {
-        await client.create({
-          _type: 'newsletter',
-          user: { _type: 'reference', _ref: result._id },
-          email: result.email,
-          subscribedAt: new Date().toISOString()
-        });
-      } catch (newsErr) {
-        console.error("⚠️ Falha na newsletter:", newsErr.message);
-      }
-    }
-
-    // 4. Token JWT
     const token = jwt.sign(
       { id: result._id, role: result.role, plan: result.plan },
       process.env.JWT_SECRET,
@@ -98,32 +99,27 @@ const register = async (req, res) => {
       success: true,
       token,
       user: {
-        id: result._id,
+        _id: result._id, // Usamos _id para bater com o que o Sanity espera
         name: result.name,
         email: result.email,
-        role: result.role,
-        plan: result.plan,
         credits: result.credits,
-        slug: result.slug.current,
-        stats: result.stats,
-        newsletter: result.newsletter
+        stats: result.stats
       }
     });
 
   } catch (error) {
-    console.error("❌ Erro no Registro:", error.message);
-    return res.status(500).json({ success: false, error: "Erro interno ao criar conta." });
+    return res.status(500).json({ success: false, error: "Erro ao criar conta." });
   }
 };
 
 /**
- * LOGIN DE USUÁRIO
+ * LOGIN
  */
 const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const user = await client.fetch(`*[_type == "user" && email == $email][0]`, { email });
+    let user = await client.fetch(`*[_type == "user" && email == $email][0]`, { email });
 
     if (!user) {
       return res.status(401).json({ success: false, error: "E-mail ou senha inválidos." });
@@ -134,7 +130,9 @@ const login = async (req, res) => {
       return res.status(401).json({ success: false, error: "E-mail ou senha inválidos." });
     }
 
-    // Atualiza apenas o lastLogin
+    // Tenta resetar os créditos no login
+    user = await checkAndResetCredits(user);
+
     await client.patch(user._id).set({ "stats.lastLogin": new Date().toISOString() }).commit();
 
     const token = jwt.sign(
@@ -147,16 +145,12 @@ const login = async (req, res) => {
       success: true,
       token,
       user: {
-        id: user._id,
+        _id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
-        plan: user.plan,
         credits: user.credits,
-        slug: user.slug?.current,
         stats: user.stats,
-        avatar: user.avatar,
-        newsletter: user.newsletter
+        slug: user.slug?.current
       }
     });
 
@@ -166,26 +160,25 @@ const login = async (req, res) => {
 };
 
 /**
- * ROTA /ME (Sessão atual)
+ * GET ME (Validação de sessão e Refresh de Créditos)
  */
 const getMe = async (req, res) => {
   try {
-    const user = await client.fetch(`*[_id == $id][0]`, { id: req.userId });
+    let user = await client.fetch(`*[_id == $id][0]`, { id: req.userId });
     if (!user) return res.status(404).json({ success: false, error: "Usuário não encontrado." });
+
+    // Tenta resetar os créditos toda vez que o app abre/valida a sessão
+    user = await checkAndResetCredits(user);
 
     return res.status(200).json({
       success: true,
       user: { 
-        id: user._id,
+        _id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
-        plan: user.plan,
         credits: user.credits,
-        slug: user.slug?.current,
         stats: user.stats,
-        avatar: user.avatar,
-        newsletter: user.newsletter
+        slug: user.slug?.current
       }
     });
   } catch (error) {

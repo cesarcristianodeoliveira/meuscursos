@@ -2,7 +2,7 @@ const client = require('../config/sanity');
 
 /**
  * SERVIÇO DE COTAS E CRÉDITOS (QuotaService) v1.3
- * Gerencia saldo, recuperação automática de 1h e limites globais.
+ * Gerencia saldo, recuperação automática e limites globais.
  */
 
 /**
@@ -17,12 +17,11 @@ const checkUserQuota = async (userId) => {
     // Regra para ADMIN: Sempre liberado
     if (user.role === 'admin') return { canGenerate: true };
 
-    // 1. Se ele tem crédito positivo (acumulado via plano ou bônus), libera.
+    // 1. Se ele tem crédito positivo, libera imediatamente.
     if (user.credits > 0) return { canGenerate: true };
 
     // 2. Lógica de recuperação por tempo (1 crédito por hora para Plano Free)
     const now = new Date();
-    // Se o campo não existir, usamos uma data muito antiga para permitir a primeira geração
     const lastGen = user.stats?.lastGenerationAt 
       ? new Date(user.stats.lastGenerationAt) 
       : new Date(0);
@@ -31,16 +30,17 @@ const checkUserQuota = async (userId) => {
     const minutesPassed = msPassed / (1000 * 60);
     const hoursPassed = minutesPassed / 60;
 
-    // Se já passou 1 hora desde a última geração de sucesso
+    // Se já passou 1 hora desde a última geração
     if (hoursPassed >= 1) {
+      // Importante: Não precisamos atualizar o crédito aqui, o consumeCredit fará isso.
       return { canGenerate: true, autoRefill: true };
     }
 
-    // Caso contrário, calcula quanto tempo falta para completar 60 minutos
+    // Caso contrário, calcula o tempo restante
     const timeLeft = Math.ceil(60 - minutesPassed);
     return { 
       canGenerate: false, 
-      reason: `Limite de 1 curso por hora atingido. Próximo crédito em ${timeLeft} min.`,
+      reason: `Você já gerou um curso recentemente. Próximo crédito disponível em ${timeLeft} min.`,
       timeLeft 
     };
 
@@ -51,12 +51,12 @@ const checkUserQuota = async (userId) => {
 };
 
 /**
- * 2. Verifica a cota GLOBAL (Segurança contra custos excessivos da API de IA)
+ * 2. Verifica a cota GLOBAL (Evita estourar custos da API de IA)
  */
 const checkGlobalQuota = async () => {
   try {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    // Conta quantos cursos foram criados por TODOS os usuários na última hora
+    // Conta cursos criados globalmente na última hora
     const query = `count(*[_type == "course" && aiMetadata.generatedAt > $oneHourAgo])`;
     const coursesInLastHour = await client.fetch(query, { oneHourAgo });
 
@@ -77,21 +77,21 @@ const checkGlobalQuota = async () => {
 const consumeCredit = async (userId) => {
   try {
     const user = await client.fetch(`*[_id == $userId][0]{credits}`, { userId });
-    
-    // Se o usuário tinha créditos acumulados (>0), subtrai 1. 
-    // Se estava no 0 usando a regra de 1h, mantém 0.
+
+    // Se ele tinha crédito (ex: 1 ou mais), subtrai. 
+    // Se estava usando o "autoRefill" (estava com 0 mas passou 1h), mantém 0.
     const newCreditAmount = user.credits > 0 ? user.credits - 1 : 0;
 
     await client
       .patch(userId)
-      .setIfMissing({ stats: {} }) // Garante que o objeto stats existe antes de atualizar filhos
+      .setIfMissing({ stats: {} })
       .set({ 
         credits: newCreditAmount, 
         "stats.lastGenerationAt": new Date().toISOString() 
       })
-      .inc({ "stats.coursesCreated": 1 }) // Incrementa contador de cursos criados
+      .inc({ "stats.coursesCreated": 1 }) 
       .commit();
-      
+
     return true;
   } catch (error) {
     console.error("❌ Erro ao consumir crédito:", error.message);
@@ -100,16 +100,18 @@ const consumeCredit = async (userId) => {
 };
 
 /**
- * 4. Reembolsa o crédito em caso de falha crítica na IA ou Imagem.
+ * 4. Reembolsa o crédito em caso de falha.
  */
 const refundCredit = async (userId) => {
   try {
-    // Devolve 1 crédito e reseta o timestamp para permitir nova tentativa imediata
+    // Ao reembolsar, voltamos o lastGenerationAt para o passado para liberar o tempo
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+    
     await client
       .patch(userId)
       .setIfMissing({ stats: {} })
       .inc({ credits: 1 })
-      .set({ "stats.lastGenerationAt": new Date(0).toISOString() })
+      .set({ "stats.lastGenerationAt": oneHourAgo })
       .commit();
     return true;
   } catch (error) {

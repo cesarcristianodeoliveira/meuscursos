@@ -3,13 +3,11 @@ const aiService = require('../services/aiService');
 const imageService = require('../services/imageService');
 const quotaService = require('../services/quotaService');
 const { formatSlug } = require('../utils/formatter');
-const crypto = require('crypto'); // Para gerar as _key únicas
+const crypto = require('crypto');
 
 /**
- * CONTROLADOR DE CURSOS (CourseController) v1.3
- * Orquestra Quota, IA, Imagem e Persistência com chaves únicas.
+ * CRIAÇÃO DE CURSO
  */
-
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
   const userId = req.userId; 
@@ -19,7 +17,6 @@ const createCourse = async (req, res) => {
   }
 
   try {
-    // 1. SEGURANÇA: Verifica se o usuário tem créditos (Quota)
     const userQuota = await quotaService.checkUserQuota(userId);
     if (!userQuota.canGenerate) {
       return res.status(429).json({ error: userQuota.reason });
@@ -27,16 +24,12 @@ const createCourse = async (req, res) => {
 
     const globalQuota = await quotaService.checkGlobalQuota();
     if (!globalQuota.isOk) {
-      return res.status(503).json({ error: "Servidor de IA sobrecarregado. Tente logo mais." });
+      return res.status(503).json({ error: "Servidor de IA sobrecarregado." });
     }
 
-    // 2. CÉREBRO: Chama o serviço de IA
     const aiData = await aiService.generateCourseContent(topic, 'llama-3.3-70b-versatile', { level });
-
-    // 3. ESTÉTICA: Busca e faz upload da imagem
     const imageData = await imageService.fetchAndUploadImage(aiData);
 
-    // 4. CATEGORIA: Busca ou Cria
     const categoryName = aiData.categoryName || 'Geral';
     const categorySlug = formatSlug(categoryName);
 
@@ -53,7 +46,6 @@ const createCourse = async (req, res) => {
       });
     }
 
-    // 5. SALVAMENTO: Mapeamento v1.3 com _key obrigatórias
     const courseTitle = aiData.title;
     const finalSlug = `${formatSlug(courseTitle)}-${crypto.randomBytes(3).toString('hex')}`;
 
@@ -70,10 +62,9 @@ const createCourse = async (req, res) => {
       tags: aiData.tags || [],
       isPublished: true,
 
-      // Mapeamento de Módulos com Chaves Únicas (RESOLVE O WARNING DO SANITY)
       modules: aiData.modules.map(module => ({
         _key: crypto.randomUUID(),
-        _type: 'courseModule', // Batendo com o Schema v1.3
+        _type: 'courseModule',
         title: module.title,
         lessons: module.lessons.map(lesson => ({
           _key: crypto.randomUUID(),
@@ -104,8 +95,6 @@ const createCourse = async (req, res) => {
         asset: { _type: 'reference', _ref: imageData.assetId }
       } : undefined,
 
-      externalImageId: imageData?.externalImageId || null,
-
       aiMetadata: {
         _type: 'object',
         provider: aiData.aiMetadata?.provider || 'Groq',
@@ -116,14 +105,12 @@ const createCourse = async (req, res) => {
     };
 
     const result = await client.create(newCourse);
-
-    // 6. CONSUMO: Atualiza créditos e stats.lastGenerationAt
     await quotaService.consumeCredit(userId);
 
     return res.status(201).json({
       success: true,
       course: {
-        id: result._id,
+        _id: result._id, // Normalizado
         slug: result.slug.current,
         title: result.title
       }
@@ -131,11 +118,80 @@ const createCourse = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Erro no CourseController:", error.message);
-    return res.status(500).json({ 
-      success: false,
-      error: "Falha na geração do curso." 
-    });
+    return res.status(500).json({ success: false, error: "Falha na geração." });
   }
 };
 
-module.exports = { createCourse };
+/**
+ * SALVAR PROGRESSO (v1.3)
+ * Chamado pelo frontend ao marcar aula como lida
+ */
+const saveProgress = async (req, res) => {
+  const { courseId } = req.params;
+  const { lessonId, completed } = req.body;
+  const userId = req.userId;
+
+  try {
+    // Buscamos se já existe uma matrícula/progresso para este usuário neste curso
+    const enrollmentQuery = `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]`;
+    let enrollment = await client.fetch(enrollmentQuery, { userId, courseId });
+
+    if (!enrollment) {
+      // Se não existe, cria a matrícula inicial
+      enrollment = await client.create({
+        _type: 'enrollment',
+        user: { _type: 'reference', _ref: userId },
+        course: { _type: 'reference', _ref: courseId },
+        completedLessons: completed ? [lessonId] : [],
+        status: 'em_andamento',
+        startDate: new Date().toISOString()
+      });
+    } else {
+      // Se existe, atualiza o array de aulas concluídas
+      const lessons = enrollment.completedLessons || [];
+      let updatedLessons;
+
+      if (completed) {
+        // Adiciona se não estiver lá
+        updatedLessons = Array.from(new Set([...lessons, lessonId]));
+      } else {
+        // Remove se estiver desmarcando
+        updatedLessons = lessons.filter(id => id !== lessonId);
+      }
+
+      await client
+        .patch(enrollment._id)
+        .set({ completedLessons: updatedLessons })
+        .commit();
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Erro ao salvar progresso:", error);
+    return res.status(500).json({ error: "Erro interno ao salvar progresso." });
+  }
+};
+
+/**
+ * BUSCAR PROGRESSO
+ */
+const getProgress = async (req, res) => {
+  const { courseId } = req.params;
+  const userId = req.userId;
+
+  try {
+    const enrollment = await client.fetch(
+      `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]`,
+      { userId, courseId }
+    );
+
+    return res.status(200).json({
+      success: true,
+      completedLessons: enrollment ? enrollment.completedLessons : []
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Erro ao buscar progresso." });
+  }
+};
+
+module.exports = { createCourse, saveProgress, getProgress };
