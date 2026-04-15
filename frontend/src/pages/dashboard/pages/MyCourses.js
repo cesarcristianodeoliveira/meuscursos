@@ -12,16 +12,16 @@ import SchoolIcon from '@mui/icons-material/School';
 
 export default function MyCourses() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth(); // Pegamos o loading do Auth também
+  const { user, authLoading } = useAuth(); 
   const [courses, setCourses] = React.useState([]);
   const [fetching, setFetching] = React.useState(true);
 
   React.useEffect(() => {
     const fetchCourses = async () => {
-      // Se o Auth ainda está carregando o perfil, esperamos
+      // 1. Espera o carregamento do Auth terminar
       if (authLoading) return;
 
-      // Se o Auth terminou e não temos usuário, paramos o fetch
+      // 2. Se não houver usuário logado, para a busca
       if (!user?._id) {
         setFetching(false);
         return;
@@ -29,7 +29,10 @@ export default function MyCourses() {
       
       try {
         setFetching(true);
-        // Filtramos pelo autor logado usando o _id normalizado
+        /**
+         * FILTRO DE SEGURANÇA:
+         * Buscamos cursos onde author._ref é igual ao _id do usuário logado.
+         */
         const query = `*[_type == "course" && author._ref == $userId] | order(_createdAt desc) {
           _id,
           title,
@@ -50,9 +53,8 @@ export default function MyCourses() {
     };
 
     fetchCourses();
-  }, [user, authLoading]);
+  }, [user?._id, authLoading]); // Dependência específica no _id
 
-  // O estado de carregamento total é a soma do Auth + Fetch do Sanity
   const isLoading = authLoading || fetching;
 
   return (
@@ -78,7 +80,7 @@ export default function MyCourses() {
           {[1, 2, 3].map((n) => (
             <Grid item xs={12} sm={6} md={4} key={n}>
               <Skeleton variant="rectangular" height={160} sx={{ borderRadius: 3 }} />
-              <Box sx={{ pt: 0.5 }}>
+              <Box sx={{ pt: 1 }}>
                 <Skeleton width="60%" />
                 <Skeleton />
               </Box>
@@ -86,7 +88,6 @@ export default function MyCourses() {
           ))}
         </Grid>
       ) : courses.length === 0 ? (
-        // Estado Vazio (Empty State)
         <Box 
           sx={{ 
             textAlign: 'center', 
@@ -102,13 +103,13 @@ export default function MyCourses() {
             Nenhum curso encontrado
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Você ainda não gerou nenhum curso com nossa IA.
+            Parece que você ainda não gerou cursos.
           </Typography>
           <Button 
             variant="outlined" 
             onClick={() => navigate('/dashboard/gerar')}
           >
-            Começar agora
+            Gerar meu primeiro curso
           </Button>
         </Box>
       ) : (
@@ -141,7 +142,6 @@ export default function MyCourses() {
                       label={course.level || 'Geral'} 
                       size="small" 
                       color="primary" 
-                      variant="soft" 
                     />
                     <Chip 
                       label={`${course.xpReward || 0} XP`} 
@@ -158,7 +158,7 @@ export default function MyCourses() {
                     sx={{
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
-                      WebkitBoxDirection: 'vertical',
+                      WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
                     }}
                   >
@@ -171,7 +171,7 @@ export default function MyCourses() {
                     variant="contained" 
                     endIcon={<PlayCircleOutlineIcon />}
                     onClick={() => navigate(`/curso/${course.slug}`)}
-                    sx={{ borderRadius: 2, py: 1 }}
+                    sx={{ borderRadius: 2 }}
                   >
                     Estudar Agora
                   </Button>
