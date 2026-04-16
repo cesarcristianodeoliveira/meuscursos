@@ -20,27 +20,21 @@ export function AuthProvider({ children }) {
   const signOut = useCallback(() => {
     setSession(null);
     setUser(null);
+    localStorage.clear(); // Limpeza completa por segurança
   }, [setSession]);
 
-  /**
-   * Função para normalizar o usuário e garantir que o _id exista.
-   * Usamos um novo objeto para garantir que o React dispare a atualização da UI.
-   */
   const handleUserResponse = useCallback((userData) => {
     if (!userData) return null;
     
     const normalizedUser = {
       ...userData,
-      _id: userData._id || userData.id // Compatibilidade v1.3
+      _id: userData._id || userData.id 
     };
     
     setUser(normalizedUser);
     return normalizedUser;
   }, []);
 
-  /**
-   * REFRESH USER: Busca dados frescos do servidor (Vital para reset de créditos)
-   */
   const refreshUser = useCallback(async () => {
     try {
       const response = await api.get('/auth/me');
@@ -49,7 +43,6 @@ export function AuthProvider({ children }) {
       }
     } catch (error) {
       console.error("Erro ao atualizar dados do usuário:", error);
-      // Se o token expirou ou é inválido, desloga
       if (error.response?.status === 401) {
         signOut();
       }
@@ -59,15 +52,21 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     async function loadStorageData() {
-      const storageToken = localStorage.getItem('token');
-      
-      if (storageToken) {
-        setSession(storageToken);
-        // Ao carregar o app, busca os dados reais do banco (Resetando créditos se necessário)
-        await refreshUser(); 
+      try {
+        const storageToken = localStorage.getItem('token');
+        
+        if (storageToken) {
+          setSession(storageToken);
+          // Aguardamos a resposta do servidor antes de liberar o loading
+          // Isso evita que o App ache que o usuário é null enquanto a API carrega
+          await refreshUser(); 
+        }
+      } catch (error) {
+        console.error("Erro no carregamento inicial:", error);
+      } finally {
+        // Agora sim, com user preenchido ou erro tratado, liberamos a UI
+        setLoading(false);
       }
-      
-      setLoading(false);
     }
     loadStorageData();
   }, [setSession, refreshUser]);
@@ -111,7 +110,7 @@ export function AuthProvider({ children }) {
       value={{ 
         signed: !!user, 
         user, 
-        authLoading: loading, // Nomeado para evitar conflito com loadings de páginas
+        authLoading: loading, // Mantido como solicitado
         signIn, 
         signOut, 
         signUp,

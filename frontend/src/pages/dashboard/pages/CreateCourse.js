@@ -75,7 +75,7 @@ export default function CreateCourse() {
 
     if (result.success) {
       setTimeout(() => {
-        navigate(`/curso/${result.slug}`);
+        navigate(`/dashboard/curso/${result.slug}`);
       }, 1500);
     } else {
       setError(result.error);

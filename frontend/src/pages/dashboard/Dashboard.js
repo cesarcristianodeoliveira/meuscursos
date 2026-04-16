@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -15,16 +15,16 @@ import CreateCourse from './pages/CreateCourse';
 import CourseView from './pages/CourseView';
 import FinalExam from './pages/FinalExam';
 import MyCourses from './pages/MyCourses';
-import ExploreCourses from './pages/ExploreCourses'; // Nova página pública
-import UserProfile from './pages/UserProfile';       // Nova página de perfil
+import ExploreCourses from './pages/ExploreCourses'; 
+import UserProfile from './pages/UserProfile';
 
 export default function Dashboard() {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      {/* Menu Lateral Fixo em Desktop */}
+      {/* Menu Lateral - Desktop */}
       <SideMenu />
       
-      {/* Navbar Superior para Mobile */}
+      {/* Navbar - Mobile */}
       <AppNavbar />
       
       <Box
@@ -36,6 +36,8 @@ export default function Dashboard() {
             : alpha(theme.palette.background.default, 1),
           overflow: 'auto',
           height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
         })}
       >
         <Stack
@@ -44,38 +46,38 @@ export default function Dashboard() {
             alignItems: 'center',
             mx: { xs: 2, md: 4 },
             pb: 5,
-            mt: { xs: 10, md: 2 }, // Margem maior no mobile por causa da AppNavbar
+            mt: { xs: 10, md: 2 }, 
           }}
         >
-          {/* O Header pode receber props se você quiser títulos dinâmicos */}
+          {/* O Header agora está dentro do fluxo de scroll */}
           <Header />
 
           <Box sx={{ width: '100%', maxWidth: '1200px' }}>
             <Routes>
-              {/* Home: Estatísticas e Cursos Recentes */}
+              {/* Nota: Como esta rota está dentro de /dashboard/* no App.js,
+                  o path="/" aqui corresponde a "/dashboard" na URL real. */}
+              
               <Route path="/" element={<MainGrid />} />
 
-              {/* Biblioteca de Cursos (Pública) */}
-              <Route path="/explorar" element={<ExploreCourses />} />
+              {/* Biblioteca Pública */}
+              <Route path="explorar" element={<ExploreCourses />} />
 
-              {/* Biblioteca Pessoal do Aluno */}
-              <Route path="/meus-cursos" element={<MyCourses />} />
+              {/* Biblioteca do Usuário */}
+              <Route path="meus-cursos" element={<MyCourses />} />
 
-              {/* Inteligência Artificial: Gerador de Conteúdo */}
-              <Route path="/gerar" element={<CreateCourse />} />
+              {/* Gerador IA */}
+              <Route path="gerar" element={<CreateCourse />} />
 
-              {/* Player do Curso v1.3 */}
-              <Route path="/curso/:slug" element={<CourseView />} />
+              {/* Visualização de Curso e Provas */}
+              <Route path="curso/:slug" element={<CourseView />} />
+              <Route path="curso/:slug/exame" element={<FinalExam />} />
 
-              {/* Sistema de Avaliação Final */}
-              <Route path="/curso/:slug/exame" element={<FinalExam />} />
-
-              {/* Perfil: :id é opcional. Sem ID = Meu Perfil. Com ID = Perfil Público */}
-              <Route path="/perfil" element={<UserProfile />} />
-              <Route path="/perfil/:id" element={<UserProfile />} />
+              {/* Perfil (Híbrido) */}
+              <Route path="perfil" element={<UserProfile />} />
+              <Route path="perfil/:id" element={<UserProfile />} />
               
-              {/* Rota de Fallback (Opcional) */}
-              <Route path="*" element={<MainGrid />} />
+              {/* Caso o usuário digite algo errado dentro de /dashboard, volta para a home do dash */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </Box>
         </Stack>

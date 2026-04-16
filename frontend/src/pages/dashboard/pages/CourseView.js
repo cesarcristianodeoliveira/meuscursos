@@ -15,7 +15,6 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import QuizIcon from '@mui/icons-material/Quiz';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import LockIcon from '@mui/icons-material/Lock';
 
 const SidebarContainer = styled(Box)(({ theme }) => ({
   borderRight: `1px solid ${theme.palette.divider}`,
@@ -60,7 +59,7 @@ export default function CourseView() {
             setActiveLesson(data.modules[0].lessons[0]);
           }
 
-          // Só busca progresso do banco se houver usuário logado
+          // Busca progresso real do backend usando o _id do curso
           if (user?._id) {
             try {
               const res = await api.get(`/courses/${data._id}/progress`);
@@ -68,6 +67,7 @@ export default function CourseView() {
                 setCompletedLessons(res.data.completedLessons || []);
               }
             } catch (err) {
+              console.warn("Usando progresso local (offline)");
               const saved = localStorage.getItem(`progress-${data._id}`);
               if (saved) setCompletedLessons(JSON.parse(saved));
             }
@@ -85,18 +85,20 @@ export default function CourseView() {
 
   const toggleLessonComplete = async (lesson) => {
     if (!user) {
-      alert("Faça login para salvar seu progresso!");
-      navigate('/login');
+      navigate('/entrar');
       return;
     }
 
     const lessonId = lesson._key || lesson.title;
     const isCompleted = completedLessons.includes(lessonId);
+    
+    // Atualização otimista da UI
     const updated = isCompleted
       ? completedLessons.filter(l => l !== lessonId)
       : [...completedLessons, lessonId];
 
     setCompletedLessons(updated);
+    localStorage.setItem(`progress-${course._id}`, JSON.stringify(updated));
 
     try {
       setSaveError(null);
@@ -105,65 +107,76 @@ export default function CourseView() {
         completed: !isCompleted
       });
     } catch (err) {
-      setSaveError("Erro ao sincronizar com o servidor.");
+      setSaveError("Erro ao sincronizar progresso com o servidor.");
     }
   };
 
   if (loading || authLoading) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <CircularProgress />
+      </Box>
+    );
   }
 
   if (!course) return <Typography sx={{ p: 4 }}>Curso não encontrado.</Typography>;
 
   return (
     <Box sx={{ flexGrow: 1, mt: -2 }}>
-      {saveError && <Alert severity="warning">{saveError}</Alert>}
+      {saveError && (
+        <Alert severity="error" onClose={() => setSaveError(null)} sx={{ mb: 2 }}>
+          {saveError}
+        </Alert>
+      )}
       
       <Grid container>
+        {/* Sidebar de Módulos */}
         <Grid item xs={12} md={4} lg={3}>
           <SidebarContainer>
             <Box sx={{ p: 2 }}>
-              <Typography variant="h6" fontWeight="bold">{course.title}</Typography>
-              <Chip label={course.level} size="small" color="primary" sx={{ mt: 1 }} />
+              <Typography variant="h6" fontWeight="bold" noWrap>{course.title}</Typography>
+              <Chip label={course.level} size="small" color="primary" sx={{ mt: 1, textTransform: 'capitalize' }} />
             </Box>
             <Divider />
 
             {course.modules?.map((module, mIdx) => (
-              <Accordion key={mIdx} defaultExpanded={mIdx === 0} elevation={0} square>
+              <Accordion key={module._key || mIdx} defaultExpanded={mIdx === 0} elevation={0} square>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography fontWeight="bold" variant="body2">Módulo {mIdx + 1}: {module.title}</Typography>
+                  <Typography fontWeight="bold" variant="body2">
+                    {mIdx + 1}. {module.title}
+                  </Typography>
                 </AccordionSummary>
                 <AccordionDetails sx={{ p: 0 }}>
                   <List disablePadding>
-                    {module.lessons?.map((lesson, lIdx) => (
-                      <ListItem key={lIdx} disablePadding>
-                        <ListItemButton 
-                          selected={activeLesson?._key === lesson._key}
-                          onClick={() => setActiveLesson(lesson)}
-                        >
-                          <ListItemIcon sx={{ minWidth: 36 }}>
-                            {completedLessons.includes(lesson._key || lesson.title) ? (
-                              <CheckCircleIcon color="success" fontSize="small" />
-                            ) : (
-                              <RadioButtonUncheckedIcon fontSize="small" />
-                            )}
-                          </ListItemIcon>
-                          <ListItemText primary={lesson.title} primaryTypographyProps={{ variant: 'body2' }} />
-                        </ListItemButton>
-                      </ListItem>
-                    ))}
+                    {module.lessons?.map((lesson, lIdx) => {
+                      const lKey = lesson._key || lesson.title;
+                      const isDone = completedLessons.includes(lKey);
+                      return (
+                        <ListItem key={lesson._key || lIdx} disablePadding>
+                          <ListItemButton 
+                            selected={activeLesson?._key === lesson._key}
+                            onClick={() => setActiveLesson(lesson)}
+                          >
+                            <ListItemIcon sx={{ minWidth: 32 }}>
+                              {isDone ? <CheckCircleIcon color="success" fontSize="small" /> : <RadioButtonUncheckedIcon fontSize="small" />}
+                            </ListItemIcon>
+                            <ListItemText primary={lesson.title} primaryTypographyProps={{ variant: 'body2' }} />
+                          </ListItemButton>
+                        </ListItem>
+                      );
+                    })}
                     
                     {module.exercises?.length > 0 && (
                       <ListItem disablePadding>
                         <ListItemButton 
-                          sx={{ bgcolor: 'action.hover' }}
-                          onClick={() => user ? navigate(`/curso/${slug}/quiz/${module._key || mIdx}`) : navigate('/login')}
+                          sx={{ bgcolor: (theme) => theme.palette.action.hover }}
+                          onClick={() => navigate(`/dashboard/curso/${slug}/quiz/${module._key || mIdx}`)}
                         >
-                          <ListItemIcon sx={{ minWidth: 36 }}>
-                            {user ? <QuizIcon color="primary" fontSize="small" /> : <LockIcon fontSize="small" />}
+                          <ListItemIcon sx={{ minWidth: 32 }}>
+                            <QuizIcon color="primary" fontSize="small" />
                           </ListItemIcon>
                           <ListItemText 
-                            primary={user ? "Fazer Quiz" : "Login para Quiz"} 
+                            primary="Desafio do Módulo" 
                             primaryTypographyProps={{ variant: 'body2', fontWeight: 'bold' }} 
                           />
                         </ListItemButton>
@@ -176,31 +189,35 @@ export default function CourseView() {
           </SidebarContainer>
         </Grid>
 
+        {/* Área de Conteúdo */}
         <Grid item xs={12} md={8} lg={9}>
           <ContentContainer>
             {activeLesson ? (
               <Stack spacing={3}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Typography variant="h4" fontWeight="bold">{activeLesson.title}</Typography>
                   <Button 
                     variant={completedLessons.includes(activeLesson._key || activeLesson.title) ? "outlined" : "contained"}
                     color="success"
+                    startIcon={completedLessons.includes(activeLesson._key || activeLesson.title) ? <CheckCircleIcon /> : null}
                     onClick={() => toggleLessonComplete(activeLesson)}
                   >
                     {completedLessons.includes(activeLesson._key || activeLesson.title) ? "Concluída" : "Concluir Aula"}
                   </Button>
                 </Box>
                 <Divider />
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="body1" sx={{ whiteSpace: 'pre-line', lineHeight: 1.8 }}>
+                <Card variant="outlined" sx={{ borderRadius: 2, border: 'none', bgcolor: 'transparent' }}>
+                  <CardContent sx={{ p: 0 }}>
+                    <Typography variant="body1" sx={{ whiteSpace: 'pre-line', lineHeight: 1.8, color: 'text.primary' }}>
                       {activeLesson.content}
                     </Typography>
                   </CardContent>
                 </Card>
               </Stack>
             ) : (
-              <Typography variant="h5" textAlign="center" mt={10}>Selecione uma lição.</Typography>
+              <Box sx={{ textAlign: 'center', mt: 10 }}>
+                <Typography variant="h5" color="text.secondary">Selecione uma aula no menu lateral para começar.</Typography>
+              </Box>
             )}
           </ContentContainer>
         </Grid>

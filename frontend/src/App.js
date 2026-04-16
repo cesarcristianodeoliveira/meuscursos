@@ -6,7 +6,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 
 // Contextos
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { CourseProvider } from './contexts/CourseContext'; // Importando o cérebro dos cursos
+import { CourseProvider } from './contexts/CourseContext';
 
 // Tema
 import AppTheme from './theme/shared-theme/AppTheme';
@@ -18,8 +18,8 @@ import SignIn from './pages/sign-in/SignIn';
 import SignUp from './pages/sign-up/SignUp';
 
 /**
- * Tela de carregamento persistente para evitar transições bruscas 
- * enquanto o Firebase/API valida o token do usuário.
+ * Tela de carregamento persistente.
+ * Agora ela herda background.default corretamente do AppTheme.
  */
 function LoadingScreen() {
   return (
@@ -29,7 +29,12 @@ function LoadingScreen() {
         justifyContent: 'center', 
         alignItems: 'center', 
         minHeight: '100vh', 
-        bgcolor: 'background.default' 
+        width: '100vw',
+        bgcolor: 'background.default', // Crucial para não piscar branco no Dark Mode
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        zIndex: 9999
       }}
     >
       <CircularProgress />
@@ -38,41 +43,64 @@ function LoadingScreen() {
 }
 
 /**
- * Componente Home: Decide se o usuário vê a Landing Page 
- * ou o Dashboard administrativo.
+ * Componente de Proteção de Rota
  */
-function Home() {
-  const { signed, loading } = useAuth();
+function PrivateRoute({ children }) {
+  const { signed, authLoading } = useAuth();
 
-  if (loading) return <LoadingScreen />;
+  if (authLoading) return <LoadingScreen />;
+  
+  return signed ? children : <Navigate to="/entrar" replace />;
+}
 
-  return signed ? <Dashboard /> : <MarketingPage />;
+/**
+ * Componente da Rota Raiz
+ */
+function RootRoute() {
+  const { signed, authLoading } = useAuth();
+
+  if (authLoading) return <LoadingScreen />;
+
+  return signed ? <Navigate to="/dashboard" replace /> : <MarketingPage />;
 }
 
 export default function App(props) {
   return (
-    <AppTheme {...props}>
-      <CssBaseline enableColorScheme />
-      <AuthProvider>
-        {/* O CourseProvider fica aqui dentro pois ele usa dados do useAuth() */}
-        <CourseProvider>
+    <AuthProvider>
+      <CourseProvider>
+        {/* O AppTheme envolve tudo o que renderiza UI, inclusive as rotas */}
+        <AppTheme {...props}>
+          {/* CssBaseline aplica o reset de CSS e a cor de fundo do tema no body */}
+          <CssBaseline enableColorScheme />
+          
           <BrowserRouter>
             <Routes>
-              {/* A rota principal "/*" lida com a lógica de Home/Dashboard.
-                  O Dashboard internamente gerencia rotas como /gerar e /cursos.
-              */}
-              <Route path="/*" element={<Home />} />
+              {/* Rota Raiz: Inteligente para Marketing ou Dashboard */}
+              <Route path="/" element={<RootRoute />} />
               
               {/* Rotas de Autenticação */}
               <Route path="/entrar" element={<SignIn />} />
               <Route path="/cadastrar" element={<SignUp />} />
 
-              {/* Redirecionamento de segurança para rotas inexistentes */}
-              <Route path="*" element={<Navigate to="/" />} />
+              {/* Dashboard Protegido: 
+                  Usamos o sufixo "/*" para permitir que o roteamento interno 
+                  do componente Dashboard funcione corretamente.
+              */}
+              <Route 
+                path="/dashboard/*" 
+                element={
+                  <PrivateRoute>
+                    <Dashboard />
+                  </PrivateRoute>
+                } 
+              />
+
+              {/* Redirecionamento de segurança para qualquer rota não definida */}
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
-        </CourseProvider>
-      </AuthProvider>
-    </AppTheme>
+        </AppTheme>
+      </CourseProvider>
+    </AuthProvider>
   );
 }

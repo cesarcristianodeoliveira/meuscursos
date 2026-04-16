@@ -144,8 +144,6 @@ export default function ExploreCourses() {
                     overflow: 'hidden',
                     border: '1px solid',
                     borderColor: 'divider',
-                    transition: 'all 0.3s ease',
-                    '&:hover': { transform: 'translateY(-8px)', boxShadow: '0 12px 30px rgba(0,0,0,0.1)' }
                   }}
                 >
                   {/* CAPA DO CURSO: Imagem ou Ícone */}
@@ -209,7 +207,7 @@ export default function ExploreCourses() {
                       fullWidth 
                       variant="contained" 
                       size="large"
-                      onClick={() => navigate(`/curso/${course.slug}`)}
+                      onClick={() => navigate(`/dashboard/curso/${course.slug}`)}
                       sx={{ borderRadius: 2, fontWeight: 'bold' }}
                     >
                       Acessar Curso

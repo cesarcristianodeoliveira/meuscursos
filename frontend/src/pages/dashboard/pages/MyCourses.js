@@ -170,7 +170,7 @@ export default function MyCourses() {
                     fullWidth 
                     variant="contained" 
                     endIcon={<PlayCircleOutlineIcon />}
-                    onClick={() => navigate(`/curso/${course.slug}`)}
+                    onClick={() => navigate(`/dashboard/curso/${course.slug}`)}
                     sx={{ borderRadius: 2 }}
                   >
                     Estudar Agora

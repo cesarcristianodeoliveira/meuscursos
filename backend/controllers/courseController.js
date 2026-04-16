@@ -110,7 +110,7 @@ const createCourse = async (req, res) => {
     return res.status(201).json({
       success: true,
       course: {
-        _id: result._id, // Normalizado
+        _id: result._id,
         slug: result.slug.current,
         title: result.title
       }
@@ -123,21 +123,18 @@ const createCourse = async (req, res) => {
 };
 
 /**
- * SALVAR PROGRESSO (v1.3)
- * Chamado pelo frontend ao marcar aula como lida
+ * SALVAR PROGRESSO
  */
 const saveProgress = async (req, res) => {
-  const { courseId } = req.params;
+  const { id: courseId } = req.params; // Usando 'id' para bater com a rota /:id/progress
   const { lessonId, completed } = req.body;
   const userId = req.userId;
 
   try {
-    // Buscamos se já existe uma matrícula/progresso para este usuário neste curso
     const enrollmentQuery = `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]`;
     let enrollment = await client.fetch(enrollmentQuery, { userId, courseId });
 
     if (!enrollment) {
-      // Se não existe, cria a matrícula inicial
       enrollment = await client.create({
         _type: 'enrollment',
         user: { _type: 'reference', _ref: userId },
@@ -147,17 +144,10 @@ const saveProgress = async (req, res) => {
         startDate: new Date().toISOString()
       });
     } else {
-      // Se existe, atualiza o array de aulas concluídas
       const lessons = enrollment.completedLessons || [];
-      let updatedLessons;
-
-      if (completed) {
-        // Adiciona se não estiver lá
-        updatedLessons = Array.from(new Set([...lessons, lessonId]));
-      } else {
-        // Remove se estiver desmarcando
-        updatedLessons = lessons.filter(id => id !== lessonId);
-      }
+      const updatedLessons = completed
+        ? Array.from(new Set([...lessons, lessonId]))
+        : lessons.filter(id => id !== lessonId);
 
       await client
         .patch(enrollment._id)
@@ -176,7 +166,7 @@ const saveProgress = async (req, res) => {
  * BUSCAR PROGRESSO
  */
 const getProgress = async (req, res) => {
-  const { courseId } = req.params;
+  const { id: courseId } = req.params;
   const userId = req.userId;
 
   try {
@@ -194,4 +184,24 @@ const getProgress = async (req, res) => {
   }
 };
 
-module.exports = { createCourse, saveProgress, getProgress };
+/**
+ * BUSCAR CURSOS DO USUÁRIO
+ */
+const getUserCourses = async (req, res) => {
+  const userId = req.userId;
+  try {
+    // Busca cursos onde o usuário é o autor ou está matriculado
+    const query = `*[_type == "course" && author._ref == $userId] | order(_createdAt desc)`;
+    const courses = await client.fetch(query, { userId });
+    return res.status(200).json({ success: true, courses });
+  } catch (error) {
+    return res.status(500).json({ error: "Erro ao buscar seus cursos." });
+  }
+};
+
+module.exports = { 
+  createCourse, 
+  saveProgress, 
+  getProgress, 
+  getUserCourses 
+};

@@ -6,8 +6,9 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
+import { alpha } from '@mui/material/styles';
 
-// Ícones atualizados para v1.3
+// Ícones
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
@@ -16,31 +17,29 @@ import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import HelpRoundedIcon from '@mui/icons-material/HelpRounded';
 
-// Itens Principais (Navegação do Ecossistema)
+// Itens Principais - Agora apontando para /dashboard/...
 const mainListItems = [
-  { text: 'Início', icon: <HomeRoundedIcon />, path: '/' },
-  { text: 'Explorar', icon: <TravelExploreIcon />, path: '/explorar' },
-  { text: 'Gerar Curso', icon: <AutoAwesomeIcon />, path: '/gerar' },
-  { text: 'Meus Cursos', icon: <LibraryBooksIcon />, path: '/meus-cursos' },
+  { text: 'Início', icon: <HomeRoundedIcon />, path: '/dashboard' },
+  { text: 'Explorar', icon: <TravelExploreIcon />, path: '/dashboard/explorar' },
+  { text: 'Gerar Curso', icon: <AutoAwesomeIcon />, path: '/dashboard/gerar' },
+  { text: 'Meus Cursos', icon: <LibraryBooksIcon />, path: '/dashboard/meus-cursos' },
 ];
 
-// Itens de Conta e Suporte
+// Itens de Conta
 const secondaryListItems = [
-  { text: 'Meu Perfil', icon: <AccountCircleRoundedIcon />, path: '/perfil' },
-  { text: 'Configurações', icon: <SettingsRoundedIcon />, path: '/configuracoes' },
-  { text: 'Suporte', icon: <HelpRoundedIcon />, path: '/feedback' },
+  { text: 'Meu Perfil', icon: <AccountCircleRoundedIcon />, path: '/dashboard/perfil' },
+  { text: 'Configurações', icon: <SettingsRoundedIcon />, path: '/dashboard/configuracoes' },
+  { text: 'Suporte', icon: <HelpRoundedIcon />, path: '/dashboard/feedback' },
 ];
 
 export default function MenuContent() {
   const location = useLocation();
 
-  /**
-   * Função para verificar se a rota atual deve marcar o item como selecionado.
-   * Isso garante que se o usuário estiver em "/perfil/algum-id", o menu "Meu Perfil"
-   * ou "Início" permaneça ativo se for o caso.
-   */
+  // Função de seleção aprimorada para lidar com o prefixo /dashboard
   const isSelected = (path) => {
-    if (path === '/') return location.pathname === '/';
+    if (path === '/dashboard') {
+      return location.pathname === '/dashboard' || location.pathname === '/dashboard/';
+    }
     return location.pathname.startsWith(path);
   };
 
@@ -56,7 +55,10 @@ export default function MenuContent() {
               sx={{
                 borderRadius: 2,
                 '&.Mui-selected': {
-                  bgcolor: 'primary.soft', // Assumindo que seu tema tem cores soft, ou use alpha(primary, 0.1)
+                  bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+                  '&:hover': {
+                    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.15),
+                  },
                 }
               }}
             >
@@ -82,7 +84,12 @@ export default function MenuContent() {
               component={Link} 
               to={item.path}
               selected={isSelected(item.path)}
-              sx={{ borderRadius: 2 }}
+              sx={{ 
+                borderRadius: 2,
+                '&.Mui-selected': {
+                  bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+                }
+              }}
             >
               <ListItemIcon sx={{ color: isSelected(item.path) ? 'primary.main' : 'inherit' }}>
                 {item.icon}
@@ -91,7 +98,8 @@ export default function MenuContent() {
                 primary={item.text} 
                 primaryTypographyProps={{ 
                   fontSize: '0.85rem',
-                  fontWeight: isSelected(item.path) ? 'bold' : 'regular'
+                  fontWeight: isSelected(item.path) ? 'bold' : 'regular',
+                  color: isSelected(item.path) ? 'primary.main' : 'inherit'
                 }} 
               />
             </ListItemButton>
