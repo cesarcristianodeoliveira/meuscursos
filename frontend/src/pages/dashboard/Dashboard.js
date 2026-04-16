@@ -4,22 +4,29 @@ import { alpha } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 
+// Componentes de Layout
 import AppNavbar from './components/AppNavbar';
 import Header from './components/Header';
-import MainGrid from './components/MainGrid';
 import SideMenu from './components/SideMenu';
 
-// Esta é a página que vamos criar a seguir
+// Páginas
+import MainGrid from './components/MainGrid';
 import CreateCourse from './pages/CreateCourse'; 
 import CourseView from './pages/CourseView';
 import FinalExam from './pages/FinalExam';
 import MyCourses from './pages/MyCourses';
+import ExploreCourses from './pages/ExploreCourses'; // Nova página pública
+import UserProfile from './pages/UserProfile';       // Nova página de perfil
 
 export default function Dashboard() {
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+      {/* Menu Lateral Fixo em Desktop */}
       <SideMenu />
+      
+      {/* Navbar Superior para Mobile */}
       <AppNavbar />
+      
       <Box
         component="main"
         sx={(theme) => ({
@@ -28,39 +35,49 @@ export default function Dashboard() {
             ? `rgba(${theme.vars.palette.background.defaultChannel} / 1)`
             : alpha(theme.palette.background.default, 1),
           overflow: 'auto',
+          height: '100vh',
         })}
       >
         <Stack
           spacing={2}
           sx={{
             alignItems: 'center',
-            mx: 3,
+            mx: { xs: 2, md: 4 },
             pb: 5,
-            mt: { xs: 8, md: 0 },
+            mt: { xs: 10, md: 2 }, // Margem maior no mobile por causa da AppNavbar
           }}
         >
-          {/* O Header pode ser dinâmico ou fixo, dependendo se você quer que 
-              ele mude o título conforme a página */}
+          {/* O Header pode receber props se você quiser títulos dinâmicos */}
           <Header />
 
-          <Routes>
-            {/* Rota Raiz do Dashboard: Mostra as estatísticas e cursos recentes */}
-            <Route path="/" element={<MainGrid />} />
+          <Box sx={{ width: '100%', maxWidth: '1200px' }}>
+            <Routes>
+              {/* Home: Estatísticas e Cursos Recentes */}
+              <Route path="/" element={<MainGrid />} />
 
-              {/* Formulário de Geração de Curso */}
-              <Route path="/gerar" element={<CreateCourse />} />
+              {/* Biblioteca de Cursos (Pública) */}
+              <Route path="/explorar" element={<ExploreCourses />} />
 
-              {/* Visualização da Aula (v1.3) */}
-              <Route path="/curso/:slug" element={<CourseView />} />
-
-              {/* Exame Final de Certificação */}
-              <Route path="/curso/:slug/exame" element={<FinalExam />} />
-
-              {/* Rota para Listagem Geral (Opcional) */}
+              {/* Biblioteca Pessoal do Aluno */}
               <Route path="/meus-cursos" element={<MyCourses />} />
 
-            {/* Futuras rotas podem ser adicionadas aqui, ex: /perfil, /meus-cursos */}
-          </Routes>
+              {/* Inteligência Artificial: Gerador de Conteúdo */}
+              <Route path="/gerar" element={<CreateCourse />} />
+
+              {/* Player do Curso v1.3 */}
+              <Route path="/curso/:slug" element={<CourseView />} />
+
+              {/* Sistema de Avaliação Final */}
+              <Route path="/curso/:slug/exame" element={<FinalExam />} />
+
+              {/* Perfil: :id é opcional. Sem ID = Meu Perfil. Com ID = Perfil Público */}
+              <Route path="/perfil" element={<UserProfile />} />
+              <Route path="/perfil/:id" element={<UserProfile />} />
+              
+              {/* Rota de Fallback (Opcional) */}
+              <Route path="*" element={<MainGrid />} />
+            </Routes>
+          </Box>
         </Stack>
       </Box>
     </Box>

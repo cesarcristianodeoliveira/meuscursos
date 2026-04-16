@@ -8,7 +8,7 @@ const CourseContext = createContext();
 export const COURSES_PER_PAGE = 6;
 
 export const CourseProvider = ({ children }) => {
-  const { refreshUser } = useAuth(); // Usamos o refreshUser que criamos na revisão anterior
+  const { refreshUser, user } = useAuth(); 
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [stats, setStats] = useState({ courses: 0, lessons: 0, quizzes: 0, categories: 0 });
@@ -16,12 +16,11 @@ export const CourseProvider = ({ children }) => {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   /**
-   * 1. Busca categorias e números globais (Ajustado para Schema v1.3)
+   * 1. Busca categorias e números globais (Schema v1.3)
    */
   const fetchGlobalData = useCallback(async (force = false) => {
     if (initialDataLoaded && !force) return;
     try {
-      // Query otimizada para contar sub-itens na v1.3
       const query = `{
         "stats": {
           "courses": count(*[_type == "course"]),
@@ -48,7 +47,7 @@ export const CourseProvider = ({ children }) => {
   }, [fetchGlobalData]);
 
   /**
-   * 2. Gerador de Cursos (Chamada ao Backend + Refresh de Dados)
+   * 2. Gerador de Cursos (Integração v1.3)
    */
   const generateCourse = async (topic, level = 'iniciante') => {
     if (isGenerating) return;
@@ -62,15 +61,15 @@ export const CourseProvider = ({ children }) => {
         level 
       });
 
-      const { course, message } = response.data;
+      const { course } = response.data;
 
-      // 1. Atualizar as estatísticas globais (contador de cursos no dashboard)
-      await fetchGlobalData(true);
+      // Atualiza dados globais e créditos do usuário imediatamente
+      await Promise.all([
+        fetchGlobalData(true),
+        refreshUser()
+      ]);
 
-      // 2. Atualizar créditos e XP do usuário logado via AuthContext
-      await refreshUser();
-
-      setStatusMessage(message || 'Curso criado com sucesso!');
+      setStatusMessage('Curso criado com sucesso! Redirecionando...');
       return { success: true, slug: course.slug };
 
     } catch (error) {
@@ -78,7 +77,7 @@ export const CourseProvider = ({ children }) => {
       setStatusMessage(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
-      // Mantemos o feedback por 3 segundos antes de resetar o estado de geração
+      // Tempo para o usuário ler a mensagem de sucesso/erro
       setTimeout(() => {
         setIsGenerating(false);
         setStatusMessage('');
@@ -87,27 +86,36 @@ export const CourseProvider = ({ children }) => {
   };
 
   /**
-   * 3. Progresso do Aluno (Ajustado para Lessons v1.3)
+   * 3. Cálculo de Progresso (Híbrido: API + LocalStorage)
+   * Agora busca do banco se o usuário estiver logado.
    */
-  const getCourseProgress = useCallback((course) => {
-    if (!course || !course._id) return 0;
-    try {
-      const saved = localStorage.getItem(`progress-${course._id}`);
-      const completedSteps = saved ? JSON.parse(saved) : [];
-      
-      // Total de passos = Todas as lições de todos os módulos + Exame Final (se houver)
-      const totalLessons = course.modules?.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0) || 0;
-      const hasFinalExam = course.finalExam && course.finalExam.length > 0;
-      const totalSteps = totalLessons + (hasFinalExam ? 1 : 0);
+  const getCourseProgress = useCallback(async (courseId, modules) => {
+    if (!courseId) return 0;
+    
+    let completedIds = [];
 
-      if (totalSteps === 0) return 0;
-      
-      const percentage = (completedSteps.length / totalSteps) * 100;
-      return Math.min(Math.round(percentage), 100);
-    } catch (err) {
-      return 0;
+    // Tenta buscar progresso real da API se houver usuário
+    if (user?._id) {
+      try {
+        const res = await api.get(`/courses/${courseId}/progress`);
+        if (res.data.success) {
+          completedIds = res.data.completedLessons || [];
+        }
+      } catch (err) {
+        // Fallback para LocalStorage se a API falhar
+        const saved = localStorage.getItem(`progress-${courseId}`);
+        completedIds = saved ? JSON.parse(saved) : [];
+      }
     }
-  }, []);
+
+    // Calcula total de lições nos módulos v1.3
+    const totalLessons = modules?.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0) || 0;
+    
+    if (totalLessons === 0) return 0;
+
+    const percentage = (completedIds.length / totalLessons) * 100;
+    return Math.min(Math.round(percentage), 100);
+  }, [user?._id]);
 
   return (
     <CourseContext.Provider value={{ 
@@ -128,8 +136,6 @@ export const CourseProvider = ({ children }) => {
 
 export const useCourse = () => {
   const context = useContext(CourseContext);
-  if (!context) {
-    throw new Error('useCourse deve ser usado dentro de um CourseProvider');
-  }
+  if (!context) throw new Error('useCourse deve ser usado dentro de um CourseProvider');
   return context;
 };

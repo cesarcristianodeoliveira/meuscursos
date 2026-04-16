@@ -8,10 +8,14 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import { Link as RouterLink } from 'react-router-dom';
+
+// Componentes Internos
 import SelectContent from './SelectContent';
 import MenuContent from './MenuContent';
 import CardAlert from './CardAlert';
 import OptionsMenu from './OptionsMenu';
+
+// Contexto
 import { useAuth } from '../../../contexts/AuthContext';
 
 const drawerWidth = 240;
@@ -37,9 +41,12 @@ export default function SideMenu() {
         display: { xs: 'none', md: 'block' },
         [`& .${drawerClasses.paper}`]: {
           backgroundColor: 'background.paper',
+          borderRight: '1px solid',
+          borderColor: 'divider',
         },
       }}
     >
+      {/* LOGO / SELETOR DE ESPAÇO */}
       <Box
         sx={{
           display: 'flex',
@@ -49,7 +56,10 @@ export default function SideMenu() {
       >
         <SelectContent />
       </Box>
+      
       <Divider />
+
+      {/* NAVEGAÇÃO PRINCIPAL */}
       <Box
         sx={{
           overflow: 'auto',
@@ -59,10 +69,14 @@ export default function SideMenu() {
         }}
       >
         <MenuContent />
-        <CardAlert />
+        
+        {/* O CardAlert pode ser usado para avisos de créditos baixos ou promoções PRO */}
+        <Box sx={{ p: 2, mt: 'auto' }}>
+          <CardAlert />
+        </Box>
       </Box>
 
-      {/* ÁREA DE USUÁRIO / AUTENTICAÇÃO */}
+      {/* RODAPÉ: PERFIL OU LOGIN */}
       <Stack
         direction="row"
         sx={{
@@ -71,21 +85,48 @@ export default function SideMenu() {
           alignItems: 'center',
           borderTop: '1px solid',
           borderColor: 'divider',
+          bgcolor: 'background.default'
         }}
       >
         {signed ? (
           <>
             <Avatar
-              sizes="small"
               alt={user?.name}
-              src={user?.avatar || ""}
-              sx={{ width: 36, height: 36 }}
-            />
-            <Box sx={{ mr: 'auto' }}>
-              <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: '16px' }}>
+              src={user?.avatar}
+              sx={{ 
+                width: 36, 
+                height: 36, 
+                fontSize: '0.9rem', 
+                bgcolor: 'primary.main',
+                border: '1px solid',
+                borderColor: 'divider'
+              }}
+            >
+              {user?.name?.charAt(0)}
+            </Avatar>
+            <Box sx={{ mr: 'auto', overflow: 'hidden' }}>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  fontWeight: 600, 
+                  lineHeight: '16px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
                 {user?.name}
               </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  color: 'text.secondary',
+                  display: 'block',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
                 {user?.email}
               </Typography>
             </Box>
@@ -93,24 +134,31 @@ export default function SideMenu() {
           </>
         ) : (
           <Stack spacing={1} sx={{ width: '100%' }}>
-            <Button
-              component={RouterLink}
-              to="/login"
-              variant="outlined"
-              fullWidth
-              size="small"
-            >
-              Entrar
-            </Button>
-            <Button
-              component={RouterLink}
-              to="/signup"
-              variant="contained"
-              fullWidth
-              size="small"
-            >
-              Cadastrar
-            </Button>
+            <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center', mb: 0.5 }}>
+              Acesse sua conta para salvar progresso
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <Button
+                component={RouterLink}
+                to="/login"
+                variant="outlined"
+                fullWidth
+                size="small"
+                sx={{ textTransform: 'none', borderRadius: 2 }}
+              >
+                Entrar
+              </Button>
+              <Button
+                component={RouterLink}
+                to="/signup"
+                variant="contained"
+                fullWidth
+                size="small"
+                sx={{ textTransform: 'none', borderRadius: 2 }}
+              >
+                Criar
+              </Button>
+            </Stack>
           </Stack>
         )}
       </Stack>

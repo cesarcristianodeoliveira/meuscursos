@@ -22,16 +22,25 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, [setSession]);
 
-  // Função para normalizar o usuário e garantir que o _id exista
+  /**
+   * Função para normalizar o usuário e garantir que o _id exista.
+   * Usamos um novo objeto para garantir que o React dispare a atualização da UI.
+   */
   const handleUserResponse = useCallback((userData) => {
+    if (!userData) return null;
+    
     const normalizedUser = {
       ...userData,
-      _id: userData._id || userData.id // Garante compatibilidade com Sanity e Mongo
+      _id: userData._id || userData.id // Compatibilidade v1.3
     };
+    
     setUser(normalizedUser);
     return normalizedUser;
   }, []);
 
+  /**
+   * REFRESH USER: Busca dados frescos do servidor (Vital para reset de créditos)
+   */
   const refreshUser = useCallback(async () => {
     try {
       const response = await api.get('/auth/me');
@@ -40,6 +49,7 @@ export function AuthProvider({ children }) {
       }
     } catch (error) {
       console.error("Erro ao atualizar dados do usuário:", error);
+      // Se o token expirou ou é inválido, desloga
       if (error.response?.status === 401) {
         signOut();
       }
@@ -50,10 +60,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     async function loadStorageData() {
       const storageToken = localStorage.getItem('token');
+      
       if (storageToken) {
         setSession(storageToken);
+        // Ao carregar o app, busca os dados reais do banco (Resetando créditos se necessário)
         await refreshUser(); 
       }
+      
       setLoading(false);
     }
     loadStorageData();
@@ -98,7 +111,7 @@ export function AuthProvider({ children }) {
       value={{ 
         signed: !!user, 
         user, 
-        loading, 
+        authLoading: loading, // Nomeado para evitar conflito com loadings de páginas
         signIn, 
         signOut, 
         signUp,
