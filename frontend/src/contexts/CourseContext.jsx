@@ -16,11 +16,12 @@ export const CourseProvider = ({ children }) => {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   /**
-   * 1. Busca categorias e números globais (Schema v1.3)
+   * 1. Busca estatísticas e categorias (Otimizado v1.4)
    */
   const fetchGlobalData = useCallback(async (force = false) => {
     if (initialDataLoaded && !force) return;
     try {
+      // Query otimizada para contar sub-itens sem pesar o client
       const query = `{
         "stats": {
           "courses": count(*[_type == "course"]),
@@ -32,7 +33,9 @@ export const CourseProvider = ({ children }) => {
       }`;
 
       const data = await client.fetch(query);
-      const sortedCats = ['Recentes', ...(data.cats || []).sort()];
+      
+      // Filtra e ordena categorias, garantindo que 'Recentes' seja sempre a primeira
+      const sortedCats = ['Recentes', ...(data.cats || []).filter(c => c).sort()];
 
       setStats(data.stats);
       setCategories(sortedCats);
@@ -47,7 +50,7 @@ export const CourseProvider = ({ children }) => {
   }, [fetchGlobalData]);
 
   /**
-   * 2. Gerador de Cursos (Integração v1.3)
+   * 2. Gerador de Cursos
    */
   const generateCourse = async (topic, level = 'iniciante') => {
     if (isGenerating) return;
@@ -56,20 +59,16 @@ export const CourseProvider = ({ children }) => {
     setStatusMessage(`O Professor IA está estruturando suas aulas sobre: ${topic}...`);
 
     try {
-      const response = await api.post('/courses/generate', { 
-        topic, 
-        level 
-      });
-
+      const response = await api.post('/courses/generate', { topic, level });
       const { course } = response.data;
 
-      // Atualiza dados globais e créditos do usuário imediatamente
+      // Sincroniza dados globais e créditos do usuário
       await Promise.all([
         fetchGlobalData(true),
         refreshUser()
       ]);
 
-      setStatusMessage('Curso criado com sucesso! Redirecionando...');
+      setStatusMessage('Curso criado com sucesso!');
       return { success: true, slug: course.slug };
 
     } catch (error) {
@@ -77,7 +76,6 @@ export const CourseProvider = ({ children }) => {
       setStatusMessage(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
-      // Tempo para o usuário ler a mensagem de sucesso/erro
       setTimeout(() => {
         setIsGenerating(false);
         setStatusMessage('');
@@ -86,15 +84,14 @@ export const CourseProvider = ({ children }) => {
   };
 
   /**
-   * 3. Cálculo de Progresso (Híbrido: API + LocalStorage)
-   * Agora busca do banco se o usuário estiver logado.
+   * 3. Cálculo de Progresso (Híbrido)
+   * Integrado com a nova lógica de 'desmarcar' aula
    */
   const getCourseProgress = useCallback(async (courseId, modules) => {
-    if (!courseId) return 0;
+    if (!courseId || !modules) return 0;
     
     let completedIds = [];
 
-    // Tenta buscar progresso real da API se houver usuário
     if (user?._id) {
       try {
         const res = await api.get(`/courses/${courseId}/progress`);
@@ -102,15 +99,13 @@ export const CourseProvider = ({ children }) => {
           completedIds = res.data.completedLessons || [];
         }
       } catch (err) {
-        // Fallback para LocalStorage se a API falhar
+        // Fallback local se estiver offline ou erro de API
         const saved = localStorage.getItem(`progress-${courseId}`);
         completedIds = saved ? JSON.parse(saved) : [];
       }
     }
 
-    // Calcula total de lições nos módulos v1.3
-    const totalLessons = modules?.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0) || 0;
-    
+    const totalLessons = modules.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0);
     if (totalLessons === 0) return 0;
 
     const percentage = (completedIds.length / totalLessons) * 100;

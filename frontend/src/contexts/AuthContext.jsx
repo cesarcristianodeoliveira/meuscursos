@@ -7,9 +7,11 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Função para configurar ou limpar a sessão
   const setSession = useCallback((token) => {
     if (token) {
       localStorage.setItem('token', token);
+      // Atualiza o header para todas as futuras requisições
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
       localStorage.removeItem('token');
@@ -20,12 +22,16 @@ export function AuthProvider({ children }) {
   const signOut = useCallback(() => {
     setSession(null);
     setUser(null);
-    localStorage.clear(); // Limpeza completa por segurança
+    // Removemos apenas o token e dados de progresso local para não afetar 
+    // preferências globais se você tiver outras chaves no futuro
+    localStorage.removeItem('token');
+    // Opcional: localStorage.clear(); 
   }, [setSession]);
 
   const handleUserResponse = useCallback((userData) => {
     if (!userData) return null;
     
+    // Normalização robusta do ID para garantir compatibilidade com Sanity (_id) e SQL (id)
     const normalizedUser = {
       ...userData,
       _id: userData._id || userData.id 
@@ -42,31 +48,25 @@ export function AuthProvider({ children }) {
         return handleUserResponse(response.data.user);
       }
     } catch (error) {
-      console.error("Erro ao atualizar dados do usuário:", error);
+      // Se o token expirou ou é inválido, deslogamos o usuário
       if (error.response?.status === 401) {
         signOut();
       }
+      return null;
     }
-    return null;
   }, [signOut, handleUserResponse]);
 
+  // Carregamento inicial
   useEffect(() => {
     async function loadStorageData() {
-      try {
-        const storageToken = localStorage.getItem('token');
-        
-        if (storageToken) {
-          setSession(storageToken);
-          // Aguardamos a resposta do servidor antes de liberar o loading
-          // Isso evita que o App ache que o usuário é null enquanto a API carrega
-          await refreshUser(); 
-        }
-      } catch (error) {
-        console.error("Erro no carregamento inicial:", error);
-      } finally {
-        // Agora sim, com user preenchido ou erro tratado, liberamos a UI
-        setLoading(false);
+      const storageToken = localStorage.getItem('token');
+      
+      if (storageToken) {
+        setSession(storageToken);
+        await refreshUser(); 
       }
+      
+      setLoading(false);
     }
     loadStorageData();
   }, [setSession, refreshUser]);
@@ -74,9 +74,11 @@ export function AuthProvider({ children }) {
   const signIn = useCallback(async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
+      
       if (response.data.success) {
-        setSession(response.data.token);
-        handleUserResponse(response.data.user);
+        const { token, user: userData } = response.data;
+        setSession(token);
+        handleUserResponse(userData);
         return { success: true };
       }
       return { success: false, error: response.data.error || "Dados inválidos." };
@@ -91,9 +93,11 @@ export function AuthProvider({ children }) {
   const signUp = useCallback(async (name, email, password, newsletter) => {
     try {
       const response = await api.post('/auth/register', { name, email, password, newsletter });
+      
       if (response.data.success) {
-        setSession(response.data.token);
-        handleUserResponse(response.data.user);
+        const { token, user: userData } = response.data;
+        setSession(token);
+        handleUserResponse(userData);
         return { success: true };
       }
       return { success: false, error: response.data.error || "Erro ao criar conta." };
@@ -110,7 +114,7 @@ export function AuthProvider({ children }) {
       value={{ 
         signed: !!user, 
         user, 
-        authLoading: loading, // Mantido como solicitado
+        authLoading: loading, 
         signIn, 
         signOut, 
         signUp,

@@ -6,38 +6,55 @@ const { formatSlug } = require('../utils/formatter');
 const crypto = require('crypto');
 
 /**
- * CRIAÇÃO DE CURSO
+ * BUSCAR CURSO POR SLUG (Acesso Público)
+ */
+const getCourseBySlug = async (req, res) => {
+  const { slug } = req.params;
+  try {
+    // Busca os dados básicos do curso. Não retorna o conteúdo completo das aulas
+    // para incentivar o login/matrícula, ou retorna tudo se você desejar.
+    const query = `*[_type == "course" && slug.current == $slug][0]{
+      _id, title, description, level, category->{title}, 
+      thumbnail, tags, estimatedTime, xpReward,
+      modules[]{
+        _key, title,
+        lessons[]{ _key, title, duration }, // Omitimos 'content' por padrão na view pública
+        exercises[]{ _key, question, options }
+      }
+    }`;
+    
+    const course = await client.fetch(query, { slug });
+    
+    if (!course) return res.status(404).json({ error: "Curso não encontrado." });
+    
+    return res.status(200).json({ success: true, course });
+  } catch (error) {
+    console.error("Erro ao buscar curso por slug:", error);
+    return res.status(500).json({ error: "Erro interno no servidor." });
+  }
+};
+
+/**
+ * CRIAÇÃO DE CURSO (Otimizada v1.4)
  */
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
   const userId = req.userId; 
 
-  if (!topic) {
-    return res.status(400).json({ error: "O tema do curso é obrigatório." });
-  }
+  if (!topic) return res.status(400).json({ error: "O tema do curso é obrigatório." });
 
   try {
     const userQuota = await quotaService.checkUserQuota(userId);
-    if (!userQuota.canGenerate) {
-      return res.status(429).json({ error: userQuota.reason });
-    }
+    if (!userQuota.canGenerate) return res.status(429).json({ error: userQuota.reason });
 
-    const globalQuota = await quotaService.checkGlobalQuota();
-    if (!globalQuota.isOk) {
-      return res.status(503).json({ error: "Servidor de IA sobrecarregado." });
-    }
-
+    // 1. Geração de Conteúdo e Imagem com os novos campos
     const aiData = await aiService.generateCourseContent(topic, 'llama-3.3-70b-versatile', { level });
     const imageData = await imageService.fetchAndUploadImage(aiData);
 
     const categoryName = aiData.categoryName || 'Geral';
     const categorySlug = formatSlug(categoryName);
 
-    let category = await client.fetch(
-      `*[_type == "category" && slug.current == $slug][0]`, 
-      { slug: categorySlug }
-    );
-
+    let category = await client.fetch(`*[_type == "category" && slug.current == $slug][0]`, { slug: categorySlug });
     if (!category) {
       category = await client.create({
         _type: 'category',
@@ -49,6 +66,7 @@ const createCourse = async (req, res) => {
     const courseTitle = aiData.title;
     const finalSlug = `${formatSlug(courseTitle)}-${crypto.randomBytes(3).toString('hex')}`;
 
+    // 2. Montagem do Objeto (Alinhado com Schema v1.4)
     const newCourse = {
       _type: 'course',
       title: courseTitle,
@@ -61,6 +79,10 @@ const createCourse = async (req, res) => {
       xpReward: aiData.xpReward || 100,
       tags: aiData.tags || [],
       isPublished: true,
+      
+      // Novos campos de controle visual
+      externalImageId: imageData?.externalImageId || null,
+      imageSearchPrompt: aiData.imageSearchPrompt || null,
 
       modules: aiData.modules.map(module => ({
         _key: crypto.randomUUID(),
@@ -107,14 +129,7 @@ const createCourse = async (req, res) => {
     const result = await client.create(newCourse);
     await quotaService.consumeCredit(userId);
 
-    return res.status(201).json({
-      success: true,
-      course: {
-        _id: result._id,
-        slug: result.slug.current,
-        title: result.title
-      }
-    });
+    return res.status(201).json({ success: true, course: { _id: result._id, slug: result.slug.current, title: result.title } });
 
   } catch (error) {
     console.error("❌ Erro no CourseController:", error.message);
@@ -123,7 +138,7 @@ const createCourse = async (req, res) => {
 };
 
 /**
- * SALVAR PROGRESSO
+ * SALVAR PROGRESSO (Com suporte a desmarcar)
  */
 const saveProgress = async (req, res) => {
   const { id: courseId } = req.params;
@@ -135,14 +150,17 @@ const saveProgress = async (req, res) => {
     let enrollment = await client.fetch(enrollmentQuery, { userId, courseId });
 
     if (!enrollment) {
-      enrollment = await client.create({
-        _type: 'enrollment',
-        user: { _type: 'reference', _ref: userId },
-        course: { _type: 'reference', _ref: courseId },
-        completedLessons: completed ? [lessonId] : [],
-        status: 'em_andamento',
-        startDate: new Date().toISOString()
-      });
+      // Se não existe matrícula e o usuário está concluindo a primeira aula, cria a matrícula
+      if (completed) {
+        await client.create({
+          _type: 'enrollment',
+          user: { _ref: userId },
+          course: { _ref: courseId },
+          completedLessons: [lessonId],
+          status: 'em_andamento',
+          startDate: new Date().toISOString()
+        });
+      }
     } else {
       const lessons = enrollment.completedLessons || [];
       const updatedLessons = completed
@@ -158,7 +176,7 @@ const saveProgress = async (req, res) => {
     return res.status(200).json({ success: true });
   } catch (error) {
     console.error("Erro ao salvar progresso:", error);
-    return res.status(500).json({ error: "Erro interno ao salvar progresso." });
+    return res.status(500).json({ error: "Erro interno." });
   }
 };
 
@@ -168,38 +186,19 @@ const saveProgress = async (req, res) => {
 const getProgress = async (req, res) => {
   const { id: courseId } = req.params;
   const userId = req.userId;
-
   try {
     const enrollment = await client.fetch(
       `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]`,
       { userId, courseId }
     );
-
-    return res.status(200).json({
-      success: true,
-      completedLessons: enrollment ? enrollment.completedLessons : []
-    });
+    return res.status(200).json({ success: true, completedLessons: enrollment ? enrollment.completedLessons : [] });
   } catch (error) {
     return res.status(500).json({ error: "Erro ao buscar progresso." });
   }
 };
 
 /**
- * BUSCAR CURSOS DO USUÁRIO
- */
-const getUserCourses = async (req, res) => {
-  const userId = req.userId;
-  try {
-    const query = `*[_type == "course" && author._ref == $userId] | order(_createdAt desc)`;
-    const courses = await client.fetch(query, { userId });
-    return res.status(200).json({ success: true, courses });
-  } catch (error) {
-    return res.status(500).json({ error: "Erro ao buscar seus cursos." });
-  }
-};
-
-/**
- * BUSCAR CURSO POR ID (Detalhes)
+ * BUSCAR CURSO POR ID (Estudo Privado)
  */
 const getCourseById = async (req, res) => {
   const { id } = req.params;
@@ -208,14 +207,19 @@ const getCourseById = async (req, res) => {
     if (!course) return res.status(404).json({ error: "Curso não encontrado." });
     return res.status(200).json({ success: true, course });
   } catch (error) {
-    return res.status(500).json({ error: "Erro ao buscar detalhes do curso." });
+    return res.status(500).json({ error: "Erro ao buscar curso." });
   }
 };
 
-module.exports = { 
-  createCourse, 
-  saveProgress, 
-  getProgress, 
-  getUserCourses,
-  getCourseById 
+const getUserCourses = async (req, res) => {
+  const userId = req.userId;
+  try {
+    const query = `*[_type == "course" && author._ref == $userId] | order(_createdAt desc)`;
+    const courses = await client.fetch(query, { userId });
+    return res.status(200).json({ success: true, courses });
+  } catch (error) {
+    return res.status(500).json({ error: "Erro ao buscar cursos." });
+  }
 };
+
+module.exports = { createCourse, saveProgress, getProgress, getUserCourses, getCourseById, getCourseBySlug };

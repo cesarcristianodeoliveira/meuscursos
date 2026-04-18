@@ -30,7 +30,7 @@ export default {
       to: [{ type: 'category' }] 
     },
 
-    // Imagens
+    // --- SEÇÃO DE IMAGENS ATUALIZADA ---
     { 
       name: 'thumbnail', 
       title: 'Capa (Upload)', 
@@ -41,7 +41,13 @@ export default {
       name: 'externalImageId', 
       title: 'ID da Imagem Externa', 
       type: 'string',
-      description: 'URL ou ID da imagem gerada por IA'
+      description: 'ID retornado pelo Pixabay para controle de duplicatas'
+    },
+    {
+      name: 'imageSearchPrompt',
+      title: 'Prompt Visual da IA',
+      type: 'string',
+      description: 'O prompt em inglês gerado pela IA para busca da capa'
     },
 
     { name: 'description', title: 'Descrição Curta', type: 'text', rows: 3 },
@@ -66,14 +72,14 @@ export default {
     { name: 'tags', title: 'Tags', type: 'array', of: [{ type: 'string' }] },
     { name: 'isPublished', title: 'Publicado', type: 'boolean', initialValue: true },
 
-    // CONTEÚDO ESTRUTURADO (v1.3 Otimizado)
+    // CONTEÚDO ESTRUTURADO
     {
       name: 'modules',
       title: 'Módulos do Curso',
       type: 'array',
       of: [{
         type: 'object',
-        name: 'courseModule', // Nome único para evitar conflitos de chaves
+        name: 'courseModule',
         fields: [
           { name: 'title', title: 'Título do Módulo', type: 'string' },
           {
@@ -82,7 +88,7 @@ export default {
             type: 'array',
             of: [{
               type: 'object',
-              name: 'lesson', // Definir o 'name' ajuda o Sanity a gerenciar chaves
+              name: 'lesson',
               fields: [
                 { name: 'title', title: 'Título da Aula', type: 'string' },
                 { name: 'content', title: 'Conteúdo (Markdown)', type: 'text' },
@@ -96,7 +102,7 @@ export default {
             type: 'array',
             of: [{
               type: 'object',
-              name: 'exercise', // Definir o 'name' ajuda o Sanity a gerenciar chaves
+              name: 'exercise',
               fields: [
                 { name: 'question', title: 'Pergunta', type: 'string' },
                 { name: 'options', title: 'Opções', type: 'array', of: [{ type: 'string' }] },
@@ -114,7 +120,7 @@ export default {
       type: 'array',
       of: [{
         type: 'object',
-        name: 'examQuestion', // Nome único
+        name: 'examQuestion',
         fields: [
           { name: 'question', title: 'Pergunta', type: 'string' },
           { name: 'options', title: 'Opções', type: 'array', of: [{ type: 'string' }] },

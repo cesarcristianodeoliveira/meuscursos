@@ -2,8 +2,8 @@ const axios = require('axios');
 const client = require('../config/sanity');
 
 /**
- * SERVIÇO DE IMAGENS (ImageService) v1.3
- * Busca capas no Pixabay, evita duplicatas e faz o upload para o Sanity Assets.
+ * SERVIÇO DE IMAGENS (ImageService) v1.4
+ * Prioriza o prompt visual da IA e garante compatibilidade com o Sanity Assets.
  */
 
 const fetchAndUploadImage = async (courseData) => {
@@ -14,52 +14,50 @@ const fetchAndUploadImage = async (courseData) => {
       return null;
     }
 
-    // 1. Refino da Query (Otimização para o Pixabay)
-    // Filtramos termos que poluem a busca visual e focamos no assunto real.
-    const forbiddenTerms = /curso|aula|online|educação|aprendizado|estudo|dicas|como|course|lesson|education|learning|study|tips|how to|gera|gerado/gi;
+    // 1. Refino da Query: Prioridade máxima para o prompt visual da IA (imageSearchPrompt)
+    // Se a IA não gerou, usamos categoria + título como fallback
+    let cleanQuery = "";
+    
+    if (courseData.imageSearchPrompt) {
+      // Limpa termos técnicos que o Pixabay não entende bem
+      cleanQuery = courseData.imageSearchPrompt
+        .replace(/photographic|minimalist|professional|highly/gi, '')
+        .trim();
+    } else {
+      const forbiddenTerms = /curso|aula|online|educação|aprendizado|estudo|dicas|course|lesson|education|learning/gi;
+      cleanQuery = `${courseData.categoryName || ''} ${courseData.title || ''}`
+        .replace(forbiddenTerms, '')
+        .replace(/[:.;?!#]/g, '')
+        .trim();
+    }
 
-    let queryParts = [
-      courseData.categoryName,
-      courseData.title,
-      courseData.tags?.[0]
-    ].filter(part => typeof part === 'string' && part.length > 0);
+    // Limitamos a 4 palavras para não confundir o motor de busca do Pixabay
+    const finalQuery = cleanQuery.split(/\s+/).slice(0, 4).join(' ');
 
-    let cleanQuery = queryParts
-      .join(' ')
-      .replace(/[:.;?!#]/g, '') // Remove pontuação
-      .replace(forbiddenTerms, '') // Remove palavras genéricas
-      .trim()
-      .split(/\s+/)
-      .slice(0, 3) // Mantém apenas as 3 palavras mais relevantes (evita queries longas demais)
-      .join(' ');
-
-    console.log(`📸 Buscando imagem no Pixabay para: "${cleanQuery}"`);
+    console.log(`📸 Buscando imagem no Pixabay para: "${finalQuery}"`);
 
     const baseUrl = `https://pixabay.com/api/?key=${apiKey}`;
-    const searchParams = `&q=${encodeURIComponent(cleanQuery)}&image_type=photo&orientation=horizontal&safesearch=true&per_page=15&lang=pt`;
+    // Usamos lang=en pois o prompt da IA agora vem em inglês (melhor precisão)
+    const searchParams = `&q=${encodeURIComponent(finalQuery)}&image_type=photo&orientation=horizontal&safesearch=true&per_page=10&lang=en`;
 
     // 2. Execução da Busca Principal
     let response = await axios.get(baseUrl + searchParams, { timeout: 8000 });
     let hits = response.data.hits || [];
 
-    // 3. Fallback: Se não achou nada, tenta apenas a Categoria (ou 'tecnologia' como última instância)
+    // 3. Fallback: Se não achou nada com o prompt da IA, tenta a Categoria em Português
     if (hits.length === 0) {
+      console.log(`⚠️ Sem resultados para o prompt específico. Tentando categoria...`);
       const fallbackTerm = courseData.categoryName || 'tecnologia';
-      console.log(`⚠️ Sem resultados para "${cleanQuery}". Tentando fallback por: "${fallbackTerm}"`);
       const fallbackUrl = `${baseUrl}&q=${encodeURIComponent(fallbackTerm)}&image_type=photo&orientation=horizontal&per_page=5&lang=pt`;
       const fallbackRes = await axios.get(fallbackUrl);
       hits = fallbackRes.data.hits || [];
     }
 
-    if (hits.length === 0) {
-      console.warn("⚠️ Nenhuma imagem encontrada no Pixabay.");
-      return null;
-    }
+    if (hits.length === 0) return null;
 
     // 4. Verificação de Ineditismo (Deduplicação)
     let selectedImage = null;
     for (const hit of hits) {
-      // Verifica se este ID do Pixabay já foi usado
       const alreadyUsed = await client.fetch(
         `count(*[_type == "course" && externalImageId == $id])`, 
         { id: String(hit.id) }
@@ -71,35 +69,25 @@ const fetchAndUploadImage = async (courseData) => {
       }
     }
 
-    // Se todas as imagens da página já foram usadas, pegamos a primeira do resultado
     selectedImage = selectedImage || hits[0];
 
-    // 5. Download da Imagem Selecionada
+    // 5. Download e Upload
     const imageUrl = selectedImage.largeImageURL || selectedImage.webformatURL;
-    
-    const imageRes = await axios.get(imageUrl, { 
-      responseType: 'arraybuffer',
-      timeout: 15000 
-    });
-
+    const imageRes = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 15000 });
     const buffer = Buffer.from(imageRes.data);
 
-    // 6. Upload para o Sanity Assets
     const asset = await client.assets.upload('image', buffer, {
       filename: `pixabay-${selectedImage.id}.jpg`,
       contentType: 'image/jpeg',
-      label: `Capa: ${courseData.title}`,
-      title: courseData.title,
-      description: `Imagem via Pixabay ID: ${selectedImage.id}`
+      label: `Capa: ${courseData.title}`
     });
 
     return {
-      assetId: asset._id, // _id do asset no Sanity
-      externalImageId: String(selectedImage.id) // Salvo para controle de duplicatas
+      assetId: asset._id,
+      externalImageId: String(selectedImage.id)
     };
 
   } catch (error) {
-    // Erro silencioso: se a imagem falhar, o curso continua sem capa (melhor que quebrar tudo)
     console.error("❌ Erro no ImageService:", error.message);
     return null;
   }

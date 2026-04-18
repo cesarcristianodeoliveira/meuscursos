@@ -3,11 +3,50 @@ export default {
   title: 'Matrículas e Progresso',
   type: 'document',
   fields: [
-    { name: 'student', title: 'Aluno', type: 'reference', to: [{ type: 'user' }] },
-    { name: 'course', title: 'Curso', type: 'reference', to: [{ type: 'course' }] },
-    { name: 'enrolledAt', title: 'Data da Matrícula', type: 'datetime', initialValue: (new Date()).toISOString() },
-    { name: 'completedModules', title: 'Módulos Concluídos', type: 'array', of: [{ type: 'string' }] },
-    { name: 'isCompleted', title: 'Curso Finalizado', type: 'boolean', initialValue: false },
-    { name: 'finalScore', title: 'Nota no Exame', type: 'number' }
+    { 
+      name: 'user',
+      title: 'Usuário', 
+      type: 'reference', 
+      to: [{ type: 'user' }] 
+    },
+    { 
+      name: 'course', 
+      title: 'Curso', 
+      type: 'reference', 
+      to: [{ type: 'course' }] 
+    },
+    { 
+      name: 'completedLessons',
+      title: 'Aulas Concluídas', 
+      type: 'array', 
+      of: [{ type: 'string' }] 
+    },
+    { 
+      name: 'status',
+      title: 'Status', 
+      type: 'string',
+      options: {
+        list: [
+          { title: 'Em Andamento', value: 'em_andamento' },
+          { title: 'Concluído', value: 'concluido' }
+        ]
+      },
+      initialValue: 'em_andamento'
+    },
+    { 
+      name: 'startDate',
+      title: 'Data de Início', 
+      type: 'datetime' 
+    },
+    { 
+      name: 'finalScore', 
+      title: 'Nota no Exame', 
+      type: 'number' 
+    },
+    {
+      name: 'completionDate',
+      title: 'Data de Conclusão',
+      type: 'datetime'
+    }
   ]
 }

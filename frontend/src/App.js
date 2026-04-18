@@ -16,25 +16,15 @@ import MarketingPage from './pages/marketing-page/MarketingPage';
 import Dashboard from './pages/dashboard/Dashboard';
 import SignIn from './pages/sign-in/SignIn';
 import SignUp from './pages/sign-up/SignUp';
+import CourseView from './pages/dashboard/pages/CourseView'; // Importado para rota híbrida
 
-/**
- * Tela de carregamento persistente.
- * Agora ela herda background.default corretamente do AppTheme.
- */
 function LoadingScreen() {
   return (
     <Box 
       sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        minHeight: '100vh', 
-        width: '100vw',
-        bgcolor: 'background.default', // Crucial para não piscar branco no Dark Mode
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        zIndex: 9999
+        display: 'flex', justifyContent: 'center', alignItems: 'center', 
+        minHeight: '100vh', width: '100vw', bgcolor: 'background.default',
+        position: 'fixed', top: 0, left: 0, zIndex: 9999
       }}
     >
       <CircularProgress />
@@ -42,25 +32,15 @@ function LoadingScreen() {
   );
 }
 
-/**
- * Componente de Proteção de Rota
- */
 function PrivateRoute({ children }) {
   const { signed, authLoading } = useAuth();
-
   if (authLoading) return <LoadingScreen />;
-  
   return signed ? children : <Navigate to="/entrar" replace />;
 }
 
-/**
- * Componente da Rota Raiz
- */
 function RootRoute() {
   const { signed, authLoading } = useAuth();
-
   if (authLoading) return <LoadingScreen />;
-
   return signed ? <Navigate to="/dashboard" replace /> : <MarketingPage />;
 }
 
@@ -68,24 +48,24 @@ export default function App(props) {
   return (
     <AuthProvider>
       <CourseProvider>
-        {/* O AppTheme envolve tudo o que renderiza UI, inclusive as rotas */}
         <AppTheme {...props}>
-          {/* CssBaseline aplica o reset de CSS e a cor de fundo do tema no body */}
           <CssBaseline enableColorScheme />
           
           <BrowserRouter>
             <Routes>
-              {/* Rota Raiz: Inteligente para Marketing ou Dashboard */}
+              {/* 1. Rota Raiz Inteligente */}
               <Route path="/" element={<RootRoute />} />
               
-              {/* Rotas de Autenticação */}
+              {/* 2. Autenticação */}
               <Route path="/entrar" element={<SignIn />} />
               <Route path="/cadastrar" element={<SignUp />} />
 
-              {/* Dashboard Protegido: 
-                  Usamos o sufixo "/*" para permitir que o roteamento interno 
-                  do componente Dashboard funcione corretamente.
-              */}
+              {/* 3. ROTA HÍBRIDA (Pública/Privada)
+                  Esta é a chave! Permitimos acessar o curso pelo slug.
+                  O componente CourseView agora lida com 'user' logado ou não. */}
+              <Route path="/curso/:slug" element={<CourseView />} />
+
+              {/* 4. Dashboard (Área do Aluno e Gerador) */}
               <Route 
                 path="/dashboard/*" 
                 element={
@@ -95,7 +75,7 @@ export default function App(props) {
                 } 
               />
 
-              {/* Redirecionamento de segurança para qualquer rota não definida */}
+              {/* Redirecionamento de segurança */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
