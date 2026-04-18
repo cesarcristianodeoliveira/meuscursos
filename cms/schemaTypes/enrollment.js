@@ -7,19 +7,22 @@ export default {
       name: 'user',
       title: 'Usuário', 
       type: 'reference', 
-      to: [{ type: 'user' }] 
+      to: [{ type: 'user' }],
+      validation: Rule => Rule.required()
     },
     { 
       name: 'course', 
       title: 'Curso', 
       type: 'reference', 
-      to: [{ type: 'course' }] 
+      to: [{ type: 'course' }],
+      validation: Rule => Rule.required()
     },
     { 
       name: 'completedLessons',
       title: 'Aulas Concluídas', 
       type: 'array', 
-      of: [{ type: 'string' }] 
+      of: [{ type: 'string' }],
+      description: 'Armazena os _keys das aulas terminadas'
     },
     { 
       name: 'status',
@@ -36,7 +39,8 @@ export default {
     { 
       name: 'startDate',
       title: 'Data de Início', 
-      type: 'datetime' 
+      type: 'datetime',
+      initialValue: (new Date()).toISOString()
     },
     { 
       name: 'finalScore', 
@@ -48,5 +52,19 @@ export default {
       title: 'Data de Conclusão',
       type: 'datetime'
     }
-  ]
+  ],
+  preview: {
+    select: {
+      userTitle: 'user.name',
+      userEmail: 'user.email',
+      courseTitle: 'course.title',
+      completedCount: 'completedLessons.length'
+    },
+    prepare({ userTitle, userEmail, courseTitle, completedCount }) {
+      return {
+        title: `${userTitle || 'Usuário'} -> ${courseTitle || 'Sem Curso'}`,
+        subtitle: `${userEmail} | ${completedCount || 0} aulas concluídas`,
+      };
+    }
+  }
 }
