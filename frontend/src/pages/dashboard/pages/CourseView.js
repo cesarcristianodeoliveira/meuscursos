@@ -5,12 +5,11 @@ import { client } from '../../../client';
 import api from '../../../services/api'; 
 import { useAuth } from '../../../contexts/AuthContext';
 import { 
-  Box, Typography, Stack, Card, 
+  Box, Typography, Stack, Card, Grid,
   List, ListItem, ListItemButton, ListItemIcon, ListItemText,
   Divider, Button, CircularProgress, Chip, Accordion, 
   AccordionSummary, AccordionDetails, Alert, Radio, RadioGroup, FormControlLabel, FormControl
 } from '@mui/material';
-import Grid from '@mui/material/Grid2'; // Usando o novo Grid v2/v6
 import { styled } from '@mui/material/styles';
 
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -50,7 +49,6 @@ const ModuleQuiz = ({ rawQuestions, onComplete }) => {
   const [submitted, setSubmitted] = React.useState(false);
   const [score, setScore] = React.useState(0);
 
-  // Embaralha ao carregar ou ao clicar em refazer
   const initQuiz = React.useCallback(() => {
     const shuffled = shuffleArray(rawQuestions).map(q => ({
       ...q,
@@ -110,7 +108,7 @@ const ModuleQuiz = ({ rawQuestions, onComplete }) => {
             {isWin ? "Incrível! Você dominou este módulo." : `Você acertou ${score} de ${questions.length}. Tente novamente para atingir 100%!`}
           </Alert>
           {!isWin && (
-            <Button startIcon={<ReplayIcon />} variant="outlined" onClick={initQuiz}>
+            <Button startIcon={<ReplayIcon />} variant="outlined" onClick={initQuiz} sx={{ alignSelf: 'start' }}>
               Refazer e Embaralhar Questões
             </Button>
           )}
@@ -181,7 +179,8 @@ export default function CourseView() {
   return (
     <Box sx={{ flexGrow: 1, mt: -2 }}>
       <Grid container>
-        <Grid size={{ xs: 12, md: 4, lg: 3 }}>
+        {/* Sidebar - Grid v1 */}
+        <Grid item xs={12} md={4} lg={3}>
           <SidebarContainer>
             <Box sx={{ p: 2 }}>
               <Typography variant="h6" fontWeight="bold">{course.title}</Typography>
@@ -217,7 +216,7 @@ export default function CourseView() {
                       {module.exercises?.length > 0 && (
                         <ListItem disablePadding>
                           <ListItemButton 
-                            disabled={!isModuleComplete && !!user} // Bloqueia se não completou aulas
+                            disabled={!isModuleComplete && !!user}
                             selected={activeQuiz === module._key}
                             onClick={() => { setActiveQuiz(module._key); setActiveLesson(null); }}
                             sx={{ bgcolor: isModuleComplete ? 'action.hover' : 'transparent' }}
@@ -241,7 +240,8 @@ export default function CourseView() {
           </SidebarContainer>
         </Grid>
 
-        <Grid size={{ xs: 12, md: 8, lg: 9 }}>
+        {/* Conteúdo Principal - Grid v1 */}
+        <Grid item xs={12} md={8} lg={9}>
           <ContentContainer>
             {activeQuiz ? (
               <ModuleQuiz 
@@ -273,7 +273,9 @@ export default function CourseView() {
                   </Card>
                 )}
               </Stack>
-            ) : null}
+            ) : (
+               <Typography variant="h5" color="text.secondary" textAlign="center" mt={10}>Selecione uma aula.</Typography>
+            )}
           </ContentContainer>
         </Grid>
       </Grid>
