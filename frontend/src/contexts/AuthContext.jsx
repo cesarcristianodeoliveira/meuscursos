@@ -7,11 +7,23 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Função para configurar ou limpar a sessão
+  // Normalização robusta do usuário para garantir que o _id do Sanity esteja sempre presente
+  const handleUserResponse = useCallback((userData) => {
+    if (!userData) return null;
+    
+    const normalizedUser = {
+      ...userData,
+      _id: userData._id || userData.id 
+    };
+    
+    setUser(normalizedUser);
+    return normalizedUser;
+  }, []);
+
+  // Função para configurar ou limpar a sessão e os headers da API
   const setSession = useCallback((token) => {
     if (token) {
       localStorage.setItem('token', token);
-      // Atualiza o header para todas as futuras requisições
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
       localStorage.removeItem('token');
@@ -22,24 +34,9 @@ export function AuthProvider({ children }) {
   const signOut = useCallback(() => {
     setSession(null);
     setUser(null);
-    // Removemos apenas o token e dados de progresso local para não afetar 
-    // preferências globais se você tiver outras chaves no futuro
-    localStorage.removeItem('token');
-    // Opcional: localStorage.clear(); 
+    // Limpamos possíveis estados residuais no localStorage se necessário
+    // localStorage.clear(); // Use com cautela se tiver outras preferências salvas
   }, [setSession]);
-
-  const handleUserResponse = useCallback((userData) => {
-    if (!userData) return null;
-    
-    // Normalização robusta do ID para garantir compatibilidade com Sanity (_id) e SQL (id)
-    const normalizedUser = {
-      ...userData,
-      _id: userData._id || userData.id 
-    };
-    
-    setUser(normalizedUser);
-    return normalizedUser;
-  }, []);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -48,7 +45,6 @@ export function AuthProvider({ children }) {
         return handleUserResponse(response.data.user);
       }
     } catch (error) {
-      // Se o token expirou ou é inválido, deslogamos o usuário
       if (error.response?.status === 401) {
         signOut();
       }
@@ -56,7 +52,23 @@ export function AuthProvider({ children }) {
     }
   }, [signOut, handleUserResponse]);
 
-  // Carregamento inicial
+  // CONFIGURAÇÃO DOS INTERCEPTORES (O "Pulo do Gato")
+  // Isso garante que se qualquer requisição no app der 401, o AuthContext deslogue o usuário na hora
+  useEffect(() => {
+    const interceptor = api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          signOut();
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => api.interceptors.response.eject(interceptor);
+  }, [signOut]);
+
+  // Carregamento inicial do estado de autenticação
   useEffect(() => {
     async function loadStorageData() {
       const storageToken = localStorage.getItem('token');

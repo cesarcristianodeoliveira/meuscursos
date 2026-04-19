@@ -18,21 +18,26 @@ import QuizIcon from '@mui/icons-material/Quiz';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LockIcon from '@mui/icons-material/Lock';
 import ReplayIcon from '@mui/icons-material/Replay';
+import VerifiedIcon from '@mui/icons-material/Verified';
+import MenuBook from '@mui/icons-material/MenuBook';
 
 const SidebarContainer = styled(Box)(({ theme }) => ({
   borderRight: `1px solid ${theme.palette.divider}`,
-  height: 'calc(100vh - 100px)',
+  height: 'calc(100vh - 64px)', // Ajustado para altura da Toolbar padrão
   overflowY: 'auto',
   backgroundColor: theme.palette.background.paper,
+  position: 'sticky',
+  top: 64,
 }));
 
 const ContentContainer = styled(Box)(({ theme }) => ({
-  height: 'calc(100vh - 100px)',
-  overflowY: 'auto',
+  minHeight: 'calc(100vh - 64px)',
   padding: theme.spacing(4),
+  backgroundColor: theme.palette.background.default,
 }));
 
 const shuffleArray = (array) => {
+  if (!array || array.length === 0) return [];
   const newArr = [...array];
   for (let i = newArr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -41,16 +46,17 @@ const shuffleArray = (array) => {
   return newArr;
 };
 
-const ModuleQuiz = ({ rawQuestions, onComplete, isSaving }) => {
+const ModuleQuiz = ({ rawQuestions = [], onComplete, isSaving, title = "Desafio" }) => {
   const [questions, setQuestions] = React.useState([]);
   const [answers, setAnswers] = React.useState({});
   const [submitted, setSubmitted] = React.useState(false);
   const [score, setScore] = React.useState(0);
 
   const initQuiz = React.useCallback(() => {
+    if (!rawQuestions) return;
     const shuffled = shuffleArray(rawQuestions).map(q => ({
       ...q,
-      shuffledOptions: shuffleArray(q.options)
+      shuffledOptions: shuffleArray(q.options || [])
     }));
     setQuestions(shuffled);
     setAnswers({});
@@ -70,26 +76,41 @@ const ModuleQuiz = ({ rawQuestions, onComplete, isSaving }) => {
     if (onComplete) onComplete(currentScore, questions.length);
   };
 
+  if (!rawQuestions || rawQuestions.length === 0) {
+    return <Alert severity="info">Este módulo não possui questões.</Alert>;
+  }
+
   const isWin = score === questions.length;
 
   return (
-    <Stack spacing={4}>
-      <Typography variant="h5" fontWeight="bold">Desafio do Módulo</Typography>
+    <Stack spacing={4} sx={{ maxWidth: 800, mx: 'auto' }}>
+      <Typography variant="h5" fontWeight="bold" color="primary">{title}</Typography>
       
       {questions.map((q, idx) => (
         <Card key={idx} variant="outlined" sx={{ 
-          p: 2, 
-          bgcolor: submitted ? (answers[idx] === q.correctAnswer ? 'success.light' : 'error.light') : 'transparent',
-          opacity: submitted && !isWin ? 0.8 : 1
+          p: 3, 
+          transition: '0.3s',
+          borderLeft: submitted ? 6 : 1,
+          borderLeftColor: submitted ? (answers[idx] === q.correctAnswer ? 'success.main' : 'error.main') : 'divider',
         }}>
           <Typography fontWeight="bold" sx={{ mb: 2 }}>{idx + 1}. {q.question}</Typography>
-          <FormControl component="fieldset">
+          <FormControl component="fieldset" sx={{ width: '100%' }}>
             <RadioGroup 
               value={answers[idx] || ''} 
               onChange={(e) => setAnswers({...answers, [idx]: e.target.value})}
             >
               {q.shuffledOptions.map((opt, oIdx) => (
-                <FormControlLabel key={oIdx} value={opt} control={<Radio disabled={submitted} />} label={opt} />
+                <FormControlLabel 
+                  key={oIdx} 
+                  value={opt} 
+                  control={<Radio disabled={submitted} />} 
+                  label={opt} 
+                  sx={{ 
+                    borderRadius: 1,
+                    mb: 1,
+                    '&:hover': { bgcolor: submitted ? 'transparent' : 'action.hover' }
+                  }}
+                />
               ))}
             </RadioGroup>
           </FormControl>
@@ -103,16 +124,16 @@ const ModuleQuiz = ({ rawQuestions, onComplete, isSaving }) => {
           size="large" 
           disabled={Object.keys(answers).length < questions.length || isSaving}
         >
-          {isSaving ? "Salvando..." : "Finalizar e Corrigir"}
+          {isSaving ? "Processando..." : "Enviar Respostas"}
         </Button>
       ) : (
         <Stack spacing={2}>
-          <Alert severity={isWin ? "success" : "warning"}>
-            {isWin ? "Incrível! Você dominou este módulo e seu progresso foi salvo." : `Você acertou ${score} de ${questions.length}. Tente novamente para atingir 100%!`}
+          <Alert severity={isWin ? "success" : "warning"} variant="filled">
+            {isWin ? "Incrível! Você dominou este assunto." : `Você acertou ${score} de ${questions.length} questões.`}
           </Alert>
           {!isWin && (
             <Button startIcon={<ReplayIcon />} variant="outlined" onClick={initQuiz} sx={{ alignSelf: 'start' }}>
-              Refazer e Embaralhar Questões
+              Tentar Novamente
             </Button>
           )}
         </Stack>
@@ -132,6 +153,7 @@ export default function CourseView() {
   const [activeQuiz, setActiveQuiz] = React.useState(null);
   const [completedLessons, setCompletedLessons] = React.useState([]);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [courseStatus, setCourseStatus] = React.useState('em_andamento');
 
   React.useEffect(() => {
     const fetchCourseData = async () => {
@@ -142,7 +164,8 @@ export default function CourseView() {
             _key, title,
             lessons[]{ _key, title, content, duration },
             exercises[]{ _key, question, options, correctAnswer }
-          }
+          },
+          finalExam[]{ _key, question, options, correctAnswer }
         }`;
         const data = await client.fetch(query, { slug });
 
@@ -152,7 +175,10 @@ export default function CourseView() {
 
           if (user?._id) {
             const res = await api.get(`/courses/${data._id}/progress`);
-            if (res.data.success) setCompletedLessons(res.data.completedLessons || []);
+            if (res.data.success) {
+              setCompletedLessons(res.data.completedLessons || []);
+              setCourseStatus(res.data.status);
+            }
           }
         }
         setLoading(false);
@@ -178,52 +204,68 @@ export default function CourseView() {
   };
 
   const handleQuizComplete = async (score, total) => {
-    if (!user || score !== total) return; // Só salvamos persistente se fechar 100%
-
-    setIsSaving(true);
-    try {
-      await api.post(`/courses/${course._id}/quiz-result`, {
-        score: score,
-        totalQuestions: total,
-        status: 'em_andamento' 
-      });
-    } catch (err) {
-      console.error("Erro ao salvar resultado do quiz no servidor", err);
-    } finally {
-      setIsSaving(false);
+    if (!user) return;
+    const isFinal = activeQuiz === 'final';
+    
+    if (score === total || isFinal) {
+      setIsSaving(true);
+      try {
+        const res = await api.post(`/courses/${course._id}/quiz-result`, {
+          score,
+          totalQuestions: total,
+          isFinalExam: isFinal
+        });
+        if (res.data.status === 'concluido') setCourseStatus('concluido');
+      } catch (err) {
+        console.error("Erro ao salvar resultado");
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
-  if (loading || authLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}><CircularProgress /></Box>;
+  if (loading || authLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress /></Box>;
   if (!course) return <Typography sx={{ p: 4 }}>Curso não encontrado.</Typography>;
 
+  const allLessonsCount = course.modules?.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0);
+  const isAllLessonsDone = completedLessons.length >= allLessonsCount && allLessonsCount > 0;
+
   return (
-    <Box sx={{ flexGrow: 1, mt: -2 }}>
+    <Box sx={{ flexGrow: 1 }}>
       <Grid container>
+        {/* SIDEBAR */}
         <Grid item xs={12} md={4} lg={3}>
           <SidebarContainer>
-            <Box sx={{ p: 2 }}>
-              <Typography variant="h6" fontWeight="bold">{course.title}</Typography>
-              <Chip label={course.level} size="small" color="primary" sx={{ mt: 1 }} />
+            <Box sx={{ p: 3 }}>
+              <Typography variant="h6" fontWeight="bold" gutterBottom>{course.title}</Typography>
+              <Stack direction="row" spacing={1}>
+                <Chip label={course.level} size="small" variant="outlined" />
+                {courseStatus === 'concluido' && (
+                  <Chip icon={<VerifiedIcon />} label="Certificado" color="success" size="small" />
+                )}
+              </Stack>
             </Box>
             <Divider />
 
             {course.modules?.map((module, mIdx) => {
-              const allLessonsInModule = module.lessons?.map(l => l._key) || [];
-              const isModuleComplete = allLessonsInModule.every(id => completedLessons.includes(id));
+              const moduleLessons = module.lessons || [];
+              const completedInModule = moduleLessons.filter(l => completedLessons.includes(l._key)).length;
 
               return (
-                <Accordion key={module._key || mIdx} defaultExpanded={mIdx === 0} elevation={0} square>
+                <Accordion key={module._key} defaultExpanded={mIdx === 0} elevation={0} square>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography fontWeight="bold" variant="body2">{mIdx + 1}. {module.title}</Typography>
+                    <Box>
+                       <Typography fontWeight="bold" variant="body2">{module.title}</Typography>
+                       <Typography variant="caption" color="text.secondary">{completedInModule}/{moduleLessons.length} aulas</Typography>
+                    </Box>
                   </AccordionSummary>
                   <AccordionDetails sx={{ p: 0 }}>
                     <List disablePadding>
-                      {module.lessons?.map((lesson) => (
+                      {moduleLessons.map((lesson) => (
                         <ListItem key={lesson._key} disablePadding>
                           <ListItemButton 
                             selected={activeLesson?._key === lesson._key && !activeQuiz}
-                            onClick={() => { setActiveLesson(lesson); setActiveQuiz(null); }}
+                            onClick={() => { setActiveLesson(lesson); setActiveQuiz(null); window.scrollTo(0,0); }}
                           >
                             <ListItemIcon sx={{ minWidth: 32 }}>
                               {completedLessons.includes(lesson._key) ? <CheckCircleIcon color="success" fontSize="small" /> : <RadioButtonUncheckedIcon fontSize="small" />}
@@ -236,19 +278,14 @@ export default function CourseView() {
                       {module.exercises?.length > 0 && (
                         <ListItem disablePadding>
                           <ListItemButton 
-                            disabled={!isModuleComplete && !!user}
                             selected={activeQuiz === module._key}
                             onClick={() => { setActiveQuiz(module._key); setActiveLesson(null); }}
-                            sx={{ bgcolor: isModuleComplete ? 'action.hover' : 'transparent' }}
+                            sx={{ bgcolor: 'action.hover' }}
                           >
                             <ListItemIcon sx={{ minWidth: 32 }}>
-                              {isModuleComplete ? <QuizIcon color="primary" fontSize="small" /> : <LockIcon fontSize="small" />}
+                              <QuizIcon fontSize="small" color="primary" />
                             </ListItemIcon>
-                            <ListItemText 
-                              primary="Quiz do Módulo" 
-                              secondary={!isModuleComplete && user ? "Conclua as aulas para liberar" : ""}
-                              primaryTypographyProps={{ variant: 'body2', fontWeight: 'bold' }} 
-                            />
+                            <ListItemText primary="Quiz de Prática" primaryTypographyProps={{ variant: 'body2', fontWeight: 'bold' }} />
                           </ListItemButton>
                         </ListItem>
                       )}
@@ -257,44 +294,86 @@ export default function CourseView() {
                 </Accordion>
               );
             })}
+
+            <Divider sx={{ my: 2 }} />
+            <Box sx={{ px: 2, pb: 4 }}>
+              <ListItemButton 
+                disabled={!isAllLessonsDone}
+                selected={activeQuiz === 'final'}
+                onClick={() => { setActiveQuiz('final'); setActiveLesson(null); }}
+                sx={{ 
+                  borderRadius: 2, 
+                  bgcolor: isAllLessonsDone ? 'primary.main' : 'transparent',
+                  color: isAllLessonsDone ? 'white' : 'inherit',
+                  '&.Mui-selected': { bgcolor: 'primary.dark', color: 'white' },
+                  '&:hover': { bgcolor: isAllLessonsDone ? 'primary.dark' : 'action.hover' }
+                }}
+              >
+                <ListItemIcon>
+                  {courseStatus === 'concluido' ? <VerifiedIcon sx={{ color: 'white' }} /> : <LockIcon sx={{ color: isAllLessonsDone ? 'white' : 'inherit' }} />}
+                </ListItemIcon>
+                <ListItemText 
+                  primary="EXAME FINAL" 
+                  secondary={!isAllLessonsDone ? "Bloqueado" : "Disponível"}
+                  primaryTypographyProps={{ fontWeight: 'bold' }}
+                  secondaryTypographyProps={{ color: isAllLessonsDone ? 'white' : 'text.secondary', fontSize: '0.7rem' }}
+                />
+              </ListItemButton>
+            </Box>
           </SidebarContainer>
         </Grid>
 
+        {/* CONTEÚDO PRINCIPAL */}
         <Grid item xs={12} md={8} lg={9}>
           <ContentContainer>
-            {activeQuiz ? (
+            {activeQuiz === 'final' ? (
               <ModuleQuiz 
+                title="Exame Final de Certificação"
+                rawQuestions={course.finalExam} 
+                onComplete={handleQuizComplete}
+                isSaving={isSaving}
+              />
+            ) : activeQuiz ? (
+              <ModuleQuiz 
+                title="Desafio de Conhecimento"
                 rawQuestions={course.modules.find(m => m._key === activeQuiz)?.exercises} 
                 onComplete={handleQuizComplete}
                 isSaving={isSaving}
               />
             ) : activeLesson ? (
-              <Stack spacing={3}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="h4" fontWeight="bold">{activeLesson.title}</Typography>
+              <Stack spacing={3} sx={{ maxWidth: 900, mx: 'auto' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+                  <Box>
+                    <Typography variant="h4" fontWeight="bold" gutterBottom>{activeLesson.title}</Typography>
+                    <Typography variant="caption" color="text.secondary">Tempo estimado: {activeLesson.duration || '5'} min</Typography>
+                  </Box>
                   {user && (
                     <Button 
                       variant={completedLessons.includes(activeLesson._key) ? "outlined" : "contained"}
                       color="success"
+                      startIcon={completedLessons.includes(activeLesson._key) ? <CheckCircleIcon /> : null}
                       onClick={() => toggleLessonComplete(activeLesson)}
                     >
-                      {completedLessons.includes(activeLesson._key) ? "Concluída" : "Concluir Aula"}
+                      {completedLessons.includes(activeLesson._key) ? "Concluída" : "Marcar como lida"}
                     </Button>
                   )}
                 </Box>
                 <Divider />
-                {user ? (
-                  <Box className="markdown-body"><ReactMarkdown>{activeLesson.content}</ReactMarkdown></Box>
-                ) : (
-                  <Card sx={{ p: 4, textAlign: 'center', border: '1px dashed #ccc' }}>
-                    <LockIcon sx={{ fontSize: 50, color: 'text.secondary', mb: 2 }} />
-                    <Typography variant="h6">Conteúdo Restrito</Typography>
-                    <Button variant="contained" sx={{ mt: 2 }} onClick={() => navigate('/entrar')}>Entrar para Estudar</Button>
-                  </Card>
-                )}
+                <Box 
+                  sx={{ 
+                    '& p': { lineHeight: 1.7, fontSize: '1.1rem', mb: 2 },
+                    '& code': { bgcolor: 'action.hover', p: 0.5, borderRadius: 1 },
+                    '& img': { maxWidth: '100%', borderRadius: 2 }
+                  }}
+                >
+                  <ReactMarkdown>{activeLesson.content}</ReactMarkdown>
+                </Box>
               </Stack>
             ) : (
-               <Typography variant="h5" color="text.secondary" textAlign="center" mt={10}>Selecione uma aula.</Typography>
+                <Stack alignItems="center" justifyContent="center" sx={{ height: '60vh' }}>
+                   <MenuBook sx={{ fontSize: 80, opacity: 0.1, mb: 2 }} />
+                   <Typography variant="h5" color="text.disabled">Selecione uma aula para começar</Typography>
+                </Stack>
             )}
           </ContentContainer>
         </Grid>

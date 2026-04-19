@@ -16,12 +16,13 @@ export const CourseProvider = ({ children }) => {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   /**
-   * 1. Busca estatísticas e categorias (Otimizado v1.4)
+   * 1. Busca estatísticas e categorias (Otimizado com Cache Local)
    */
   const fetchGlobalData = useCallback(async (force = false) => {
+    // Evita refetch se já carregou, a menos que seja forçado (ex: após criar curso)
     if (initialDataLoaded && !force) return;
+
     try {
-      // Query otimizada para contar sub-itens sem pesar o client
       const query = `{
         "stats": {
           "courses": count(*[_type == "course"]),
@@ -34,7 +35,6 @@ export const CourseProvider = ({ children }) => {
 
       const data = await client.fetch(query);
       
-      // Filtra e ordena categorias, garantindo que 'Recentes' seja sempre a primeira
       const sortedCats = ['Recentes', ...(data.cats || []).filter(c => c).sort()];
 
       setStats(data.stats);
@@ -56,60 +56,64 @@ export const CourseProvider = ({ children }) => {
     if (isGenerating) return;
 
     setIsGenerating(true);
-    setStatusMessage(`O Professor IA está estruturando suas aulas sobre: ${topic}...`);
+    setStatusMessage(`O Professor IA está estruturando seu curso sobre: ${topic}...`);
 
     try {
+      // Endpoint que chama a v1.6 do Controller
       const response = await api.post('/courses/generate', { topic, level });
       const { course } = response.data;
 
-      // Sincroniza dados globais e créditos do usuário
+      // Sincroniza dados globais e créditos do usuário simultaneamente
       await Promise.all([
         fetchGlobalData(true),
         refreshUser()
       ]);
 
-      setStatusMessage('Curso criado com sucesso!');
-      return { success: true, slug: course.slug };
+      setStatusMessage('Curso criado com sucesso! Redirecionando...');
+      return { success: true, slug: course.slug.current || course.slug };
 
     } catch (error) {
       const errorMsg = error.response?.data?.error || "Falha na geração do curso.";
       setStatusMessage(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
+      // Mantém a mensagem por 2s antes de resetar o estado de carregamento
       setTimeout(() => {
         setIsGenerating(false);
         setStatusMessage('');
-      }, 3000);
+      }, 2000);
     }
   };
 
   /**
-   * 3. Cálculo de Progresso (Híbrido)
-   * Integrado com a nova lógica de 'desmarcar' aula
+   * 3. Cálculo de Progresso (v2.0 - Suporte a Exame Final)
+   * Agora considera se o curso está com status 'concluido' no banco
    */
   const getCourseProgress = useCallback(async (courseId, modules) => {
     if (!courseId || !modules) return 0;
     
-    let completedIds = [];
-
-    if (user?._id) {
-      try {
+    try {
+      if (user?._id) {
         const res = await api.get(`/courses/${courseId}/progress`);
         if (res.data.success) {
-          completedIds = res.data.completedLessons || [];
+          const { completedLessons, status } = res.data;
+          
+          // Se o status no banco já é concluído, o progresso é 100% (independente de desmarcar aula)
+          if (status === 'concluido') return 100;
+
+          const totalLessons = modules.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0);
+          if (totalLessons === 0) return 0;
+
+          // Calculamos o progresso baseado nas aulas, mas limitamos a 99% 
+          // O 100% real só vem quando o status for 'concluido' (após o Exame Final)
+          const percentage = (completedLessons.length / totalLessons) * 100;
+          return Math.min(Math.round(percentage), 99);
         }
-      } catch (err) {
-        // Fallback local se estiver offline ou erro de API
-        const saved = localStorage.getItem(`progress-${courseId}`);
-        completedIds = saved ? JSON.parse(saved) : [];
       }
+    } catch (err) {
+      console.error("Erro ao calcular progresso:", err);
     }
-
-    const totalLessons = modules.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0);
-    if (totalLessons === 0) return 0;
-
-    const percentage = (completedIds.length / totalLessons) * 100;
-    return Math.min(Math.round(percentage), 100);
+    return 0;
   }, [user?._id]);
 
   return (

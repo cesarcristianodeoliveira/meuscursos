@@ -18,11 +18,11 @@ const getCourseBySlug = async (req, res) => {
         _key, title,
         lessons[]{ _key, title, duration, content }, 
         exercises[]{ _key, question, options, correctAnswer }
-      }
+      },
+      finalExam[]{ _key, question, options, correctAnswer }
     }`;
     
     const course = await client.fetch(query, { slug });
-    
     if (!course) return res.status(404).json({ error: "Curso não encontrado." });
     
     return res.status(200).json({ success: true, course });
@@ -33,7 +33,7 @@ const getCourseBySlug = async (req, res) => {
 };
 
 /**
- * CRIAÇÃO DE CURSO (Otimizada v1.4)
+ * CRIAÇÃO DE CURSO (Otimizada v1.5)
  */
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
@@ -98,6 +98,14 @@ const createCourse = async (req, res) => {
         }))
       })),
 
+      finalExam: (aiData.finalExam || []).map(q => ({
+        _key: crypto.randomUUID(),
+        _type: 'examQuestion',
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correctAnswer
+      })),
+
       thumbnail: imageData?.assetId ? {
         _type: 'image',
         asset: { _type: 'reference', _ref: imageData.assetId }
@@ -124,11 +132,11 @@ const createCourse = async (req, res) => {
 };
 
 /**
- * SALVAR RESULTADO DO QUIZ (Persistência v1.5)
+ * SALVAR RESULTADO DO QUIZ (Persistência v1.6 - Trava de Conclusão)
  */
 const saveQuizProgress = async (req, res) => {
   const { id: courseId } = req.params;
-  const { score, totalQuestions, status } = req.body;
+  const { score, totalQuestions, isFinalExam } = req.body;
   const userId = req.userId;
 
   try {
@@ -138,33 +146,41 @@ const saveQuizProgress = async (req, res) => {
     const scorePercentage = Math.round((score / totalQuestions) * 100);
 
     if (!enrollment) {
-      // Cria matrícula se o aluno for direto para o quiz
-      await client.create({
+      // Se não houver matrícula, cria uma como "em_andamento"
+      enrollment = await client.create({
         _type: 'enrollment',
         user: { _ref: userId },
         course: { _ref: courseId },
         completedLessons: [],
-        finalScore: scorePercentage,
-        status: scorePercentage === 100 ? 'concluido' : (status || 'em_andamento'),
-        startDate: new Date().toISOString(),
-        completionDate: scorePercentage === 100 ? new Date().toISOString() : null
+        status: 'em_andamento',
+        startDate: new Date().toISOString()
       });
-    } else {
-      const patchData = { finalScore: scorePercentage };
-      
-      // Se acertou 100%, marca como concluído
-      if (scorePercentage === 100) {
+    }
+
+    const patchData = {};
+    
+    // REGRA DE OURO: Só marca como concluído se for o Exame Final E aproveitamento >= 80%
+    if (isFinalExam) {
+      patchData.finalScore = scorePercentage;
+      if (scorePercentage >= 80) {
         patchData.status = 'concluido';
         patchData.completionDate = new Date().toISOString();
       }
-
-      await client
-        .patch(enrollment._id)
-        .set(patchData)
-        .commit();
+    } else {
+      // Se for quiz de módulo, apenas atualizamos a nota do último quiz praticado
+      patchData.lastModuleScore = scorePercentage;
     }
 
-    return res.status(200).json({ success: true, finalScore: scorePercentage });
+    await client
+      .patch(enrollment._id)
+      .set(patchData)
+      .commit();
+
+    return res.status(200).json({ 
+      success: true, 
+      finalScore: scorePercentage, 
+      status: patchData.status || enrollment.status 
+    });
   } catch (error) {
     console.error("Erro ao salvar resultado do quiz:", error);
     return res.status(500).json({ error: "Erro ao processar resultado do quiz." });
@@ -214,7 +230,7 @@ const saveProgress = async (req, res) => {
 };
 
 /**
- * BUSCAR PROGRESSO (Aulas + Quiz)
+ * BUSCAR PROGRESSO
  */
 const getProgress = async (req, res) => {
   const { id: courseId } = req.params;
