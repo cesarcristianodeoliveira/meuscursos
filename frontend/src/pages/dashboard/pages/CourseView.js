@@ -32,7 +32,6 @@ const ContentContainer = styled(Box)(({ theme }) => ({
   padding: theme.spacing(4),
 }));
 
-// --- ALGORITMO DE EMBARALHAMENTO (Fisher-Yates) ---
 const shuffleArray = (array) => {
   const newArr = [...array];
   for (let i = newArr.length - 1; i > 0; i--) {
@@ -42,8 +41,7 @@ const shuffleArray = (array) => {
   return newArr;
 };
 
-// --- COMPONENTE DE QUIZ EVOLUÍDO ---
-const ModuleQuiz = ({ rawQuestions, onComplete }) => {
+const ModuleQuiz = ({ rawQuestions, onComplete, isSaving }) => {
   const [questions, setQuestions] = React.useState([]);
   const [answers, setAnswers] = React.useState({});
   const [submitted, setSubmitted] = React.useState(false);
@@ -69,7 +67,7 @@ const ModuleQuiz = ({ rawQuestions, onComplete }) => {
     });
     setScore(currentScore);
     setSubmitted(true);
-    if (onComplete) onComplete(currentScore);
+    if (onComplete) onComplete(currentScore, questions.length);
   };
 
   const isWin = score === questions.length;
@@ -99,13 +97,18 @@ const ModuleQuiz = ({ rawQuestions, onComplete }) => {
       ))}
 
       {!submitted ? (
-        <Button variant="contained" onClick={handleSubmit} size="large" disabled={Object.keys(answers).length < questions.length}>
-          Finalizar e Corrigir
+        <Button 
+          variant="contained" 
+          onClick={handleSubmit} 
+          size="large" 
+          disabled={Object.keys(answers).length < questions.length || isSaving}
+        >
+          {isSaving ? "Salvando..." : "Finalizar e Corrigir"}
         </Button>
       ) : (
         <Stack spacing={2}>
           <Alert severity={isWin ? "success" : "warning"}>
-            {isWin ? "Incrível! Você dominou este módulo." : `Você acertou ${score} de ${questions.length}. Tente novamente para atingir 100%!`}
+            {isWin ? "Incrível! Você dominou este módulo e seu progresso foi salvo." : `Você acertou ${score} de ${questions.length}. Tente novamente para atingir 100%!`}
           </Alert>
           {!isWin && (
             <Button startIcon={<ReplayIcon />} variant="outlined" onClick={initQuiz} sx={{ alignSelf: 'start' }}>
@@ -128,6 +131,7 @@ export default function CourseView() {
   const [activeLesson, setActiveLesson] = React.useState(null);
   const [activeQuiz, setActiveQuiz] = React.useState(null);
   const [completedLessons, setCompletedLessons] = React.useState([]);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   React.useEffect(() => {
     const fetchCourseData = async () => {
@@ -173,13 +177,29 @@ export default function CourseView() {
     } catch (err) { console.error("Erro ao salvar progresso"); }
   };
 
+  const handleQuizComplete = async (score, total) => {
+    if (!user || score !== total) return; // Só salvamos persistente se fechar 100%
+
+    setIsSaving(true);
+    try {
+      await api.post(`/courses/${course._id}/quiz-result`, {
+        score: score,
+        totalQuestions: total,
+        status: 'em_andamento' 
+      });
+    } catch (err) {
+      console.error("Erro ao salvar resultado do quiz no servidor", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (loading || authLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}><CircularProgress /></Box>;
   if (!course) return <Typography sx={{ p: 4 }}>Curso não encontrado.</Typography>;
 
   return (
     <Box sx={{ flexGrow: 1, mt: -2 }}>
       <Grid container>
-        {/* Sidebar - Grid v1 */}
         <Grid item xs={12} md={4} lg={3}>
           <SidebarContainer>
             <Box sx={{ p: 2 }}>
@@ -240,13 +260,13 @@ export default function CourseView() {
           </SidebarContainer>
         </Grid>
 
-        {/* Conteúdo Principal - Grid v1 */}
         <Grid item xs={12} md={8} lg={9}>
           <ContentContainer>
             {activeQuiz ? (
               <ModuleQuiz 
                 rawQuestions={course.modules.find(m => m._key === activeQuiz)?.exercises} 
-                onComplete={(score) => console.log("Quiz finalizado. Acertos:", score)} 
+                onComplete={handleQuizComplete}
+                isSaving={isSaving}
               />
             ) : activeLesson ? (
               <Stack spacing={3}>
