@@ -7,26 +7,38 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Normalização robusta do usuário para garantir que o _id do Sanity esteja sempre presente
+  /**
+   * Normaliza os dados do usuário vindos do Sanity/Backend.
+   * Garante que o _id e objetos de stats existam para evitar erros no Front.
+   */
   const handleUserResponse = useCallback((userData) => {
     if (!userData) return null;
     
     const normalizedUser = {
       ...userData,
-      _id: userData._id || userData.id 
+      _id: userData._id || userData.id,
+      credits: userData.credits ?? 0,
+      stats: userData.stats || { 
+        totalXp: 0, 
+        level: 1, 
+        coursesCreated: 0, 
+        coursesCompleted: 0 
+      }
     };
     
     setUser(normalizedUser);
     return normalizedUser;
   }, []);
 
-  // Função para configurar ou limpar a sessão e os headers da API
+  /**
+   * Configura o Header global da API e o LocalStorage.
+   */
   const setSession = useCallback((token) => {
     if (token) {
-      localStorage.setItem('token', token);
+      localStorage.setItem('@IAcademy:token', token);
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
-      localStorage.removeItem('token');
+      localStorage.removeItem('@IAcademy:token');
       delete api.defaults.headers.common['Authorization'];
     }
   }, []);
@@ -34,10 +46,12 @@ export function AuthProvider({ children }) {
   const signOut = useCallback(() => {
     setSession(null);
     setUser(null);
-    // Limpamos possíveis estados residuais no localStorage se necessário
-    // localStorage.clear(); // Use com cautela se tiver outras preferências salvas
   }, [setSession]);
 
+  /**
+   * Busca os dados mais recentes do usuário (XP, Créditos, etc).
+   * Chamado no carregamento inicial e após ações importantes (como gerar curso).
+   */
   const refreshUser = useCallback(async () => {
     try {
       const response = await api.get('/auth/me');
@@ -45,15 +59,16 @@ export function AuthProvider({ children }) {
         return handleUserResponse(response.data.user);
       }
     } catch (error) {
-      if (error.response?.status === 401) {
-        signOut();
-      }
+      // Se o erro for 401, o interceptor já chamará o signOut
       return null;
     }
-  }, [signOut, handleUserResponse]);
+  }, [handleUserResponse]);
 
-  // CONFIGURAÇÃO DOS INTERCEPTORES (O "Pulo do Gato")
-  // Isso garante que se qualquer requisição no app der 401, o AuthContext deslogue o usuário na hora
+  /**
+   * INTERCEPTOR: O coração da segurança.
+   * Se qualquer chamada à API retornar 401 (Não autorizado), 
+   * o contexto limpa os dados e manda o usuário para o Login.
+   */
   useEffect(() => {
     const interceptor = api.interceptors.response.use(
       (response) => response,
@@ -68,10 +83,12 @@ export function AuthProvider({ children }) {
     return () => api.interceptors.response.eject(interceptor);
   }, [signOut]);
 
-  // Carregamento inicial do estado de autenticação
+  /**
+   * LOAD STORAGE: Executado uma única vez ao abrir o App.
+   */
   useEffect(() => {
     async function loadStorageData() {
-      const storageToken = localStorage.getItem('token');
+      const storageToken = localStorage.getItem('@IAcademy:token');
       
       if (storageToken) {
         setSession(storageToken);
@@ -89,15 +106,16 @@ export function AuthProvider({ children }) {
       
       if (response.data.success) {
         const { token, user: userData } = response.data;
+        // Ordem importa: primeiro injeta o token, depois salva o user
         setSession(token);
         handleUserResponse(userData);
         return { success: true };
       }
-      return { success: false, error: response.data.error || "Dados inválidos." };
+      return { success: false, error: response.data.error || "E-mail ou senha incorretos." };
     } catch (error) {
       return { 
         success: false, 
-        error: error.response?.data?.error || "Erro ao conectar com o servidor." 
+        error: error.response?.data?.error || "Erro de conexão com o servidor." 
       };
     }
   }, [setSession, handleUserResponse]);
@@ -116,7 +134,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       return { 
         success: false, 
-        error: error.response?.data?.error || "Erro ao conectar com o servidor." 
+        error: error.response?.data?.error || "Erro ao processar registro." 
       };
     }
   }, [setSession, handleUserResponse]);
@@ -140,6 +158,8 @@ export function AuthProvider({ children }) {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  if (!context) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  }
   return context;
 };

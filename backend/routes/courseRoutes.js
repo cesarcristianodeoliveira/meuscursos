@@ -5,40 +5,38 @@ const authMiddleware = require('../middlewares/authMiddleware');
 
 /**
  * --- ROTAS PÚBLICAS ---
- * Acessíveis sem token para Landing Pages e SEO.
+ * Acessíveis para SEO, compartilhamento e visualização pré-venda.
  */
 
-// Busca detalhes do curso para quem ainda não logou
+// Busca detalhes do curso pelo slug (independente de login)
 router.get('/public/:slug', courseController.getCourseBySlug);
-
 
 /**
  * --- ROTAS PRIVADAS (Requerem Login) ---
- * Todas as rotas abaixo utilizam o authMiddleware.
+ * O authMiddleware garante que o req.userId esteja disponível no Controller.
  */
 
-// Geração de curso via IA e listagem do autor
+// Geração de novo curso via IA
 router.post('/generate', authMiddleware, courseController.createCourse);
+
+// Lista os cursos gerados pelo próprio usuário logado
 router.get('/my-courses', authMiddleware, courseController.getUserCourses);
 
-// Detalhes completos do curso para o ambiente de estudo
-router.get('/:id', authMiddleware, courseController.getCourseById);
+// Busca detalhes do curso para o ambiente de estudo (usando slug para consistência de URL)
+router.get('/study/:slug', authMiddleware, courseController.getCourseBySlug);
 
 /**
- * --- PERSISTÊNCIA DE PROGRESSO E GAMIFICAÇÃO ---
+ * --- PROGRESSO E GAMIFICAÇÃO ---
  */
 
-// Busca o progresso (Aulas concluídas, notas e status)
+// Busca o progresso do usuário no curso (aulas concluídas e notas)
+// Aqui usamos o ID do documento do Sanity para facilitar a query de matrícula
 router.get('/:id/progress', authMiddleware, courseController.getProgress);
 
-// Salva a conclusão de uma aula individual
+// Salva o progresso de uma aula (marcar como concluída ou desmarcar)
 router.post('/:id/progress', authMiddleware, courseController.saveProgress);
 
-/**
- * ADICIONADO: Persistência do Quiz
- * Salva a nota final e pode marcar o curso como concluído no Sanity
- */
+// Salva o resultado de quizzes (módulos ou exame final)
 router.post('/:id/quiz-result', authMiddleware, courseController.saveQuizProgress);
-
 
 module.exports = router;

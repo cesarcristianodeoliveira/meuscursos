@@ -6,35 +6,40 @@ const { formatSlug } = require('../utils/formatter');
 const crypto = require('crypto');
 
 /**
- * BUSCAR PROGRESSO (Atualizado para o novo Schema)
+ * BUSCAR PROGRESSO
  */
 const getProgress = async (req, res) => {
   const { id: courseId } = req.params;
   const userId = req.userId;
+
   try {
     const enrollment = await client.fetch(
       `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]{
         completedLessons,
         completedQuizzes,
         finalScore,
-        status
+        status,
+        progress
       }`,
       { userId, courseId }
     );
+
     return res.status(200).json({ 
       success: true, 
+      progress: enrollment?.progress || 0,
       completedLessons: enrollment?.completedLessons || [],
       completedQuizzes: enrollment?.completedQuizzes || [],
       finalScore: enrollment?.finalScore || 0,
       status: enrollment?.status || 'nao_iniciado'
     });
   } catch (error) {
+    console.error("Erro ao buscar progresso:", error);
     return res.status(500).json({ error: "Erro ao buscar progresso." });
   }
 };
 
 /**
- * SALVAR PROGRESSO DAS AULAS (Com Título e Data)
+ * SALVAR PROGRESSO DAS AULAS (Com Cálculo de % Automático)
  */
 const saveProgress = async (req, res) => {
   const { id: courseId } = req.params;
@@ -42,52 +47,51 @@ const saveProgress = async (req, res) => {
   const userId = req.userId;
 
   try {
-    const enrollmentQuery = `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]`;
-    let enrollment = await client.fetch(enrollmentQuery, { userId, courseId });
+    // 1. Busca Matrícula e total de aulas do curso para calcular progresso
+    const data = await client.fetch(`{
+      "enrollment": *[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0],
+      "totalLessons": count(*[_id == $courseId][0].modules[].lessons[])
+    }`, { userId, courseId });
 
-    if (!enrollment) {
-      if (completed) {
-        await client.create({
-          _type: 'enrollment',
-          user: { _ref: userId },
-          course: { _ref: courseId },
-          completedLessons: [{
-            _key: crypto.randomUUID(),
-            lessonKey: lessonId,
-            lessonTitle: lessonTitle,
-            completedAt: new Date().toISOString()
-          }],
-          status: 'em_andamento',
-          startDate: new Date().toISOString()
+    const { enrollment, totalLessons } = data;
+    let lessons = enrollment?.completedLessons || [];
+
+    if (completed) {
+      if (!lessons.some(l => l.lessonKey === lessonId)) {
+        lessons.push({
+          _key: crypto.randomUUID(),
+          lessonKey: lessonId,
+          lessonTitle: lessonTitle,
+          completedAt: new Date().toISOString()
         });
       }
     } else {
-      const lessons = enrollment.completedLessons || [];
-      let updatedLessons;
+      lessons = lessons.filter(l => l.lessonKey !== lessonId);
+    }
 
-      if (completed) {
-        // Evita duplicatas conferindo pelo lessonKey
-        const exists = lessons.some(l => l.lessonKey === lessonId);
-        updatedLessons = exists ? lessons : [
-          ...lessons, 
-          { 
-            _key: crypto.randomUUID(), 
-            lessonKey: lessonId, 
-            lessonTitle: lessonTitle, 
-            completedAt: new Date().toISOString() 
-          }
-        ];
-      } else {
-        updatedLessons = lessons.filter(l => l.lessonKey !== lessonId);
-      }
+    // 2. Calcula porcentagem
+    const progressPercent = Math.round((lessons.length / (totalLessons || 1)) * 100);
 
-      await client
-        .patch(enrollment._id)
-        .set({ completedLessons: updatedLessons })
+    if (!enrollment) {
+      await client.create({
+        _type: 'enrollment',
+        user: { _ref: userId },
+        course: { _ref: courseId },
+        completedLessons: lessons,
+        progress: progressPercent,
+        status: 'em_andamento',
+        startDate: new Date().toISOString()
+      });
+    } else {
+      await client.patch(enrollment._id)
+        .set({ 
+          completedLessons: lessons,
+          progress: progressPercent 
+        })
         .commit();
     }
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, progress: progressPercent });
   } catch (error) {
     console.error("Erro ao salvar progresso:", error);
     return res.status(500).json({ error: "Erro interno." });
@@ -95,7 +99,7 @@ const saveProgress = async (req, res) => {
 };
 
 /**
- * SALVAR RESULTADO DO QUIZ (Persistência por Módulo)
+ * SALVAR RESULTADO DO QUIZ
  */
 const saveQuizProgress = async (req, res) => {
   const { id: courseId } = req.params;
@@ -103,8 +107,10 @@ const saveQuizProgress = async (req, res) => {
   const userId = req.userId;
 
   try {
-    const enrollmentQuery = `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]`;
-    let enrollment = await client.fetch(enrollmentQuery, { userId, courseId });
+    let enrollment = await client.fetch(
+      `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]`,
+      { userId, courseId }
+    );
 
     const scorePercentage = Math.round((score / totalQuestions) * 100);
 
@@ -113,8 +119,6 @@ const saveQuizProgress = async (req, res) => {
         _type: 'enrollment',
         user: { _ref: userId },
         course: { _ref: courseId },
-        completedLessons: [],
-        completedQuizzes: [],
         status: 'em_andamento',
         startDate: new Date().toISOString()
       });
@@ -125,87 +129,54 @@ const saveQuizProgress = async (req, res) => {
       if (scorePercentage >= 80) {
         patchData.status = 'concluido';
         patchData.completionDate = new Date().toISOString();
+        patchData.progress = 100; // Certificação garante progresso total
       }
       await client.patch(enrollment._id).set(patchData).commit();
     } else {
-      // Lógica para Quizzes de Módulo
       const quizzes = enrollment.completedQuizzes || [];
       const newQuizResult = {
         _key: crypto.randomUUID(),
-        moduleKey,
-        moduleTitle,
-        score,
-        totalQuestions,
+        moduleKey, moduleTitle, score, totalQuestions,
         percent: scorePercentage
       };
 
-      // Se o quiz do módulo já existe, atualizamos, senão adicionamos
       const existingIdx = quizzes.findIndex(q => q.moduleKey === moduleKey);
       let updatedQuizzes = [...quizzes];
-
-      if (existingIdx > -1) {
-        updatedQuizzes[existingIdx] = newQuizResult;
-      } else {
-        updatedQuizzes.push(newQuizResult);
-      }
+      if (existingIdx > -1) updatedQuizzes[existingIdx] = newQuizResult;
+      else updatedQuizzes.push(newQuizResult);
 
       await client.patch(enrollment._id).set({ completedQuizzes: updatedQuizzes }).commit();
     }
 
-    return res.status(200).json({ 
-      success: true, 
-      percent: scorePercentage,
-      status: scorePercentage >= 80 && isFinalExam ? 'concluido' : 'em_andamento'
-    });
+    return res.status(200).json({ success: true, percent: scorePercentage });
   } catch (error) {
-    console.error("Erro ao salvar resultado do quiz:", error);
-    return res.status(500).json({ error: "Erro ao processar resultado do quiz." });
+    return res.status(500).json({ error: "Erro ao processar quiz." });
   }
 };
 
-// ... (getCourseBySlug, createCourse, etc permanecem similares, apenas garanta que o createCourse use crypto.randomUUID() para as chaves)
-
-const getCourseBySlug = async (req, res) => {
-  const { slug } = req.params;
-  try {
-    const query = `*[_type == "course" && slug.current == $slug][0]{
-      _id, title, description, level, category->{title}, 
-      thumbnail, tags, estimatedTime, xpReward,
-      modules[]{
-        _key, title,
-        lessons[]{ _key, title, duration, content }, 
-        exercises[]{ _key, question, options, correctAnswer }
-      },
-      finalExam[]{ _key, question, options, correctAnswer }
-    }`;
-    
-    const course = await client.fetch(query, { slug });
-    if (!course) return res.status(404).json({ error: "Curso não encontrado." });
-    
-    return res.status(200).json({ success: true, course });
-  } catch (error) {
-    console.error("Erro ao buscar curso por slug:", error);
-    return res.status(500).json({ error: "Erro interno no servidor." });
-  }
-};
-
+/**
+ * CRIAR CURSO COM IA (O Coração do Sistema)
+ */
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
-  const userId = req.userId; 
+  const userId = req.userId;
 
-  if (!topic) return res.status(400).json({ error: "O tema do curso é obrigatório." });
+  if (!topic) return res.status(400).json({ error: "O tema é obrigatório." });
 
   try {
+    // 1. Cota
     const userQuota = await quotaService.checkUserQuota(userId);
     if (!userQuota.canGenerate) return res.status(429).json({ error: userQuota.reason });
 
+    // 2. Conteúdo e Imagem
     const aiData = await aiService.generateCourseContent(topic, 'llama-3.3-70b-versatile', { level });
     const imageData = await imageService.fetchAndUploadImage(aiData);
 
+    // 3. Categoria (Sincroniza com o Sanity)
     const categoryName = aiData.categoryName || 'Geral';
     const categorySlug = formatSlug(categoryName);
-
     let category = await client.fetch(`*[_type == "category" && slug.current == $slug][0]`, { slug: categorySlug });
+    
     if (!category) {
       category = await client.create({
         _type: 'category',
@@ -214,16 +185,15 @@ const createCourse = async (req, res) => {
       });
     }
 
-    const courseTitle = aiData.title;
-    const finalSlug = `${formatSlug(courseTitle)}-${crypto.randomBytes(3).toString('hex')}`;
-
+    // 4. Montagem do Documento (Mapeamento de Keys Únicas)
+    const finalSlug = `${formatSlug(aiData.title)}-${crypto.randomBytes(3).toString('hex')}`;
     const newCourse = {
       _type: 'course',
-      title: courseTitle,
+      title: aiData.title,
       slug: { _type: 'slug', current: finalSlug },
       description: aiData.description,
-      author: { _type: 'reference', _ref: userId },
-      category: { _type: 'reference', _ref: category._id },
+      author: { _ref: userId },
+      category: { _ref: category._id },
       level: level || 'iniciante',
       estimatedTime: aiData.estimatedTime || 0,
       xpReward: aiData.xpReward || 100,
@@ -231,88 +201,72 @@ const createCourse = async (req, res) => {
       isPublished: true,
       externalImageId: imageData?.externalImageId || null,
       imageSearchPrompt: aiData.imageSearchPrompt || null,
-
-      modules: aiData.modules.map(module => ({
-        _key: crypto.randomUUID(),
-        _type: 'courseModule',
-        title: module.title,
-        lessons: module.lessons.map(lesson => ({
-          _key: crypto.randomUUID(),
-          _type: 'lesson',
-          title: lesson.title,
-          content: lesson.content,
-          duration: lesson.duration || 5
-        })),
-        exercises: module.exercises.map(ex => ({
-          _key: crypto.randomUUID(),
-          _type: 'exercise',
-          question: ex.question,
-          options: ex.options,
-          correctAnswer: ex.correctAnswer
-        }))
-      })),
-
-      finalExam: (aiData.finalExam || []).map(q => ({
-        _key: crypto.randomUUID(),
-        _type: 'examQuestion',
-        question: q.question,
-        options: q.options,
-        correctAnswer: q.correctAnswer
-      })),
-
       thumbnail: imageData?.assetId ? {
         _type: 'image',
-        asset: { _type: 'reference', _ref: imageData.assetId }
+        asset: { _ref: imageData.assetId }
       } : undefined,
-
-      aiMetadata: {
-        _type: 'object',
-        provider: aiData.aiMetadata?.provider || 'Groq',
-        model: aiData.aiMetadata?.model || 'llama-3.3-70b-versatile',
-        totalTokens: aiData.aiMetadata?.totalTokens || 0,
-        generatedAt: new Date().toISOString()
-      }
+      modules: aiData.modules.map(m => ({
+        _key: crypto.randomUUID(),
+        title: m.title,
+        lessons: m.lessons.map(l => ({
+          _key: crypto.randomUUID(),
+          title: l.title,
+          content: l.content,
+          duration: l.duration || 5
+        })),
+        exercises: m.exercises.map(e => ({
+          _key: crypto.randomUUID(),
+          ...e
+        }))
+      })),
+      finalExam: aiData.finalExam.map(q => ({ _key: crypto.randomUUID(), ...q })),
+      aiMetadata: { ...aiData.aiMetadata, generatedAt: new Date().toISOString() }
     };
 
     const result = await client.create(newCourse);
     await quotaService.consumeCredit(userId);
 
-    return res.status(201).json({ success: true, course: { _id: result._id, slug: result.slug.current, title: result.title } });
+    return res.status(201).json({ success: true, courseId: result._id, slug: result.slug.current });
 
   } catch (error) {
-    console.error("❌ Erro no CourseController:", error.message);
-    return res.status(500).json({ success: false, error: "Falha na geração." });
+    console.error("❌ Erro ao criar curso:", error);
+    return res.status(500).json({ error: "Falha na geração do curso pela IA." });
+  }
+};
+
+/**
+ * BUSCAS DE CURSO
+ */
+const getCourseBySlug = async (req, res) => {
+  const { slug } = req.params;
+  try {
+    const course = await client.fetch(
+      `*[_type == "course" && slug.current == $slug][0]{
+        ...,
+        category->{title},
+        author->{name, avatar}
+      }`, { slug }
+    );
+    if (!course) return res.status(404).json({ error: "Não encontrado." });
+    return res.status(200).json({ success: true, course });
+  } catch (error) {
+    return res.status(500).json({ error: "Erro interno." });
   }
 };
 
 const getUserCourses = async (req, res) => {
-  const userId = req.userId;
   try {
-    const query = `*[_type == "course" && author._ref == $userId] | order(_createdAt desc)`;
-    const courses = await client.fetch(query, { userId });
+    const courses = await client.fetch(
+      `*[_type == "course" && author._ref == $userId] | order(_createdAt desc)`,
+      { userId: req.userId }
+    );
     return res.status(200).json({ success: true, courses });
   } catch (error) {
-    return res.status(500).json({ error: "Erro ao buscar cursos." });
-  }
-};
-
-const getCourseById = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const course = await client.fetch(`*[_id == $id][0]`, { id });
-    if (!course) return res.status(404).json({ error: "Curso não encontrado." });
-    return res.status(200).json({ success: true, course });
-  } catch (error) {
-    return res.status(500).json({ error: "Erro ao buscar curso." });
+    return res.status(500).json({ error: "Erro ao buscar seus cursos." });
   }
 };
 
 module.exports = { 
-  createCourse, 
-  saveProgress, 
-  saveQuizProgress, 
-  getProgress, 
-  getUserCourses, 
-  getCourseById, 
-  getCourseBySlug 
+  createCourse, saveProgress, saveQuizProgress, 
+  getProgress, getUserCourses, getCourseBySlug 
 };

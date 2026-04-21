@@ -2,19 +2,28 @@ export default {
   name: 'enrollment',
   title: 'Matrículas e Progresso',
   type: 'document',
+  fieldsets: [
+    { name: 'participants', title: 'Vínculos Principal', options: { columns: 2 } },
+    { name: 'progressData', title: 'Progresso Detalhado', options: { collapsible: true, collapsed: false } },
+    { name: 'assessment', title: 'Avaliação e Certificação', options: { columns: 2 } }
+  ],
   fields: [
     { 
       name: 'user',
       title: 'Usuário', 
       type: 'reference', 
+      fieldset: 'participants',
       to: [{ type: 'user' }],
+      options: { disableNew: true },
       validation: Rule => Rule.required()
     },
     { 
       name: 'course', 
       title: 'Curso', 
       type: 'reference', 
+      fieldset: 'participants',
       to: [{ type: 'course' }],
+      options: { disableNew: true },
       validation: Rule => Rule.required()
     },
     { 
@@ -24,16 +33,26 @@ export default {
       options: {
         list: [
           { title: '📖 Em Andamento', value: 'em_andamento' },
-          { title: '✅ Concluído', value: 'concluido' }
+          { title: '✅ Concluido', value: 'concluido' }
         ]
       },
       initialValue: 'em_andamento'
     },
+    {
+      name: 'progress',
+      title: 'Progresso Atual (%)',
+      type: 'number',
+      description: 'Porcentagem total de conclusão do curso.',
+      initialValue: 0,
+      validation: Rule => Rule.min(0).max(100)
+    },
+
+    // --- PROGRESSO DETALHADO ---
     { 
       name: 'completedLessons',
       title: 'Aulas Concluídas', 
       type: 'array', 
-      description: 'Histórico detalhado de lições assistidas',
+      fieldset: 'progressData',
       of: [
         {
           type: 'object',
@@ -42,15 +61,24 @@ export default {
             { name: 'lessonKey', title: 'ID da Lição', type: 'string' },
             { name: 'lessonTitle', title: 'Título da Lição', type: 'string' },
             { name: 'completedAt', title: 'Data de Conclusão', type: 'datetime' }
-          ]
+          ],
+          preview: {
+            select: { title: 'lessonTitle', date: 'completedAt' },
+            prepare({ title, date }) {
+              return {
+                title: title || 'Lição sem título',
+                subtitle: date ? new Date(date).toLocaleDateString() : 'Sem data'
+              }
+            }
+          }
         }
       ]
     },
     { 
       name: 'completedQuizzes',
-      title: 'Quizzes de Módulo Concluídos', 
+      title: 'Quizzes de Módulo', 
       type: 'array',
-      description: 'Resultados dos testes de cada módulo',
+      fieldset: 'progressData',
       of: [
         {
           type: 'object',
@@ -61,28 +89,40 @@ export default {
             { name: 'score', title: 'Acertos', type: 'number' },
             { name: 'totalQuestions', title: 'Total de Questões', type: 'number' },
             { name: 'percent', title: 'Aproveitamento (%)', type: 'number' }
-          ]
+          ],
+          preview: {
+            select: { title: 'moduleTitle', score: 'score', total: 'totalQuestions' },
+            prepare({ title, score, total }) {
+              return {
+                title: `Módulo: ${title}`,
+                subtitle: `Acertos: ${score}/${total}`
+              }
+            }
+          }
         }
       ]
     },
+
+    // --- AVALIAÇÃO FINAL ---
     { 
       name: 'finalScore', 
       title: 'Nota do Exame Final (%)', 
       type: 'number',
-      description: 'Nota obtida no exame de certificação',
+      fieldset: 'assessment',
       validation: Rule => Rule.min(0).max(100)
     },
     { 
       name: 'startDate',
       title: 'Data de Início', 
       type: 'datetime',
+      fieldset: 'assessment',
       initialValue: () => new Date().toISOString()
     },
     {
       name: 'completionDate',
       title: 'Data de Conclusão',
       type: 'datetime',
-      description: 'Preenchido automaticamente ao concluir o exame final'
+      fieldset: 'assessment'
     }
   ],
   preview: {
@@ -90,15 +130,16 @@ export default {
       userTitle: 'user.name',
       courseTitle: 'course.title',
       status: 'status',
-      finalScore: 'finalScore'
+      finalScore: 'finalScore',
+      progress: 'progress'
     },
-    prepare({ userTitle, courseTitle, status, finalScore }) {
+    prepare({ userTitle, courseTitle, status, finalScore, progress }) {
       const statusEmoji = status === 'concluido' ? '🎓' : '📚';
-      const scoreDisplay = finalScore ? ` | Nota Final: ${finalScore}%` : '';
+      const progressLabel = progress ? `${progress}%` : '0%';
       
       return {
-        title: `${statusEmoji} ${userTitle} -> ${courseTitle}`,
-        subtitle: `Status: ${status}${scoreDisplay}`,
+        title: `${statusEmoji} ${userTitle || 'Usuário'} -> ${courseTitle || 'Curso'}`,
+        subtitle: `Status: ${status} (${progressLabel}) ${finalScore ? `| Nota Final: ${finalScore}%` : ''}`,
       };
     }
   }

@@ -4,16 +4,19 @@ const jwt = require('jsonwebtoken');
 const { formatSlug } = require('../utils/formatter');
 
 /**
- * FUNÇÃO AUXILIAR: Verifica e reseta créditos baseada no tempo
+ * FUNÇÃO AUXILIAR: Verifica e reseta créditos baseada no tempo.
+ * Regra: Se plano 'free' e 0 créditos, recupera 1 crédito após 1 hora.
  */
 const checkAndResetCredits = async (user) => {
-  if (user.credits > 0) return user;
+  // Se o usuário já tem créditos ou é Pro, não precisamos resetar por tempo
+  if (user.credits > 0 || user.plan === 'pro') return user;
 
-  const lastGen = new Date(user.stats?.lastGenerationAt);
+  const lastGen = new Date(user.stats?.lastGenerationAt || 0);
   const now = new Date();
   const diffInHours = (now - lastGen) / (1000 * 60 * 60);
 
   if (diffInHours >= 1) {
+    console.log(`♻️ Resetando crédito por tempo para o usuário: ${user.email}`);
     const updatedUser = await client
       .patch(user._id)
       .set({ credits: 1 })
@@ -23,6 +26,9 @@ const checkAndResetCredits = async (user) => {
   return user;
 };
 
+/**
+ * Gera um slug único para o usuário, evitando colisões de nomes iguais.
+ */
 const generateUniqueSlug = async (name) => {
   const baseSlug = formatSlug(name);
   let uniqueSlug = baseSlug;
@@ -30,8 +36,7 @@ const generateUniqueSlug = async (name) => {
   let exists = true;
 
   while (exists) {
-    const query = `*[_type == "user" && slug.current == $slug][0]`;
-    const user = await client.fetch(query, { slug: uniqueSlug });
+    const user = await client.fetch(`*[_type == "user" && slug.current == $slug][0]`, { slug: uniqueSlug });
     if (!user) {
       exists = false;
     } else {
@@ -43,26 +48,26 @@ const generateUniqueSlug = async (name) => {
 };
 
 /**
- * REGISTRO (Atualizado v1.7 - Com criação de Newsletter separada)
+ * REGISTRO
  */
 const register = async (req, res) => {
   const { name, email, password, newsletter } = req.body;
 
   try {
     if (!name || !email || !password) {
-      return res.status(400).json({ success: false, error: "Preencha todos os campos." });
+      return res.status(400).json({ success: false, error: "Preencha todos os campos obrigatórios." });
     }
 
     const userExists = await client.fetch(`*[_type == "user" && email == $email][0]`, { email });
     if (userExists) {
-      return res.status(400).json({ success: false, error: "Este e-mail já está em uso." });
+      return res.status(400).json({ success: false, error: "Este e-mail já está cadastrado." });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const finalSlug = await generateUniqueSlug(name);
 
-    // 1. Criar o documento do Usuário
+    // Documento do Usuário (Sincronizado com User Schema)
     const newUser = {
       _type: 'user',
       name,
@@ -80,26 +85,21 @@ const register = async (req, res) => {
         coursesCreated: 0,
         coursesCompleted: 0,
         lastLogin: new Date().toISOString(),
+        // Truque: define 1h atrás para permitir gerar curso imediatamente
         lastGenerationAt: new Date(Date.now() - 3600000).toISOString() 
       }
     };
 
     const userCreated = await client.create(newUser);
 
-    // 2. Se selecionou newsletter, cria o documento no schema 'newsletter'
+    // Registro na Newsletter (Opcional/Silencioso)
     if (newsletter) {
-      try {
-        await client.create({
-          _type: 'newsletter',
-          user: { _type: 'reference', _ref: userCreated._id },
-          email: userCreated.email,
-          subscribedAt: new Date().toISOString()
-        });
-        console.log(`📧 Inscrição na newsletter criada para: ${email}`);
-      } catch (newsErr) {
-        console.error("Erro silencioso ao criar newsletter:", newsErr);
-        // Não travamos o registro se a newsletter falhar, apenas logamos.
-      }
+      client.create({
+        _type: 'newsletter',
+        user: { _type: 'reference', _ref: userCreated._id },
+        email: userCreated.email,
+        subscribedAt: new Date().toISOString()
+      }).catch(err => console.error("Erro ao registrar newsletter:", err.message));
     }
 
     const token = jwt.sign(
@@ -116,13 +116,14 @@ const register = async (req, res) => {
         name: userCreated.name,
         email: userCreated.email,
         credits: userCreated.credits,
-        stats: userCreated.stats
+        stats: userCreated.stats,
+        slug: userCreated.slug?.current
       }
     });
 
   } catch (error) {
-    console.error("Erro no registro:", error);
-    return res.status(500).json({ success: false, error: "Erro ao criar conta." });
+    console.error("❌ Erro no Registro:", error);
+    return res.status(500).json({ success: false, error: "Falha ao criar conta no banco de dados." });
   }
 };
 
@@ -133,11 +134,12 @@ const login = async (req, res) => {
   const { email, password } = req.body;
   try {
     let user = await client.fetch(`*[_type == "user" && email == $email][0]`, { email });
-    if (!user) return res.status(401).json({ success: false, error: "E-mail ou senha inválidos." });
+    if (!user) return res.status(401).json({ success: false, error: "Credenciais inválidas." });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ success: false, error: "E-mail ou senha inválidos." });
+    if (!isMatch) return res.status(401).json({ success: false, error: "Credenciais inválidas." });
 
+    // Sincroniza créditos e atualiza último login
     user = await checkAndResetCredits(user);
     await client.patch(user._id).set({ "stats.lastLogin": new Date().toISOString() }).commit();
 
@@ -156,22 +158,25 @@ const login = async (req, res) => {
         email: user.email,
         credits: user.credits,
         stats: user.stats,
-        slug: user.slug?.current
+        slug: user.slug?.current,
+        plan: user.plan
       }
     });
   } catch (error) {
-    return res.status(500).json({ success: false, error: "Erro interno no servidor." });
+    console.error("❌ Erro no Login:", error);
+    return res.status(500).json({ success: false, error: "Erro interno ao processar login." });
   }
 };
 
 /**
- * GET ME
+ * GET ME (Validação de Sessão)
  */
 const getMe = async (req, res) => {
   try {
     let user = await client.fetch(`*[_id == $id][0]`, { id: req.userId });
     if (!user) return res.status(404).json({ success: false, error: "Usuário não encontrado." });
 
+    // Verifica se ganhou crédito novo enquanto estava navegando
     user = await checkAndResetCredits(user);
 
     return res.status(200).json({
@@ -182,7 +187,8 @@ const getMe = async (req, res) => {
         email: user.email,
         credits: user.credits,
         stats: user.stats,
-        slug: user.slug?.current
+        slug: user.slug?.current,
+        plan: user.plan
       }
     });
   } catch (error) {

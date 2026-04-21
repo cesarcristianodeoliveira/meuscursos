@@ -2,66 +2,70 @@ const Groq = require('groq-sdk');
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 /**
- * SERVIÇO DE INTELIGÊNCIA ARTIFICIAL (AI Service) v1.5
- * Ajustado para evitar códigos irrelevantes e otimizar busca de imagens por keywords.
+ * SERVIÇO DE INTELIGÊNCIA ARTIFICIAL (AI Service) v1.6
+ * Otimizado para: 
+ * 1. Consistência de XP e Tempo.
+ * 2. Markdown compatível com UI Components.
+ * 3. Keywords de imagem ultra-específicas.
  */
 
 const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile', options = {}) => {
   const { level = 'iniciante' } = options;
 
-  const isBeginner = level === 'iniciante';
-  const isIntermediate = level === 'intermediario';
-  
-  const moduleCount = isBeginner ? 3 : (isIntermediate ? 4 : 5);
-  const lessonsPerModule = isBeginner ? 3 : 4;
-  const finalExamCount = isBeginner ? 5 : (isIntermediate ? 8 : 10);
+  // Configurações dinâmicas por nível para guiar a IA
+  const config = {
+    iniciante: { modules: 3, lessons: 3, finalExams: 5, xpBase: 600 },
+    intermediario: { modules: 4, lessons: 4, finalExams: 8, xpBase: 1000 },
+    avancado: { modules: 5, lessons: 4, finalExams: 10, xpBase: 1500 }
+  }[level] || { modules: 3, lessons: 3, finalExams: 5, xpBase: 600 };
 
-  const systemPrompt = `Você é um Professor Expert em Design Instrucional.
-    Sua tarefa é estruturar um curso pedagógico completo e profissional.
+  const systemPrompt = `Você é um Designer Instrucional Expert em Educação Digital.
+    Sua tarefa é estruturar um curso pedagógico de alta qualidade.
     Responda EXCLUSIVAMENTE com um objeto JSON válido.
 
     DIRETRIZES DE QUALIDADE:
-    - CONTEÚDO: Markdown rico com subtítulos (##) e listas. 
-    - CÓDIGO: Use blocos de código (ex: \`\`\`javascript) APENAS se o tema for programação ou tecnologia. Se o tema for culinária, artes ou outros, use apenas texto e tabelas Markdown.
-    - VISUAL: No campo "imageSearchPrompt", retorne apenas 3 a 5 palavras-chave em INGLÊS que descrevam o objeto principal. Exemplo: "cooked rice bowl, kitchen" ou "javascript code, laptop". Nunca use frases longas.
-    - PRECISÃO: A "correctAnswer" deve ser idêntica a uma das opções.`;
+    - CONTEÚDO: Use Markdown rico. Sempre inclua um título (##) no início do conteúdo da aula e use (###) para subseções.
+    - DIDÁTICA: Explique conceitos complexos de forma clara. Use listas (bullet points) para facilitar a leitura.
+    - CÓDIGO: Use blocos de código com a linguagem especificada (ex: \`\`\`javascript) se o tema for técnico.
+    - IMAGEM: O campo "imageSearchPrompt" deve conter apenas substantivos e adjetivos em INGLÊS que gerem fotos profissionais no Unsplash. Evite termos genéricos como "education" ou "course".
+    - INTEGRIDADE: Certifique-se de que a "correctAnswer" seja idêntica a uma das opções na lista "options".`;
 
   const userPrompt = `Gere um curso completo sobre: "${topic}".
-    Nível: ${level}.
-    Estrutura: ${moduleCount} módulos, cada um com ${lessonsPerModule} aulas.
-    Exame Final: Exatamente ${finalExamCount} questões.
+    Nível de dificuldade: ${level}.
+    Estrutura exigida: ${config.modules} módulos, cada um com ${config.lessons} aulas.
+    Exame Final: Exatamente ${config.finalExams} questões.
 
     Estrutura JSON obrigatória:
     {
-      "title": "Título do Curso",
-      "description": "Sinopse profissional",
-      "categoryName": "Categoria Principal",
+      "title": "Título Impactante",
+      "description": "Sinopse profissional para atrair alunos",
+      "categoryName": "Categoria (ex: Tecnologia, Culinária, Business)",
       "tags": ["tag1", "tag2"],
-      "imageSearchPrompt": "Keywords em inglês para o tema ${topic}",
+      "imageSearchPrompt": "3 a 5 keywords em inglês",
       "modules": [
         {
-          "title": "Módulo X",
+          "title": "Nome do Módulo",
           "lessons": [
             {
-              "title": "Aula X",
-              "content": "Conteúdo didático em Markdown",
+              "title": "Nome da Aula",
+              "content": "Conteúdo em Markdown (mínimo 400 palavras)",
               "duration": 10
             }
           ],
           "exercises": [
             {
-              "question": "Pergunta?",
-              "options": ["A", "B", "C", "D"],
-              "correctAnswer": "Opção correta"
+              "question": "Pergunta do quiz?",
+              "options": ["Opção 1", "Opção 2", "Opção 3", "Opção 4"],
+              "correctAnswer": "Opção 2"
             }
           ]
         }
       ],
       "finalExam": [
         {
-          "question": "Pergunta?",
+          "question": "Pergunta do exame final?",
           "options": ["1", "2", "3", "4"],
-          "correctAnswer": "Opção correta"
+          "correctAnswer": "3"
         }
       ]
     }`;
@@ -73,14 +77,13 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
         { role: 'user', content: userPrompt }
       ],
       model: provider,
-      temperature: 0.6, // Ajustado para manter criatividade com foco estrutural
+      temperature: 0.7, // Aumentado levemente para maior profundidade no conteúdo
       response_format: { type: "json_object" }
     });
 
-    const content = chatCompletion.choices[0].message.content;
-    const rawData = JSON.parse(content);
+    const rawData = JSON.parse(chatCompletion.choices[0].message.content);
 
-    // --- PÓS-PROCESSAMENTO DE MÉTRICAS ---
+    // --- PÓS-PROCESSAMENTO DE MÉTRICAS (Refinado) ---
     let totalWordCount = 0;
     let totalLessons = 0;
     let totalExercises = 0;
@@ -88,17 +91,28 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
     rawData.modules.forEach(mod => {
       totalExercises += (mod.exercises?.length || 0);
       mod.lessons.forEach(lesson => {
-        totalWordCount += (lesson.content || "").split(/\s+/).length;
+        // Sanitização simples para contagem de palavras
+        const cleanContent = (lesson.content || "").replace(/[#*`]/g, '');
+        const wordCount = cleanContent.trim().split(/\s+/).length;
+        
+        totalWordCount += wordCount;
         totalLessons++;
+        
+        // Ajusta a duração da aula dinamicamente se a IA falhar na estimativa
+        // Média de 150 palavras por minuto para leitura técnica
+        const calculatedDuration = Math.max(5, Math.ceil(wordCount / 150));
+        lesson.duration = calculatedDuration;
       });
     });
 
-    const readingTime = Math.ceil(totalWordCount / 180); 
-    const exerciseTime = (totalExercises + (rawData.finalExam?.length || 0)) * 2;
-    const finalEstimatedTime = readingTime + exerciseTime;
+    // Tempo total: Leitura + 2 minutos por exercício
+    const totalExamQuestions = rawData.finalExam?.length || 0;
+    const estimatedReadingTime = Math.ceil(totalWordCount / 150);
+    const estimatedActivityTime = (totalExercises + totalExamQuestions) * 2;
+    const finalEstimatedTime = estimatedReadingTime + estimatedActivityTime;
 
-    const baseXP = level === 'avancado' ? 1500 : (level === 'intermediario' ? 1000 : 600);
-    const finalXpReward = baseXP + (totalLessons * 40) + (finalEstimatedTime * 2);
+    // Cálculo de XP baseado em esforço real e profundidade
+    const finalXpReward = config.xpBase + (totalLessons * 50) + (finalEstimatedTime * 5);
 
     return {
       ...rawData,
@@ -113,8 +127,8 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
     };
 
   } catch (error) {
-    console.error("❌ Erro na Geração da IA:", error.message);
-    throw new Error("Falha ao gerar curso.");
+    console.error("❌ Erro na Geração da IA (aiService):", error.message);
+    throw new Error("Não foi possível gerar o conteúdo do curso no momento.");
   }
 };
 

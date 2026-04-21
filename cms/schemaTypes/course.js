@@ -2,7 +2,6 @@ export default {
   name: 'course',
   title: 'Cursos',
   type: 'document',
-  // Organizamos os campos em grupos para facilitar a edição no Sanity Studio
   fieldsets: [
     { name: 'media', title: 'Identidade Visual', options: { collapsible: true, collapsed: false } },
     { name: 'gamification', title: 'Recompensas e Nível', options: { columns: 2 } },
@@ -49,7 +48,7 @@ export default {
       title: 'ID da Imagem (Pixabay)', 
       type: 'string',
       fieldset: 'media',
-      readOnly: true, // Evita alteração manual de IDs de integração
+      readOnly: true,
       description: 'Identificador único da imagem no provedor externo.'
     },
     {
@@ -65,7 +64,7 @@ export default {
       title: 'Descrição', 
       type: 'text', 
       rows: 3,
-      validation: Rule => Rule.required().min(20).max(500)
+      validation: Rule => Rule.required().min(20).max(800)
     },
     
     // --- GAMIFICAÇÃO ---
@@ -88,13 +87,15 @@ export default {
       title: 'XP ao Concluir', 
       type: 'number', 
       fieldset: 'gamification',
-      initialValue: 100 
+      initialValue: 100,
+      validation: Rule => Rule.min(0)
     },
     { 
       name: 'estimatedTime', 
       title: 'Duração Total (min)', 
       type: 'number',
-      fieldset: 'gamification' 
+      fieldset: 'gamification',
+      validation: Rule => Rule.min(1)
     },
     { 
       name: 'tags', 
@@ -133,15 +134,20 @@ export default {
               fields: [
                 { name: 'title', title: 'Título da Aula', type: 'string' },
                 { name: 'content', title: 'Conteúdo Markdown', type: 'text' },
-                { name: 'duration', title: 'Duração (min)', type: 'number' }
-              ]
+                { name: 'duration', title: 'Duração (min)', type: 'number', initialValue: 5 }
+              ],
+              preview: {
+                select: { title: 'title', dur: 'duration' },
+                prepare({ title, dur }) {
+                  return { title: `${title}`, subtitle: `${dur || 5} min` }
+                }
+              }
             }]
           },
           {
             name: 'exercises',
-            title: 'Quiz Prático (Módulo)',
+            title: 'Quiz do Módulo',
             type: 'array',
-            description: 'Questões para fixação rápida.',
             of: [{
               type: 'object',
               name: 'exercise',
@@ -152,22 +158,29 @@ export default {
               ]
             }]
           }
-        ]
+        ],
+        preview: {
+          select: { title: 'title', lessons: 'lessons' },
+          prepare({ title, lessons }) {
+            return {
+              title: title,
+              subtitle: `${lessons?.length || 0} aulas neste módulo`
+            }
+          }
+        }
       }]
     },
 
     {
       name: 'finalExam',
       title: 'Exame de Certificação (Final)',
-      description: 'Avaliação final necessária para a conclusão do curso.',
       type: 'array',
-      validation: Rule => Rule.min(1).warning('Cursos sem exame final não podem ser concluídos pelos alunos.'),
       of: [{
         type: 'object',
         name: 'examQuestion',
         fields: [
           { name: 'question', title: 'Pergunta', type: 'string' },
-          { name: 'options', title: 'Opções de Resposta', type: 'array', of: [{ type: 'string' }] },
+          { name: 'options', title: 'Opções', type: 'array', of: [{ type: 'string' }] },
           { name: 'correctAnswer', title: 'Resposta Correta', type: 'string' }
         ]
       }]
@@ -178,7 +191,7 @@ export default {
       name: 'aiMetadata',
       title: 'Dados de Geração (IA)',
       type: 'object',
-      readOnly: true, // Histórico de IA não deve ser editado manualmente
+      readOnly: true,
       fields: [
         { name: 'provider', title: 'Provedor', type: 'string' },
         { name: 'model', title: 'Modelo', type: 'string' },
@@ -197,7 +210,7 @@ export default {
     prepare({ title, author, media, level }) {
       return {
         title,
-        subtitle: `${level.toUpperCase()} | Por: ${author || 'Sistema'}`,
+        subtitle: `${(level || 'iniciante').toUpperCase()} | Por: ${author || 'Sistema'}`,
         media
       }
     }

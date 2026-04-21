@@ -1,19 +1,22 @@
 import * as React from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Checkbox from '@mui/material/Checkbox';
-import Divider from '@mui/material/Divider';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import FormLabel from '@mui/material/FormLabel';
-import FormControl from '@mui/material/FormControl';
-import Link from '@mui/material/Link';
-import TextField from '@mui/material/TextField';
-import Typography from '@mui/material/Typography';
-import Stack from '@mui/material/Stack';
-import MuiCard from '@mui/material/Card';
-import Grid from '@mui/material/Grid';
-import CircularProgress from '@mui/material/CircularProgress';
+import {
+  Box,
+  Button,
+  Checkbox,
+  Divider,
+  FormControlLabel,
+  FormLabel,
+  FormControl,
+  Link,
+  TextField,
+  Typography,
+  Stack,
+  Card as MuiCard,
+  Grid,
+  CircularProgress,
+  Alert
+} from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { SitemarkIcon } from './components/CustomIcons';
 import { useAuth } from '../../contexts/AuthContext';
@@ -39,6 +42,7 @@ const Card = styled(MuiCard)(({ theme }) => ({
 }));
 
 const SignUpContainer = styled(Stack)(({ theme }) => ({
+  minHeight: '100dvh',
   padding: theme.spacing(2),
   [theme.breakpoints.up('sm')]: {
     padding: theme.spacing(4),
@@ -59,67 +63,57 @@ const SignUpContainer = styled(Stack)(({ theme }) => ({
   },
 }));
 
-export default function SignUp(props) {
+export default function SignUp() {
   const navigate = useNavigate();
-  const { signIn } = useAuth(); // Usamos o signIn para logar automaticamente após o registro
+  const { signIn } = useAuth();
 
   // Estados de erro
-  const [nameError, setNameError] = React.useState(false);
-  const [nameErrorMessage, setNameErrorMessage] = React.useState('');
-  const [emailError, setEmailError] = React.useState(false);
-  const [emailErrorMessage, setEmailErrorMessage] = React.useState('');
-  const [passwordError, setPasswordError] = React.useState(false);
-  const [passwordErrorMessage, setPasswordErrorMessage] = React.useState('');
-  const [confirmError, setConfirmError] = React.useState(false);
-  const [confirmErrorMessage, setConfirmErrorMessage] = React.useState('');
-  
+  const [errors, setErrors] = React.useState({
+    name: { error: false, message: '' },
+    email: { error: false, message: '' },
+    password: { error: false, message: '' },
+    confirmPassword: { error: false, message: '' },
+  });
+
   const [backendError, setBackendError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
-  const validateInputs = () => {
-    const name = document.getElementById('name');
-    const email = document.getElementById('email');
-    const password = document.getElementById('password');
-    const confirmPassword = document.getElementById('confirmPassword');
+  const validateInputs = (data) => {
+    const name = data.get('name');
+    const email = data.get('email');
+    const password = data.get('password');
+    const confirmPassword = data.get('confirmPassword');
+
+    let newErrors = {
+      name: { error: false, message: '' },
+      email: { error: false, message: '' },
+      password: { error: false, message: '' },
+      confirmPassword: { error: false, message: '' },
+    };
 
     let isValid = true;
 
-    if (!name.value || name.value.length < 1) {
-      setNameError(true);
-      setNameErrorMessage('O nome é obrigatório.');
+    if (!name || name.length < 2) {
+      newErrors.name = { error: true, message: 'Digite seu nome completo.' };
       isValid = false;
-    } else {
-      setNameError(false);
-      setNameErrorMessage('');
     }
 
-    if (!email.value || !/\S+@\S+\.\S+/.test(email.value)) {
-      setEmailError(true);
-      setEmailErrorMessage('Por favor, insira um e-mail válido.');
+    if (!email || !/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = { error: true, message: 'Insira um e-mail válido.' };
       isValid = false;
-    } else {
-      setEmailError(false);
-      setEmailErrorMessage('');
     }
 
-    if (!password.value || password.value.length < 6) {
-      setPasswordError(true);
-      setPasswordErrorMessage('A senha deve ter pelo menos 6 caracteres.');
+    if (!password || password.length < 6) {
+      newErrors.password = { error: true, message: 'A senha deve ter pelo menos 6 caracteres.' };
       isValid = false;
-    } else {
-      setPasswordError(false);
-      setPasswordErrorMessage('');
     }
 
-    if (confirmPassword.value !== password.value) {
-      setConfirmError(true);
-      setConfirmErrorMessage('As senhas não coincidem.');
+    if (confirmPassword !== password) {
+      newErrors.confirmPassword = { error: true, message: 'As senhas não coincidem.' };
       isValid = false;
-    } else {
-      setConfirmError(false);
-      setConfirmErrorMessage('');
     }
 
+    setErrors(newErrors);
     return isValid;
   };
 
@@ -127,176 +121,172 @@ export default function SignUp(props) {
     event.preventDefault();
     setBackendError('');
 
-    if (!validateInputs()) {
+    const data = new FormData(event.currentTarget);
+    
+    if (!validateInputs(data)) {
       return;
     }
 
     setLoading(true);
 
-    const data = new FormData(event.currentTarget);
-    const name = data.get('name');
-    const email = data.get('email');
-    const password = data.get('password');
-    const newsletter = data.get('newsletter') === 'on';
+    const payload = {
+      name: data.get('name'),
+      email: data.get('email'),
+      password: data.get('password'),
+      newsletter: data.get('newsletter') === 'on',
+    };
 
     try {
-      // Chamada direta para o endpoint de registro do nosso backend
-      const response = await api.post('/auth/register', {
-        name,
-        email,
-        password,
-        newsletter
-      });
+      const response = await api.post('/auth/register', payload);
 
       if (response.data.success) {
-        // Loga automaticamente para melhorar a UX
-        const loginResult = await signIn(email, password);
-        if (loginResult.success) {
+        // Login automático após sucesso no registro
+        const loginResult = await signIn(payload.email, payload.password);
+        if (loginResult && loginResult.success) {
           navigate('/'); 
         } else {
-          navigate('/entrar'); // Fallback caso o login automático falhe
+          navigate('/entrar'); 
         }
       } else {
         setBackendError(response.data.error || 'Erro ao criar conta.');
       }
     } catch (err) {
-      setBackendError(err.response?.data?.error || 'Falha na comunicação com o servidor.');
+      setBackendError(
+        err.response?.data?.error || 'Falha na comunicação com o servidor. Tente novamente.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <>
-      <SignUpContainer direction="column" justifyContent="center">
-        <Card variant="outlined">
+    <SignUpContainer direction="column" justifyContent="center">
+      <Card variant="outlined">
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
           <SitemarkIcon />
-          <Typography
-            component="h1"
-            variant="h4"
-            sx={{ width: '100%', fontSize: 'clamp(2rem, 10vw, 2.15rem)' }}
-          >
-            Cadastrar
-          </Typography>
+        </Box>
+        <Typography
+          component="h1"
+          variant="h4"
+          sx={{ width: '100%', fontSize: 'clamp(2rem, 10vw, 2.15rem)', textAlign: 'center', mb: 1 }}
+        >
+          Cadastrar
+        </Typography>
 
-          {backendError && (
-            <Typography color="error" variant="body2" sx={{ textAlign: 'center', fontWeight: 'bold' }}>
-              {backendError}
-            </Typography>
-          )}
+        {backendError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {backendError}
+          </Alert>
+        )}
 
-          <Box
-            component="form"
-            onSubmit={handleSubmit}
-            sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
-          >
-            <FormControl>
-              <FormLabel htmlFor="name">Nome completo</FormLabel>
-              <TextField
-                autoComplete="name"
-                name="name"
-                required
-                fullWidth
-                id="name"
-                placeholder="Ex: João Silva"
-                disabled={loading}
-                error={nameError}
-                helperText={nameErrorMessage}
-                color={nameError ? 'error' : 'primary'}
-              />
-            </FormControl>
-            
-            <FormControl>
-              <FormLabel htmlFor="email">E-mail</FormLabel>
-              <TextField
-                required
-                fullWidth
-                id="email"
-                placeholder="seu@email.com"
-                name="email"
-                autoComplete="email"
-                variant="outlined"
-                disabled={loading}
-                error={emailError}
-                helperText={emailErrorMessage}
-                color={emailError ? 'error' : 'primary'}
-              />
-            </FormControl>
-
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <FormLabel htmlFor="password">Senha</FormLabel>
-                  <TextField
-                    required
-                    fullWidth
-                    name="password"
-                    placeholder="••••••"
-                    type="password"
-                    id="password"
-                    autoComplete="new-password"
-                    variant="outlined"
-                    disabled={loading}
-                    error={passwordError}
-                    helperText={passwordErrorMessage}
-                    color={passwordError ? 'error' : 'primary'}
-                  />
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <FormLabel htmlFor="confirmPassword">Confirmar Senha</FormLabel>
-                  <TextField
-                    required
-                    fullWidth
-                    name="confirmPassword"
-                    placeholder="••••••"
-                    type="password"
-                    id="confirmPassword"
-                    variant="outlined"
-                    disabled={loading}
-                    error={confirmError}
-                    helperText={confirmErrorMessage}
-                    color={confirmError ? 'error' : 'primary'}
-                  />
-                </FormControl>
-              </Grid>
-            </Grid>
-
-            <FormControlLabel
-              control={<Checkbox name="newsletter" color="primary" />}
-              label="Assinar boletim informativo."
-              disabled={loading}
-            />
-            
-            <Button
-              type="submit"
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}
+        >
+          <FormControl>
+            <FormLabel htmlFor="name">Nome completo</FormLabel>
+            <TextField
+              autoComplete="name"
+              name="name"
+              required
               fullWidth
-              variant="contained"
+              id="name"
+              placeholder="Ex: João Silva"
+              autoFocus
               disabled={loading}
-              startIcon={loading && <CircularProgress size={20} color="inherit" />}
+              error={errors.name.error}
+              helperText={errors.name.message}
+            />
+          </FormControl>
+          
+          <FormControl>
+            <FormLabel htmlFor="email">E-mail</FormLabel>
+            <TextField
+              required
+              fullWidth
+              id="email"
+              placeholder="seu@email.com"
+              name="email"
+              autoComplete="email"
+              disabled={loading}
+              error={errors.email.error}
+              helperText={errors.email.message}
+            />
+          </FormControl>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <FormLabel htmlFor="password">Senha</FormLabel>
+                <TextField
+                  required
+                  fullWidth
+                  name="password"
+                  placeholder="••••••"
+                  type="password"
+                  id="password"
+                  autoComplete="new-password"
+                  disabled={loading}
+                  error={errors.password.error}
+                  helperText={errors.password.message}
+                />
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <FormLabel htmlFor="confirmPassword">Confirmar</FormLabel>
+                <TextField
+                  required
+                  fullWidth
+                  name="confirmPassword"
+                  placeholder="••••••"
+                  type="password"
+                  id="confirmPassword"
+                  disabled={loading}
+                  error={errors.confirmPassword.error}
+                  helperText={errors.confirmPassword.message}
+                />
+              </FormControl>
+            </Grid>
+          </Grid>
+
+          <FormControlLabel
+            control={<Checkbox name="newsletter" color="primary" defaultChecked />}
+            label={<Typography variant="body2">Assinar boletim informativo.</Typography>}
+            disabled={loading}
+          />
+          
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            size="large"
+            disabled={loading}
+            sx={{ mt: 1 }}
+          >
+            {loading ? <CircularProgress size={24} color="inherit" /> : 'Criar Conta'}
+          </Button>
+        </Box>
+
+        <Divider sx={{ my: 1 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>ou</Typography>
+        </Divider>
+
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Typography sx={{ textAlign: 'center' }}>
+            Já tem uma conta?{' '}
+            <Link
+              component={RouterLink}
+              to="/entrar"
+              variant="body2"
+              fontWeight="bold"
             >
-              {loading ? 'Processando...' : 'Cadastrar'}
-            </Button>
-          </Box>
-          <Divider>
-            <Typography sx={{ color: 'text.secondary' }}>ou</Typography>
-          </Divider>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography sx={{ textAlign: 'center' }}>
-              Já tem uma conta?{' '}
-              <Link
-                component={RouterLink}
-                to="/entrar"
-                variant="body2"
-                sx={{ alignSelf: 'center' }}
-              >
-                Entrar
-              </Link>
-            </Typography>
-          </Box>
-        </Card>
-      </SignUpContainer>
-    </>
+              Entrar
+            </Link>
+          </Typography>
+        </Box>
+      </Card>
+    </SignUpContainer>
   );
 }

@@ -4,25 +4,36 @@ const authController = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
 
 /**
- * ROTAS DE AUTENTICAÇÃO - v1.3
- * Gerencia ciclo de vida do usuário e integridade de créditos.
+ * ROTAS DE AUTENTICAÇÃO v1.4
+ * Gerencia o ciclo de vida do usuário, segurança de sessão e sincronização de créditos.
+ */
+
+/**
+ * --- ACESSO PÚBLICO ---
  */
 
 // [POST] /api/auth/register
-// Cria o usuário com lastGenerationAt antigo para permitir uso imediato.
+// Cria o documento do usuário no Sanity e inicializa stats/créditos.
 router.post('/register', authController.register);
 
 // [POST] /api/auth/login
-// Realiza o login e verifica se o crédito de 1h deve ser resetado.
+// Valida credenciais e retorna o JWT (JSON Web Token).
 router.post('/login', authController.login);
 
+
 /**
- * ROTAS PROTEGIDAS
- * Necessitam do Bearer Token no Header.
+ * --- ACESSO PROTEGIDO ---
+ * Requer Header: Authorization: Bearer <token>
  */
 
 // [GET] /api/auth/me
-// Vital para o AuthContext: valida a sessão e atualiza créditos/stats silenciosamente.
+// Rota fundamental para o Frontend (React AuthContext).
+// Além de validar o token, o controller deve sincronizar o progresso e 
+// verificar se o tempo de recarga de 1h da cota gratuita já expirou.
 router.get('/me', authMiddleware, authController.getMe);
+
+// [PUT] /api/auth/update-profile
+// (Opcional) Para atualizar nome, avatar ou preferência de newsletter.
+// router.put('/update', authMiddleware, authController.updateProfile);
 
 module.exports = router;
