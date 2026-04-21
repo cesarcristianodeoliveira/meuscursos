@@ -23,7 +23,6 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LockIcon from '@mui/icons-material/Lock';
 import ReplayIcon from '@mui/icons-material/Replay';
 import VerifiedIcon from '@mui/icons-material/Verified';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 // --- ESTILOS ---
 const SidebarContainer = styled(Box)(({ theme }) => ({
