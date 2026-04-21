@@ -4,8 +4,7 @@ const jwt = require('jsonwebtoken');
 const { formatSlug } = require('../utils/formatter');
 
 /**
- * FUNÇÃO AUXILIAR: Verifica e reseta créditos baseada no tempo (v1.3)
- * Regra: Se o crédito for 0 e já passou 1 hora desde a última geração, devolve 1 crédito.
+ * FUNÇÃO AUXILIAR: Verifica e reseta créditos baseada no tempo
  */
 const checkAndResetCredits = async (user) => {
   if (user.credits > 0) return user;
@@ -15,15 +14,12 @@ const checkAndResetCredits = async (user) => {
   const diffInHours = (now - lastGen) / (1000 * 60 * 60);
 
   if (diffInHours >= 1) {
-    // Atualiza no Sanity e retorna o usuário atualizado
     const updatedUser = await client
       .patch(user._id)
       .set({ credits: 1 })
       .commit();
-    console.log(`✅ Crédito resetado para o usuário: ${user.email}`);
     return updatedUser;
   }
-
   return user;
 };
 
@@ -47,7 +43,7 @@ const generateUniqueSlug = async (name) => {
 };
 
 /**
- * REGISTRO
+ * REGISTRO (Atualizado v1.7 - Com criação de Newsletter separada)
  */
 const register = async (req, res) => {
   const { name, email, password, newsletter } = req.body;
@@ -66,6 +62,7 @@ const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
     const finalSlug = await generateUniqueSlug(name);
 
+    // 1. Criar o documento do Usuário
     const newUser = {
       _type: 'user',
       name,
@@ -83,14 +80,30 @@ const register = async (req, res) => {
         coursesCreated: 0,
         coursesCompleted: 0,
         lastLogin: new Date().toISOString(),
-        lastGenerationAt: new Date(Date.now() - 3600000).toISOString() // Registra como "usado há 1 hora" para já começar podendo usar
+        lastGenerationAt: new Date(Date.now() - 3600000).toISOString() 
       }
     };
 
-    const result = await client.create(newUser);
+    const userCreated = await client.create(newUser);
+
+    // 2. Se selecionou newsletter, cria o documento no schema 'newsletter'
+    if (newsletter) {
+      try {
+        await client.create({
+          _type: 'newsletter',
+          user: { _type: 'reference', _ref: userCreated._id },
+          email: userCreated.email,
+          subscribedAt: new Date().toISOString()
+        });
+        console.log(`📧 Inscrição na newsletter criada para: ${email}`);
+      } catch (newsErr) {
+        console.error("Erro silencioso ao criar newsletter:", newsErr);
+        // Não travamos o registro se a newsletter falhar, apenas logamos.
+      }
+    }
 
     const token = jwt.sign(
-      { id: result._id, role: result.role, plan: result.plan },
+      { id: userCreated._id, role: userCreated.role, plan: userCreated.plan },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -99,15 +112,16 @@ const register = async (req, res) => {
       success: true,
       token,
       user: {
-        _id: result._id, // Usamos _id para bater com o que o Sanity espera
-        name: result.name,
-        email: result.email,
-        credits: result.credits,
-        stats: result.stats
+        _id: userCreated._id,
+        name: userCreated.name,
+        email: userCreated.email,
+        credits: userCreated.credits,
+        stats: userCreated.stats
       }
     });
 
   } catch (error) {
+    console.error("Erro no registro:", error);
     return res.status(500).json({ success: false, error: "Erro ao criar conta." });
   }
 };
@@ -117,22 +131,14 @@ const register = async (req, res) => {
  */
 const login = async (req, res) => {
   const { email, password } = req.body;
-
   try {
     let user = await client.fetch(`*[_type == "user" && email == $email][0]`, { email });
-
-    if (!user) {
-      return res.status(401).json({ success: false, error: "E-mail ou senha inválidos." });
-    }
+    if (!user) return res.status(401).json({ success: false, error: "E-mail ou senha inválidos." });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, error: "E-mail ou senha inválidos." });
-    }
+    if (!isMatch) return res.status(401).json({ success: false, error: "E-mail ou senha inválidos." });
 
-    // Tenta resetar os créditos no login
     user = await checkAndResetCredits(user);
-
     await client.patch(user._id).set({ "stats.lastLogin": new Date().toISOString() }).commit();
 
     const token = jwt.sign(
@@ -153,21 +159,19 @@ const login = async (req, res) => {
         slug: user.slug?.current
       }
     });
-
   } catch (error) {
     return res.status(500).json({ success: false, error: "Erro interno no servidor." });
   }
 };
 
 /**
- * GET ME (Validação de sessão e Refresh de Créditos)
+ * GET ME
  */
 const getMe = async (req, res) => {
   try {
     let user = await client.fetch(`*[_id == $id][0]`, { id: req.userId });
     if (!user) return res.status(404).json({ success: false, error: "Usuário não encontrado." });
 
-    // Tenta resetar os créditos toda vez que o app abre/valida a sessão
     user = await checkAndResetCredits(user);
 
     return res.status(200).json({

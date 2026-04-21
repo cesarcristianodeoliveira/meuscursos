@@ -33,15 +33,37 @@ export default {
       name: 'completedLessons',
       title: 'Aulas Concluídas', 
       type: 'array', 
-      of: [{ type: 'string' }],
-      description: 'Lista de IDs (_key) das lições finalizadas'
+      description: 'Histórico detalhado de lições assistidas',
+      of: [
+        {
+          type: 'object',
+          name: 'lessonProgress',
+          fields: [
+            { name: 'lessonKey', title: 'ID da Lição', type: 'string' },
+            { name: 'lessonTitle', title: 'Título da Lição', type: 'string' },
+            { name: 'completedAt', title: 'Data de Conclusão', type: 'datetime' }
+          ]
+        }
+      ]
     },
     { 
-      name: 'lastModuleScore',
-      title: 'Nota do Último Módulo (%)', 
-      type: 'number',
-      description: 'Nota persistida dos quizzes de prática (não gera certificado)',
-      validation: Rule => Rule.min(0).max(100)
+      name: 'completedQuizzes',
+      title: 'Quizzes de Módulo Concluídos', 
+      type: 'array',
+      description: 'Resultados dos testes de cada módulo',
+      of: [
+        {
+          type: 'object',
+          name: 'quizResult',
+          fields: [
+            { name: 'moduleKey', title: 'ID do Módulo', type: 'string' },
+            { name: 'moduleTitle', title: 'Título do Módulo', type: 'string' },
+            { name: 'score', title: 'Acertos', type: 'number' },
+            { name: 'totalQuestions', title: 'Total de Questões', type: 'number' },
+            { name: 'percent', title: 'Aproveitamento (%)', type: 'number' }
+          ]
+        }
+      ]
     },
     { 
       name: 'finalScore', 
@@ -60,24 +82,23 @@ export default {
       name: 'completionDate',
       title: 'Data de Conclusão',
       type: 'datetime',
-      description: 'Preenchido automaticamente ao atingir 80% no exame final'
+      description: 'Preenchido automaticamente ao concluir o exame final'
     }
   ],
   preview: {
     select: {
       userTitle: 'user.name',
-      userEmail: 'user.email',
       courseTitle: 'course.title',
       status: 'status',
       finalScore: 'finalScore'
     },
-    prepare({ userTitle, userEmail, courseTitle, status, finalScore }) {
+    prepare({ userTitle, courseTitle, status, finalScore }) {
       const statusEmoji = status === 'concluido' ? '🎓' : '📚';
-      const scoreDisplay = finalScore ? ` | Nota: ${finalScore}%` : '';
+      const scoreDisplay = finalScore ? ` | Nota Final: ${finalScore}%` : '';
       
       return {
-        title: `${statusEmoji} ${userTitle || 'Estudante'} -> ${courseTitle || 'Curso'}`,
-        subtitle: `${userEmail || 'Sem e-mail'}${scoreDisplay}`,
+        title: `${statusEmoji} ${userTitle} -> ${courseTitle}`,
+        subtitle: `Status: ${status}${scoreDisplay}`,
       };
     }
   }

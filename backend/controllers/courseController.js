@@ -6,8 +6,165 @@ const { formatSlug } = require('../utils/formatter');
 const crypto = require('crypto');
 
 /**
- * BUSCAR CURSO POR SLUG (Acesso Público)
+ * BUSCAR PROGRESSO (Atualizado para o novo Schema)
  */
+const getProgress = async (req, res) => {
+  const { id: courseId } = req.params;
+  const userId = req.userId;
+  try {
+    const enrollment = await client.fetch(
+      `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]{
+        completedLessons,
+        completedQuizzes,
+        finalScore,
+        status
+      }`,
+      { userId, courseId }
+    );
+    return res.status(200).json({ 
+      success: true, 
+      completedLessons: enrollment?.completedLessons || [],
+      completedQuizzes: enrollment?.completedQuizzes || [],
+      finalScore: enrollment?.finalScore || 0,
+      status: enrollment?.status || 'nao_iniciado'
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Erro ao buscar progresso." });
+  }
+};
+
+/**
+ * SALVAR PROGRESSO DAS AULAS (Com Título e Data)
+ */
+const saveProgress = async (req, res) => {
+  const { id: courseId } = req.params;
+  const { lessonId, lessonTitle, completed } = req.body;
+  const userId = req.userId;
+
+  try {
+    const enrollmentQuery = `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]`;
+    let enrollment = await client.fetch(enrollmentQuery, { userId, courseId });
+
+    if (!enrollment) {
+      if (completed) {
+        await client.create({
+          _type: 'enrollment',
+          user: { _ref: userId },
+          course: { _ref: courseId },
+          completedLessons: [{
+            _key: crypto.randomUUID(),
+            lessonKey: lessonId,
+            lessonTitle: lessonTitle,
+            completedAt: new Date().toISOString()
+          }],
+          status: 'em_andamento',
+          startDate: new Date().toISOString()
+        });
+      }
+    } else {
+      const lessons = enrollment.completedLessons || [];
+      let updatedLessons;
+
+      if (completed) {
+        // Evita duplicatas conferindo pelo lessonKey
+        const exists = lessons.some(l => l.lessonKey === lessonId);
+        updatedLessons = exists ? lessons : [
+          ...lessons, 
+          { 
+            _key: crypto.randomUUID(), 
+            lessonKey: lessonId, 
+            lessonTitle: lessonTitle, 
+            completedAt: new Date().toISOString() 
+          }
+        ];
+      } else {
+        updatedLessons = lessons.filter(l => l.lessonKey !== lessonId);
+      }
+
+      await client
+        .patch(enrollment._id)
+        .set({ completedLessons: updatedLessons })
+        .commit();
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Erro ao salvar progresso:", error);
+    return res.status(500).json({ error: "Erro interno." });
+  }
+};
+
+/**
+ * SALVAR RESULTADO DO QUIZ (Persistência por Módulo)
+ */
+const saveQuizProgress = async (req, res) => {
+  const { id: courseId } = req.params;
+  const { score, totalQuestions, isFinalExam, moduleKey, moduleTitle } = req.body;
+  const userId = req.userId;
+
+  try {
+    const enrollmentQuery = `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]`;
+    let enrollment = await client.fetch(enrollmentQuery, { userId, courseId });
+
+    const scorePercentage = Math.round((score / totalQuestions) * 100);
+
+    if (!enrollment) {
+      enrollment = await client.create({
+        _type: 'enrollment',
+        user: { _ref: userId },
+        course: { _ref: courseId },
+        completedLessons: [],
+        completedQuizzes: [],
+        status: 'em_andamento',
+        startDate: new Date().toISOString()
+      });
+    }
+
+    if (isFinalExam) {
+      const patchData = { finalScore: scorePercentage };
+      if (scorePercentage >= 80) {
+        patchData.status = 'concluido';
+        patchData.completionDate = new Date().toISOString();
+      }
+      await client.patch(enrollment._id).set(patchData).commit();
+    } else {
+      // Lógica para Quizzes de Módulo
+      const quizzes = enrollment.completedQuizzes || [];
+      const newQuizResult = {
+        _key: crypto.randomUUID(),
+        moduleKey,
+        moduleTitle,
+        score,
+        totalQuestions,
+        percent: scorePercentage
+      };
+
+      // Se o quiz do módulo já existe, atualizamos, senão adicionamos
+      const existingIdx = quizzes.findIndex(q => q.moduleKey === moduleKey);
+      let updatedQuizzes = [...quizzes];
+
+      if (existingIdx > -1) {
+        updatedQuizzes[existingIdx] = newQuizResult;
+      } else {
+        updatedQuizzes.push(newQuizResult);
+      }
+
+      await client.patch(enrollment._id).set({ completedQuizzes: updatedQuizzes }).commit();
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      percent: scorePercentage,
+      status: scorePercentage >= 80 && isFinalExam ? 'concluido' : 'em_andamento'
+    });
+  } catch (error) {
+    console.error("Erro ao salvar resultado do quiz:", error);
+    return res.status(500).json({ error: "Erro ao processar resultado do quiz." });
+  }
+};
+
+// ... (getCourseBySlug, createCourse, etc permanecem similares, apenas garanta que o createCourse use crypto.randomUUID() para as chaves)
+
 const getCourseBySlug = async (req, res) => {
   const { slug } = req.params;
   try {
@@ -32,9 +189,6 @@ const getCourseBySlug = async (req, res) => {
   }
 };
 
-/**
- * CRIAÇÃO DE CURSO (Otimizada v1.5)
- */
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
   const userId = req.userId; 
@@ -131,130 +285,6 @@ const createCourse = async (req, res) => {
   }
 };
 
-/**
- * SALVAR RESULTADO DO QUIZ (Persistência v1.6 - Trava de Conclusão)
- */
-const saveQuizProgress = async (req, res) => {
-  const { id: courseId } = req.params;
-  const { score, totalQuestions, isFinalExam } = req.body;
-  const userId = req.userId;
-
-  try {
-    const enrollmentQuery = `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]`;
-    let enrollment = await client.fetch(enrollmentQuery, { userId, courseId });
-
-    const scorePercentage = Math.round((score / totalQuestions) * 100);
-
-    if (!enrollment) {
-      // Se não houver matrícula, cria uma como "em_andamento"
-      enrollment = await client.create({
-        _type: 'enrollment',
-        user: { _ref: userId },
-        course: { _ref: courseId },
-        completedLessons: [],
-        status: 'em_andamento',
-        startDate: new Date().toISOString()
-      });
-    }
-
-    const patchData = {};
-    
-    // REGRA DE OURO: Só marca como concluído se for o Exame Final E aproveitamento >= 80%
-    if (isFinalExam) {
-      patchData.finalScore = scorePercentage;
-      if (scorePercentage >= 80) {
-        patchData.status = 'concluido';
-        patchData.completionDate = new Date().toISOString();
-      }
-    } else {
-      // Se for quiz de módulo, apenas atualizamos a nota do último quiz praticado
-      patchData.lastModuleScore = scorePercentage;
-    }
-
-    await client
-      .patch(enrollment._id)
-      .set(patchData)
-      .commit();
-
-    return res.status(200).json({ 
-      success: true, 
-      finalScore: scorePercentage, 
-      status: patchData.status || enrollment.status 
-    });
-  } catch (error) {
-    console.error("Erro ao salvar resultado do quiz:", error);
-    return res.status(500).json({ error: "Erro ao processar resultado do quiz." });
-  }
-};
-
-/**
- * SALVAR PROGRESSO DAS AULAS
- */
-const saveProgress = async (req, res) => {
-  const { id: courseId } = req.params;
-  const { lessonId, completed } = req.body;
-  const userId = req.userId;
-
-  try {
-    const enrollmentQuery = `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]`;
-    let enrollment = await client.fetch(enrollmentQuery, { userId, courseId });
-
-    if (!enrollment) {
-      if (completed) {
-        await client.create({
-          _type: 'enrollment',
-          user: { _ref: userId },
-          course: { _ref: courseId },
-          completedLessons: [lessonId],
-          status: 'em_andamento',
-          startDate: new Date().toISOString()
-        });
-      }
-    } else {
-      const lessons = enrollment.completedLessons || [];
-      const updatedLessons = completed
-        ? Array.from(new Set([...lessons, lessonId]))
-        : lessons.filter(id => id !== lessonId);
-
-      await client
-        .patch(enrollment._id)
-        .set({ completedLessons: updatedLessons })
-        .commit();
-    }
-
-    return res.status(200).json({ success: true });
-  } catch (error) {
-    console.error("Erro ao salvar progresso:", error);
-    return res.status(500).json({ error: "Erro interno." });
-  }
-};
-
-/**
- * BUSCAR PROGRESSO
- */
-const getProgress = async (req, res) => {
-  const { id: courseId } = req.params;
-  const userId = req.userId;
-  try {
-    const enrollment = await client.fetch(
-      `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]{
-        completedLessons,
-        finalScore,
-        status
-      }`,
-      { userId, courseId }
-    );
-    return res.status(200).json({ 
-      success: true, 
-      completedLessons: enrollment ? (enrollment.completedLessons || []) : [],
-      finalScore: enrollment ? (enrollment.finalScore || 0) : 0,
-      status: enrollment ? enrollment.status : 'nao_iniciado'
-    });
-  } catch (error) {
-    return res.status(500).json({ error: "Erro ao buscar progresso." });
-  }
-};
-
 const getUserCourses = async (req, res) => {
   const userId = req.userId;
   try {
@@ -269,7 +299,7 @@ const getUserCourses = async (req, res) => {
 const getCourseById = async (req, res) => {
   const { id } = req.params;
   try {
-    const course = await client.fetch(`*[_type == "course" && _id == $id][0]`, { id });
+    const course = await client.fetch(`*[_id == $id][0]`, { id });
     if (!course) return res.status(404).json({ error: "Curso não encontrado." });
     return res.status(200).json({ success: true, course });
   } catch (error) {

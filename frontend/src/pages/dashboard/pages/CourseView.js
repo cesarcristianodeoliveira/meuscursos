@@ -23,7 +23,7 @@ import MenuBook from '@mui/icons-material/MenuBook';
 
 const SidebarContainer = styled(Box)(({ theme }) => ({
   borderRight: `1px solid ${theme.palette.divider}`,
-  height: 'calc(100vh - 64px)', // Ajustado para altura da Toolbar padrão
+  height: 'calc(100vh - 64px)', 
   overflowY: 'auto',
   backgroundColor: theme.palette.background.paper,
   position: 'sticky',
@@ -105,11 +105,7 @@ const ModuleQuiz = ({ rawQuestions = [], onComplete, isSaving, title = "Desafio"
                   value={opt} 
                   control={<Radio disabled={submitted} />} 
                   label={opt} 
-                  sx={{ 
-                    borderRadius: 1,
-                    mb: 1,
-                    '&:hover': { bgcolor: submitted ? 'transparent' : 'action.hover' }
-                  }}
+                  sx={{ borderRadius: 1, mb: 1 }}
                 />
               ))}
             </RadioGroup>
@@ -176,7 +172,9 @@ export default function CourseView() {
           if (user?._id) {
             const res = await api.get(`/courses/${data._id}/progress`);
             if (res.data.success) {
-              setCompletedLessons(res.data.completedLessons || []);
+              // Extraímos apenas os IDs das aulas para facilitar o uso dos ícones no front
+              const idsOnly = res.data.completedLessons?.map(l => l.lessonKey) || [];
+              setCompletedLessons(idsOnly);
               setCourseStatus(res.data.status);
             }
           }
@@ -195,32 +193,44 @@ export default function CourseView() {
     
     const lessonId = lesson._key;
     const isCompleted = completedLessons.includes(lessonId);
-    const updated = isCompleted ? completedLessons.filter(l => l !== lessonId) : [...completedLessons, lessonId];
-
+    
+    // Atualização otimista do estado local
+    const updated = isCompleted ? completedLessons.filter(id => id !== lessonId) : [...completedLessons, lessonId];
     setCompletedLessons(updated);
+
     try {
-      await api.post(`/courses/${course._id}/progress`, { lessonId, completed: !isCompleted });
-    } catch (err) { console.error("Erro ao salvar progresso"); }
+      await api.post(`/courses/${course._id}/progress`, { 
+        lessonId, 
+        lessonTitle: lesson.title, // Novo: Enviando título para o Sanity
+        completed: !isCompleted 
+      });
+    } catch (err) { 
+      console.error("Erro ao salvar progresso"); 
+    }
   };
 
   const handleQuizComplete = async (score, total) => {
     if (!user) return;
     const isFinal = activeQuiz === 'final';
     
-    if (score === total || isFinal) {
-      setIsSaving(true);
-      try {
-        const res = await api.post(`/courses/${course._id}/quiz-result`, {
-          score,
-          totalQuestions: total,
-          isFinalExam: isFinal
-        });
-        if (res.data.status === 'concluido') setCourseStatus('concluido');
-      } catch (err) {
-        console.error("Erro ao salvar resultado");
-      } finally {
-        setIsSaving(false);
-      }
+    // Encontramos o módulo atual se não for o exame final
+    const currentModule = !isFinal ? course.modules.find(m => m._key === activeQuiz) : null;
+
+    setIsSaving(true);
+    try {
+      const res = await api.post(`/courses/${course._id}/quiz-result`, {
+        score,
+        totalQuestions: total,
+        isFinalExam: isFinal,
+        moduleKey: currentModule?._key, // Novo
+        moduleTitle: currentModule?.title // Novo
+      });
+      
+      if (res.data.status === 'concluido') setCourseStatus('concluido');
+    } catch (err) {
+      console.error("Erro ao salvar resultado");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -234,7 +244,7 @@ export default function CourseView() {
     <Box sx={{ flexGrow: 1 }}>
       <Grid container>
         {/* SIDEBAR */}
-        <Grid item xs={12} md={4} lg={3}>
+        <Grid size={{ xs: 12, md: 4, lg: 3 }}>
           <SidebarContainer>
             <Box sx={{ p: 3 }}>
               <Typography variant="h6" fontWeight="bold" gutterBottom>{course.title}</Typography>
@@ -324,7 +334,7 @@ export default function CourseView() {
         </Grid>
 
         {/* CONTEÚDO PRINCIPAL */}
-        <Grid item xs={12} md={8} lg={9}>
+        <Grid size={{ xs: 12, md: 8, lg: 9 }}>
           <ContentContainer>
             {activeQuiz === 'final' ? (
               <ModuleQuiz 
@@ -335,7 +345,7 @@ export default function CourseView() {
               />
             ) : activeQuiz ? (
               <ModuleQuiz 
-                title="Desafio de Conhecimento"
+                title={course.modules.find(m => m._key === activeQuiz)?.title || "Desafio"}
                 rawQuestions={course.modules.find(m => m._key === activeQuiz)?.exercises} 
                 onComplete={handleQuizComplete}
                 isSaving={isSaving}
@@ -362,7 +372,8 @@ export default function CourseView() {
                 <Box 
                   sx={{ 
                     '& p': { lineHeight: 1.7, fontSize: '1.1rem', mb: 2 },
-                    '& code': { bgcolor: 'action.hover', p: 0.5, borderRadius: 1 },
+                    '& pre': { bgcolor: 'grey.900', color: 'common.white', p: 2, borderRadius: 1, overflowX: 'auto' },
+                    '& code': { bgcolor: 'action.hover', p: 0.5, borderRadius: 1, fontFamily: 'monospace' },
                     '& img': { maxWidth: '100%', borderRadius: 2 }
                   }}
                 >
