@@ -3,7 +3,7 @@ export default {
   title: 'Matrículas e Progresso',
   type: 'document',
   fieldsets: [
-    { name: 'participants', title: 'Vínculos Principal', options: { columns: 2 } },
+    { name: 'participants', title: 'Vínculos Principais', options: { columns: 2 } },
     { name: 'progressData', title: 'Progresso Detalhado', options: { collapsible: true, collapsed: false } },
     { name: 'assessment', title: 'Avaliação e Certificação', options: { columns: 2 } }
   ],
@@ -39,7 +39,7 @@ export default {
       initialValue: 'em_andamento'
     },
     {
-      name: 'progress',
+      name: 'progress', // Certifique-se de que o backend envie um número para cá
       title: 'Progresso Atual (%)',
       type: 'number',
       description: 'Porcentagem total de conclusão do curso.',
@@ -88,14 +88,20 @@ export default {
             { name: 'moduleTitle', title: 'Título do Módulo', type: 'string' },
             { name: 'score', title: 'Acertos', type: 'number' },
             { name: 'totalQuestions', title: 'Total de Questões', type: 'number' },
-            { name: 'percent', title: 'Aproveitamento (%)', type: 'number' }
+            { name: 'percent', title: 'Aproveitamento (%)', type: 'number' },
+            { 
+              name: 'isPassed', 
+              title: 'Aprovado?', 
+              type: 'boolean',
+              description: 'Define se este módulo libera o próximo.'
+            }
           ],
           preview: {
-            select: { title: 'moduleTitle', score: 'score', total: 'totalQuestions' },
-            prepare({ title, score, total }) {
+            select: { title: 'moduleTitle', score: 'score', total: 'totalQuestions', passed: 'isPassed' },
+            prepare({ title, score, total, passed }) {
               return {
-                title: `Módulo: ${title}`,
-                subtitle: `Acertos: ${score}/${total}`
+                title: `${passed ? '✅' : '❌'} Módulo: ${title}`,
+                subtitle: `Acertos: ${score}/${total} (${Math.round((score/total)*100)}%)`
               }
             }
           }
@@ -135,11 +141,11 @@ export default {
     },
     prepare({ userTitle, courseTitle, status, finalScore, progress }) {
       const statusEmoji = status === 'concluido' ? '🎓' : '📚';
-      const progressLabel = progress ? `${progress}%` : '0%';
+      const progressValue = typeof progress === 'number' ? progress : 0;
       
       return {
         title: `${statusEmoji} ${userTitle || 'Usuário'} -> ${courseTitle || 'Curso'}`,
-        subtitle: `Status: ${status} (${progressLabel}) ${finalScore ? `| Nota Final: ${finalScore}%` : ''}`,
+        subtitle: `Status: ${status} (${progressValue}%) ${finalScore ? `| Nota Final: ${finalScore}%` : ''}`,
       };
     }
   }
