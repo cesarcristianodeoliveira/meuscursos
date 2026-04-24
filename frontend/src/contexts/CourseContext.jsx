@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useCallback, useEffect } from 'react';
+// Importação corrigida para apontar para o arquivo cliente na raiz da src
 import { client } from '../client'; 
 import api from '../services/api';     
 import { useAuth } from './AuthContext';
@@ -8,7 +9,9 @@ const CourseContext = createContext();
 export const COURSES_PER_PAGE = 6;
 
 export const CourseProvider = ({ children }) => {
-  const { refreshUser, user } = useAuth(); 
+  // Removido 'user' (que causava o warning) e mantido apenas o necessário
+  const { refreshUser, signed } = useAuth(); 
+  
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [stats, setStats] = useState({ courses: 0, lessons: 0, quizzes: 0, categories: 0 });
@@ -16,8 +19,7 @@ export const CourseProvider = ({ children }) => {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   /**
-   * 1. BUSCA DADOS GLOBAIS (Stats e Categorias)
-   * Usado para popular o Dashboard e filtros de busca.
+   * 1. BUSCA DADOS GLOBAIS (Estatísticas e Categorias)
    */
   const fetchGlobalData = useCallback(async (force = false) => {
     if (initialDataLoaded && !force) return;
@@ -35,7 +37,6 @@ export const CourseProvider = ({ children }) => {
 
       const data = await client.fetch(query);
       
-      // Limpa títulos nulos e ordena alfabeticamente
       const sortedCats = [
         'Recentes', 
         ...(data.cats || [])
@@ -43,7 +44,7 @@ export const CourseProvider = ({ children }) => {
           .sort((a, b) => a.localeCompare(b))
       ];
 
-      setStats(data.stats);
+      setStats(data.stats || { courses: 0, lessons: 0, quizzes: 0, categories: 0 });
       setCategories(sortedCats);
       setInitialDataLoaded(true);
     } catch (err) {
@@ -51,14 +52,13 @@ export const CourseProvider = ({ children }) => {
     }
   }, [initialDataLoaded]);
 
-  // Carrega os dados assim que o Provider monta
+  // Carregamento inicial automático
   useEffect(() => {
     fetchGlobalData();
   }, [fetchGlobalData]);
 
   /**
    * 2. GERADOR DE CURSOS (IA)
-   * Orquestra a chamada ao backend e atualiza o estado do usuário.
    */
   const generateCourse = async (topic, level = 'iniciante') => {
     if (isGenerating) return;
@@ -70,10 +70,10 @@ export const CourseProvider = ({ children }) => {
       const response = await api.post('/courses/generate', { topic, level });
       const { courseId, slug } = response.data;
 
-      // Sincroniza tudo: créditos do usuário e contadores globais
+      // Sincroniza dados globais e créditos do usuário após criação
       await Promise.all([
         fetchGlobalData(true),
-        refreshUser()
+        refreshUser() 
       ]);
 
       setStatusMessage('Curso criado com sucesso! Redirecionando...');
@@ -82,11 +82,9 @@ export const CourseProvider = ({ children }) => {
     } catch (error) {
       const errorMsg = error.response?.data?.error || "Falha na geração do curso. Verifique seus créditos.";
       setStatusMessage(errorMsg);
-      // No erro, resetamos o loading mais rápido para permitir nova tentativa
       setIsGenerating(false); 
       return { success: false, error: errorMsg };
     } finally {
-      // Se sucesso, mantém a mensagem positiva por 2s
       setTimeout(() => {
         setIsGenerating(false);
         setStatusMessage('');
@@ -95,25 +93,44 @@ export const CourseProvider = ({ children }) => {
   };
 
   /**
-   * 3. CÁLCULO DE PROGRESSO (Sincronizado com Backend v2.0)
+   * 3. CÁLCULO DE PROGRESSO (Modo Público/Privado)
    */
   const getCourseProgress = useCallback(async (courseId) => {
-    if (!courseId || !user?._id) return 0;
+    // Se não estiver logado (signed: false), retorna progresso zerado sem erro
+    if (!courseId || !signed) {
+      return { progress: 0, completedLessons: [], completedQuizzes: [] };
+    }
     
     try {
       const res = await api.get(`/courses/${courseId}/progress`);
       if (res.data.success) {
-        // O backend agora retorna o campo 'progress' já calculado
-        const { progress, status } = res.data;
-        
-        if (status === 'concluido') return 100;
-        return progress || 0;
+        return {
+          progress: res.data.progress || 0,
+          completedLessons: res.data.completedLessons || [],
+          completedQuizzes: res.data.completedQuizzes || [],
+          status: res.data.status
+        };
       }
     } catch (err) {
       console.error("Erro ao obter progresso:", err);
     }
-    return 0;
-  }, [user?._id]);
+    return { progress: 0, completedLessons: [], completedQuizzes: [] };
+  }, [signed]);
+
+  /**
+   * 4. ATUALIZAR PROGRESSO DE LIÇÃO
+   */
+  const updateLessonProgress = useCallback(async (courseId, lessonData) => {
+    if (!signed) return { success: false, error: 'Necessário login' };
+    
+    try {
+      const res = await api.post(`/courses/${courseId}/progress`, lessonData);
+      return res.data;
+    } catch (err) {
+      console.error("Erro ao salvar lição:", err);
+      return { success: false, error: 'Erro interno ao salvar' };
+    }
+  }, [signed]);
 
   return (
     <CourseContext.Provider value={{ 
@@ -121,6 +138,7 @@ export const CourseProvider = ({ children }) => {
       statusMessage, 
       generateCourse,
       getCourseProgress,
+      updateLessonProgress,
       stats, 
       categories, 
       fetchGlobalData, 

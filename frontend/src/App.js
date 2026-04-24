@@ -55,20 +55,27 @@ function LoadingScreen() {
 }
 
 /**
- * Proteção de rotas para áreas exclusivas de alunos
+ * Proteção de rotas para áreas exclusivas de alunos (Gerar Curso, Perfil, etc)
  */
 function PrivateRoute({ children }) {
   const { signed, authLoading } = useAuth();
+  
   if (authLoading) return <LoadingScreen />;
-  return signed ? children : <Navigate to="/entrar" replace />;
+  
+  // Se não estiver logado, redireciona para o entrar salvando a rota de origem
+  return signed ? children : <Navigate to="/entrar" replace state={{ from: window.location.pathname }} />;
 }
 
 /**
- * Lógica da Home: Se logado -> Dashboard, Se deslogado -> Landing Page
+ * Lógica da Home: Se logado -> Dashboard, Se deslogado -> Landing Page (Marketing)
  */
 function RootRoute() {
   const { signed, authLoading } = useAuth();
+  
   if (authLoading) return <LoadingScreen />;
+  
+  // Decidimos manter a MarketingPage como porta de entrada mesmo logado? 
+  // Geralmente, se o usuário digita a URL pura e está logado, mandamos para o Dashboard.
   return signed ? <Navigate to="/dashboard" replace /> : <MarketingPage />;
 }
 
@@ -80,21 +87,21 @@ export default function App(props) {
           <CssBaseline enableColorScheme />
           
           <BrowserRouter>
-            <ScrollToTop /> {/* Garante UX de topo ao navegar */}
+            <ScrollToTop />
             <Routes>
-              {/* 1. Direcionamento Inteligente */}
+              {/* 1. Direcionamento Inteligente (Home ou Dashboard) */}
               <Route path="/" element={<RootRoute />} />
               
               {/* 2. Fluxo de Autenticação */}
               <Route path="/entrar" element={<SignIn />} />
               <Route path="/cadastrar" element={<SignUp />} />
 
-              {/* 3. Visualização de Curso (Pública com Upgrade para Privada)
-                  Qualquer pessoa pode ver a estrutura do curso, mas o CourseView
-                  internamente bloqueia o conteúdo se o usuário não estiver logado/matriculado. */}
+              {/* 3. Visualização de Curso (PÚBLICA)
+                  Aberto para SEO e visitantes. As travas de progresso e 
+                  conclusão de quiz são tratadas dentro do componente CourseView. */}
               <Route path="/curso/:slug" element={<CourseView />} />
 
-              {/* 4. Ecossistema do Aluno (Dashboard, Perfil, Meus Cursos) */}
+              {/* 4. Ecossistema Privado do Aluno */}
               <Route 
                 path="/dashboard/*" 
                 element={
@@ -104,7 +111,7 @@ export default function App(props) {
                 } 
               />
 
-              {/* Fallback de segurança */}
+              {/* Fallback de segurança para rotas inexistentes */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>

@@ -9,13 +9,13 @@ export function AuthProvider({ children }) {
 
   /**
    * Normaliza os dados do usuário vindos do Sanity/Backend.
-   * Garante que o _id e objetos de stats existam para evitar erros no Front.
    */
   const handleUserResponse = useCallback((userData) => {
     if (!userData) return null;
     
     const normalizedUser = {
       ...userData,
+      // Garante consistência entre _id (Sanity) e id (JWT)
       _id: userData._id || userData.id,
       credits: userData.credits ?? 0,
       stats: userData.stats || { 
@@ -32,12 +32,17 @@ export function AuthProvider({ children }) {
 
   /**
    * Configura o Header global da API e o LocalStorage.
+   * Chave simplificada para 'token' conforme solicitado.
    */
   const setSession = useCallback((token) => {
     if (token) {
-      localStorage.setItem('@IAcademy:token', token);
+      localStorage.setItem('token', token);
+      // Remove a chave antiga se ela ainda existir (migração silenciosa)
+      localStorage.removeItem('@IAcademy:token');
+      
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
+      localStorage.removeItem('token');
       localStorage.removeItem('@IAcademy:token');
       delete api.defaults.headers.common['Authorization'];
     }
@@ -49,8 +54,7 @@ export function AuthProvider({ children }) {
   }, [setSession]);
 
   /**
-   * Busca os dados mais recentes do usuário (XP, Créditos, etc).
-   * Chamado no carregamento inicial e após ações importantes (como gerar curso).
+   * Busca os dados mais recentes do usuário.
    */
   const refreshUser = useCallback(async () => {
     try {
@@ -59,36 +63,19 @@ export function AuthProvider({ children }) {
         return handleUserResponse(response.data.user);
       }
     } catch (error) {
-      // Se o erro for 401, o interceptor já chamará o signOut
+      // O interceptor da api.js já cuida do 401, mas por segurança:
+      if (error.response?.status === 401) signOut();
       return null;
     }
-  }, [handleUserResponse]);
+  }, [handleUserResponse, signOut]);
 
   /**
-   * INTERCEPTOR: O coração da segurança.
-   * Se qualquer chamada à API retornar 401 (Não autorizado), 
-   * o contexto limpa os dados e manda o usuário para o Login.
-   */
-  useEffect(() => {
-    const interceptor = api.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response?.status === 401) {
-          signOut();
-        }
-        return Promise.reject(error);
-      }
-    );
-
-    return () => api.interceptors.response.eject(interceptor);
-  }, [signOut]);
-
-  /**
-   * LOAD STORAGE: Executado uma única vez ao abrir o App.
+   * LOAD STORAGE: Executado uma única vez ao iniciar a aplicação.
    */
   useEffect(() => {
     async function loadStorageData() {
-      const storageToken = localStorage.getItem('@IAcademy:token');
+      // Verifica primeiro a chave nova, depois a antiga para migração
+      const storageToken = localStorage.getItem('token') || localStorage.getItem('@IAcademy:token');
       
       if (storageToken) {
         setSession(storageToken);
@@ -106,7 +93,6 @@ export function AuthProvider({ children }) {
       
       if (response.data.success) {
         const { token, user: userData } = response.data;
-        // Ordem importa: primeiro injeta o token, depois salva o user
         setSession(token);
         handleUserResponse(userData);
         return { success: true };
@@ -142,7 +128,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider 
       value={{ 
-        signed: !!user, 
+        signed: !!user, // Booleano que indica se há usuário logado
         user, 
         authLoading: loading, 
         signIn, 

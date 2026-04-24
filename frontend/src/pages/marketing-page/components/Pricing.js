@@ -29,7 +29,7 @@ const tiers = [
   {
     title: 'Pro',
     subheader: 'Recomendado',
-    price: '29',
+    price: '9',
     description: [
       '3 créditos por hora',
       'Motores Groq, ChatGPT e Gemini',

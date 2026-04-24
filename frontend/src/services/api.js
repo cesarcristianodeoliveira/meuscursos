@@ -3,7 +3,7 @@ import axios from 'axios';
 const api = axios.create({
   // Prioriza a variável de ambiente do deploy (Vercel/Netlify)
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
-  timeout: 30000, // 30 segundos (ideal para processos de IA que demoram)
+  timeout: 45000, // Aumentado para 45s para dar margem à geração de imagens da IA
   headers: {
     'Content-Type': 'application/json'
   }
@@ -11,9 +11,13 @@ const api = axios.create({
 
 /**
  * INTERCEPTOR DE REQUISIÇÃO
- * Garante que cada chamada à API leve o token mais atualizado.
  */
 api.interceptors.request.use((config) => {
+  // Migração: Se ainda existir o token com nome antigo, removemos para evitar lixo no storage
+  if (localStorage.getItem('@IAcademy:token')) {
+    localStorage.removeItem('@IAcademy:token');
+  }
+
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -25,34 +29,39 @@ api.interceptors.request.use((config) => {
 
 /**
  * INTERCEPTOR DE RESPOSTA
- * Gerencia erros de autenticação e falhas de rede de forma centralizada.
  */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const { response } = error;
+    const { response, code } = error;
 
     // 1. Sessão Expirada ou Token Inválido (401)
     if (response && response.status === 401) {
       localStorage.removeItem('token');
       
-      // Só redireciona se não estivermos já tentando logar
-      if (!window.location.pathname.includes('/entrar')) {
-        // O uso do window.location força o reset de todos os estados do React
-        // garantindo que não sobrem dados do usuário anterior na memória.
-        window.location.href = '/entrar?session=expired';
+      // Evita loops: Só redireciona se já não estiver na página de login
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/entrar' && currentPath !== '/cadastro') {
+        // Armazena a rota atual para redirecionar o usuário de volta após o login
+        const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `/entrar?session=expired&return=${returnUrl}`;
       }
     }
 
-    // 2. Erros Críticos de Servidor (500+)
+    // 2. Erro de Timeout (IA demorou demais)
+    if (code === 'ECONNABORTED') {
+      error.message = "A geração do conteúdo está demorando mais que o esperado. Verifique sua conexão ou tente um tema mais simples.";
+    }
+
+    // 3. Erros Críticos de Servidor (500+)
     if (response && response.status >= 500) {
       console.error("🔥 Erro crítico no servidor:", response.data);
     }
 
-    // 3. Falha de Conexão (Servidor Offline ou Sem Internet)
+    // 4. Falha de Conexão (Servidor Offline ou Sem Internet)
     if (!response) {
       console.error("🌐 Falha de comunicação com a API");
-      error.message = "Conexão perdida. Verifique se o servidor está online.";
+      error.message = error.message || "Não foi possível conectar ao servidor. Verifique sua internet.";
     }
 
     return Promise.reject(error);

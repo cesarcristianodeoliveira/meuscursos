@@ -104,15 +104,6 @@ export default function AppAppBar() {
               >
                 FAQ
               </Button>
-              <Button 
-                variant="text" 
-                color="info" 
-                size="small" 
-                sx={{ minWidth: 0 }}
-                onClick={() => scrollToSection('faq')}
-              >
-                Blog
-              </Button>
             </Box>
           </Box>
           <Box
