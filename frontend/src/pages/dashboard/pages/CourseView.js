@@ -77,7 +77,7 @@ const ModuleQuiz = ({ courseId, quizKey, rawQuestions = [], onComplete, isSaving
   React.useEffect(() => { initQuiz(); }, [initQuiz]);
 
   const handleSubmit = () => {
-    if (isGuest) return onComplete(0, 0); // Redireciona se for convidado
+    if (isGuest) return; 
 
     let currentScore = 0;
     questions.forEach((q, idx) => {
@@ -96,7 +96,7 @@ const ModuleQuiz = ({ courseId, quizKey, rawQuestions = [], onComplete, isSaving
     initQuiz();
   };
 
-  if (!rawQuestions || rawQuestions.length === 0) return <Alert severity="info">Nenhuma questão disponível para este módulo.</Alert>;
+  if (!rawQuestions || rawQuestions.length === 0) return <Alert severity="info">Nenhuma questão disponível.</Alert>;
 
   const isWin = score === questions.length;
 
@@ -139,7 +139,7 @@ const ModuleQuiz = ({ courseId, quizKey, rawQuestions = [], onComplete, isSaving
           size="large" 
           disabled={(!isGuest && Object.keys(answers).length < questions.length) || isSaving}
         >
-          {isSaving ? "Finalizando..." : isGuest ? "Fazer Login para Responder" : "Enviar Respostas"}
+          {isSaving ? "Finalizando..." : isGuest ? "Faça Login para Responder" : "Enviar Respostas"}
         </Button>
       ) : (
         <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 4, bgcolor: isWin ? 'success.dark' : 'grey.800', color: 'white' }}>
@@ -173,7 +173,6 @@ export default function CourseView() {
   const [isSaving, setIsSaving] = React.useState(false);
   const [courseStatus, setCourseStatus] = React.useState('em_andamento');
 
-  // 1. Carrega o curso e o progresso
   React.useEffect(() => {
     const fetchCourseData = async () => {
       try {
@@ -208,14 +207,11 @@ export default function CourseView() {
     if (!authLoading) fetchCourseData();
   }, [slug, authLoading, signed, getCourseProgress]);
 
-  // 2. Ação de Concluir Aula
   const toggleLessonComplete = async (lesson) => {
     if (!signed) return navigate('/entrar', { state: { from: window.location.pathname } });
     
     const lessonId = lesson._key;
     const isCurrentlyCompleted = completedLessons.includes(lessonId);
-    
-    // UI Otimista
     setCompletedLessons(prev => isCurrentlyCompleted ? prev.filter(id => id !== lessonId) : [...prev, lessonId]);
 
     try {
@@ -230,9 +226,8 @@ export default function CourseView() {
     }
   };
 
-  // 3. Ação de Concluir Quiz
   const handleQuizComplete = async (score, total) => {
-    if (!signed) return navigate('/entrar', { state: { from: window.location.pathname } });
+    if (!signed) return;
 
     const isFinal = activeQuiz === 'final';
     const currentModule = !isFinal ? course.modules.find(m => m._key === activeQuiz) : null;
@@ -277,15 +272,19 @@ export default function CourseView() {
   if (loading || authLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress /></Box>;
   if (!course) return <Box sx={{ p: 4 }}><Alert severity="error">Curso não encontrado.</Alert></Box>;
 
-  // --- LÓGICA DE TRAVAS ---
+  // --- REGRAS DE DESBLOQUEIO ---
   const allLessonsCount = course.modules?.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0);
+  const totalModulesWithQuiz = course.modules?.filter(m => m.exercises?.length > 0).length || 0;
+  
   const isAllLessonsDone = completedLessons.length >= allLessonsCount;
-  const isFinalExamUnlocked = signed && isAllLessonsDone && (completedQuizzes.length >= (course.modules?.length || 0));
+  const isAllQuizzesDone = completedQuizzes.length >= totalModulesWithQuiz;
+  
+  // Exame Final só libera se TODAS as aulas E TODOS os quizzes de módulo estiverem feitos
+  const isFinalExamUnlocked = signed && isAllLessonsDone && isAllQuizzesDone;
 
   return (
     <Box sx={{ display: 'flex', bgcolor: 'background.default' }}>
       <Grid container>
-        {/* SIDEBAR */}
         <Grid item xs={12} md={3}>
           <SidebarContainer>
             <Box sx={{ p: 3 }}>
@@ -294,74 +293,60 @@ export default function CourseView() {
                 <Chip label={course.level} size="small" variant="outlined" sx={{ textTransform: 'capitalize' }} />
                 {courseStatus === 'concluido' && <Chip icon={<VerifiedIcon />} label="Concluído" color="success" size="small" />}
               </Stack>
-              {!signed && (
-                <Alert severity="info" sx={{ mt: 2, '& .MuiAlert-message': { fontSize: '0.75rem' } }}>
-                  Faça login para salvar seu progresso.
-                </Alert>
-              )}
             </Box>
             <Divider />
 
-            {course.modules?.map((module, mIdx) => {
-              // Visitantes veem tudo liberado para ler, mas usuários logados seguem a trilha
-              const isModuleLocked = signed && mIdx > 0 && !completedQuizzes.includes(course.modules[mIdx-1]._key);
+            {course.modules?.map((module) => {
+              // Aulas deste módulo específico
+              const moduleLessonKeys = module.lessons?.map(l => l._key) || [];
+              const completedInThisModule = moduleLessonKeys.filter(k => completedLessons.includes(k)).length;
+              const isModuleLessonsDone = completedInThisModule === moduleLessonKeys.length;
 
               return (
-                <Accordion 
-                  key={module._key} 
-                  disabled={isModuleLocked}
-                  defaultExpanded={mIdx === 0} 
-                  elevation={0} 
-                  square 
-                  sx={{ '&:before': { display: 'none' } }}
-                >
-                  <AccordionSummary expandIcon={isModuleLocked ? <LockIcon fontSize="small"/> : <ExpandMoreIcon />}>
+                <Accordion key={module._key} defaultExpanded elevation={0} square sx={{ '&:before': { display: 'none' } }}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                     <Box>
-                      <Typography fontWeight="bold" variant="body2" color={isModuleLocked ? 'text.disabled' : 'text.primary'}>
-                        {module.title}
+                      <Typography fontWeight="bold" variant="body2">{module.title}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {completedInThisModule}/{module.lessons?.length} aulas
                       </Typography>
-                      {signed && (
-                        <Typography variant="caption" color="text.secondary">
-                          {module.lessons?.filter(l => completedLessons.includes(l._key)).length}/{module.lessons?.length} aulas
-                        </Typography>
-                      )}
                     </Box>
                   </AccordionSummary>
                   <AccordionDetails sx={{ p: 0 }}>
                     <List disablePadding>
-                      {module.lessons?.map((lesson, lIdx) => {
-                        const isLessonLocked = signed && lIdx > 0 && !completedLessons.includes(module.lessons[lIdx-1]._key);
-
-                        return (
-                          <ListItem key={lesson._key} disablePadding>
-                            <ListItemButton 
-                              disabled={isLessonLocked}
-                              selected={activeLesson?._key === lesson._key}
-                              onClick={() => { setActiveLesson(lesson); setActiveQuiz(null); window.scrollTo(0,0); }}
-                            >
-                              <ListItemIcon sx={{ minWidth: 32 }}>
-                                {completedLessons.includes(lesson._key) ? <CheckCircleIcon color="success" /> : <RadioButtonUncheckedIcon fontSize="small" />}
-                              </ListItemIcon>
-                              <ListItemText primary={lesson.title} primaryTypographyProps={{ variant: 'body2' }} />
-                              {isLessonLocked && <LockIcon sx={{ fontSize: 14, ml: 1, opacity: 0.5 }} />}
-                            </ListItemButton>
-                          </ListItem>
-                        );
-                      })}
+                      {module.lessons?.map((lesson) => (
+                        <ListItem key={lesson._key} disablePadding>
+                          <ListItemButton 
+                            selected={activeLesson?._key === lesson._key}
+                            onClick={() => { setActiveLesson(lesson); setActiveQuiz(null); window.scrollTo(0,0); }}
+                          >
+                            <ListItemIcon sx={{ minWidth: 32 }}>
+                              {completedLessons.includes(lesson._key) ? <CheckCircleIcon color="success" /> : <RadioButtonUncheckedIcon fontSize="small" />}
+                            </ListItemIcon>
+                            <ListItemText primary={lesson.title} primaryTypographyProps={{ variant: 'body2' }} />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
                       
                       {module.exercises?.length > 0 && (
                         <ListItemButton 
-                          // Bloqueia o quiz se não terminou as aulas (apenas para logados)
-                          disabled={signed && module.lessons?.some(l => !completedLessons.includes(l._key))}
+                          // REGRA: Quiz do módulo só habilita se as aulas DESTE módulo acabarem
+                          disabled={signed && !isModuleLessonsDone}
                           selected={activeQuiz === module._key}
                           onClick={() => { setActiveQuiz(module._key); setActiveLesson(null); }}
                           sx={{ bgcolor: 'action.hover' }}
                         >
                           <ListItemIcon sx={{ minWidth: 32 }}>
-                            {completedQuizzes.includes(module._key) ? <CheckCircleIcon color="primary" fontSize="small" /> : <QuizIcon color="primary" fontSize="small" />}
+                            {completedQuizzes.includes(module._key) ? <CheckCircleIcon color="primary" fontSize="small" /> : (signed && !isModuleLessonsDone ? <LockIcon fontSize="small" /> : <QuizIcon color="primary" fontSize="small" />)}
                           </ListItemIcon>
-                          <ListItemText primary="Quiz do Módulo" primaryTypographyProps={{ variant: 'body2', fontWeight: 'bold' }} />
-                          {!signed && <LockIcon sx={{ fontSize: 14, opacity: 0.5 }} />}
+                          <ListItemText 
+                            primary="Quiz do Módulo" 
+                            primaryTypographyProps={{ 
+                              variant: 'body2', 
+                              fontWeight: 'bold',
+                              color: (signed && !isModuleLessonsDone) ? 'text.disabled' : 'text.primary'
+                            }} 
+                          />
                         </ListItemButton>
                       )}
                     </List>
@@ -375,21 +360,20 @@ export default function CourseView() {
                 fullWidth 
                 variant={isFinalExamUnlocked ? "contained" : "outlined"}
                 disabled={!isFinalExamUnlocked}
-                startIcon={courseStatus === 'concluido' ? <VerifiedIcon /> : <LockIcon />}
+                startIcon={courseStatus === 'concluido' ? <VerifiedIcon /> : (isFinalExamUnlocked ? <QuizIcon /> : <LockIcon />)}
                 onClick={() => { setActiveQuiz('final'); setActiveLesson(null); }}
               >
                 Exame Final
               </Button>
-              {!isFinalExamUnlocked && (
+              {!isFinalExamUnlocked && signed && (
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
-                  {signed ? "Conclua todos os módulos e quizzes." : "Faça login para o Exame Final."}
+                  Complete todas as aulas e quizzes anteriores para liberar o exame.
                 </Typography>
               )}
             </Box>
           </SidebarContainer>
         </Grid>
 
-        {/* CONTEÚDO PRINCIPAL */}
         <Grid item xs={12} md={9}>
           <ContentContainer>
             {activeQuiz ? (

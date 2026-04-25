@@ -173,7 +173,7 @@ const createCourse = async (req, res) => {
     }
 
     // 1. Verificar Cota
-    const userQuota = await quotaService.checkUserQuota(userId);
+    const userQuota = await quotaService.checkUserQuota(userId, level);
     if (!userQuota.canGenerate) return res.status(429).json({ error: userQuota.reason });
 
     // 2. Gerar Conteúdo
