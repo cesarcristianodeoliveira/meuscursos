@@ -125,7 +125,7 @@ const saveQuizProgress = async (req, res) => {
 
     if (isFinalExam) {
       const patchData = { finalScore: scorePercentage };
-      if (scorePercentage >= 80) { // Média para passar no exame final
+      if (scorePercentage >= 80) { 
         patchData.status = 'concluido';
         patchData.completionDate = new Date().toISOString();
         patchData.progress = 100;
@@ -137,7 +137,7 @@ const saveQuizProgress = async (req, res) => {
         _key: crypto.randomUUID(),
         moduleKey, moduleTitle, score, totalQuestions,
         percent: scorePercentage,
-        isPassed: isPassed // Campo novo enviado pelo frontend
+        isPassed: isPassed 
       };
 
       const existingIdx = quizzes.findIndex(q => q.moduleKey === moduleKey);
@@ -156,35 +156,34 @@ const saveQuizProgress = async (req, res) => {
 };
 
 /**
- * CRIAR CURSO COM IA
+ * CRIAR CURSO COM IA (REVISADO v1.0.0-rc1)
  */
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
   const userId = req.userId;
+  const MODEL_NAME = 'llama-3.3-70b-versatile';
 
   if (!topic) return res.status(400).json({ error: "O tema é obrigatório." });
 
   try {
-    // 0. VALIDAR USUÁRIO (Evita erro de "Usuário não encontrado")
     const user = await client.fetch(`*[_type == "user" && _id == $userId][0]`, { userId });
-    if (!user) {
-      console.error(`Usuário ${userId} não encontrado no Sanity`);
-      return res.status(404).json({ error: "Usuário não encontrado. Faça login novamente." });
-    }
+    if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
 
-    // 1. Verificar Cota
+    // 1. Verificar Cota (Agora passando o LEVEL para validação de acesso Pro/Free)
     const userQuota = await quotaService.checkUserQuota(userId, level);
     if (!userQuota.canGenerate) return res.status(429).json({ error: userQuota.reason });
 
-    // 2. Gerar Conteúdo
-    const aiData = await aiService.generateCourseContent(topic, 'llama-3.3-70b-versatile', { level });
+    // 2. Gerar Conteúdo (Desestruturação correta do novo aiService)
+    const { course: aiData, usage } = await aiService.generateCourseContent(topic, MODEL_NAME, { level });
+    
+    // 3. Gerar Imagem (Usa o prompt dinâmico da IA)
     const imageData = await imageService.fetchAndUploadImage(aiData);
 
-    // 3. Categoria
+    // 4. Gerenciar Categoria
     const categoryName = aiData.categoryName || 'Geral';
     const categorySlug = formatSlug(categoryName);
     let category = await client.fetch(`*[_type == "category" && slug.current == $slug][0]`, { slug: categorySlug });
-    
+
     if (!category) {
       category = await client.create({
         _type: 'category',
@@ -194,6 +193,7 @@ const createCourse = async (req, res) => {
     }
 
     const finalSlug = `${formatSlug(aiData.title)}-${crypto.randomBytes(3).toString('hex')}`;
+    
     const newCourse = {
       _type: 'course',
       title: aiData.title,
@@ -202,14 +202,19 @@ const createCourse = async (req, res) => {
       author: { _type: 'reference', _ref: userId },
       category: { _type: 'reference', _ref: category._id },
       level: level || 'iniciante',
-      estimatedTime: aiData.estimatedTime || 0,
-      xpReward: aiData.xpReward || 100,
+      estimatedTime: aiData.estimatedTime,
+      xpReward: aiData.xpReward,
       tags: aiData.tags || [],
       isPublished: true,
+
+      // Dados de imagem enriquecidos
       thumbnail: imageData?.assetId ? {
         _type: 'image',
         asset: { _type: 'reference', _ref: imageData.assetId }
       } : undefined,
+      externalImageId: imageData?.externalId || "",
+      imageSearchPrompt: imageData?.searchPrompt || "",
+
       modules: aiData.modules.map(m => ({
         _key: crypto.randomUUID(),
         title: m.title,
@@ -217,7 +222,7 @@ const createCourse = async (req, res) => {
           _key: crypto.randomUUID(),
           title: l.title,
           content: l.content,
-          duration: l.duration || 5
+          duration: l.duration
         })),
         exercises: m.exercises.map(e => ({
           _key: crypto.randomUUID(),
@@ -232,7 +237,13 @@ const createCourse = async (req, res) => {
         options: q.options,
         correctAnswer: q.correctAnswer
       })),
-      aiMetadata: { generatedAt: new Date().toISOString() }
+
+      // Metadados para transparência e monitoramento
+      aiMetadata: { 
+        model: MODEL_NAME,
+        totalTokens: usage?.totalTokens || 0,
+        generatedAt: new Date().toISOString() 
+      }
     };
 
     const result = await client.create(newCourse);
@@ -242,6 +253,8 @@ const createCourse = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Erro ao criar curso:", error);
+    // Em caso de erro após consumir cota ou durante o processo, 
+    // você pode chamar o quotaService.refundCredit(userId) aqui se desejar.
     return res.status(500).json({ error: "Falha na geração do curso pela IA." });
   }
 };

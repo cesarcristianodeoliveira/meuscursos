@@ -1,16 +1,15 @@
 const client = require('../config/sanity');
 
 /**
- * SERVIÇO DE COTAS E CRÉDITOS (QuotaService) v1.4
- * Gerencia limites de usuários, proteção contra spam e custos de API.
+ * SERVIÇO DE COTAS E CRÉDITOS (QuotaService) v1.0.0-rc1
+ * Proteção contra abusos, gestão de créditos Pro e suporte a níveis.
  */
 
 /**
- * 1. Verifica permissão de geração (Individual + Global)
+ * 1. Verifica permissão de geração (Individual + Global + Nível)
  */
-const checkUserQuota = async (userId) => {
+const checkUserQuota = async (userId, requestedLevel = 'iniciante') => {
   try {
-    // Busca dados essenciais do usuário
     const user = await client.fetch(
       `*[_type == "user" && _id == $userId][0]{
         role, 
@@ -22,25 +21,33 @@ const checkUserQuota = async (userId) => {
 
     if (!user) return { canGenerate: false, reason: "Usuário não encontrado." };
 
-    // A. Regra para ADMIN: Sempre liberado
+    // A. ADMIN: Acesso total e irrestrito
     if (user.role === 'admin') return { canGenerate: true };
 
-    // B. Verificação de Segurança Global (Evita gastos excessivos na API Groq/Pixabay)
+    // B. Bloqueio de Nível (Exemplo de Regra de Negócio para Cursos Livres)
+    // Usuários sem créditos (Free Tier) só podem gerar cursos 'iniciante'
+    if (user.credits <= 0 && requestedLevel !== 'iniciante') {
+      return { 
+        canGenerate: false, 
+        reason: "O nível intermediário/avançado é exclusivo para usuários PRO. Adquira créditos para continuar." 
+      };
+    }
+
+    // C. Proteção Global (Evita queima de orçamento da API em caso de ataque)
     const globalCheck = await checkGlobalQuota();
     if (!globalCheck.isOk) {
       return { 
         canGenerate: false, 
-        reason: "O sistema está sob alta carga. Tente novamente em alguns minutos." 
+        reason: "O sistema atingiu o limite de tráfego momentâneo. Tente novamente em instantes." 
       };
     }
 
-    // C. Se tem créditos comprados/acumulados (> 0), libera.
+    // D. Verificação de Créditos Pagos
     if (user.credits > 0) return { canGenerate: true };
 
-    // D. Lógica de Recarga Automática (1 crédito gratuito por hora)
+    // E. Regra da Hora Gratuita (Micro-learning orgânico)
     const now = new Date();
     const lastGen = user.lastGenerationAt ? new Date(user.lastGenerationAt) : new Date(0);
-    
     const msPassed = now - lastGen;
     const minutesPassed = Math.floor(msPassed / (1000 * 60));
     
@@ -48,31 +55,30 @@ const checkUserQuota = async (userId) => {
       return { canGenerate: true, isFreeTier: true };
     }
 
-    // Caso contrário, bloqueia e informa o tempo restante
+    // Retorno amigável com tempo de espera
     const timeLeft = 60 - minutesPassed;
     return { 
       canGenerate: false, 
-      reason: `Limite atingido. Seu próximo curso gratuito estará disponível em ${timeLeft} minutos.`,
+      reason: `Você já gerou um curso recentemente. Seu próximo acesso gratuito será em ${timeLeft} minutos.`,
       timeLeft 
     };
 
   } catch (error) {
     console.error("❌ Erro ao verificar cota:", error.message);
-    return { canGenerate: false, reason: "Erro ao validar seus créditos." };
+    return { canGenerate: false, reason: "Falha na validação de segurança." };
   }
 };
 
 /**
- * 2. Verifica a cota GLOBAL (Proteção de custos)
+ * 2. Verifica a cota GLOBAL (Monitoramento de custos operacionais)
  */
 const checkGlobalQuota = async () => {
   try {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    // Conta cursos criados globalmente na última hora
     const query = `count(*[_type == "course" && _createdAt > $oneHourAgo])`;
     const coursesInLastHour = await client.fetch(query, { oneHourAgo });
 
-    const GLOBAL_LIMIT = 50; 
+    const GLOBAL_LIMIT = 30; // Ajustado para segurança inicial
     return {
       availableSlots: GLOBAL_LIMIT - coursesInLastHour,
       isOk: coursesInLastHour < GLOBAL_LIMIT
@@ -84,16 +90,16 @@ const checkGlobalQuota = async () => {
 };
 
 /**
- * 3. Consome o crédito com proteção contra concorrência
+ * 3. Consome o crédito ou atualiza o timestamp da hora gratuita
  */
 const consumeCredit = async (userId) => {
   try {
+    // Buscamos o estado atual do crédito antes de agir
     const user = await client.fetch(`*[_id == $userId][0]{credits}`, { userId });
 
-    // Só decrementa se o usuário tiver créditos. 
-    // Se ele estava usando a "hora gratuita" (créditos = 0), apenas atualizamos o timestamp.
-    const patch = client.patch(userId).setIfMissing({ stats: {} });
+    const patch = client.patch(userId).setIfMissing({ stats: {}, credits: 0 });
 
+    // Se o usuário tinha créditos, remove 1. Se era a hora gratuita, créditos continuam 0.
     if (user.credits > 0) {
       patch.dec({ credits: 1 });
     }
@@ -111,21 +117,27 @@ const consumeCredit = async (userId) => {
 };
 
 /**
- * 4. Reembolsa em caso de erro na geração da IA/Imagem
+ * 4. Reembolsa o usuário (Essencial para falhas de imagem/IA)
  */
 const refundCredit = async (userId) => {
   try {
-    // Movemos o timestamp para 1 hora atrás para liberar a geração gratuita novamente
+    const user = await client.fetch(`*[_id == $userId][0]{credits}`, { userId });
     const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
     
-    await client
-      .patch(userId)
-      .setIfMissing({ stats: {} })
-      .inc({ credits: 1 })
+    const patch = client.patch(userId).setIfMissing({ stats: {}, credits: 0 });
+
+    // Se o usuário já tinha créditos, ele recebe o ponto de volta.
+    // Se era Free Tier, voltamos o relógio para ele tentar de novo agora.
+    if (user.credits > 0) {
+      patch.inc({ credits: 1 });
+    }
+
+    await patch
       .set({ "stats.lastGenerationAt": oneHourAgo })
+      .dec({ "stats.coursesCreated": 1 }) // Remove da contagem de sucesso
       .commit();
 
-    console.log(`♻️ Crédito reembolsado para o usuário ${userId}`);
+    console.log(`♻️ Crédito/Tempo estornado para o usuário: ${userId}`);
     return true;
   } catch (error) {
     console.error("❌ Erro ao reembolsar crédito:", error.message);
