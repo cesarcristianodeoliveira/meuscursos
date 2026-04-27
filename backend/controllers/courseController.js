@@ -161,6 +161,9 @@ const saveQuizProgress = async (req, res) => {
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
   const userId = req.userId;
+  
+  // Definições explícitas para os metadados do Sanity
+  const PROVIDER_NAME = 'Groq';
   const MODEL_NAME = 'llama-3.3-70b-versatile';
 
   if (!topic) return res.status(400).json({ error: "O tema é obrigatório." });
@@ -169,14 +172,14 @@ const createCourse = async (req, res) => {
     const user = await client.fetch(`*[_type == "user" && _id == $userId][0]`, { userId });
     if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
 
-    // 1. Verificar Cota (Agora passando o LEVEL para validação de acesso Pro/Free)
+    // 1. Verificar Cota
     const userQuota = await quotaService.checkUserQuota(userId, level);
     if (!userQuota.canGenerate) return res.status(429).json({ error: userQuota.reason });
 
-    // 2. Gerar Conteúdo (Desestruturação correta do novo aiService)
+    // 2. Gerar Conteúdo
     const { course: aiData, usage } = await aiService.generateCourseContent(topic, MODEL_NAME, { level });
     
-    // 3. Gerar Imagem (Usa o prompt dinâmico da IA)
+    // 3. Gerar Imagem
     const imageData = await imageService.fetchAndUploadImage(aiData);
 
     // 4. Gerenciar Categoria
@@ -207,7 +210,6 @@ const createCourse = async (req, res) => {
       tags: aiData.tags || [],
       isPublished: true,
 
-      // Dados de imagem enriquecidos
       thumbnail: imageData?.assetId ? {
         _type: 'image',
         asset: { _type: 'reference', _ref: imageData.assetId }
@@ -238,8 +240,9 @@ const createCourse = async (req, res) => {
         correctAnswer: q.correctAnswer
       })),
 
-      // Metadados para transparência e monitoramento
+      // CORREÇÃO: Preenchimento do Provedor e Modelo nos metadados
       aiMetadata: { 
+        provider: PROVIDER_NAME,
         model: MODEL_NAME,
         totalTokens: usage?.totalTokens || 0,
         generatedAt: new Date().toISOString() 
@@ -253,8 +256,8 @@ const createCourse = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Erro ao criar curso:", error);
-    // Em caso de erro após consumir cota ou durante o processo, 
-    // você pode chamar o quotaService.refundCredit(userId) aqui se desejar.
+    // Tenta reembolsar o crédito caso a falha ocorra após o check de cota
+    try { await quotaService.refundCredit(userId); } catch (e) { console.error("Erro no reembolso:", e); }
     return res.status(500).json({ error: "Falha na geração do curso pela IA." });
   }
 };
