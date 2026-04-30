@@ -1,5 +1,4 @@
 import React, { createContext, useState, useContext, useCallback, useEffect } from 'react';
-// Importação corrigida para apontar para o arquivo cliente na raiz da src
 import { client } from '../client'; 
 import api from '../services/api';     
 import { useAuth } from './AuthContext';
@@ -9,7 +8,6 @@ const CourseContext = createContext();
 export const COURSES_PER_PAGE = 6;
 
 export const CourseProvider = ({ children }) => {
-  // Removido 'user' (que causava o warning) e mantido apenas o necessário
   const { refreshUser, signed } = useAuth(); 
   
   const [isGenerating, setIsGenerating] = useState(false);
@@ -52,7 +50,6 @@ export const CourseProvider = ({ children }) => {
     }
   }, [initialDataLoaded]);
 
-  // Carregamento inicial automático
   useEffect(() => {
     fetchGlobalData();
   }, [fetchGlobalData]);
@@ -82,7 +79,6 @@ export const CourseProvider = ({ children }) => {
     } catch (error) {
       const errorMsg = error.response?.data?.error || "Falha na geração do curso. Verifique seus créditos.";
       setStatusMessage(errorMsg);
-      setIsGenerating(false); 
       return { success: false, error: errorMsg };
     } finally {
       setTimeout(() => {
@@ -93,10 +89,9 @@ export const CourseProvider = ({ children }) => {
   };
 
   /**
-   * 3. CÁLCULO DE PROGRESSO (Modo Público/Privado)
+   * 3. BUSCAR PROGRESSO
    */
   const getCourseProgress = useCallback(async (courseId) => {
-    // Se não estiver logado (signed: false), retorna progresso zerado sem erro
     if (!courseId || !signed) {
       return { progress: 0, completedLessons: [], completedQuizzes: [] };
     }
@@ -118,19 +113,49 @@ export const CourseProvider = ({ children }) => {
   }, [signed]);
 
   /**
-   * 4. ATUALIZAR PROGRESSO DE LIÇÃO
+   * 4. ATUALIZAR PROGRESSO E SINCRONIZAR PERFIL (XP)
    */
   const updateLessonProgress = useCallback(async (courseId, lessonData) => {
     if (!signed) return { success: false, error: 'Necessário login' };
     
     try {
       const res = await api.post(`/courses/${courseId}/progress`, lessonData);
+      
+      // Se a lição completada puder gerar mudança de nível ou status,
+      // ou apenas para garantir que o progresso visual no header mude:
+      if (res.data.success) {
+          // refreshUser garante que se houver XP por lição (futuro) ou 
+          // mudança de nível, o Header atualize imediatamente.
+          await refreshUser(); 
+      }
+      
       return res.data;
     } catch (err) {
       console.error("Erro ao salvar lição:", err);
       return { success: false, error: 'Erro interno ao salvar' };
     }
-  }, [signed]);
+  }, [signed, refreshUser]);
+
+  /**
+   * 5. SALVAR QUIZ E ATUALIZAR XP/CERTIFICADO
+   * Criamos essa função específica no contexto para centralizar a lógica de recompensa
+   */
+  const saveQuizResult = useCallback(async (courseId, quizData) => {
+    if (!signed) return { success: false };
+
+    try {
+      const res = await api.post(`/courses/${courseId}/quiz-result`, quizData);
+      
+      // CRÍTICO: Após o quiz, o usuário ganha XP. 
+      // Chamamos refreshUser para atualizar o saldo de XP na tela na hora!
+      await refreshUser();
+      
+      return res.data;
+    } catch (err) {
+      console.error("Erro ao salvar resultado do quiz:", err);
+      return { success: false };
+    }
+  }, [signed, refreshUser]);
 
   return (
     <CourseContext.Provider value={{ 
@@ -139,6 +164,7 @@ export const CourseProvider = ({ children }) => {
       generateCourse,
       getCourseProgress,
       updateLessonProgress,
+      saveQuizResult, // Nova função exportada
       stats, 
       categories, 
       fetchGlobalData, 

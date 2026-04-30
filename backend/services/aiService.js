@@ -2,14 +2,13 @@ const Groq = require('groq-sdk');
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 /**
- * SERVIÇO DE INTELIGÊNCIA ARTIFICIAL (AI Service) v1.0.0-rc1
- * Especializado em Cursos Livres (Não Regulamentados) e Micro-learning.
+ * SERVIÇO DE INTELIGÊNCIA ARTIFICIAL (AI Service) v1.0.1
+ * Especializado em Cursos Livres e Micro-learning.
  */
 
 const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile', options = {}) => {
   const { level = 'iniciante' } = options;
 
-  // Em vez de números fixos, passamos "objetivos pedagógicos" para a IA
   const strategy = {
     iniciante: "Introdução rápida, conceitos base e vitórias rápidas para o aluno.",
     intermediario: "Foco em ferramentas, métodos e aplicação em cenários reais.",
@@ -17,40 +16,43 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
   }[level];
 
   const systemPrompt = `Você é um Designer Instrucional Expert em Cursos Livres e EAD.
-    Sua missão é criar uma experiência de aprendizado fluida, não repetitiva e altamente engajadora.
+    Sua missão é criar uma experiência de aprendizado fluida, profunda e altamente engajadora.
     
-    DIRETRIZES EAD:
+    DIRETRIZES TÉCNICAS:
     1. CURSOS NÃO REGULAMENTADOS: Foque em habilidades práticas e competências diretas.
     2. MICRO-LEARNING: Divida o conhecimento em doses que mantenham o interesse.
-    3. MARKDOWN: Use títulos (##, ###), listas e blocos de código para facilitar a leitura em telas.
-    4. IMAGEM: "imageSearchPrompt" deve ser 3 termos em INGLÊS que representem o tema de forma profissional.`;
+    3. MARKDOWN: Use obrigatoriamente títulos (##, ###), listas, negrito e blocos de código.
+    
+    DIRETRIZES DE IMAGEM (CRÍTICO):
+    - O campo "imageSearchPrompt" deve conter exatamente 3 a 5 palavras-chave em INGLÊS.
+    - REVISÃO ORTOGRÁFICA: Você deve garantir que as palavras em inglês estejam escritas corretamente (ex: "language", não "lnguge").
+    - FOCO NO TEMA: As palavras devem representar o CONCEITO GLOBAL do curso. 
+    - PROIBIÇÃO: Não use termos que apareçam apenas em exemplos de frases ou exercícios (ex: se o curso é de Inglês e há um exemplo sobre 'cachorro', NÃO use 'dog' no prompt de imagem).`;
 
-  const userPrompt = `Gere um curso completo sobre: "${topic}".
+  const userPrompt = `Gere um curso completo sobre o tema: "${topic}".
     Nível: ${level}.
-    Objetivo: ${strategy}
+    Objetivo Pedagógico: ${strategy}
 
-    REGRAS DE ESTRUTURA DINÂMICA:
-    - Módulos: Crie a quantidade necessária para cobrir o tema com qualidade (Sugerido entre 3 a 8 módulos).
-    - Aulas: Cada módulo deve ter uma quantidade variável de aulas, dependendo da profundidade do subtema.
-    - Conteúdo: Cada aula deve ser profunda (mínimo de 500 palavras) e formatada em Markdown.
-    - Quizzes: Cada módulo deve ter exercícios que validem o conhecimento daquele bloco.
-    - Exame Final: Questões que cubram o curso todo.
+    REGRAS DE ESTRUTURA:
+    - Módulos: De 3 a 8 módulos para garantir profundidade.
+    - Conteúdo: Cada aula deve ser extensa, rica em detalhes e exemplos (mínimo de 500 palavras por aula).
+    - Qualidade: Evite repetições e garanta que o tom seja profissional e motivador.
 
-    RETORNE NESTE FORMATO JSON:
+    RETORNE RIGOROSAMENTE NESTE FORMATO JSON:
     {
-      "title": "Título Criativo",
-      "description": "Pitch de vendas do curso",
-      "categoryName": "Categoria",
-      "tags": ["tag1", "tag2"],
-      "imageSearchPrompt": "keywords in english",
+      "title": "Título Impactante",
+      "description": "Uma descrição que convide o aluno a se matricular",
+      "categoryName": "Categoria Principal",
+      "tags": ["Tag1", "Tag2"],
+      "imageSearchPrompt": "accurate english keywords for professional photography",
       "modules": [
         {
-          "title": "string",
-          "lessons": [{ "title": "string", "content": "markdown", "duration": 0 }],
-          "exercises": [{ "question": "string", "options": ["a", "b", "c", "d"], "correctAnswer": "a" }]
+          "title": "Título do Módulo",
+          "lessons": [{ "title": "Título da Aula", "content": "Conteúdo rico em Markdown", "duration": 0 }],
+          "exercises": [{ "question": "Pergunta do Quiz", "options": ["A", "B", "C", "D"], "correctAnswer": "A" }]
         }
       ],
-      "finalExam": [{ "question": "string", "options": ["a", "b", "c", "d"], "correctAnswer": "a" }]
+      "finalExam": [{ "question": "Pergunta Final", "options": ["A", "B", "C", "D"], "correctAnswer": "A" }]
     }`;
 
   try {
@@ -60,13 +62,13 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
         { role: 'user', content: userPrompt }
       ],
       model: provider,
-      temperature: 0.7,
+      temperature: 0.6, // Reduzido levemente para maior precisão ortográfica
       response_format: { type: "json_object" }
     });
 
     const rawData = JSON.parse(chatCompletion.choices[0].message.content);
 
-    // --- CÁLCULO DE MÉTRICAS 100% DINÂMICO (PÓS-IA) ---
+    // --- CÁLCULO DE MÉTRICAS DINÂMICO ---
     let totalWords = 0;
     let totalLessons = 0;
     let totalQuizzes = 0;
@@ -77,26 +79,16 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
         const words = (lesson.content || "").trim().split(/\s+/).length;
         totalWords += words;
         totalLessons++;
-        
-        // Duração por aula: 1 minuto para cada 130 palavras (leitura atenta em EAD)
         lesson.duration = Math.max(5, Math.ceil(words / 130));
       });
     });
 
     const totalExamQuestions = rawData.finalExam?.length || 0;
-    
-    // Tempo Total = Leitura + Tempo de Resolução (1.5 min por questão)
     const readingTime = Math.ceil(totalWords / 130);
     const quizTime = Math.ceil((totalQuizzes + totalExamQuestions) * 1.5);
     const totalDuration = readingTime + quizTime;
 
-    /**
-     * CÁLCULO DE XP (JUSTO E DINÂMICO)
-     * Não usamos mais XP fixo. O XP é proporcional ao esforço:
-     * - Cada 100 palavras = 10 XP (Valoriza a leitura)
-     * - Cada Questão = 20 XP (Valoriza o desafio)
-     * - Bônus de Nível: Iniciante (1x), Intermediário (1.5x), Avançado (2x)
-     */
+    // Cálculo de XP proporcional ao esforço e nível
     const levelMultiplier = { iniciante: 1, intermediario: 1.5, avancado: 2 }[level] || 1;
     const baseScore = (totalWords / 10) + ((totalQuizzes + totalExamQuestions) * 20);
     const finalXpReward = Math.round(baseScore * levelMultiplier);
@@ -115,7 +107,7 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
 
   } catch (error) {
     console.error("❌ Erro fatal no aiService:", error.message);
-    throw new Error("Erro ao gerar conteúdo dinâmico.");
+    throw new Error("Erro ao gerar conteúdo dinâmico via IA.");
   }
 };
 

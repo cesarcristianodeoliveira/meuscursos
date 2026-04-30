@@ -9,13 +9,12 @@ import {
 import { styled } from '@mui/material/styles';
 
 // Ícones
-import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
-import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ShareIcon from '@mui/icons-material/Share';
 import SchoolIcon from '@mui/icons-material/School';
 import VerifiedIcon from '@mui/icons-material/Verified';
+import MilitaryTechIcon from '@mui/icons-material/MilitaryTech';
 
 import { useAuth } from '../../../contexts/AuthContext';
 
@@ -37,30 +36,29 @@ const AvatarWrapper = styled(Box)(({ theme }) => ({
 }));
 
 export default function UserProfile() {
-  const { id } = useParams(); // ID vindo da URL para perfil público
+  const { id } = useParams(); 
   const navigate = useNavigate();
   const { user: loggedUser, signOut } = useAuth();
-  
+
   const [profileData, setProfileData] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
 
-  // Define se o perfil visualizado pertence ao usuário logado
   const isOwnProfile = !id || id === loggedUser?._id;
 
   React.useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
       try {
-        // Se for o próprio perfil e não houver ID na URL, usa dados do context
         if (isOwnProfile && loggedUser) {
           setProfileData(loggedUser);
           setLoading(false);
           return;
         }
 
-        // Busca perfil público no Sanity via ID
+        // Busca perfil público adaptado para a nova estrutura de stats
         const query = `*[_type == "user" && _id == $userId][0]{
-          _id, name, email, plan, role, xp, credits,
+          _id, name, email, plan, role, credits,
+          stats,
           "avatar": avatar.asset->url
         }`;
         const result = await client.fetch(query, { userId: id });
@@ -84,9 +82,12 @@ export default function UserProfile() {
     </Container>
   );
 
-  // Lógica de Nível
-  const userXP = profileData?.xp || 0;
-  const currentLevel = Math.floor(userXP / 1000) + 1;
+  // Lógica de Gamificação Centralizada (Stats vindos do Context ou Sanity)
+  const userXP = profileData?.stats?.totalXp || 0;
+  const userLevel = profileData?.stats?.level || 1;
+  const coursesCompleted = profileData?.stats?.coursesCompleted || 0;
+  
+  // Cálculo de progresso para o próximo nível (base 1000 XP por nível)
   const progressToNextLevel = (userXP % 1000) / 10;
 
   return (
@@ -100,20 +101,18 @@ export default function UserProfile() {
             {profileData?.name?.charAt(0)}
           </Avatar>
         </AvatarWrapper>
-        
-        {isOwnProfile && (
-          <Box sx={{ position: 'absolute', right: 20, top: 20 }}>
-            <Tooltip title="Compartilhar Perfil">
-              <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}>
-                <ShareIcon />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        )}
+
+        <Box sx={{ position: 'absolute', right: 20, top: 20 }}>
+          <Tooltip title="Compartilhar Perfil">
+            <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}>
+              <ShareIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </ProfileHeader>
 
       <Grid container spacing={4}>
-        {/* IDENTIDADE */}
+        {/* COLUNA ESQUERDA: IDENTIDADE */}
         <Grid item xs={12} md={4}>
           <Stack spacing={3}>
             <Box sx={{ pl: 2 }}>
@@ -122,7 +121,7 @@ export default function UserProfile() {
                 {profileData?.role === 'admin' && <VerifiedIcon color="primary" fontSize="small" />}
               </Stack>
               <Typography variant="body1" color="text.secondary">
-                Estudante de IA desde 2026
+                Membro desde {new Date().getFullYear()}
               </Typography>
               <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                 <Chip 
@@ -131,16 +130,21 @@ export default function UserProfile() {
                   size="small"
                   sx={{ fontWeight: 'bold' }}
                 />
-                <Chip label={`Lvl ${currentLevel}`} color="primary" size="small" variant="outlined" />
+                <Chip label={`Nível ${userLevel}`} color="primary" size="small" variant="outlined" />
               </Stack>
             </Box>
 
-            <Card variant="outlined" sx={{ borderRadius: 4, bgcolor: 'background.paper' }}>
+            <Card variant="outlined" sx={{ borderRadius: 4, bgcolor: 'background.paper', position: 'relative', overflow: 'hidden' }}>
               <CardContent>
-                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Progresso Acadêmico</Typography>
-                <Typography variant="h3" fontWeight="900" color="primary">{userXP}</Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>XP TOTAL ACUMULADO</Typography>
-                <LinearProgress variant="determinate" value={progressToNextLevel} sx={{ height: 6, borderRadius: 3 }} />
+                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Progresso de Nível</Typography>
+                <Stack direction="row" alignItems="baseline" spacing={1}>
+                  <Typography variant="h3" fontWeight="900" color="primary">{userXP}</Typography>
+                  <Typography variant="subtitle1" color="text.secondary">XP</Typography>
+                </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, textTransform: 'uppercase' }}>
+                  Faltam {1000 - (userXP % 1000)} XP para o nível {userLevel + 1}
+                </Typography>
+                <LinearProgress variant="determinate" value={progressToNextLevel} sx={{ height: 10, borderRadius: 5 }} />
               </CardContent>
             </Card>
 
@@ -159,73 +163,55 @@ export default function UserProfile() {
           </Stack>
         </Grid>
 
-        {/* CONTEÚDO PÚBLICO / PRIVADO */}
+        {/* COLUNA DIREITA: CONTEÚDO */}
         <Grid item xs={12} md={8}>
           <Stack spacing={3}>
-            {/* Se for o próprio perfil, mostra os créditos */}
             {isOwnProfile && (
-              <Card variant="outlined" sx={{ borderRadius: 4, borderLeft: '6px solid', borderLeftColor: 'primary.main' }}>
+              <Card variant="outlined" sx={{ borderRadius: 4, background: (theme) => `linear-gradient(90deg, ${theme.palette.background.paper} 0%, ${theme.palette.action.hover} 100%)` }}>
                 <CardContent>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Box>
-                      <Typography variant="subtitle2" color="text.secondary">Créditos Disponíveis</Typography>
-                      <Typography variant="h5" fontWeight="bold">{profileData?.credits || 0}</Typography>
+                      <Typography variant="subtitle2" color="text.secondary">Saldo de Créditos</Typography>
+                      <Typography variant="h4" fontWeight="bold">{profileData?.credits || 0}</Typography>
                     </Box>
-                    <Avatar sx={{ bgcolor: 'primary.light' }}>
-                      <MonetizationOnIcon />
+                    <Avatar sx={{ bgcolor: 'warning.light', width: 56, height: 56 }}>
+                      <MonetizationOnIcon sx={{ fontSize: 32, color: 'warning.dark' }} />
                     </Avatar>
                   </Stack>
                 </CardContent>
               </Card>
             )}
 
-            {/* BOX DE CONQUISTAS (Visível para todos) */}
             <Card variant="outlined" sx={{ borderRadius: 4 }}>
               <CardContent sx={{ p: 4 }}>
                 <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <SchoolIcon color="primary" /> Conquistas do Aluno
+                  <SchoolIcon color="primary" /> Estatísticas de Aprendizado
                 </Typography>
                 <Divider sx={{ my: 2 }} />
-                
+
                 <Grid container spacing={2} sx={{ mt: 1 }}>
                   <Grid item xs={6} sm={4}>
-                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 3 }}>
-                      <Typography variant="h5" fontWeight="bold">0</Typography>
-                      <Typography variant="caption">Cursos Concluídos</Typography>
+                    <Box sx={{ textAlign: 'center', p: 3, bgcolor: 'action.hover', borderRadius: 4 }}>
+                      <Typography variant="h4" fontWeight="bold">{coursesCompleted}</Typography>
+                      <Typography variant="body2" color="text.secondary">Cursos</Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={6} sm={4}>
-                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 3 }}>
-                      <Typography variant="h5" fontWeight="bold">0</Typography>
-                      <Typography variant="caption">Certificados</Typography>
+                    <Box sx={{ textAlign: 'center', p: 3, bgcolor: 'action.hover', borderRadius: 4 }}>
+                      <Typography variant="h4" fontWeight="bold">{coursesCompleted}</Typography>
+                      <Typography variant="body2" color="text.secondary">Certificados</Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={12} sm={4}>
-                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 3 }}>
-                      <Typography variant="h5" fontWeight="bold">{currentLevel}</Typography>
-                      <Typography variant="caption">Rank Global</Typography>
+                    <Box sx={{ textAlign: 'center', p: 3, bgcolor: 'primary.main', color: 'white', borderRadius: 4 }}>
+                      <MilitaryTechIcon sx={{ fontSize: 40 }} />
+                      <Typography variant="h6" fontWeight="bold">Top 10%</Typography>
+                      <Typography variant="caption">Ranking IA</Typography>
                     </Box>
                   </Grid>
                 </Grid>
               </CardContent>
             </Card>
-
-            {/* CONFIGURAÇÕES (Somente o dono vê) */}
-            {isOwnProfile && (
-              <Card variant="outlined" sx={{ borderRadius: 4 }}>
-                <CardContent>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <SettingsIcon color="primary" fontSize="small" /> Preferências de Conta
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Apenas você pode ver esta seção.
-                  </Typography>
-                  <Button variant="contained" size="small" startIcon={<WorkspacePremiumIcon />} color="secondary">
-                    Gerenciar Assinatura PRO
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
           </Stack>
         </Grid>
       </Grid>

@@ -98,7 +98,7 @@ const saveProgress = async (req, res) => {
 };
 
 /**
- * SALVAR RESULTADO DO QUIZ
+ * SALVAR RESULTADO DO QUIZ E RECOMPENSAS (CORREÇÃO XP/CERTIFICADO)
  */
 const saveQuizProgress = async (req, res) => {
   const { id: courseId } = req.params;
@@ -106,11 +106,13 @@ const saveQuizProgress = async (req, res) => {
   const userId = req.userId;
 
   try {
-    let enrollment = await client.fetch(
-      `*[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0]`,
-      { userId, courseId }
-    );
+    // Buscamos a matrícula e o prêmio de XP definido no curso
+    const data = await client.fetch(`{
+      "enrollment": *[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0],
+      "course": *[_type == "course" && _id == $courseId][0]{xpReward, title}
+    }`, { userId, courseId });
 
+    let { enrollment, course } = data;
     const scorePercentage = Math.round((score / totalQuestions) * 100);
 
     if (!enrollment) {
@@ -124,14 +126,42 @@ const saveQuizProgress = async (req, res) => {
     }
 
     if (isFinalExam) {
-      const patchData = { finalScore: scorePercentage };
-      if (scorePercentage >= 80) { 
-        patchData.status = 'concluido';
-        patchData.completionDate = new Date().toISOString();
-        patchData.progress = 100;
-      }
+      const isFinishing = scorePercentage >= 80 && enrollment.status !== 'concluido';
+      
+      const patchData = { 
+        finalScore: scorePercentage,
+        // Se passou, garante o status concluído e 100% de progresso
+        ...(scorePercentage >= 80 ? { 
+            status: 'concluido', 
+            completionDate: new Date().toISOString(),
+            progress: 100 
+        } : {})
+      };
+
       await client.patch(enrollment._id).set(patchData).commit();
+
+      // LOGICA DE RECOMPENSA (SÓ RODA SE ELE ACABOU DE CONCLUIR)
+      if (isFinishing) {
+        // 1. Gerar Certificado
+        await client.create({
+          _type: 'certificate',
+          user: { _type: 'reference', _ref: userId },
+          course: { _type: 'reference', _ref: courseId },
+          issueDate: new Date().toISOString(),
+          hash: crypto.randomBytes(8).toString('hex').toUpperCase(),
+          canvasData: JSON.stringify({ courseTitle: course.title, finalScore: scorePercentage })
+        });
+
+        // 2. Dar XP ao Usuário (Direto no documento do User)
+        const reward = course.xpReward || 100;
+        await client.patch(userId)
+          .inc({ xp: reward })
+          .commit();
+        
+        console.log(`✅ Recompensas entregues: ${reward} XP e Certificado gerado.`);
+      }
     } else {
+      // Logica de Quizzes de Módulo (Progressivo)
       const quizzes = enrollment.completedQuizzes || [];
       const newQuizResult = {
         _key: crypto.randomUUID(),
@@ -148,10 +178,10 @@ const saveQuizProgress = async (req, res) => {
       await client.patch(enrollment._id).set({ completedQuizzes: updatedQuizzes }).commit();
     }
 
-    return res.status(200).json({ success: true, percent: scorePercentage });
+    return res.status(200).json({ success: true, percent: scorePercentage, status: scorePercentage >= 80 ? 'concluido' : 'tentar_novamente' });
   } catch (error) {
-    console.error("Erro no quiz:", error);
-    return res.status(500).json({ error: "Erro ao processar quiz." });
+    console.error("Erro no quiz/conclusão:", error);
+    return res.status(500).json({ error: "Erro ao processar resultado." });
   }
 };
 
@@ -161,8 +191,7 @@ const saveQuizProgress = async (req, res) => {
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
   const userId = req.userId;
-  
-  // Definições explícitas para os metadados do Sanity
+
   const PROVIDER_NAME = 'Groq';
   const MODEL_NAME = 'llama-3.3-70b-versatile';
 
@@ -172,17 +201,12 @@ const createCourse = async (req, res) => {
     const user = await client.fetch(`*[_type == "user" && _id == $userId][0]`, { userId });
     if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
 
-    // 1. Verificar Cota
     const userQuota = await quotaService.checkUserQuota(userId, level);
     if (!userQuota.canGenerate) return res.status(429).json({ error: userQuota.reason });
 
-    // 2. Gerar Conteúdo
     const { course: aiData, usage } = await aiService.generateCourseContent(topic, MODEL_NAME, { level });
-    
-    // 3. Gerar Imagem
     const imageData = await imageService.fetchAndUploadImage(aiData);
 
-    // 4. Gerenciar Categoria
     const categoryName = aiData.categoryName || 'Geral';
     const categorySlug = formatSlug(categoryName);
     let category = await client.fetch(`*[_type == "category" && slug.current == $slug][0]`, { slug: categorySlug });
@@ -196,7 +220,7 @@ const createCourse = async (req, res) => {
     }
 
     const finalSlug = `${formatSlug(aiData.title)}-${crypto.randomBytes(3).toString('hex')}`;
-    
+
     const newCourse = {
       _type: 'course',
       title: aiData.title,
@@ -240,7 +264,6 @@ const createCourse = async (req, res) => {
         correctAnswer: q.correctAnswer
       })),
 
-      // CORREÇÃO: Preenchimento do Provedor e Modelo nos metadados
       aiMetadata: { 
         provider: PROVIDER_NAME,
         model: MODEL_NAME,
@@ -256,7 +279,6 @@ const createCourse = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Erro ao criar curso:", error);
-    // Tenta reembolsar o crédito caso a falha ocorra após o check de cota
     try { await quotaService.refundCredit(userId); } catch (e) { console.error("Erro no reembolso:", e); }
     return res.status(500).json({ error: "Falha na geração do curso pela IA." });
   }

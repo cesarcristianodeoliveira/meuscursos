@@ -9,20 +9,22 @@ export function AuthProvider({ children }) {
 
   /**
    * Normaliza os dados do usuário vindos do Sanity/Backend.
+   * Garante que campos de Gamificação (XP/Level) sempre existam.
    */
   const handleUserResponse = useCallback((userData) => {
     if (!userData) return null;
     
     const normalizedUser = {
       ...userData,
-      // Garante consistência entre _id (Sanity) e id (JWT)
       _id: userData._id || userData.id,
       credits: userData.credits ?? 0,
-      stats: userData.stats || { 
-        totalXp: 0, 
-        level: 1, 
-        coursesCreated: 0, 
-        coursesCompleted: 0 
+      // Blindagem dos dados de XP e Progresso
+      stats: {
+        totalXp: userData.stats?.totalXp ?? 0,
+        level: userData.stats?.level ?? 1,
+        coursesCreated: userData.stats?.coursesCreated ?? 0,
+        coursesCompleted: userData.stats?.coursesCompleted ?? 0,
+        ...(userData.stats || {})
       }
     };
     
@@ -32,14 +34,11 @@ export function AuthProvider({ children }) {
 
   /**
    * Configura o Header global da API e o LocalStorage.
-   * Chave simplificada para 'token' conforme solicitado.
    */
   const setSession = useCallback((token) => {
     if (token) {
       localStorage.setItem('token', token);
-      // Remove a chave antiga se ela ainda existir (migração silenciosa)
-      localStorage.removeItem('@IAcademy:token');
-      
+      localStorage.removeItem('@IAcademy:token'); // Migração concluída
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
       localStorage.removeItem('token');
@@ -54,7 +53,7 @@ export function AuthProvider({ children }) {
   }, [setSession]);
 
   /**
-   * Busca os dados mais recentes do usuário.
+   * Busca os dados mais recentes do usuário (XP, Créditos, etc).
    */
   const refreshUser = useCallback(async () => {
     try {
@@ -63,18 +62,19 @@ export function AuthProvider({ children }) {
         return handleUserResponse(response.data.user);
       }
     } catch (error) {
-      // O interceptor da api.js já cuida do 401, mas por segurança:
-      if (error.response?.status === 401) signOut();
+      // Se o token for inválido, desloga o usuário
+      if (error.response?.status === 401) {
+        signOut();
+      }
       return null;
     }
   }, [handleUserResponse, signOut]);
 
   /**
-   * LOAD STORAGE: Executado uma única vez ao iniciar a aplicação.
+   * LOAD STORAGE: Inicialização do App
    */
   useEffect(() => {
     async function loadStorageData() {
-      // Verifica primeiro a chave nova, depois a antiga para migração
       const storageToken = localStorage.getItem('token') || localStorage.getItem('@IAcademy:token');
       
       if (storageToken) {
@@ -128,7 +128,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider 
       value={{ 
-        signed: !!user, // Booleano que indica se há usuário logado
+        signed: !!user,
         user, 
         authLoading: loading, 
         signIn, 
