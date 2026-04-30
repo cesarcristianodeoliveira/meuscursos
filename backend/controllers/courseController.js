@@ -98,7 +98,7 @@ const saveProgress = async (req, res) => {
 };
 
 /**
- * SALVAR RESULTADO DO QUIZ E RECOMPENSAS (CORREÇÃO XP/CERTIFICADO)
+ * SALVAR RESULTADO DO QUIZ E RECOMPENSAS (FIX: XP & CERTIFICADO)
  */
 const saveQuizProgress = async (req, res) => {
   const { id: courseId } = req.params;
@@ -106,7 +106,6 @@ const saveQuizProgress = async (req, res) => {
   const userId = req.userId;
 
   try {
-    // Buscamos a matrícula e o prêmio de XP definido no curso
     const data = await client.fetch(`{
       "enrollment": *[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0],
       "course": *[_type == "course" && _id == $courseId][0]{xpReward, title}
@@ -130,7 +129,6 @@ const saveQuizProgress = async (req, res) => {
       
       const patchData = { 
         finalScore: scorePercentage,
-        // Se passou, garante o status concluído e 100% de progresso
         ...(scorePercentage >= 80 ? { 
             status: 'concluido', 
             completionDate: new Date().toISOString(),
@@ -140,7 +138,6 @@ const saveQuizProgress = async (req, res) => {
 
       await client.patch(enrollment._id).set(patchData).commit();
 
-      // LOGICA DE RECOMPENSA (SÓ RODA SE ELE ACABOU DE CONCLUIR)
       if (isFinishing) {
         // 1. Gerar Certificado
         await client.create({
@@ -152,16 +149,16 @@ const saveQuizProgress = async (req, res) => {
           canvasData: JSON.stringify({ courseTitle: course.title, finalScore: scorePercentage })
         });
 
-        // 2. Dar XP ao Usuário (Direto no documento do User)
+        // 2. CORREÇÃO CRITICAL: setIfMissing garante que o incremento não falhe
         const reward = course.xpReward || 100;
         await client.patch(userId)
-          .inc({ xp: reward })
+          .setIfMissing({ xp: 0, coursesCompleted: 0 }) // Inicializa se não existir
+          .inc({ xp: reward, coursesCompleted: 1 })    // Incrementa ambos
           .commit();
         
-        console.log(`✅ Recompensas entregues: ${reward} XP e Certificado gerado.`);
+        console.log(`✅ Recompensas v1.0.2: ${reward} XP e Certificado gerado.`);
       }
     } else {
-      // Logica de Quizzes de Módulo (Progressivo)
       const quizzes = enrollment.completedQuizzes || [];
       const newQuizResult = {
         _key: crypto.randomUUID(),
@@ -186,7 +183,7 @@ const saveQuizProgress = async (req, res) => {
 };
 
 /**
- * CRIAR CURSO COM IA (REVISADO v1.0.0-rc1)
+ * CRIAR CURSO COM IA (REVISADO v1.0.2)
  */
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
@@ -205,7 +202,13 @@ const createCourse = async (req, res) => {
     if (!userQuota.canGenerate) return res.status(429).json({ error: userQuota.reason });
 
     const { course: aiData, usage } = await aiService.generateCourseContent(topic, MODEL_NAME, { level });
-    const imageData = await imageService.fetchAndUploadImage(aiData);
+    
+    // CORREÇÃO: Usar Tags e Categoria para buscar a imagem (mais fiel)
+    const imageData = await imageService.fetchAndUploadImage({
+        categoryName: aiData.categoryName,
+        tags: aiData.tags,
+        title: aiData.title
+    });
 
     const categoryName = aiData.categoryName || 'Geral';
     const categorySlug = formatSlug(categoryName);
@@ -219,6 +222,11 @@ const createCourse = async (req, res) => {
       });
     }
 
+    // CORREÇÃO: Calcular tempo real somando a duração das aulas
+    const realDuration = aiData.modules.reduce((acc, mod) => {
+        return acc + mod.lessons.reduce((lAcc, lesson) => lAcc + (lesson.duration || 0), 0);
+    }, 0);
+
     const finalSlug = `${formatSlug(aiData.title)}-${crypto.randomBytes(3).toString('hex')}`;
 
     const newCourse = {
@@ -229,7 +237,7 @@ const createCourse = async (req, res) => {
       author: { _type: 'reference', _ref: userId },
       category: { _type: 'reference', _ref: category._id },
       level: level || 'iniciante',
-      estimatedTime: aiData.estimatedTime,
+      estimatedTime: realDuration || aiData.estimatedTime, // Usa a soma real
       xpReward: aiData.xpReward,
       tags: aiData.tags || [],
       isPublished: true,
