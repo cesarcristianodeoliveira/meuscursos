@@ -17,7 +17,7 @@ export const CourseProvider = ({ children }) => {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   /**
-   * 1. BUSCA DADOS GLOBAIS (Estatísticas e Categorias)
+   * 1. BUSCA DADOS GLOBAIS
    */
   const fetchGlobalData = useCallback(async (force = false) => {
     if (initialDataLoaded && !force) return;
@@ -67,7 +67,7 @@ export const CourseProvider = ({ children }) => {
       const response = await api.post('/courses/generate', { topic, level });
       const { courseId, slug } = response.data;
 
-      // Sincroniza dados globais e créditos do usuário após criação
+      // Sincroniza dados e créditos
       await Promise.all([
         fetchGlobalData(true),
         refreshUser() 
@@ -77,7 +77,7 @@ export const CourseProvider = ({ children }) => {
       return { success: true, slug: slug || courseId };
 
     } catch (error) {
-      const errorMsg = error.response?.data?.error || "Falha na geração do curso. Verifique seus créditos.";
+      const errorMsg = error.response?.data?.error || "Falha na geração do curso.";
       setStatusMessage(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
@@ -93,7 +93,7 @@ export const CourseProvider = ({ children }) => {
    */
   const getCourseProgress = useCallback(async (courseId) => {
     if (!courseId || !signed) {
-      return { progress: 0, completedLessons: [], completedQuizzes: [] };
+      return { progress: 0, completedLessons: [], completedQuizzes: [], status: 'visitante' };
     }
     
     try {
@@ -113,7 +113,7 @@ export const CourseProvider = ({ children }) => {
   }, [signed]);
 
   /**
-   * 4. ATUALIZAR PROGRESSO E SINCRONIZAR PERFIL (XP)
+   * 4. ATUALIZAR PROGRESSO DE LIÇÃO
    */
   const updateLessonProgress = useCallback(async (courseId, lessonData) => {
     if (!signed) return { success: false, error: 'Necessário login' };
@@ -121,11 +121,8 @@ export const CourseProvider = ({ children }) => {
     try {
       const res = await api.post(`/courses/${courseId}/progress`, lessonData);
       
-      // Se a lição completada puder gerar mudança de nível ou status,
-      // ou apenas para garantir que o progresso visual no header mude:
       if (res.data.success) {
-          // refreshUser garante que se houver XP por lição (futuro) ou 
-          // mudança de nível, o Header atualize imediatamente.
+          // Atualiza dados do usuário (pode haver ganho de XP)
           await refreshUser(); 
       }
       
@@ -137,23 +134,21 @@ export const CourseProvider = ({ children }) => {
   }, [signed, refreshUser]);
 
   /**
-   * 5. SALVAR QUIZ E ATUALIZAR XP/CERTIFICADO
-   * Criamos essa função específica no contexto para centralizar a lógica de recompensa
+   * 5. SALVAR QUIZ E ATUALIZAR XP (Centralizado)
    */
   const saveQuizResult = useCallback(async (courseId, quizData) => {
-    if (!signed) return { success: false };
+    if (!signed) return { success: false, error: 'Login necessário' };
 
     try {
       const res = await api.post(`/courses/${courseId}/quiz-result`, quizData);
       
-      // CRÍTICO: Após o quiz, o usuário ganha XP. 
-      // Chamamos refreshUser para atualizar o saldo de XP na tela na hora!
+      // Essencial: Atualiza o XP e Nível no AuthContext imediatamente
       await refreshUser();
       
       return res.data;
     } catch (err) {
       console.error("Erro ao salvar resultado do quiz:", err);
-      return { success: false };
+      return { success: false, error: 'Erro ao processar quiz' };
     }
   }, [signed, refreshUser]);
 
@@ -164,7 +159,7 @@ export const CourseProvider = ({ children }) => {
       generateCourse,
       getCourseProgress,
       updateLessonProgress,
-      saveQuizResult, // Nova função exportada
+      saveQuizResult, 
       stats, 
       categories, 
       fetchGlobalData, 

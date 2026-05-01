@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm'; 
 import { client } from '../../../client';
-import api from '../../../services/api'; 
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCourse } from '../../../contexts/CourseContext';
 import { 
@@ -87,12 +86,14 @@ const ModuleQuiz = ({ courseId, quizKey, rawQuestions = [], onComplete, isSaving
     });
     setScore(currentScore);
     setSubmitted(true);
+    
     localStorage.setItem(storageKey, JSON.stringify({ 
         questions, 
         answers, 
         submitted: true, 
         score: currentScore 
     }));
+
     if (onComplete) onComplete(currentScore, questions.length);
   };
 
@@ -144,7 +145,7 @@ const ModuleQuiz = ({ courseId, quizKey, rawQuestions = [], onComplete, isSaving
           size="large" 
           disabled={(!isGuest && Object.keys(answers).length < questions.length) || isSaving}
         >
-          {isSaving ? "Gravando XP..." : isGuest ? "Faça Login para Responder" : "Finalizar Quiz"}
+          {isSaving ? "Gravando Progresso..." : isGuest ? "Faça Login para Responder" : "Finalizar Quiz"}
         </Button>
       ) : (
         <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4, bgcolor: isWin ? 'success.dark' : 'grey.900', color: 'white' }}>
@@ -153,7 +154,7 @@ const ModuleQuiz = ({ courseId, quizKey, rawQuestions = [], onComplete, isSaving
           </Typography>
           {!isWin && (
             <Button variant="contained" color="inherit" onClick={handleReset} sx={{ color: 'black', mt: 2 }} startIcon={<ReplayIcon />}>
-              Tentar Novamente (Reiniciar)
+              Tentar Novamente
             </Button>
           )}
         </Paper>
@@ -167,7 +168,7 @@ export default function CourseView() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { signed, authLoading } = useAuth(); 
-  const { fetchGlobalData, getCourseProgress, updateLessonProgress } = useCourse();
+  const { fetchGlobalData, getCourseProgress, updateLessonProgress, saveQuizResult } = useCourse();
 
   const [course, setCourse] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
@@ -219,7 +220,6 @@ export default function CourseView() {
     const lessonId = lesson._key;
     const isCurrentlyCompleted = completedLessons.includes(lessonId);
     
-    // UI Feedback imediato
     setCompletedLessons(prev => isCurrentlyCompleted ? prev.filter(id => id !== lessonId) : [...prev, lessonId]);
 
     try {
@@ -243,7 +243,8 @@ export default function CourseView() {
 
     setIsSaving(true);
     try {
-      const res = await api.post(`/courses/${course._id}/quiz-result`, {
+      // Agora usamos a função do contexto para garantir sincronia de XP
+      const res = await saveQuizResult(course._id, {
         score,
         totalQuestions: total,
         isFinalExam: isFinal,
@@ -256,7 +257,7 @@ export default function CourseView() {
         setCompletedQuizzes(prev => [...new Set([...prev, currentModule._key])]);
       }
 
-      if (res.data.status === 'concluido') setCourseStatus('concluido');
+      if (res.status === 'concluido') setCourseStatus('concluido');
       fetchGlobalData(true);
     } catch (err) {
       console.error("Erro ao salvar resultado do quiz");
@@ -269,7 +270,7 @@ export default function CourseView() {
     h2: ({node, ...props}) => <Typography variant="h5" fontWeight="bold" sx={{ mt: 4, mb: 2, color: 'primary.main' }} {...props} />,
     h3: ({node, ...props}) => <Typography variant="h6" fontWeight="bold" sx={{ mt: 3, mb: 1 }} {...props} />,
     p: ({node, ...props}) => <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.8, color: 'text.secondary' }} {...props} />,
-    li: ({node, ...props}) => <Typography component="li" variant="body1" sx={{ mb: 1, color: 'text.secondary' }} {...props} />,
+    li: ({node, ...props}) => <Typography component="li" variant="body1" sx={{ mb: 1, color: 'text.secondary', ml: 2 }} {...props} />,
     code: ({node, inline, ...props}) => (
       inline ? 
       <Box component="code" sx={{ bgcolor: 'action.hover', p: '2px 4px', borderRadius: 1, fontFamily: 'monospace', fontSize: '0.9em' }} {...props} /> :
@@ -282,7 +283,7 @@ export default function CourseView() {
   if (loading || authLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><CircularProgress /></Box>;
   if (!course) return <Box sx={{ p: 4 }}><Alert severity="error">Curso não encontrado.</Alert></Box>;
 
-  // --- LÓGICA DE BLOQUEIO ---
+  // Lógica de Desbloqueio
   const allLessonsCount = course.modules?.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0);
   const totalModulesWithQuiz = course.modules?.filter(m => m.exercises?.length > 0).length || 0;
   
@@ -293,7 +294,7 @@ export default function CourseView() {
   return (
     <Box sx={{ display: 'flex', bgcolor: 'background.default' }}>
       <Grid container>
-        {/* SIDEBAR DE NAVEGAÇÃO */}
+        {/* SIDEBAR */}
         <Grid item xs={12} md={3}>
           <SidebarContainer>
             <Box sx={{ p: 3 }}>
@@ -316,7 +317,7 @@ export default function CourseView() {
                     <Box>
                       <Typography fontWeight="bold" variant="body2">{module.title}</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {completedInThisModule}/{module.lessons?.length} aulas concluídas
+                        {completedInThisModule}/{module.lessons?.length} aulas
                       </Typography>
                     </Box>
                   </AccordionSummary>
@@ -374,16 +375,11 @@ export default function CourseView() {
               >
                 Exame Final
               </Button>
-              {!isFinalExamUnlocked && signed && (
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
-                  Complete tudo para liberar o exame.
-                </Typography>
-              )}
             </Box>
           </SidebarContainer>
         </Grid>
 
-        {/* ÁREA DE CONTEÚDO PRINCIPAL */}
+        {/* CONTEÚDO */}
         <Grid item xs={12} md={9}>
           <ContentContainer>
             {activeQuiz ? (
@@ -400,8 +396,8 @@ export default function CourseView() {
               <Stack spacing={4} sx={{ maxWidth: 900, mx: 'auto' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
                   <Box>
-                    <Typography variant="overline" color="primary" fontWeight="bold">Lendo agora</Typography>
-                    <Typography variant="h3" fontWeight="900">{activeLesson.title}</Typography>
+                    <Typography variant="overline" color="primary" fontWeight="bold">Conteúdo da Aula</Typography>
+                    <Typography variant="h4" fontWeight="900">{activeLesson.title}</Typography>
                   </Box>
                   <Button 
                     variant={completedLessons.includes(activeLesson._key) ? "outlined" : "contained"}
@@ -411,7 +407,7 @@ export default function CourseView() {
                     startIcon={completedLessons.includes(activeLesson._key) ? <CheckCircleIcon /> : <RadioButtonUncheckedIcon />}
                     sx={{ borderRadius: 3 }}
                   >
-                    {completedLessons.includes(activeLesson._key) ? "Aula Concluída" : "Marcar como Lida"}
+                    {completedLessons.includes(activeLesson._key) ? "Concluída" : "Concluir Aula"}
                   </Button>
                 </Box>
                 <Divider />
