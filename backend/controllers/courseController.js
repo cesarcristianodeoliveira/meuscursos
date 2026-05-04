@@ -6,7 +6,7 @@ const { formatSlug } = require('../utils/formatter');
 const crypto = require('crypto');
 
 /**
- * BUSCAR PROGRESSO
+ * BUSCAR PROGRESSO DO ALUNO
  */
 const getProgress = async (req, res) => {
   const { id: courseId } = req.params;
@@ -34,13 +34,13 @@ const getProgress = async (req, res) => {
       status: enrollment?.status || 'nao_iniciado'
     });
   } catch (error) {
-    console.error("Erro ao buscar progresso:", error);
+    console.error("❌ Erro ao buscar progresso:", error);
     return res.status(500).json({ error: "Erro ao buscar progresso." });
   }
 };
 
 /**
- * SALVAR PROGRESSO DAS AULAS
+ * SALVAR PROGRESSO DE LEITURA (AULAS)
  */
 const saveProgress = async (req, res) => {
   const { id: courseId } = req.params;
@@ -92,13 +92,13 @@ const saveProgress = async (req, res) => {
 
     return res.status(200).json({ success: true, progress: progressPercent });
   } catch (error) {
-    console.error("Erro ao salvar progresso:", error);
+    console.error("❌ Erro ao salvar progresso:", error);
     return res.status(500).json({ error: "Erro interno." });
   }
 };
 
 /**
- * SALVAR RESULTADO DO QUIZ E RECOMPENSAS (FIX: XP & CERTIFICADO)
+ * SALVAR RESULTADO DO QUIZ E FINALIZAR CURSO (XP & CERTIFICADO)
  */
 const saveQuizProgress = async (req, res) => {
   const { id: courseId } = req.params;
@@ -125,7 +125,8 @@ const saveQuizProgress = async (req, res) => {
     }
 
     if (isFinalExam) {
-      const isFinishing = scorePercentage >= 80 && enrollment.status !== 'concluido';
+      const alreadyCompleted = enrollment.status === 'concluido';
+      const isFinishingNow = scorePercentage >= 80 && !alreadyCompleted;
       
       const patchData = { 
         finalScore: scorePercentage,
@@ -138,7 +139,7 @@ const saveQuizProgress = async (req, res) => {
 
       await client.patch(enrollment._id).set(patchData).commit();
 
-      if (isFinishing) {
+      if (isFinishingNow) {
         // 1. Gerar Certificado
         await client.create({
           _type: 'certificate',
@@ -149,16 +150,14 @@ const saveQuizProgress = async (req, res) => {
           canvasData: JSON.stringify({ courseTitle: course.title, finalScore: scorePercentage })
         });
 
-        // 2. CORREÇÃO CRITICAL: setIfMissing garante que o incremento não falhe
+        // 2. CONCORRÊNCIA E XP: Usa o QuotaService para garantir estrutura correta
         const reward = course.xpReward || 100;
-        await client.patch(userId)
-          .setIfMissing({ xp: 0, coursesCompleted: 0 }) // Inicializa se não existir
-          .inc({ xp: reward, coursesCompleted: 1 })    // Incrementa ambos
-          .commit();
+        await quotaService.addXpReward(userId, reward);
         
-        console.log(`✅ Recompensas v1.0.2: ${reward} XP e Certificado gerado.`);
+        console.log(`✅ Curso Concluído: ${reward} XP e Certificado gerado para ${userId}`);
       }
     } else {
+      // Lógica para Quizzes de Módulo
       const quizzes = enrollment.completedQuizzes || [];
       const newQuizResult = {
         _key: crypto.randomUUID(),
@@ -175,15 +174,19 @@ const saveQuizProgress = async (req, res) => {
       await client.patch(enrollment._id).set({ completedQuizzes: updatedQuizzes }).commit();
     }
 
-    return res.status(200).json({ success: true, percent: scorePercentage, status: scorePercentage >= 80 ? 'concluido' : 'tentar_novamente' });
+    return res.status(200).json({ 
+      success: true, 
+      percent: scorePercentage, 
+      status: scorePercentage >= 80 ? 'concluido' : 'tentar_novamente' 
+    });
   } catch (error) {
-    console.error("Erro no quiz/conclusão:", error);
+    console.error("❌ Erro no quiz/conclusão:", error);
     return res.status(500).json({ error: "Erro ao processar resultado." });
   }
 };
 
 /**
- * CRIAR CURSO COM IA (REVISADO v1.0.2)
+ * CRIAR NOVO CURSO COM IA
  */
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
@@ -195,21 +198,22 @@ const createCourse = async (req, res) => {
   if (!topic) return res.status(400).json({ error: "O tema é obrigatório." });
 
   try {
-    const user = await client.fetch(`*[_type == "user" && _id == $userId][0]`, { userId });
-    if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
-
+    // 1. Verificação de Cota
     const userQuota = await quotaService.checkUserQuota(userId, level);
     if (!userQuota.canGenerate) return res.status(429).json({ error: userQuota.reason });
 
+    // 2. Geração do Conteúdo via IA
     const { course: aiData, usage } = await aiService.generateCourseContent(topic, MODEL_NAME, { level });
     
-    // CORREÇÃO: Usar Tags e Categoria para buscar a imagem (mais fiel)
+    // 3. Geração da Capa (Usando o prompt limpo da IA)
     const imageData = await imageService.fetchAndUploadImage({
+        imageSearchPrompt: aiData.imageSearchPrompt,
         categoryName: aiData.categoryName,
         tags: aiData.tags,
         title: aiData.title
     });
 
+    // 4. Tratamento da Categoria
     const categoryName = aiData.categoryName || 'Geral';
     const categorySlug = formatSlug(categoryName);
     let category = await client.fetch(`*[_type == "category" && slug.current == $slug][0]`, { slug: categorySlug });
@@ -222,11 +226,7 @@ const createCourse = async (req, res) => {
       });
     }
 
-    // CORREÇÃO: Calcular tempo real somando a duração das aulas
-    const realDuration = aiData.modules.reduce((acc, mod) => {
-        return acc + mod.lessons.reduce((lAcc, lesson) => lAcc + (lesson.duration || 0), 0);
-    }, 0);
-
+    // 5. Construção do Objeto do Curso
     const finalSlug = `${formatSlug(aiData.title)}-${crypto.randomBytes(3).toString('hex')}`;
 
     const newCourse = {
@@ -237,7 +237,7 @@ const createCourse = async (req, res) => {
       author: { _type: 'reference', _ref: userId },
       category: { _type: 'reference', _ref: category._id },
       level: level || 'iniciante',
-      estimatedTime: realDuration || aiData.estimatedTime, // Usa a soma real
+      estimatedTime: aiData.estimatedTime,
       xpReward: aiData.xpReward,
       tags: aiData.tags || [],
       isPublished: true,
@@ -281,13 +281,16 @@ const createCourse = async (req, res) => {
     };
 
     const result = await client.create(newCourse);
+    
+    // 6. Consumir crédito apenas após o sucesso da criação
     await quotaService.consumeCredit(userId);
 
     return res.status(201).json({ success: true, courseId: result._id, slug: result.slug.current });
 
   } catch (error) {
-    console.error("❌ Erro ao criar curso:", error);
-    try { await quotaService.refundCredit(userId); } catch (e) { console.error("Erro no reembolso:", e); }
+    console.error("❌ Erro fatal na criação do curso:", error);
+    // Tenta reembolsar em caso de erro no meio do processo
+    try { await quotaService.refundCredit(userId); } catch (e) { console.error("Erro no estorno:", e); }
     return res.status(500).json({ error: "Falha na geração do curso pela IA." });
   }
 };
@@ -302,10 +305,10 @@ const getCourseBySlug = async (req, res) => {
         author->{name, avatar}
       }`, { slug }
     );
-    if (!course) return res.status(404).json({ error: "Não encontrado." });
+    if (!course) return res.status(404).json({ error: "Curso não encontrado." });
     return res.status(200).json({ success: true, course });
   } catch (error) {
-    return res.status(500).json({ error: "Erro interno." });
+    return res.status(500).json({ error: "Erro interno ao buscar curso." });
   }
 };
 

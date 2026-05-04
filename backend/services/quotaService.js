@@ -1,8 +1,8 @@
 const client = require('../config/sanity');
 
 /**
- * SERVIÇO DE COTAS E CRÉDITOS (QuotaService) v1.0.0-rc1
- * Proteção contra abusos, gestão de créditos Pro e suporte a níveis.
+ * SERVIÇO DE COTAS, CRÉDITOS E PROGRESSO (QuotaService) v1.1.0
+ * Gestão de economia do app, proteção contra abusos e evolução de nível.
  */
 
 /**
@@ -21,45 +21,34 @@ const checkUserQuota = async (userId, requestedLevel = 'iniciante') => {
 
     if (!user) return { canGenerate: false, reason: "Usuário não encontrado." };
 
-    // A. ADMIN: Acesso total e irrestrito
     if (user.role === 'admin') return { canGenerate: true };
 
-    // B. Bloqueio de Nível (Exemplo de Regra de Negócio para Cursos Livres)
-    // Usuários sem créditos (Free Tier) só podem gerar cursos 'iniciante'
-    if (user.credits <= 0 && requestedLevel !== 'iniciante') {
+    // Bloqueio de Nível PRO
+    if ((user.credits || 0) <= 0 && requestedLevel !== 'iniciante') {
       return { 
         canGenerate: false, 
-        reason: "O nível intermediário/avançado é exclusivo para usuários PRO. Adquira créditos para continuar." 
+        reason: "O nível intermediário/avançado é exclusivo para usuários PRO." 
       };
     }
 
-    // C. Proteção Global (Evita queima de orçamento da API em caso de ataque)
     const globalCheck = await checkGlobalQuota();
     if (!globalCheck.isOk) {
-      return { 
-        canGenerate: false, 
-        reason: "O sistema atingiu o limite de tráfego momentâneo. Tente novamente em instantes." 
-      };
+      return { canGenerate: false, reason: "Sistema sobrecarregado. Tente em instantes." };
     }
 
-    // D. Verificação de Créditos Pagos
-    if (user.credits > 0) return { canGenerate: true };
+    if ((user.credits || 0) > 0) return { canGenerate: true };
 
-    // E. Regra da Hora Gratuita (Micro-learning orgânico)
+    // Regra da Hora Gratuita
     const now = new Date();
     const lastGen = user.lastGenerationAt ? new Date(user.lastGenerationAt) : new Date(0);
-    const msPassed = now - lastGen;
-    const minutesPassed = Math.floor(msPassed / (1000 * 60));
+    const minutesPassed = Math.floor((now - lastGen) / (1000 * 60));
     
-    if (minutesPassed >= 60) {
-      return { canGenerate: true, isFreeTier: true };
-    }
+    if (minutesPassed >= 60) return { canGenerate: true, isFreeTier: true };
 
-    // Retorno amigável com tempo de espera
     const timeLeft = 60 - minutesPassed;
     return { 
       canGenerate: false, 
-      reason: `Você já gerou um curso recentemente. Seu próximo acesso gratuito será em ${timeLeft} minutos.`,
+      reason: `Próximo acesso gratuito em ${timeLeft} minutos.`,
       timeLeft 
     };
 
@@ -70,41 +59,43 @@ const checkUserQuota = async (userId, requestedLevel = 'iniciante') => {
 };
 
 /**
- * 2. Verifica a cota GLOBAL (Monitoramento de custos operacionais)
+ * 2. Verifica a cota GLOBAL
  */
 const checkGlobalQuota = async () => {
   try {
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
     const query = `count(*[_type == "course" && _createdAt > $oneHourAgo])`;
-    const coursesInLastHour = await client.fetch(query, { oneHourAgo });
+    const count = await client.fetch(query, { oneHourAgo });
 
-    const GLOBAL_LIMIT = 30; // Ajustado para segurança inicial
-    return {
-      availableSlots: GLOBAL_LIMIT - coursesInLastHour,
-      isOk: coursesInLastHour < GLOBAL_LIMIT
-    };
+    const GLOBAL_LIMIT = 30; 
+    return { availableSlots: GLOBAL_LIMIT - count, isOk: count < GLOBAL_LIMIT };
   } catch (error) {
-    console.error("❌ Erro na cota global:", error.message);
     return { isOk: false };
   }
 };
 
 /**
- * 3. Consome o crédito ou atualiza o timestamp da hora gratuita
+ * 3. Consome o crédito e inicializa Stats com segurança
  */
 const consumeCredit = async (userId) => {
   try {
-    // Buscamos o estado atual do crédito antes de agir
     const user = await client.fetch(`*[_id == $userId][0]{credits}`, { userId });
 
-    const patch = client.patch(userId).setIfMissing({ stats: {}, credits: 0 });
+    // Patch inicial: Garante que o objeto stats e campos base existam
+    await client.patch(userId)
+      .setIfMissing({ 
+        stats: { totalXp: 0, level: 1, coursesCreated: 0, coursesCompleted: 0 }, 
+        credits: 0 
+      })
+      .commit();
 
-    // Se o usuário tinha créditos, remove 1. Se era a hora gratuita, créditos continuam 0.
-    if (user.credits > 0) {
-      patch.dec({ credits: 1 });
+    const transaction = client.patch(userId);
+
+    if ((user.credits || 0) > 0) {
+      transaction.dec({ credits: 1 });
     }
 
-    await patch
+    await transaction
       .set({ "stats.lastGenerationAt": new Date().toISOString() })
       .inc({ "stats.coursesCreated": 1 }) 
       .commit();
@@ -117,30 +108,49 @@ const consumeCredit = async (userId) => {
 };
 
 /**
- * 4. Reembolsa o usuário (Essencial para falhas de imagem/IA)
+ * 4. Adiciona XP e completa curso (ESSENCIAL PARA O GAME)
+ * Corrige o erro de gravação de XP no objeto aninhado.
+ */
+const addXpReward = async (userId, xpAmount) => {
+  try {
+    // Garante que o caminho stats.totalXp exista antes de incrementar
+    await client.patch(userId)
+      .setIfMissing({ "stats.totalXp": 0, "stats.coursesCompleted": 0 })
+      .inc({ 
+        "stats.totalXp": xpAmount,
+        "stats.coursesCompleted": 1 
+      })
+      .commit();
+    
+    console.log(`⭐ ${xpAmount} XP adicionado ao usuário ${userId}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Erro ao gravar progresso:", error.message);
+    return false;
+  }
+};
+
+/**
+ * 5. Reembolsa o usuário em caso de erro na IA
  */
 const refundCredit = async (userId) => {
   try {
     const user = await client.fetch(`*[_id == $userId][0]{credits}`, { userId });
     const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
     
-    const patch = client.patch(userId).setIfMissing({ stats: {}, credits: 0 });
+    const patch = client.patch(userId);
 
-    // Se o usuário já tinha créditos, ele recebe o ponto de volta.
-    // Se era Free Tier, voltamos o relógio para ele tentar de novo agora.
-    if (user.credits > 0) {
+    if ((user.credits || 0) > 0) {
       patch.inc({ credits: 1 });
     }
 
     await patch
       .set({ "stats.lastGenerationAt": oneHourAgo })
-      .dec({ "stats.coursesCreated": 1 }) // Remove da contagem de sucesso
+      .dec({ "stats.coursesCreated": 1 })
       .commit();
 
-    console.log(`♻️ Crédito/Tempo estornado para o usuário: ${userId}`);
     return true;
   } catch (error) {
-    console.error("❌ Erro ao reembolsar crédito:", error.message);
     return false;
   }
 };
@@ -149,5 +159,6 @@ module.exports = {
   checkUserQuota,
   checkGlobalQuota,
   consumeCredit,
+  addXpReward, // Novo método para seu sistema de níveis
   refundCredit
 };

@@ -2,8 +2,8 @@ const Groq = require('groq-sdk');
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 /**
- * SERVIÇO DE INTELIGÊNCIA ARTIFICIAL (AI Service) v1.0.2
- * Foco: Consistência Pedagógica, Metadados Reais e Imagens Precisas.
+ * SERVIÇO DE INTELIGÊNCIA ARTIFICIAL (AI Service) v1.1.0
+ * Foco: Metadados reais, Imagens precisas e Densidade Pedagógica.
  */
 
 const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile', options = {}) => {
@@ -11,50 +11,49 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
 
   const strategy = {
     iniciante: "Introdução rápida, conceitos base e vitórias rápidas para o aluno.",
-    intermediario: "Foco em ferramentas, métodos e aplicação em cenários reais.",
-    avancado: "Análise crítica, resolução de problemas complexos e otimização."
+    intermediario: "Foco em ferramentas, métodos e aplicação em cenários reais. Conteúdo técnico denso.",
+    avancado: "Análise crítica, resolução de problemas complexos e otimização profunda."
   }[level];
 
-  const systemPrompt = `Você é um Designer Instrucional Expert em Cursos Livres e EAD.
-    Sua missão é criar uma experiência de aprendizado fluida, profunda e altamente engajadora.
+  const systemPrompt = `Você é um Designer Instrucional Expert. 
+    Sua missão é criar cursos que entreguem valor real e técnico.
 
-    DIRETRIZES TÉCNICAS DE CONTEÚDO:
-    1. CONSISTÊNCIA PEDAGÓGICA (CRÍTICO): 100% das respostas corretas dos Quizzes e do Exame Final DEVEM estar explicadas explicitamente no texto das lições. Não pergunte nada que não foi ensinado.
-    2. EXAME FINAL: Deve ser uma avaliação abrangente. Não repita apenas as perguntas dos módulos; crie questões que integrem os conhecimentos de diferentes módulos.
-    3. MARKDOWN: Use títulos (##, ###), listas, negrito e blocos de código para facilitar a leitura.
-    4. EXTENSÃO: Cada aula deve ser rica em detalhes técnicos e exemplos práticos.
+    DIRETRIZES DE CONTEÚDO:
+    1. DENSIDADE: Cada lição deve ter no mínimo 300 palavras de conteúdo útil. Não seja superficial.
+    2. CONSISTÊNCIA: Tudo o que for perguntado nos Quizzes DEVE estar explicado no texto das aulas.
+    3. MARKDOWN: Use (##, ###), tabelas e negritos. Formate códigos em blocos apropriados.
 
-    DIRETRIZES DE IMAGEM (CAPA DO CURSO):
-    1. O campo "imageSearchPrompt" deve conter 3 a 5 palavras-chave em INGLÊS.
-    2. REVISÃO ORTOGRÁFICA: Verifique letra por letra (ex: "Italian", não "itlin").
-    3. SEMÂNTICA: Foque em objetos reais, iluminação cinematográfica e fotografia profissional (ex: "Italian pasta, cinematic lighting, professional food photography").
-    4. CATEGORIA: Use a categoria do curso como base para o prompt.`;
+    DIRETRIZES DE IMAGEM (ESTRITAMENTE EM INGLÊS):
+    1. O campo "imageSearchPrompt" deve ser baseado UNICAMENTE na categoria principal ou no objeto central do curso.
+    2. NÃO use adjetivos subjetivos como "soltinho", "melhor" ou "incrível".
+    3. Use termos de alta fidelidade visual. Exemplo: "Cooking", "Microbiology", "Cybersecurity", "Excel spreadsheet".
+    4. FOCO: 1 a 2 palavras-chave no máximo para garantir precisão na busca por APIs externas.`;
 
   const userPrompt = `Gere um curso completo sobre: "${topic}".
     Nível: ${level}.
-    Objetivo: ${strategy}
+    Estratégia: ${strategy}
 
-    ESTRUTURA DESEJADA:
-    - Módulos: De 3 a 8.
-    - Lições por Módulo: Mínimo 2 aulas por módulo.
-    - Quizzes: 1 pergunta por módulo (focada no conteúdo daquele módulo).
-    - Exame Final: Mínimo de 5 perguntas variadas sobre todo o curso.
+    ESTRUTURA:
+    - Módulos: De 3 a 5 módulos bem definidos.
+    - Lições: Mínimo 2 aulas por módulo.
+    - Quizzes: 1 pergunta técnica por módulo.
+    - Exame Final: 5 questões abrangentes.
 
-    RETORNE RIGOROSAMENTE NESTE FORMATO JSON:
+    RETORNE EM JSON:
     {
-      "title": "Título do Curso",
-      "description": "Descrição chamativa",
-      "categoryName": "Categoria",
+      "title": "Título",
+      "description": "Descrição",
+      "categoryName": "Categoria Principal", 
       "tags": ["Tag1", "Tag2"],
-      "imageSearchPrompt": "3-5 english keywords for thumbnail",
+      "imageSearchPrompt": "Single English word or simple term",
       "modules": [
         {
-          "title": "Título do Módulo",
-          "lessons": [{ "title": "Título", "content": "Texto Markdown extenso", "duration": 0 }],
-          "exercises": [{ "question": "Pergunta", "options": ["A", "B", "C", "D"], "correctAnswer": "A" }]
+          "title": "Módulo",
+          "lessons": [{ "title": "Aula", "content": "Markdown (min 300 palavras)", "duration": 0 }],
+          "exercises": [{ "question": "P", "options": ["A","B","C","D"], "correctAnswer": "A" }]
         }
       ],
-      "finalExam": [{ "question": "Pergunta Geral", "options": ["A", "B", "C", "D"], "correctAnswer": "A" }]
+      "finalExam": [{ "question": "P", "options": ["A","B","C","D"], "correctAnswer": "A" }]
     }`;
 
   try {
@@ -64,42 +63,43 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
         { role: 'user', content: userPrompt }
       ],
       model: provider,
-      temperature: 0.5, // Reduzido para diminuir alucinações e erros ortográficos
+      temperature: 0.6, // Ligeiramente maior para criatividade no conteúdo textual
       response_format: { type: "json_object" }
     });
 
     const rawData = JSON.parse(chatCompletion.choices[0].message.content);
 
-    // --- CÁLCULO DE MÉTRICAS DINÂMICO ---
+    // --- PROCESSAMENTO DE MÉTRICAS ---
     let totalWords = 0;
-    let accumulatedDuration = 0;
-    let totalQuestions = 0;
+    let readingTime = 0;
+    let quizCount = 0;
 
     rawData.modules.forEach(mod => {
-      totalQuestions += (mod.exercises?.length || 0);
+      quizCount += (mod.exercises?.length || 0);
       mod.lessons.forEach(lesson => {
         const words = (lesson.content || "").trim().split(/\s+/).length;
         totalWords += words;
         
-        // Cálculo de duração: média de 130 palavras por minuto + tempo base
-        const calculatedDuration = Math.max(5, Math.ceil(words / 130));
-        lesson.duration = calculatedDuration;
-        accumulatedDuration += calculatedDuration;
+        // Média de leitura: 150 palavras por minuto para conteúdo técnico
+        const calcDur = Math.max(5, Math.ceil(words / 150));
+        lesson.duration = calcDur;
+        readingTime += calcDur;
       });
     });
 
-    const totalExamQuestions = rawData.finalExam?.length || 0;
-    const totalDuration = accumulatedDuration + Math.ceil((totalQuestions + totalExamQuestions) * 1.5);
+    const examCount = rawData.finalExam?.length || 0;
+    
+    // Duração total = tempo de leitura + 2 min por questão de quiz/exame
+    const estimatedTotalTime = readingTime + ((quizCount + examCount) * 2);
 
-    // Recompensa de XP baseada na complexidade real (palavras + questões)
-    const levelMultiplier = { iniciante: 1, intermediario: 1.5, avancado: 2 }[level] || 1;
-    const baseScore = (totalWords / 8) + ((totalQuestions + totalExamQuestions) * 25);
-    const finalXpReward = Math.round(baseScore * levelMultiplier);
+    // Recompensa de XP balanceada (XP por minuto + bônus de complexidade)
+    const levelBonus = { iniciante: 1, intermediario: 1.3, avancado: 1.6 }[level];
+    const finalXpReward = Math.round((estimatedTotalTime * 10) * levelBonus);
 
     return {
       course: {
         ...rawData,
-        estimatedTime: totalDuration,
+        estimatedTime: estimatedTotalTime,
         xpReward: finalXpReward
       },
       usage: {
@@ -109,8 +109,8 @@ const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile'
     };
 
   } catch (error) {
-    console.error("❌ Erro fatal no aiService:", error.message);
-    throw new Error("Falha na geração inteligente do curso.");
+    console.error("❌ Erro no aiService:", error.message);
+    throw new Error("Erro na geração do curso via IA.");
   }
 };
 

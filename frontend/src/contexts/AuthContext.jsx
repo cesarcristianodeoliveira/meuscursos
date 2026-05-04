@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import api from '../services/api';
 
 const AuthContext = createContext({});
@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
 
   /**
    * Normaliza os dados do usuário vindos do Sanity/Backend.
-   * Garante que campos de Gamificação (XP/Level) sempre existam.
+   * Garante que os campos fiquem dentro de 'stats' para evitar erros de renderização.
    */
   const handleUserResponse = useCallback((userData) => {
     if (!userData) return null;
@@ -18,13 +18,12 @@ export function AuthProvider({ children }) {
       ...userData,
       _id: userData._id || userData.id,
       credits: userData.credits ?? 0,
-      // Blindagem dos dados de XP e Progresso
       stats: {
-        totalXp: userData.stats?.totalXp ?? 0,
-        level: userData.stats?.level ?? 1,
-        coursesCreated: userData.stats?.coursesCreated ?? 0,
-        coursesCompleted: userData.stats?.coursesCompleted ?? 0,
-        ...(userData.stats || {})
+        totalXp: userData.stats?.totalXp ?? userData.xp ?? 0,
+        level: userData.stats?.level ?? userData.level ?? 1,
+        coursesCreated: userData.stats?.coursesCreated ?? userData.coursesCreated ?? 0,
+        coursesCompleted: userData.stats?.coursesCompleted ?? userData.coursesCompleted ?? 0,
+        lastLogin: userData.stats?.lastLogin || new Date().toISOString(),
       }
     };
     
@@ -33,15 +32,13 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
-   * Configura o Header global da API e o LocalStorage.
+   * Gerencia a persistência do Token e cabeçalhos da API
    */
   const setSession = useCallback((token) => {
     if (token) {
-      localStorage.setItem('token', token);
-      localStorage.removeItem('@IAcademy:token'); // Migração concluída
+      localStorage.setItem('@IAcademy:token', token);
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
-      localStorage.removeItem('token');
       localStorage.removeItem('@IAcademy:token');
       delete api.defaults.headers.common['Authorization'];
     }
@@ -53,7 +50,7 @@ export function AuthProvider({ children }) {
   }, [setSession]);
 
   /**
-   * Busca os dados mais recentes do usuário (XP, Créditos, etc).
+   * Busca os dados atualizados (XP, Nível, Créditos)
    */
   const refreshUser = useCallback(async () => {
     try {
@@ -61,8 +58,8 @@ export function AuthProvider({ children }) {
       if (response.data.success) {
         return handleUserResponse(response.data.user);
       }
+      return null;
     } catch (error) {
-      // Se o token for inválido, desloga o usuário
       if (error.response?.status === 401) {
         signOut();
       }
@@ -71,21 +68,31 @@ export function AuthProvider({ children }) {
   }, [handleUserResponse, signOut]);
 
   /**
-   * LOAD STORAGE: Inicialização do App
+   * Inicialização: Carrega token e dados do usuário ao abrir o app
    */
   useEffect(() => {
     async function loadStorageData() {
-      const storageToken = localStorage.getItem('token') || localStorage.getItem('@IAcademy:token');
-      
-      if (storageToken) {
-        setSession(storageToken);
-        await refreshUser(); 
+      try {
+        const storageToken = localStorage.getItem('@IAcademy:token');
+        
+        if (storageToken) {
+          setSession(storageToken);
+          // Tenta validar o token buscando os dados do usuário
+          const currentUser = await refreshUser();
+          
+          if (!currentUser) {
+            signOut();
+          }
+        }
+      } catch (e) {
+        console.error("Erro ao carregar sessão:", e);
+        signOut();
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     }
     loadStorageData();
-  }, [setSession, refreshUser]);
+  }, [setSession, refreshUser, signOut]);
 
   const signIn = useCallback(async (email, password) => {
     try {
@@ -97,16 +104,17 @@ export function AuthProvider({ children }) {
         handleUserResponse(userData);
         return { success: true };
       }
-      return { success: false, error: response.data.error || "E-mail ou senha incorretos." };
+      return { success: false, error: response.data.error || "Credenciais incorretas." };
     } catch (error) {
       return { 
         success: false, 
-        error: error.response?.data?.error || "Erro de conexão com o servidor." 
+        error: error.response?.data?.error || "Falha na conexão com o servidor." 
       };
     }
   }, [setSession, handleUserResponse]);
 
-  const signUp = useCallback(async (name, email, password, newsletter) => {
+  // Ajustado para receber o objeto enviado pelo formulário de SignUp
+  const signUp = useCallback(async ({ name, email, password, newsletter }) => {
     try {
       const response = await api.post('/auth/register', { name, email, password, newsletter });
       
@@ -120,23 +128,23 @@ export function AuthProvider({ children }) {
     } catch (error) {
       return { 
         success: false, 
-        error: error.response?.data?.error || "Erro ao processar registro." 
+        error: error.response?.data?.error || "Erro no registro. Tente novamente." 
       };
     }
   }, [setSession, handleUserResponse]);
 
+  const authValue = useMemo(() => ({
+    signed: !!user,
+    user, 
+    authLoading: loading, 
+    signIn, 
+    signOut, 
+    signUp,
+    refreshUser 
+  }), [user, loading, signIn, signOut, signUp, refreshUser]);
+
   return (
-    <AuthContext.Provider 
-      value={{ 
-        signed: !!user,
-        user, 
-        authLoading: loading, 
-        signIn, 
-        signOut, 
-        signUp,
-        refreshUser 
-      }}
-    >
+    <AuthContext.Provider value={authValue}>
       {children}
     </AuthContext.Provider>
   );

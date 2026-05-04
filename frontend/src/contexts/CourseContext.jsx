@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useCallback, useEffect } from 'react';
+import React, { createContext, useState, useContext, useCallback, useEffect, useMemo } from 'react';
 import { client } from '../client'; 
 import api from '../services/api';     
 import { useAuth } from './AuthContext';
@@ -17,7 +17,7 @@ export const CourseProvider = ({ children }) => {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   /**
-   * 1. BUSCA DADOS GLOBAIS
+   * 1. BUSCA DADOS GLOBAIS (Stats da Home)
    */
   const fetchGlobalData = useCallback(async (force = false) => {
     if (initialDataLoaded && !force) return;
@@ -64,32 +64,34 @@ export const CourseProvider = ({ children }) => {
     setStatusMessage(`O Professor IA está estruturando seu curso sobre: ${topic}...`);
 
     try {
+      // O endpoint correto definido no nosso router backend
       const response = await api.post('/courses/generate', { topic, level });
-      const { courseId, slug } = response.data;
+      const { slug } = response.data;
 
-      // Sincroniza dados e créditos
+      // Sincroniza dados globais e créditos do usuário após a geração bem-sucedida
       await Promise.all([
         fetchGlobalData(true),
         refreshUser() 
       ]);
 
       setStatusMessage('Curso criado com sucesso! Redirecionando...');
-      return { success: true, slug: slug || courseId };
+      return { success: true, slug: slug };
 
     } catch (error) {
       const errorMsg = error.response?.data?.error || "Falha na geração do curso.";
       setStatusMessage(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
+      // Mantém a mensagem de sucesso por um momento antes de liberar o botão
       setTimeout(() => {
         setIsGenerating(false);
         setStatusMessage('');
-      }, 3000);
+      }, 2000);
     }
   };
 
   /**
-   * 3. BUSCAR PROGRESSO
+   * 3. BUSCAR PROGRESSO DO ALUNO NO CURSO
    */
   const getCourseProgress = useCallback(async (courseId) => {
     if (!courseId || !signed) {
@@ -98,12 +100,12 @@ export const CourseProvider = ({ children }) => {
     
     try {
       const res = await api.get(`/courses/${courseId}/progress`);
-      if (res.data.success) {
+      if (res.data) {
         return {
           progress: res.data.progress || 0,
           completedLessons: res.data.completedLessons || [],
           completedQuizzes: res.data.completedQuizzes || [],
-          status: res.data.status
+          status: res.data.status || 'em_andamento'
         };
       }
     } catch (err) {
@@ -113,28 +115,28 @@ export const CourseProvider = ({ children }) => {
   }, [signed]);
 
   /**
-   * 4. ATUALIZAR PROGRESSO DE LIÇÃO
+   * 4. ATUALIZAR PROGRESSO DE LIÇÃO (CHECKBOX)
    */
   const updateLessonProgress = useCallback(async (courseId, lessonData) => {
-    if (!signed) return { success: false, error: 'Necessário login' };
+    if (!signed) return { success: false, error: 'Faça login para salvar progresso.' };
     
     try {
       const res = await api.post(`/courses/${courseId}/progress`, lessonData);
       
       if (res.data.success) {
-          // Atualiza dados do usuário (pode haver ganho de XP)
-          await refreshUser(); 
+          // Opcional: Se houver XP por lição, atualizamos o usuário
+          // await refreshUser(); 
       }
       
       return res.data;
     } catch (err) {
       console.error("Erro ao salvar lição:", err);
-      return { success: false, error: 'Erro interno ao salvar' };
+      return { success: false, error: 'Erro ao salvar progresso.' };
     }
-  }, [signed, refreshUser]);
+  }, [signed]);
 
   /**
-   * 5. SALVAR QUIZ E ATUALIZAR XP (Centralizado)
+   * 5. SALVAR QUIZ E ATUALIZAR GAMIFICATION (XP & CERTIFICADO)
    */
   const saveQuizResult = useCallback(async (courseId, quizData) => {
     if (!signed) return { success: false, error: 'Login necessário' };
@@ -142,30 +144,36 @@ export const CourseProvider = ({ children }) => {
     try {
       const res = await api.post(`/courses/${courseId}/quiz-result`, quizData);
       
-      // Essencial: Atualiza o XP e Nível no AuthContext imediatamente
-      await refreshUser();
+      // Se o quiz resultou em aprovação/conclusão, o XP mudou no banco.
+      // Atualizamos o estado global do usuário IMEDIATAMENTE.
+      if (res.data.success) {
+        await refreshUser();
+      }
       
       return res.data;
     } catch (err) {
       console.error("Erro ao salvar resultado do quiz:", err);
-      return { success: false, error: 'Erro ao processar quiz' };
+      return { success: false, error: 'Erro ao processar resultado do quiz.' };
     }
   }, [signed, refreshUser]);
 
+  // Memoizando o valor para evitar re-renders na árvore de componentes
+  const contextValue = useMemo(() => ({
+    isGenerating, 
+    statusMessage, 
+    generateCourse,
+    getCourseProgress,
+    updateLessonProgress,
+    saveQuizResult, 
+    stats, 
+    categories, 
+    fetchGlobalData, 
+    initialDataLoaded,
+    hasPagination: stats.courses > COURSES_PER_PAGE
+  }), [isGenerating, statusMessage, stats, categories, initialDataLoaded, getCourseProgress, updateLessonProgress, saveQuizResult, fetchGlobalData]);
+
   return (
-    <CourseContext.Provider value={{ 
-      isGenerating, 
-      statusMessage, 
-      generateCourse,
-      getCourseProgress,
-      updateLessonProgress,
-      saveQuizResult, 
-      stats, 
-      categories, 
-      fetchGlobalData, 
-      initialDataLoaded,
-      hasPagination: stats.courses > COURSES_PER_PAGE
-    }}>
+    <CourseContext.Provider value={contextValue}>
       {children}
     </CourseContext.Provider>
   );

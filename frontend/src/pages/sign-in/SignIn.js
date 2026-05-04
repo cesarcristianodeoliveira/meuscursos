@@ -1,20 +1,9 @@
 import * as React from 'react';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useNavigate, Link as RouterLink, useLocation } from 'react-router-dom';
 import {
-  Box,
-  Button,
-  Checkbox,
-  FormControlLabel,
-  Divider,
-  FormLabel,
-  FormControl,
-  Link,
-  TextField,
-  Typography,
-  Stack,
-  Card as MuiCard,
-  CircularProgress,
-  Alert
+  Box, Button, Checkbox, FormControlLabel, Divider, FormLabel,
+  FormControl, Link, TextField, Typography, Stack,
+  Card as MuiCard, CircularProgress, Alert
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import ForgotPassword from './components/ForgotPassword';
@@ -29,6 +18,7 @@ const Card = styled(MuiCard)(({ theme }) => ({
   padding: theme.spacing(4),
   gap: theme.spacing(2),
   margin: 'auto',
+  borderRadius: '24px', // Borda mais arredondada para o estilo moderno
   [theme.breakpoints.up('sm')]: {
     maxWidth: '450px',
   },
@@ -43,6 +33,7 @@ const Card = styled(MuiCard)(({ theme }) => ({
 const SignInContainer = styled(Stack)(({ theme }) => ({
   minHeight: '100dvh',
   padding: theme.spacing(2),
+  position: 'relative', // Garantir que o z-index funcione
   [theme.breakpoints.up('sm')]: {
     padding: theme.spacing(4),
   },
@@ -64,20 +55,20 @@ const SignInContainer = styled(Stack)(({ theme }) => ({
 
 export default function SignIn() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn } = useAuth();
 
-  // Estados de erro de validação local
+  // Estados de erro e UI
   const [errors, setErrors] = React.useState({
     email: { error: false, message: '' },
     password: { error: false, message: '' },
   });
-
-  // Controle do modal de esqueci a senha
   const [open, setOpen] = React.useState(false);
-
-  // Erros do Backend e Loading
   const [backendError, setBackendError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+
+  // Redirecionamento: volta para onde o usuário estava ou para a home
+  const from = location.state?.from?.pathname || "/";
 
   const handleClickOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
@@ -92,7 +83,7 @@ export default function SignIn() {
     };
 
     if (!email || !/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = { error: true, message: 'Por favor, insira um e-mail válido.' };
+      newErrors.email = { error: true, message: 'Insira um e-mail válido.' };
       isValid = false;
     }
 
@@ -110,10 +101,7 @@ export default function SignIn() {
     setBackendError('');
 
     const data = new FormData(event.currentTarget);
-    
-    if (!validateInputs(data)) {
-      return;
-    }
+    if (!validateInputs(data)) return;
 
     setLoading(true);
     const email = data.get('email');
@@ -123,34 +111,33 @@ export default function SignIn() {
       const result = await signIn(email, password);
 
       if (result && result.success) {
-        navigate('/');
+        // replace: true evita que o usuário volte para o login ao clicar em "Voltar"
+        navigate(from, { replace: true });
       } else {
-        // Exibe erro vindo do backend (ex: "Senha incorreta" ou "Usuário não encontrado")
-        setBackendError(result?.error || 'Falha ao entrar. Verifique suas credenciais.');
+        setBackendError(result?.error || 'E-mail ou senha incorretos.');
       }
     } catch (err) {
-      setBackendError('Não foi possível conectar ao servidor. Verifique sua internet.');
+      setBackendError('Servidor offline. Tente novamente mais tarde.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SignInContainer direction="column" justifyContent="center">
+    <SignInContainer direction="column" justifyContent="center" alignItems="center">
       <Card variant="outlined">
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', mb: 2 }}>
           <SitemarkIcon />
+          <Typography component="h1" variant="h4" fontWeight="900" sx={{ mt: 2 }}>
+            IAcademy
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Bem-vindo de volta! Faça login para continuar.
+          </Typography>
         </Box>
-        <Typography
-          component="h1"
-          variant="h4"
-          sx={{ width: '100%', fontSize: 'clamp(2rem, 10vw, 2.15rem)', textAlign: 'center' }}
-        >
-          Entrar
-        </Typography>
 
         {backendError && (
-          <Alert severity="error" sx={{ mt: 1 }}>
+          <Alert severity="error" sx={{ mb: 1, borderRadius: '12px' }}>
             {backendError}
           </Alert>
         )}
@@ -159,13 +146,7 @@ export default function SignIn() {
           component="form"
           onSubmit={handleSubmit}
           noValidate
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            width: '100%',
-            gap: 2.5,
-            mt: 1
-          }}
+          sx={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 2.5 }}
         >
           <FormControl>
             <FormLabel htmlFor="email">E-mail</FormLabel>
@@ -180,20 +161,18 @@ export default function SignIn() {
               autoFocus
               required
               fullWidth
-              variant="outlined"
               disabled={loading}
-              color={errors.email.error ? 'error' : 'primary'}
             />
           </FormControl>
           <FormControl>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <FormLabel htmlFor="password">Senha</FormLabel>
               <Link
                 component="button"
                 type="button"
                 onClick={handleClickOpen}
                 variant="body2"
-                sx={{ alignSelf: 'baseline' }}
+                fontWeight="medium"
               >
                 Esqueceu a senha?
               </Link>
@@ -208,11 +187,10 @@ export default function SignIn() {
               autoComplete="current-password"
               required
               fullWidth
-              variant="outlined"
               disabled={loading}
-              color={errors.password.error ? 'error' : 'primary'}
             />
           </FormControl>
+          
           <FormControlLabel
             control={<Checkbox name="remember" color="primary" />}
             label={<Typography variant="body2">Lembrar de mim</Typography>}
@@ -227,29 +205,27 @@ export default function SignIn() {
             variant="contained"
             size="large"
             disabled={loading}
-            sx={{ mt: 1 }}
+            sx={{ py: 1.5, borderRadius: '12px', fontWeight: 'bold' }}
           >
-            {loading ? <CircularProgress size={24} color="inherit" /> : 'Entrar'}
+            {loading ? <CircularProgress size={24} color="inherit" /> : 'Entrar na plataforma'}
           </Button>
         </Box>
 
         <Divider sx={{ my: 1 }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>ou</Typography>
+          <Typography variant="body2" color="text.secondary">ou</Typography>
         </Divider>
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Typography sx={{ textAlign: 'center' }}>
-            Ainda não tem uma conta?{' '}
-            <Link
-              component={RouterLink}
-              to="/cadastrar"
-              variant="body2"
-              fontWeight="bold"
-            >
-              Cadastre-se
-            </Link>
-          </Typography>
-        </Box>
+        <Typography sx={{ textAlign: 'center' }}>
+          Ainda não tem conta?{' '}
+          <Link
+            component={RouterLink}
+            to="/cadastrar"
+            fontWeight="bold"
+            sx={{ textDecoration: 'none' }}
+          >
+            Crie uma agora
+          </Link>
+        </Typography>
       </Card>
     </SignInContainer>
   );

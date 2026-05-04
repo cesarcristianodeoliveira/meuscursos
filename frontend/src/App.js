@@ -19,7 +19,7 @@ import SignUp from './pages/sign-up/SignUp';
 import CourseView from './pages/dashboard/pages/CourseView';
 
 /**
- * Utilitário para resetar o scroll ao navegar
+ * Utilitário para resetar o scroll ao navegar entre rotas
  */
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -49,56 +49,53 @@ function LoadingScreen() {
         zIndex: 9999
       }}
     >
-      <CircularProgress />
+      <CircularProgress size={40} thickness={4} />
     </Box>
   );
 }
 
 /**
- * Proteção de rotas para áreas exclusivas de alunos (Gerar Curso, Perfil, etc)
+ * Proteção de rotas para áreas exclusivas de alunos
  */
 function PrivateRoute({ children }) {
   const { signed, authLoading } = useAuth();
+  const location = useLocation(); // Melhor que window.location para o React
   
   if (authLoading) return <LoadingScreen />;
   
-  // Se não estiver logado, redireciona para o entrar salvando a rota de origem
-  return signed ? children : <Navigate to="/entrar" replace state={{ from: window.location.pathname }} />;
+  // Salva a rota que o usuário tentou acessar para redirecionar após o login
+  return signed ? children : <Navigate to="/entrar" replace state={{ from: location }} />;
 }
 
 /**
- * Lógica da Home: Se logado -> Dashboard, Se deslogado -> Landing Page (Marketing)
+ * Lógica da Home: Se logado vai para Dashboard, se não, Landing Page
  */
 function RootRoute() {
   const { signed, authLoading } = useAuth();
   
   if (authLoading) return <LoadingScreen />;
   
-  // Decidimos manter a MarketingPage como porta de entrada mesmo logado? 
-  // Geralmente, se o usuário digita a URL pura e está logado, mandamos para o Dashboard.
   return signed ? <Navigate to="/dashboard" replace /> : <MarketingPage />;
 }
 
 export default function App(props) {
   return (
-    <AuthProvider>
-      <CourseProvider>
-        <AppTheme {...props}>
-          <CssBaseline enableColorScheme />
-          
+    <AppTheme {...props}>
+      <CssBaseline enableColorScheme />
+      <AuthProvider>
+        {/* O CourseProvider fica dentro do Auth pois cursos dependem do User ID */}
+        <CourseProvider>
           <BrowserRouter>
             <ScrollToTop />
             <Routes>
-              {/* 1. Direcionamento Inteligente (Home ou Dashboard) */}
+              {/* 1. Direcionamento Inteligente */}
               <Route path="/" element={<RootRoute />} />
               
               {/* 2. Fluxo de Autenticação */}
               <Route path="/entrar" element={<SignIn />} />
               <Route path="/cadastrar" element={<SignUp />} />
 
-              {/* 3. Visualização de Curso (PÚBLICA)
-                  Aberto para SEO e visitantes. As travas de progresso e 
-                  conclusão de quiz são tratadas dentro do componente CourseView. */}
+              {/* 3. Visualização de Curso (PÚBLICA para SEO) */}
               <Route path="/curso/:slug" element={<CourseView />} />
 
               {/* 4. Ecossistema Privado do Aluno */}
@@ -111,12 +108,12 @@ export default function App(props) {
                 } 
               />
 
-              {/* Fallback de segurança para rotas inexistentes */}
+              {/* Fallback de segurança */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
-        </AppTheme>
-      </CourseProvider>
-    </AuthProvider>
+        </CourseProvider>
+      </AuthProvider>
+    </AppTheme>
   );
 }
