@@ -59,27 +59,30 @@ export default function UserProfile() {
   const [profileData, setProfileData] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
 
-  const isOwnProfile = !id || id === loggedUser?._id;
+  // Verifica se o perfil sendo visualizado é o do próprio usuário logado
+  const isOwnProfile = React.useMemo(() => {
+    return !id || id === loggedUser?._id;
+  }, [id, loggedUser?._id]);
 
   React.useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
       try {
-        // Se for o próprio perfil, usamos o dado do Context (que é reativo e atualiza com XP)
         if (isOwnProfile && loggedUser) {
           setProfileData(loggedUser);
           setLoading(false);
           return;
         }
 
-        // Se for perfil de outro, buscamos no Sanity
-        const query = `*[_type == "user" && _id == $userId][0]{
-          _id, name, email, plan, role, credits, _createdAt,
-          stats,
-          "avatar": avatar.asset->url
-        }`;
-        const result = await client.fetch(query, { userId: id });
-        setProfileData(result);
+        if (id) {
+          const query = `*[_type == "user" && _id == $userId][0]{
+            _id, name, email, plan, role, credits, _createdAt,
+            stats,
+            "avatar": avatar.asset->url
+          }`;
+          const result = await client.fetch(query, { userId: id });
+          setProfileData(result);
+        }
       } catch (error) {
         console.error("Erro ao carregar perfil:", error);
       } finally {
@@ -103,17 +106,18 @@ export default function UserProfile() {
   const userXP = profileData?.stats?.totalXp || 0;
   const userLevel = profileData?.stats?.level || 1;
   const coursesCompleted = profileData?.stats?.coursesCompleted || 0;
-  const xpForNextLevel = userLevel * 1000; // Ex: Nível 1 precisa de 1000, Nível 2 de 2000...
-  const xpCurrentLevelBase = (userLevel - 1) * 1000;
   
-  const progressInLevel = userXP - xpCurrentLevelBase;
+  // Lógica de progresso baseada em blocos de 1000 XP por nível
+  const xpCurrentLevelBase = (userLevel - 1) * 1000;
+  const progressInLevel = Math.max(0, userXP - xpCurrentLevelBase);
   const progressPercentage = Math.min((progressInLevel / 1000) * 100, 100);
 
-  const joinDate = profileData?._createdAt ? new Date(profileData._createdAt).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '---';
+  const joinDate = profileData?._createdAt 
+    ? new Date(profileData._createdAt).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) 
+    : '---';
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* HEADER DO PERFIL */}
       <ProfileHeader>
         <AvatarWrapper>
           <Avatar 
@@ -166,7 +170,6 @@ export default function UserProfile() {
               </Stack>
             </Box>
 
-            {/* CARD DE XP DINÂMICO */}
             <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
               <CardContent sx={{ p: 3 }}>
                 <Typography variant="subtitle2" fontWeight="bold" color="text.secondary" gutterBottom>
@@ -209,8 +212,6 @@ export default function UserProfile() {
         {/* COLUNA DIREITA: ESTATÍSTICAS E CONQUISTAS */}
         <Grid item xs={12} md={8}>
           <Stack spacing={4}>
-            
-            {/* SALDO DE CRÉDITOS (Apenas dono) */}
             {isOwnProfile && (
               <Paper 
                 elevation={0}
@@ -227,7 +228,7 @@ export default function UserProfile() {
               >
                 <Box>
                   <Typography variant="subtitle2" color="text.secondary" fontWeight="bold">Créditos de IA Disponíveis</Typography>
-                  <Typography variant="h4" fontWeight="900">{profileData?.credits || 0}</Typography>
+                  <Typography variant="h4" fontWeight="900">{profileData?.credits ?? 0}</Typography>
                 </Box>
                 <Avatar sx={{ bgcolor: 'warning.light', width: 60, height: 60 }}>
                   <MonetizationOnIcon sx={{ fontSize: 35, color: 'warning.dark' }} />
@@ -235,7 +236,6 @@ export default function UserProfile() {
               </Paper>
             )}
 
-            {/* SEÇÃO DE APRENDIZADO */}
             <Box>
               <Typography variant="h6" fontWeight="900" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
                 <SchoolIcon color="primary" /> Jornada de Aprendizado
@@ -250,7 +250,7 @@ export default function UserProfile() {
                 </Grid>
                 <Grid item xs={12} sm={4}>
                   <StatBox elevation={0}>
-                    <Typography variant="h4" fontWeight="900" color="primary">{profileData?.stats?.coursesCreated || 0}</Typography>
+                    <Typography variant="h4" fontWeight="900" color="primary">{profileData?.stats?.coursesCreated ?? 0}</Typography>
                     <Typography variant="body2" fontWeight="bold" color="text.secondary">Cursos Gerados</Typography>
                   </StatBox>
                 </Grid>
@@ -264,7 +264,6 @@ export default function UserProfile() {
               </Grid>
             </Box>
 
-            {/* CONQUISTAS (ACHIEVEMENTS) - Opcional mas recomendado */}
             <Box>
               <Typography variant="h6" fontWeight="900" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                 <AutoAwesomeIcon color="secondary" /> Conquistas
@@ -275,7 +274,7 @@ export default function UserProfile() {
                 {[
                   { label: 'Pioneiro', color: '#FFD700', active: true },
                   { label: 'Curioso', color: '#C0C0C0', active: coursesCompleted >= 1 },
-                  { label: 'Mestre IA', color: '#CD7F32', active: profileData?.stats?.coursesCreated >= 5 },
+                  { label: 'Mestre IA', color: '#CD7F32', active: (profileData?.stats?.coursesCreated ?? 0) >= 5 },
                 ].map((badge, index) => (
                   <Grid item key={index}>
                     <Tooltip title={badge.active ? `Conquista: ${badge.label}` : 'Bloqueado'}>
@@ -295,7 +294,6 @@ export default function UserProfile() {
                 ))}
               </Grid>
             </Box>
-
           </Stack>
         </Grid>
       </Grid>

@@ -56,19 +56,19 @@ export const CourseProvider = ({ children }) => {
 
   /**
    * 2. GERADOR DE CURSOS (IA)
+   * Envolvido em useCallback para evitar erro de dependência no useMemo e no Netlify.
    */
-  const generateCourse = async (topic, level = 'iniciante') => {
-    if (isGenerating) return;
+  const generateCourse = useCallback(async (topic, level = 'iniciante') => {
+    if (isGenerating) return { success: false, error: 'Já existe uma geração em curso.' };
 
     setIsGenerating(true);
     setStatusMessage(`O Professor IA está estruturando seu curso sobre: ${topic}...`);
 
     try {
-      // O endpoint correto definido no nosso router backend
       const response = await api.post('/courses/generate', { topic, level });
       const { slug } = response.data;
 
-      // Sincroniza dados globais e créditos do usuário após a geração bem-sucedida
+      // Sincroniza dados globais e créditos do usuário após a geração
       await Promise.all([
         fetchGlobalData(true),
         refreshUser() 
@@ -82,13 +82,12 @@ export const CourseProvider = ({ children }) => {
       setStatusMessage(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
-      // Mantém a mensagem de sucesso por um momento antes de liberar o botão
       setTimeout(() => {
         setIsGenerating(false);
         setStatusMessage('');
       }, 2000);
     }
-  };
+  }, [isGenerating, fetchGlobalData, refreshUser]);
 
   /**
    * 3. BUSCAR PROGRESSO DO ALUNO NO CURSO
@@ -115,19 +114,13 @@ export const CourseProvider = ({ children }) => {
   }, [signed]);
 
   /**
-   * 4. ATUALIZAR PROGRESSO DE LIÇÃO (CHECKBOX)
+   * 4. ATUALIZAR PROGRESSO DE LIÇÃO
    */
   const updateLessonProgress = useCallback(async (courseId, lessonData) => {
     if (!signed) return { success: false, error: 'Faça login para salvar progresso.' };
     
     try {
       const res = await api.post(`/courses/${courseId}/progress`, lessonData);
-      
-      if (res.data.success) {
-          // Opcional: Se houver XP por lição, atualizamos o usuário
-          // await refreshUser(); 
-      }
-      
       return res.data;
     } catch (err) {
       console.error("Erro ao salvar lição:", err);
@@ -136,7 +129,7 @@ export const CourseProvider = ({ children }) => {
   }, [signed]);
 
   /**
-   * 5. SALVAR QUIZ E ATUALIZAR GAMIFICATION (XP & CERTIFICADO)
+   * 5. SALVAR QUIZ E ATUALIZAR GAMIFICATION
    */
   const saveQuizResult = useCallback(async (courseId, quizData) => {
     if (!signed) return { success: false, error: 'Login necessário' };
@@ -144,8 +137,6 @@ export const CourseProvider = ({ children }) => {
     try {
       const res = await api.post(`/courses/${courseId}/quiz-result`, quizData);
       
-      // Se o quiz resultou em aprovação/conclusão, o XP mudou no banco.
-      // Atualizamos o estado global do usuário IMEDIATAMENTE.
       if (res.data.success) {
         await refreshUser();
       }
@@ -157,7 +148,10 @@ export const CourseProvider = ({ children }) => {
     }
   }, [signed, refreshUser]);
 
-  // Memoizando o valor para evitar re-renders na árvore de componentes
+  /**
+   * Valor do contexto memoizado. 
+   * Agora todas as funções no array de dependências são estáveis.
+   */
   const contextValue = useMemo(() => ({
     isGenerating, 
     statusMessage, 
@@ -170,7 +164,18 @@ export const CourseProvider = ({ children }) => {
     fetchGlobalData, 
     initialDataLoaded,
     hasPagination: stats.courses > COURSES_PER_PAGE
-  }), [isGenerating, statusMessage, stats, categories, initialDataLoaded, getCourseProgress, updateLessonProgress, saveQuizResult, fetchGlobalData]);
+  }), [
+    isGenerating, 
+    statusMessage, 
+    generateCourse, 
+    getCourseProgress, 
+    updateLessonProgress, 
+    saveQuizResult, 
+    stats, 
+    categories, 
+    fetchGlobalData, 
+    initialDataLoaded
+  ]);
 
   return (
     <CourseContext.Provider value={contextValue}>
