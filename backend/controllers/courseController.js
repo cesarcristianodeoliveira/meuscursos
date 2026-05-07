@@ -140,7 +140,6 @@ const saveQuizProgress = async (req, res) => {
       await client.patch(enrollment._id).set(patchData).commit();
 
       if (isFinishingNow) {
-        // 1. Gerar Certificado
         await client.create({
           _type: 'certificate',
           user: { _type: 'reference', _ref: userId },
@@ -150,14 +149,10 @@ const saveQuizProgress = async (req, res) => {
           canvasData: JSON.stringify({ courseTitle: course.title, finalScore: scorePercentage })
         });
 
-        // 2. CONCORRÊNCIA E XP: Usa o QuotaService para garantir estrutura correta
         const reward = course.xpReward || 100;
         await quotaService.addXpReward(userId, reward);
-        
-        console.log(`✅ Curso Concluído: ${reward} XP e Certificado gerado para ${userId}`);
       }
     } else {
-      // Lógica para Quizzes de Módulo
       const quizzes = enrollment.completedQuizzes || [];
       const newQuizResult = {
         _key: crypto.randomUUID(),
@@ -186,7 +181,7 @@ const saveQuizProgress = async (req, res) => {
 };
 
 /**
- * CRIAR NOVO CURSO COM IA
+ * CRIAR NOVO CURSO COM IA (Versão Otimizada)
  */
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
@@ -202,10 +197,10 @@ const createCourse = async (req, res) => {
     const userQuota = await quotaService.checkUserQuota(userId, level);
     if (!userQuota.canGenerate) return res.status(429).json({ error: userQuota.reason });
 
-    // 2. Geração do Conteúdo via IA
+    // 2. Geração do Conteúdo via IA (aiService processa o texto e métricas)
     const { course: aiData, usage } = await aiService.generateCourseContent(topic, MODEL_NAME, { level });
     
-    // 3. Geração da Capa (Usando o prompt limpo da IA)
+    // 3. Geração da Capa (Busca condicional)
     const imageData = await imageService.fetchAndUploadImage({
         imageSearchPrompt: aiData.imageSearchPrompt,
         categoryName: aiData.categoryName,
@@ -229,6 +224,12 @@ const createCourse = async (req, res) => {
     // 5. Construção do Objeto do Curso
     const finalSlug = `${formatSlug(aiData.title)}-${crypto.randomBytes(3).toString('hex')}`;
 
+    // Lógica: Se imageData.assetId não existir, thumbnail será undefined (vazio no Sanity)
+    const thumbnailObj = imageData?.assetId ? {
+      _type: 'image',
+      asset: { _type: 'reference', _ref: imageData.assetId }
+    } : undefined;
+
     const newCourse = {
       _type: 'course',
       title: aiData.title,
@@ -241,14 +242,13 @@ const createCourse = async (req, res) => {
       xpReward: aiData.xpReward,
       tags: aiData.tags || [],
       isPublished: true,
-
-      thumbnail: imageData?.assetId ? {
-        _type: 'image',
-        asset: { _type: 'reference', _ref: imageData.assetId }
-      } : undefined,
+      
+      // Imagem Dinâmica
+      thumbnail: thumbnailObj,
       externalImageId: imageData?.externalId || "",
-      imageSearchPrompt: imageData?.searchPrompt || "",
+      imageSearchPrompt: aiData.imageSearchPrompt,
 
+      // Módulos e Lições com IDs únicos
       modules: aiData.modules.map(m => ({
         _key: crypto.randomUUID(),
         title: m.title,
@@ -265,6 +265,7 @@ const createCourse = async (req, res) => {
           correctAnswer: e.correctAnswer
         }))
       })),
+
       finalExam: aiData.finalExam.map(q => ({
         _key: crypto.randomUUID(),
         question: q.question,
@@ -282,19 +283,21 @@ const createCourse = async (req, res) => {
 
     const result = await client.create(newCourse);
     
-    // 6. Consumir crédito apenas após o sucesso da criação
+    // 6. Confirmar consumo de crédito
     await quotaService.consumeCredit(userId);
 
     return res.status(201).json({ success: true, courseId: result._id, slug: result.slug.current });
 
   } catch (error) {
     console.error("❌ Erro fatal na criação do curso:", error);
-    // Tenta reembolsar em caso de erro no meio do processo
-    try { await quotaService.refundCredit(userId); } catch (e) { console.error("Erro no estorno:", e); }
+    try { await quotaService.refundCredit(userId); } catch (e) { console.error("Erro no estorno de crédito:", e); }
     return res.status(500).json({ error: "Falha na geração do curso pela IA." });
   }
 };
 
+/**
+ * BUSCAR CURSO POR SLUG
+ */
 const getCourseBySlug = async (req, res) => {
   const { slug } = req.params;
   try {
@@ -312,6 +315,9 @@ const getCourseBySlug = async (req, res) => {
   }
 };
 
+/**
+ * BUSCAR CURSOS DO USUÁRIO LOGADO
+ */
 const getUserCourses = async (req, res) => {
   try {
     const courses = await client.fetch(
