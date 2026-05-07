@@ -56,16 +56,22 @@ export const CourseProvider = ({ children }) => {
 
   /**
    * 2. GERADOR DE CURSOS (IA)
-   * Envolvido em useCallback para evitar erro de dependência no useMemo e no Netlify.
+   * Agora com suporte a mensagens de status mais precisas sobre a imagem.
    */
   const generateCourse = useCallback(async (topic, level = 'iniciante') => {
     if (isGenerating) return { success: false, error: 'Já existe uma geração em curso.' };
 
     setIsGenerating(true);
-    setStatusMessage(`O Professor IA está estruturando seu curso sobre: ${topic}...`);
+    setStatusMessage(`O Professor IA está estruturando o conteúdo sobre: ${topic}...`);
 
     try {
+      // Pequeno delay visual para simular a fase de "Design Instrucional"
+      setTimeout(() => setStatusMessage("IA gerando conteúdo e lições técnicas..."), 2000);
+      
       const response = await api.post('/courses/generate', { topic, level });
+      
+      setStatusMessage("Finalizando design e buscando mídias visuais...");
+      
       const { slug } = response.data;
 
       // Sincroniza dados globais e créditos do usuário após a geração
@@ -82,10 +88,11 @@ export const CourseProvider = ({ children }) => {
       setStatusMessage(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
+      // Mantemos a mensagem de sucesso por 2 segundos antes de limpar
       setTimeout(() => {
         setIsGenerating(false);
         setStatusMessage('');
-      }, 2000);
+      }, 2500);
     }
   }, [isGenerating, fetchGlobalData, refreshUser]);
 
@@ -129,7 +136,7 @@ export const CourseProvider = ({ children }) => {
   }, [signed]);
 
   /**
-   * 5. SALVAR QUIZ E ATUALIZAR GAMIFICATION
+   * 5. SALVAR QUIZ E ATUALIZAR GAMIFICATION (Sincronização de XP)
    */
   const saveQuizResult = useCallback(async (courseId, quizData) => {
     if (!signed) return { success: false, error: 'Login necessário' };
@@ -137,6 +144,7 @@ export const CourseProvider = ({ children }) => {
     try {
       const res = await api.post(`/courses/${courseId}/quiz-result`, quizData);
       
+      // Se concluiu o curso ou ganhou XP, atualizamos o perfil do usuário imediatamente
       if (res.data.success) {
         await refreshUser();
       }
@@ -149,8 +157,7 @@ export const CourseProvider = ({ children }) => {
   }, [signed, refreshUser]);
 
   /**
-   * Valor do contexto memoizado. 
-   * Agora todas as funções no array de dependências são estáveis.
+   * Valor do contexto memoizado.
    */
   const contextValue = useMemo(() => ({
     isGenerating, 
