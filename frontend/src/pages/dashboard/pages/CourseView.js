@@ -8,8 +8,8 @@ import { useCourse } from '../../../contexts/CourseContext';
 import {
   Box, Typography, Stack, Card, Grid,
   List, ListItemButton, ListItemIcon, ListItemText,
-  Divider, Button, CircularProgress, Chip, Accordion,
-  AccordionSummary, AccordionDetails, Alert, Radio, RadioGroup,
+  Divider, Button, Chip, Accordion,
+  AccordionSummary, AccordionDetails, Radio, RadioGroup,
   FormControlLabel, Paper, IconButton, Drawer, useMediaQuery, useTheme
 } from '@mui/material';
 import { styled, alpha } from '@mui/material/styles';
@@ -22,25 +22,20 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import MenuIcon from '@mui/icons-material/Menu';
 
-// --- ESTILOS CUSTOMIZADOS ---
+// --- ESTILOS ---
 const SidebarWrapper = styled(Box)(({ theme }) => ({
   height: '100%',
   overflowY: 'auto',
   backgroundColor: alpha(theme.palette.background.paper, 0.8),
-  backdropFilter: 'blur(8px)',
-  '&::-webkit-scrollbar': { width: '5px' },
-  '&::-webkit-scrollbar-thumb': { 
-    backgroundColor: theme.palette.divider, 
-    borderRadius: '10px' 
-  }
+  backdropFilter: 'blur(10px)',
+  '&::-webkit-scrollbar': { width: '4px' },
+  '&::-webkit-scrollbar-thumb': { backgroundColor: theme.palette.divider, borderRadius: '10px' }
 }));
 
 const ContentContainer = styled(Box)(({ theme }) => ({
   minHeight: 'calc(100vh - 64px)',
   padding: theme.spacing(3),
-  [theme.breakpoints.up('md')]: {
-    padding: theme.spacing(6),
-  },
+  [theme.breakpoints.up('md')]: { padding: theme.spacing(6) },
   backgroundColor: theme.palette.background.default,
 }));
 
@@ -104,11 +99,11 @@ const ModuleQuiz = ({ courseId, quizKey, rawQuestions = [], onComplete, isSaving
   return (
     <Stack spacing={4} sx={{ maxWidth: 800, mx: 'auto', py: 2 }}>
       <Box>
-        <Typography variant="h4" fontWeight="900" gutterBottom color="primary">
+        <Typography variant="h4" fontWeight="900" color="primary" gutterBottom>
           {title}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Responda todas as perguntas corretamente para validar o módulo.
+          {isWin ? "Você concluiu este desafio com sucesso!" : "Responda corretamente para progredir."}
         </Typography>
       </Box>
 
@@ -131,9 +126,7 @@ const ModuleQuiz = ({ courseId, quizKey, rawQuestions = [], onComplete, isSaving
                   label={opt}
                   sx={{ 
                     mb: 1, p: 1, borderRadius: 2, 
-                    transition: '0.2s',
                     bgcolor: submitted && opt === q.correctAnswer ? alpha('#4caf50', 0.1) : 'transparent',
-                    '&:hover': { bgcolor: !submitted ? alpha('#000', 0.04) : 'transparent' }
                   }}
                 />
               ))}
@@ -144,26 +137,20 @@ const ModuleQuiz = ({ courseId, quizKey, rawQuestions = [], onComplete, isSaving
 
       {!submitted ? (
         <Button 
-          variant="contained" 
+          variant="contained" fullWidth size="large"
           onClick={handleSubmit} 
-          size="large" 
           disabled={(!isGuest && Object.keys(answers).length < questions.length) || isSaving} 
-          sx={{ borderRadius: 3, py: 2, fontWeight: 'bold', fontSize: '1.1rem' }}
+          sx={{ borderRadius: 3, py: 2, fontWeight: 'bold' }}
         >
-          {isSaving ? "Sincronizando..." : isGuest ? "Entre para responder" : "Finalizar Desafio"}
+          {isSaving ? "Salvando..." : isGuest ? "Faça login para responder" : "Enviar Respostas"}
         </Button>
       ) : (
-        <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: 4, border: '1px solid', borderColor: isWin ? 'success.main' : 'divider', bgcolor: isWin ? alpha('#4caf50', 0.05) : 'background.paper' }}>
-          <Typography variant="h5" fontWeight="900" color={isWin ? "success.main" : "text.primary"}>
-            {isWin ? "🎯 Excelente! Você dominou este conteúdo." : `Você acertou ${score} de ${questions.length}`}
+        <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: 4, bgcolor: isWin ? alpha('#4caf50', 0.05) : alpha('#f44336', 0.05), border: '1px solid', borderColor: isWin ? 'success.main' : 'error.main' }}>
+          <Typography variant="h5" fontWeight="900" color={isWin ? "success.main" : "error.main"}>
+            {isWin ? "🎯 Excelente! Conteúdo Dominado." : `Você acertou ${score} de ${questions.length}`}
           </Typography>
           {!isWin && (
-            <Button 
-              variant="outlined" 
-              color="primary" 
-              sx={{ mt: 3, borderRadius: 2 }} 
-              onClick={() => { localStorage.removeItem(storageKey); initQuiz(); }}
-            >
+            <Button variant="outlined" sx={{ mt: 2 }} onClick={() => { localStorage.removeItem(storageKey); initQuiz(); }}>
               Tentar Novamente
             </Button>
           )}
@@ -240,39 +227,46 @@ export default function CourseView() {
     setIsSaving(false);
   };
 
-  const MarkdownComponents = {
-    h2: (p) => <Typography variant="h5" fontWeight="900" sx={{ mt: 5, mb: 2, color: 'primary.main' }} {...p} />,
-    h3: (p) => <Typography variant="h6" fontWeight="bold" sx={{ mt: 4, mb: 1.5 }} {...p} />,
-    p: (p) => <Typography variant="body1" sx={{ mb: 2.5, lineHeight: 1.8, color: 'text.secondary', fontSize: '1.05rem' }} {...p} />,
-    li: (p) => <Typography component="li" sx={{ mb: 1.2, color: 'text.secondary', ml: 2 }} {...p} />,
-    code: ({ inline, ...p }) => inline ? 
-      <Box component="code" sx={{ bgcolor: alpha(theme.palette.secondary.main, 0.1), px: 0.8, borderRadius: 1, color: 'secondary.dark', fontFamily: 'monospace' }} {...p} /> :
-      <Box component="pre" sx={{ bgcolor: '#1e1e1e', color: '#d4d4d4', p: 3, borderRadius: 3, overflowX: 'auto', my: 4, boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)' }}><code {...p} /></Box>
-  };
+  // Cálculo para o Exame Final
+  const totalLessons = course?.modules?.reduce((acc, m) => acc + (m.lessons?.length || 0), 0) || 0;
+  const isCourseComplete = completedLessons.length >= totalLessons;
 
-  if (loading || authLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 20 }}><CircularProgress size={60} thickness={4} /></Box>;
-  if (!course) return <Alert severity="error">Curso não encontrado.</Alert>;
+  if (loading || authLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <Typography variant="button" sx={{ letterSpacing: 2 }}>Carregando Ambiente...</Typography>
+      </Box>
+    );
+  }
+
+  if (!course) {
+    return (
+      <Box sx={{ p: 5, textAlign: 'center' }}>
+        <Typography variant="h6">Curso não encontrado.</Typography>
+      </Box>
+    );
+  }
 
   const sidebarContent = (
     <SidebarWrapper>
       <Box sx={{ p: 3 }}>
-        <Typography variant="h6" fontWeight="900" sx={{ lineHeight: 1.2 }}>{course.title}</Typography>
-        <Stack direction="row" spacing={1} mt={2}>
-          <Chip label={course.level} size="small" variant="outlined" sx={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.65rem' }} />
-          {courseStatus === 'concluido' && <Chip icon={<VerifiedIcon />} label="Concluído" color="success" size="small" />}
+        <Typography variant="h6" fontWeight="900">{course.title}</Typography>
+        <Stack direction="row" spacing={1} mt={1}>
+          <Chip label={course.level} size="small" variant="outlined" />
+          {courseStatus === 'concluido' && <Chip icon={<VerifiedIcon />} label="Certificado" color="success" size="small" />}
         </Stack>
       </Box>
-      <Divider sx={{ mb: 1 }} />
+      <Divider />
       {course.modules?.map((module) => {
         const doneInModule = module.lessons?.filter(l => completedLessons.includes(l._key)).length;
-        const isModuleLessonsDone = doneInModule === module.lessons?.length;
+        const isModuleDone = doneInModule === module.lessons?.length;
 
         return (
-          <Accordion key={module._key} elevation={0} square defaultExpanded sx={{ bgcolor: 'transparent', '&:before': { display: 'none' } }}>
+          <Accordion key={module._key} elevation={0} defaultExpanded sx={{ bgcolor: 'transparent' }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Box>
-                <Typography variant="subtitle2" fontWeight="800" sx={{ color: 'text.primary' }}>{module.title}</Typography>
-                <Typography variant="caption" color="text.secondary">{doneInModule}/{module.lessons?.length} concluídas</Typography>
+                <Typography variant="subtitle2" fontWeight="700">{module.title}</Typography>
+                <Typography variant="caption">{doneInModule}/{module.lessons?.length} aulas</Typography>
               </Box>
             </AccordionSummary>
             <AccordionDetails sx={{ p: 0 }}>
@@ -281,32 +275,23 @@ export default function CourseView() {
                   <ListItemButton
                     key={lesson._key}
                     selected={activeLesson?._key === lesson._key}
-                    onClick={() => { setActiveLesson(lesson); setActiveQuiz(null); if(isMobile) setMobileOpen(false); window.scrollTo(0,0); }}
-                    sx={{ py: 1, pl: 3 }}
+                    onClick={() => { setActiveLesson(lesson); setActiveQuiz(null); setMobileOpen(false); window.scrollTo(0,0); }}
                   >
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      {completedLessons.includes(lesson._key) ? <CheckCircleIcon color="success" fontSize="small" /> : <RadioButtonUncheckedIcon fontSize="small" color="disabled" />}
+                    <ListItemIcon sx={{ minWidth: 35 }}>
+                      {completedLessons.includes(lesson._key) ? <CheckCircleIcon color="success" /> : <RadioButtonUncheckedIcon color="disabled" />}
                     </ListItemIcon>
-                    <ListItemText primary={lesson.title} primaryTypographyProps={{ variant: 'body2', fontWeight: activeLesson?._key === lesson._key ? 700 : 400 }} />
+                    <ListItemText primary={lesson.title} primaryTypographyProps={{ variant: 'body2' }} />
                   </ListItemButton>
                 ))}
                 {module.exercises?.length > 0 && (
                   <ListItemButton
-                    disabled={!isModuleLessonsDone}
+                    disabled={!isModuleDone}
                     selected={activeQuiz === module._key}
-                    onClick={() => { setActiveQuiz(module._key); setActiveLesson(null); if(isMobile) setMobileOpen(false); window.scrollTo(0,0); }}
-                    sx={{ 
-                      m: 1, borderRadius: 2,
-                      bgcolor: activeQuiz === module._key ? 'primary.main' : alpha(theme.palette.primary.main, 0.08),
-                      color: activeQuiz === module._key ? 'white' : 'primary.main',
-                      '&:hover': { bgcolor: activeQuiz === module._key ? 'primary.dark' : alpha(theme.palette.primary.main, 0.15) },
-                      '&.Mui-disabled': { bgcolor: alpha(theme.palette.action.disabledBackground, 0.1) }
-                    }}
+                    onClick={() => { setActiveQuiz(module._key); setActiveLesson(null); setMobileOpen(false); window.scrollTo(0,0); }}
+                    sx={{ m: 1, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.05) }}
                   >
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      <QuizIcon fontSize="small" sx={{ color: activeQuiz === module._key ? 'white' : 'inherit' }} />
-                    </ListItemIcon>
-                    <ListItemText primary="Desafio do Módulo" primaryTypographyProps={{ variant: 'body2', fontWeight: 'bold' }} />
+                    <ListItemIcon sx={{ minWidth: 35 }}><QuizIcon color="primary" /></ListItemIcon>
+                    <ListItemText primary="Quiz do Módulo" primaryTypographyProps={{ variant: 'body2', fontWeight: 'bold' }} />
                   </ListItemButton>
                 )}
               </List>
@@ -314,82 +299,72 @@ export default function CourseView() {
           </Accordion>
         );
       })}
+
+      <Box sx={{ p: 2, mt: 'auto' }}>
+        <Divider sx={{ mb: 2 }} />
+        <Button
+          fullWidth variant={activeQuiz === 'final' ? "contained" : "outlined"}
+          color="secondary" disabled={!isCourseComplete}
+          startIcon={<VerifiedIcon />}
+          onClick={() => { setActiveQuiz('final'); setActiveLesson(null); setMobileOpen(false); window.scrollTo(0,0); }}
+          sx={{ borderRadius: 3, py: 1.5, fontWeight: 'bold' }}
+        >
+          Exame Final
+        </Button>
+      </Box>
     </SidebarWrapper>
   );
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
       {isMobile && (
-        <IconButton 
-          onClick={() => setMobileOpen(true)} 
-          sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000, bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' }, boxShadow: 6 }}
-        >
+        <IconButton onClick={() => setMobileOpen(true)} sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1100, bgcolor: 'primary.main', color: 'white', boxShadow: 3 }}>
           <MenuIcon />
         </IconButton>
       )}
 
-      <Grid container sx={{ width: '100%' }}>
-        {!isMobile && (
-          <Grid item md={3} lg={2.5} sx={{ borderRight: '1px solid', borderColor: 'divider', position: 'sticky', top: 64, height: 'calc(100vh - 64px)' }}>
-            {sidebarContent}
-          </Grid>
-        )}
-
+      <Grid container>
+        {!isMobile && <Grid item md={3} lg={2.5} sx={{ borderRight: '1px solid', borderColor: 'divider', height: '100vh', position: 'sticky', top: 0 }}>{sidebarContent}</Grid>}
         <Grid item xs={12} md={9} lg={9.5}>
           <ContentContainer>
             {activeQuiz ? (
               <ModuleQuiz
-                courseId={course._id}
-                quizKey={activeQuiz}
-                title={activeQuiz === 'final' ? "Exame de Certificação" : "Avaliação de Módulo"}
+                courseId={course._id} quizKey={activeQuiz}
+                title={activeQuiz === 'final' ? "Exame de Certificação" : "Quiz de Módulo"}
                 rawQuestions={activeQuiz === 'final' ? course.finalExam : course.modules.find(m => m._key === activeQuiz)?.exercises}
-                onComplete={handleQuizComplete}
-                isSaving={isSaving}
-                isGuest={!signed}
+                onComplete={handleQuizComplete} isSaving={isSaving} isGuest={!signed}
               />
             ) : activeLesson ? (
-              <Stack spacing={4} sx={{ maxWidth: 900, mx: 'auto' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-                  <Box>
-                    <Typography variant="overline" color="primary" fontWeight="800" sx={{ letterSpacing: 1.5 }}>Aula Atual</Typography>
-                    <Typography variant="h3" fontWeight="900" sx={{ fontSize: { xs: '1.75rem', md: '2.5rem' }, color: 'text.primary' }}>{activeLesson.title}</Typography>
-                  </Box>
+              <Stack spacing={4} sx={{ maxWidth: 850, mx: 'auto' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="h4" fontWeight="900">{activeLesson.title}</Typography>
                   <Button
                     variant={completedLessons.includes(activeLesson._key) ? "outlined" : "contained"}
-                    color="success"
-                    onClick={() => handleLessonToggle(activeLesson)}
-                    startIcon={completedLessons.includes(activeLesson._key) ? <CheckCircleIcon /> : <RadioButtonUncheckedIcon />}
-                    sx={{ borderRadius: '10px', px: 3, py: 1, textTransform: 'none', fontWeight: 'bold' }}
+                    color="success" onClick={() => handleLessonToggle(activeLesson)}
+                    sx={{ borderRadius: 2, fontWeight: 'bold' }}
                   >
-                    {completedLessons.includes(activeLesson._key) ? "Concluída" : "Marcar como lida"}
+                    {completedLessons.includes(activeLesson._key) ? "Concluída" : "Marcar Concluída"}
                   </Button>
                 </Box>
-                
                 <Divider />
-
-                <Box sx={{ pb: 10, '& img': { maxWidth: '100%', borderRadius: 3, my: 3, boxShadow: theme.shadows[4] } }}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents}>
+                <Box sx={{ pb: 10 }}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                    h2: (p) => <Typography variant="h5" fontWeight="800" sx={{ mt: 4, mb: 2 }} {...p} />,
+                    p: (p) => <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.7, color: 'text.secondary' }} {...p} />,
+                    code: ({ inline, ...p }) => inline ? <code style={{ backgroundColor: '#eee', padding: '2px 4px' }} {...p} /> : <pre style={{ background: '#222', color: '#fff', padding: '1rem', borderRadius: '8px', overflow: 'auto' }}><code {...p} /></pre>
+                  }}>
                     {activeLesson.content}
                   </ReactMarkdown>
                 </Box>
               </Stack>
             ) : (
-              <Box sx={{ textAlign: 'center', mt: 10 }}>
-                <Typography variant="h5" color="text.secondary">Selecione uma aula para começar.</Typography>
-              </Box>
+                <Typography>Selecione um conteúdo</Typography>
             )}
           </ContentContainer>
         </Grid>
       </Grid>
 
-      <Drawer 
-        anchor="left"
-        open={mobileOpen} 
-        onClose={() => setMobileOpen(false)} 
-        PaperProps={{ sx: { width: 300, border: 'none' } }}
-      >
-        {sidebarContent}
-      </Drawer>
+      <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)}>{sidebarContent}</Drawer>
     </Box>
   );
 }

@@ -69,12 +69,12 @@ export default function CreateCourse() {
     const result = await generateCourse(topic, selectedLevel);
 
     if (result.success) {
-      // Pequeno delay para o usuário ler a mensagem de sucesso do Context
+      // Pequeno delay para o usuário ler a mensagem de sucesso
       setTimeout(() => {
         navigate(`/dashboard/curso/${result.slug}`);
       }, 2000);
     } else {
-      setError(result.error);
+      setError(result.error || 'Ocorreu um erro ao gerar o curso.');
     }
   };
 
@@ -203,9 +203,9 @@ export default function CreateCourse() {
                   {user?.role === 'admin' ? 'ILIMITADO' : `${user?.credits || 0} Crédito(s)`}
                 </Typography>
                 <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                  {user?.credits > 0 
+                  {hasCredits 
                     ? "Você pode gerar um novo curso agora mesmo!" 
-                    : "Sua cota gratuita será renovada em 1 hora automaticamente."}
+                    : "Sua cota gratuita será renovada em breve automaticamente."}
                 </Typography>
               </CardContent>
             </Card>
@@ -213,17 +213,17 @@ export default function CreateCourse() {
             <Card variant="outlined" sx={{ borderRadius: 4 }}>
               <CardContent sx={{ p: 3 }}>
                 <Typography variant="subtitle2" fontWeight="800" gutterBottom color="primary">
-                  REGRAS DO SEU PLANO: {user?.plan?.toUpperCase()}
+                  REGRAS DO SEU PLANO: {user?.plan?.toUpperCase() || 'FREE'}
                 </Typography>
                 <Stack spacing={1.5} sx={{ mt: 2 }}>
                   <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     • Geração imediata de currículo completo.
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    • {user?.plan === 'free' ? '1 crédito por hora.' : 'Créditos ampliados.'}
+                    • {user?.plan === 'pro' ? 'Créditos ampliados.' : '1 crédito renovável por período.'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    • Certificado de conclusão em cada curso.
+                    • Certificado de conclusão incluso.
                   </Typography>
                 </Stack>
               </CardContent>
@@ -238,7 +238,7 @@ export default function CreateCourse() {
         </Grid>
       </Grid>
 
-      {/* OVERLAY DE CARREGAMENTO ÉPICO */}
+      {/* OVERLAY DE CARREGAMENTO */}
       {isGenerating && (
         <Box sx={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
