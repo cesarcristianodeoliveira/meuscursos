@@ -8,7 +8,7 @@ const CourseContext = createContext();
 export const COURSES_PER_PAGE = 6;
 
 export const CourseProvider = ({ children }) => {
-  const { refreshUser, signed } = useAuth(); 
+  const { setUser, signed } = useAuth(); // Usando setUser para atualização atômica
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -56,7 +56,7 @@ export const CourseProvider = ({ children }) => {
 
   /**
    * 2. GERADOR DE CURSOS (IA)
-   * Agora com suporte a mensagens de status mais precisas sobre a imagem.
+   * Otimizado para atualizar créditos sem requisições extras.
    */
   const generateCourse = useCallback(async (topic, level = 'iniciante') => {
     if (isGenerating) return { success: false, error: 'Já existe uma geração em curso.' };
@@ -65,20 +65,35 @@ export const CourseProvider = ({ children }) => {
     setStatusMessage(`O Professor IA está estruturando o conteúdo sobre: ${topic}...`);
 
     try {
-      // Pequeno delay visual para simular a fase de "Design Instrucional"
-      setTimeout(() => setStatusMessage("IA gerando conteúdo e lições técnicas..."), 2000);
+      // Feedback visual das etapas
+      const statusSteps = [
+        "IA gerando conteúdo e lições técnicas...",
+        "Validando estrutura didática...",
+        "Finalizando design e buscando mídias visuais..."
+      ];
+
+      let step = 0;
+      const interval = setInterval(() => {
+        if (step < statusSteps.length) {
+          setStatusMessage(statusSteps[step]);
+          step++;
+        } else {
+          clearInterval(interval);
+        }
+      }, 3000);
       
       const response = await api.post('/courses/generate', { topic, level });
+      clearInterval(interval);
       
-      setStatusMessage("Finalizando design e buscando mídias visuais...");
-      
-      const { slug } = response.data;
+      const { slug, updatedCredits, updatedXp } = response.data;
 
-      // Sincroniza dados globais e créditos do usuário após a geração
-      await Promise.all([
-        fetchGlobalData(true),
-        refreshUser() 
-      ]);
+      // 🔄 Sincronização Atômica: Atualiza o usuário globalmente com os novos dados
+      if (updatedCredits !== undefined) {
+        setUser(prev => ({ ...prev, credits: updatedCredits, xp: updatedXp }));
+      }
+
+      // Atualiza as estatísticas da home (total de cursos aumentou)
+      await fetchGlobalData(true);
 
       setStatusMessage('Curso criado com sucesso! Redirecionando...');
       return { success: true, slug: slug };
@@ -88,16 +103,15 @@ export const CourseProvider = ({ children }) => {
       setStatusMessage(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
-      // Mantemos a mensagem de sucesso por 2 segundos antes de limpar
       setTimeout(() => {
         setIsGenerating(false);
         setStatusMessage('');
       }, 2500);
     }
-  }, [isGenerating, fetchGlobalData, refreshUser]);
+  }, [isGenerating, fetchGlobalData, setUser]);
 
   /**
-   * 3. BUSCAR PROGRESSO DO ALUNO NO CURSO
+   * 3. BUSCAR PROGRESSO DO ALUNO
    */
   const getCourseProgress = useCallback(async (courseId) => {
     if (!courseId || !signed) {
@@ -106,18 +120,16 @@ export const CourseProvider = ({ children }) => {
     
     try {
       const res = await api.get(`/courses/${courseId}/progress`);
-      if (res.data) {
-        return {
-          progress: res.data.progress || 0,
-          completedLessons: res.data.completedLessons || [],
-          completedQuizzes: res.data.completedQuizzes || [],
-          status: res.data.status || 'em_andamento'
-        };
-      }
+      return {
+        progress: res.data.progress || 0,
+        completedLessons: res.data.completedLessons || [],
+        completedQuizzes: res.data.completedQuizzes || [],
+        status: res.data.status || 'em_andamento'
+      };
     } catch (err) {
       console.error("Erro ao obter progresso:", err);
+      return { progress: 0, completedLessons: [], completedQuizzes: [] };
     }
-    return { progress: 0, completedLessons: [], completedQuizzes: [] };
   }, [signed]);
 
   /**
@@ -136,7 +148,7 @@ export const CourseProvider = ({ children }) => {
   }, [signed]);
 
   /**
-   * 5. SALVAR QUIZ E ATUALIZAR GAMIFICATION (Sincronização de XP)
+   * 5. SALVAR QUIZ E ATUALIZAR GAMIFICATION
    */
   const saveQuizResult = useCallback(async (courseId, quizData) => {
     if (!signed) return { success: false, error: 'Login necessário' };
@@ -144,9 +156,9 @@ export const CourseProvider = ({ children }) => {
     try {
       const res = await api.post(`/courses/${courseId}/quiz-result`, quizData);
       
-      // Se concluiu o curso ou ganhou XP, atualizamos o perfil do usuário imediatamente
-      if (res.data.success) {
-        await refreshUser();
+      // Se a resposta trouxer dados de XP atualizados, aplicamos ao usuário
+      if (res.data.success && res.data.updatedXp) {
+        setUser(prev => ({ ...prev, xp: res.data.updatedXp }));
       }
       
       return res.data;
@@ -154,7 +166,7 @@ export const CourseProvider = ({ children }) => {
       console.error("Erro ao salvar resultado do quiz:", err);
       return { success: false, error: 'Erro ao processar resultado do quiz.' };
     }
-  }, [signed, refreshUser]);
+  }, [signed, setUser]);
 
   /**
    * Valor do contexto memoizado.

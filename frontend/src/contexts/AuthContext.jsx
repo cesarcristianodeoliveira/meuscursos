@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
 
   /**
    * Normaliza os dados do usuário vindos do Sanity/Backend.
-   * Garante que os campos fiquem dentro de 'stats' para evitar erros de renderização.
+   * Mantém a compatibilidade entre 'xp' e 'stats.totalXp'.
    */
   const handleUserResponse = useCallback((userData) => {
     if (!userData) return null;
@@ -18,6 +18,7 @@ export function AuthProvider({ children }) {
       ...userData,
       _id: userData._id || userData.id,
       credits: userData.credits ?? 0,
+      xp: userData.xp ?? userData.stats?.totalXp ?? 0, // Facilita acesso direto
       stats: {
         totalXp: userData.stats?.totalXp ?? userData.xp ?? 0,
         level: userData.stats?.level ?? userData.level ?? 1,
@@ -77,7 +78,6 @@ export function AuthProvider({ children }) {
         
         if (storageToken) {
           setSession(storageToken);
-          // Tenta validar o token buscando os dados do usuário
           const currentUser = await refreshUser();
           
           if (!currentUser) {
@@ -113,7 +113,6 @@ export function AuthProvider({ children }) {
     }
   }, [setSession, handleUserResponse]);
 
-  // Ajustado para receber o objeto enviado pelo formulário de SignUp
   const signUp = useCallback(async ({ name, email, password, newsletter }) => {
     try {
       const response = await api.post('/auth/register', { name, email, password, newsletter });
@@ -133,9 +132,11 @@ export function AuthProvider({ children }) {
     }
   }, [setSession, handleUserResponse]);
 
+  // Adicionado 'setUser' ao value para permitir atualizações manuais de outros contextos
   const authValue = useMemo(() => ({
     signed: !!user,
     user, 
+    setUser, // <--- ADICIONADO AQUI
     authLoading: loading, 
     signIn, 
     signOut, 

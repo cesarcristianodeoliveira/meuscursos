@@ -98,7 +98,7 @@ const saveProgress = async (req, res) => {
 };
 
 /**
- * SALVAR RESULTADO DO QUIZ E FINALIZAR CURSO (XP & CERTIFICADO)
+ * SALVAR RESULTADO DO QUIZ E FINALIZAR CURSO
  */
 const saveQuizProgress = async (req, res) => {
   const { id: courseId } = req.params;
@@ -108,10 +108,11 @@ const saveQuizProgress = async (req, res) => {
   try {
     const data = await client.fetch(`{
       "enrollment": *[_type == "enrollment" && user._ref == $userId && course._ref == $courseId][0],
-      "course": *[_type == "course" && _id == $courseId][0]{xpReward, title}
+      "course": *[_type == "course" && _id == $courseId][0]{xpReward, title},
+      "user": *[_type == "user" && _id == $userId][0]{xp}
     }`, { userId, courseId });
 
-    let { enrollment, course } = data;
+    let { enrollment, course, user } = data;
     const scorePercentage = Math.round((score / totalQuestions) * 100);
 
     if (!enrollment) {
@@ -140,6 +141,7 @@ const saveQuizProgress = async (req, res) => {
       await client.patch(enrollment._id).set(patchData).commit();
 
       if (isFinishingNow) {
+        // Criar Certificado
         await client.create({
           _type: 'certificate',
           user: { _type: 'reference', _ref: userId },
@@ -149,6 +151,7 @@ const saveQuizProgress = async (req, res) => {
           canvasData: JSON.stringify({ courseTitle: course.title, finalScore: scorePercentage })
         });
 
+        // Recompensa de XP
         const reward = course.xpReward || 100;
         await quotaService.addXpReward(userId, reward);
       }
@@ -181,14 +184,11 @@ const saveQuizProgress = async (req, res) => {
 };
 
 /**
- * CRIAR NOVO CURSO COM IA (Versão Otimizada)
+ * CRIAR NOVO CURSO COM IA (Otimizado para Créditos em Real-Time)
  */
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
   const userId = req.userId;
-
-  const PROVIDER_NAME = 'Groq';
-  const MODEL_NAME = 'llama-3.3-70b-versatile';
 
   if (!topic) return res.status(400).json({ error: "O tema é obrigatório." });
 
@@ -197,10 +197,10 @@ const createCourse = async (req, res) => {
     const userQuota = await quotaService.checkUserQuota(userId, level);
     if (!userQuota.canGenerate) return res.status(429).json({ error: userQuota.reason });
 
-    // 2. Geração do Conteúdo via IA (aiService processa o texto e métricas)
-    const { course: aiData, usage } = await aiService.generateCourseContent(topic, MODEL_NAME, { level });
-    
-    // 3. Geração da Capa (Busca condicional)
+    // 2. Geração de Conteúdo e Imagem em paralelo (mais rápido)
+    const aiResponse = await aiService.generateCourseContent(topic, 'llama-3.3-70b-versatile', { level });
+    const { course: aiData, usage } = aiResponse;
+
     const imageData = await imageService.fetchAndUploadImage({
         imageSearchPrompt: aiData.imageSearchPrompt,
         categoryName: aiData.categoryName,
@@ -208,7 +208,7 @@ const createCourse = async (req, res) => {
         title: aiData.title
     });
 
-    // 4. Tratamento da Categoria
+    // 3. Tratamento da Categoria
     const categoryName = aiData.categoryName || 'Geral';
     const categorySlug = formatSlug(categoryName);
     let category = await client.fetch(`*[_type == "category" && slug.current == $slug][0]`, { slug: categorySlug });
@@ -221,10 +221,8 @@ const createCourse = async (req, res) => {
       });
     }
 
-    // 5. Construção do Objeto do Curso
+    // 4. Construção do Objeto e Slug
     const finalSlug = `${formatSlug(aiData.title)}-${crypto.randomBytes(3).toString('hex')}`;
-
-    // Lógica: Se imageData.assetId não existir, thumbnail será undefined (vazio no Sanity)
     const thumbnailObj = imageData?.assetId ? {
       _type: 'image',
       asset: { _type: 'reference', _ref: imageData.assetId }
@@ -242,13 +240,9 @@ const createCourse = async (req, res) => {
       xpReward: aiData.xpReward,
       tags: aiData.tags || [],
       isPublished: true,
-      
-      // Imagem Dinâmica
       thumbnail: thumbnailObj,
       externalImageId: imageData?.externalId || "",
       imageSearchPrompt: aiData.imageSearchPrompt,
-
-      // Módulos e Lições com IDs únicos
       modules: aiData.modules.map(m => ({
         _key: crypto.randomUUID(),
         title: m.title,
@@ -265,17 +259,15 @@ const createCourse = async (req, res) => {
           correctAnswer: e.correctAnswer
         }))
       })),
-
       finalExam: aiData.finalExam.map(q => ({
         _key: crypto.randomUUID(),
         question: q.question,
         options: q.options,
         correctAnswer: q.correctAnswer
       })),
-
       aiMetadata: { 
-        provider: PROVIDER_NAME,
-        model: MODEL_NAME,
+        provider: 'Groq',
+        model: 'llama-3.3-70b-versatile',
         totalTokens: usage?.totalTokens || 0,
         generatedAt: new Date().toISOString() 
       }
@@ -283,14 +275,22 @@ const createCourse = async (req, res) => {
 
     const result = await client.create(newCourse);
     
-    // 6. Confirmar consumo de crédito
+    // 5. Consumo de crédito e busca do saldo ATUALIZADO
     await quotaService.consumeCredit(userId);
+    const updatedUser = await client.fetch(`*[_type == "user" && _id == $userId][0]{credits, xp}`, { userId });
 
-    return res.status(201).json({ success: true, courseId: result._id, slug: result.slug.current });
+    // 6. Retornamos o saldo para o frontend atualizar o estado global
+    return res.status(201).json({ 
+      success: true, 
+      courseId: result._id, 
+      slug: result.slug.current,
+      updatedCredits: updatedUser.credits, // Crucial para o frontend
+      updatedXp: updatedUser.xp
+    });
 
   } catch (error) {
     console.error("❌ Erro fatal na criação do curso:", error);
-    try { await quotaService.refundCredit(userId); } catch (e) { console.error("Erro no estorno de crédito:", e); }
+    try { await quotaService.refundCredit(userId); } catch (e) { console.error("Erro no estorno:", e); }
     return res.status(500).json({ error: "Falha na geração do curso pela IA." });
   }
 };

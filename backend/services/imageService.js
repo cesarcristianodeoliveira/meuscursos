@@ -2,8 +2,8 @@ const axios = require('axios');
 const client = require('../config/sanity');
 
 /**
- * SERVIÇO DE IMAGENS (ImageService) v1.1.0
- * Foco: Precisão visual, Fallback inteligente e Sincronia com IA.
+ * SERVIÇO DE IMAGENS (ImageService) v1.2.0
+ * Foco: Sincronia com Prompt de IA, Diversidade Visual e Performance.
  */
 
 const fetchAndUploadImage = async (courseData) => {
@@ -15,33 +15,29 @@ const fetchAndUploadImage = async (courseData) => {
     }
 
     const baseUrl = `https://pixabay.com/api/?key=${apiKey}`;
-    
-    /**
-     * Ajuste Estratégico: Removemos o filtro fixo de categorias 
-     * para permitir que o app cresça além de comida e tecnologia.
-     */
-    const baseParams = `&image_type=photo&orientation=horizontal&safesearch=true&per_page=30&lang=en`;
+    const baseParams = `&image_type=photo&orientation=horizontal&safesearch=true&per_page=20&lang=en&editors_choice=false`;
 
-    // 1. Limpeza de Query (Otimizada para APIs de imagem)
+    // 1. Limpeza de Query Inteligente
+    // Agora mantemos termos de qualidade (food, photography) mas removemos lixo estrutural
     const cleanTerm = (text) => {
       if (!text) return "";
       return text
         .toLowerCase()
-        // Remove termos descritivos que poluem a busca por fotos reais
-        .replace(/photographic|minimalist|professional|highly|a|of|the|with|an|single|serving|class|online|course|lesson|tutorial|photography|image|photo/gi, '')
+        // Remove apenas palavras que REALMENTE estragam a busca no Pixabay
         .replace(/[:.;?!#]/g, '')
+        .replace(/\b(a|an|the|of|by|for|at|in|on|course|lesson|tutorial|online|class)\b/gi, '')
         .trim()
         .split(/\s+/)
-        .filter((word, index, self) => self.indexOf(word) === index) // Remove duplicatas
+        .filter((word, index, self) => self.indexOf(word) === index)
         .join(' ');
     };
 
     // 2. Hierarquia de Busca (Cascata)
-    // Agora priorizamos o termo simplificado que a IA gera (ex: "Rice")
+    // Damos prioridade total ao prompt gerado pela IA (que agora é descritivo)
     const queries = [
       cleanTerm(courseData.imageSearchPrompt), 
-      cleanTerm(`${courseData.categoryName || ""} ${courseData.tags?.[0] || ""}`),
-      cleanTerm(courseData.title)
+      cleanTerm(`${courseData.title} ${courseData.categoryName || ""}`),
+      "abstract technology background" // Fallback genérico final
     ].filter(q => q && q.length > 2);
 
     let hits = [];
@@ -49,7 +45,7 @@ const fetchAndUploadImage = async (courseData) => {
 
     // 3. Execução em Cascata
     for (const query of queries) {
-      console.log(`📸 Buscando imagem para: "${query}"`);
+      console.log(`📸 Tentando busca Pixabay: "${query}"`);
       try {
         const response = await axios.get(`${baseUrl}&q=${encodeURIComponent(query)}${baseParams}`, { timeout: 8000 });
 
@@ -59,17 +55,15 @@ const fetchAndUploadImage = async (courseData) => {
           break; 
         }
       } catch (err) {
-        console.error(`⚠️ Erro na tentativa com "${query}":`, err.message);
+        console.error(`⚠️ Falha na query "${query}":`, err.message);
         continue;
       }
     }
 
-    if (hits.length === 0) {
-      console.error("❌ Nenhuma imagem encontrada no Pixabay para este curso.");
-      return null; 
-    }
+    if (hits.length === 0) return null;
 
-    // 4. Inteligência de Seleção (Evita capas idênticas no App)
+    // 4. Seleção Anti-Repetição
+    // Buscamos uma imagem que ainda não foi usada no banco de dados do Sanity
     let selectedImage = null;
     for (const hit of hits) {
       const alreadyUsed = await client.fetch(
@@ -83,12 +77,12 @@ const fetchAndUploadImage = async (courseData) => {
       }
     }
 
-    // Se todas as fotos da página já foram usadas, seleciona uma aleatória do set atual
-    selectedImage = selectedImage || hits[Math.floor(Math.random() * hits.length)];
+    // Se todas as fotos já foram usadas (raro), pegamos uma aleatória das top 5 (mais relevantes)
+    selectedImage = selectedImage || hits[Math.floor(Math.random() * Math.min(5, hits.length))];
 
-    console.log(`✅ Capa definida! ID: ${selectedImage.id} | Termo final: "${usedQuery}"`);
+    console.log(`✅ Imagem selecionada! ID: ${selectedImage.id} via query: "${usedQuery}"`);
 
-    // 5. Upload para o CDN do Sanity
+    // 5. Download e Upload para o Sanity
     const imageUrl = selectedImage.largeImageURL || selectedImage.webformatURL;
     const imageRes = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 15000 });
     const buffer = Buffer.from(imageRes.data);
@@ -96,9 +90,10 @@ const fetchAndUploadImage = async (courseData) => {
     const asset = await client.assets.upload('image', buffer, {
       filename: `pixabay-${selectedImage.id}.jpg`,
       contentType: 'image/jpeg',
-      label: `Capa: ${courseData.title}`,
+      label: `Cover: ${courseData.title}`,
       title: courseData.title,
-      description: `Busca IA: ${usedQuery} | Pixabay ID ${selectedImage.id}`
+      // Metadados úteis para debug futuro
+      description: `AI Prompt: ${courseData.imageSearchPrompt} | Used Query: ${usedQuery}`
     });
 
     return {
