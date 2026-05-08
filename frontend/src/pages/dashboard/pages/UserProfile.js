@@ -141,7 +141,7 @@ export default function UserProfile() {
 
       <Grid container spacing={4}>
         {/* COLUNA ESQUERDA: IDENTIDADE E XP */}
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Stack spacing={3}>
             <Box sx={{ pl: 1 }}>
               <Stack direction="row" alignItems="center" spacing={1}>
@@ -210,7 +210,7 @@ export default function UserProfile() {
         </Grid>
 
         {/* COLUNA DIREITA: ESTATÍSTICAS E CONQUISTAS */}
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Stack spacing={4}>
             {isOwnProfile && (
               <Paper 
@@ -242,19 +242,19 @@ export default function UserProfile() {
               </Typography>
               
               <Grid container spacing={3}>
-                <Grid item xs={12} sm={4}>
+                <Grid size={{ xs: 12, sm: 4 }}>
                   <StatBox elevation={0}>
                     <Typography variant="h4" fontWeight="900" color="primary">{coursesCompleted}</Typography>
                     <Typography variant="body2" fontWeight="bold" color="text.secondary">Cursos Concluídos</Typography>
                   </StatBox>
                 </Grid>
-                <Grid item xs={12} sm={4}>
+                <Grid size={{ xs: 12, sm: 4 }}>
                   <StatBox elevation={0}>
                     <Typography variant="h4" fontWeight="900" color="primary">{profileData?.stats?.coursesCreated ?? 0}</Typography>
                     <Typography variant="body2" fontWeight="bold" color="text.secondary">Cursos Gerados</Typography>
                   </StatBox>
                 </Grid>
-                <Grid item xs={12} sm={4}>
+                <Grid size={{ xs: 12, sm: 4 }}>
                   <StatBox elevation={0} sx={{ bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' } }}>
                     <MilitaryTechIcon sx={{ fontSize: 40, mb: 1 }} />
                     <Typography variant="h6" fontWeight="bold">TOP 10%</Typography>
@@ -276,7 +276,7 @@ export default function UserProfile() {
                   { label: 'Curioso', color: '#C0C0C0', active: coursesCompleted >= 1 },
                   { label: 'Mestre IA', color: '#CD7F32', active: (profileData?.stats?.coursesCreated ?? 0) >= 5 },
                 ].map((badge, index) => (
-                  <Grid item key={index}>
+                  <Grid key={index}>
                     <Tooltip title={badge.active ? `Conquista: ${badge.label}` : 'Bloqueado'}>
                       <Avatar 
                         sx={{ 

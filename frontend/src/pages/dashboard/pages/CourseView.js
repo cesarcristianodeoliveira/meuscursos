@@ -324,8 +324,8 @@ export default function CourseView() {
       )}
 
       <Grid container>
-        {!isMobile && <Grid item md={3} lg={2.5} sx={{ borderRight: '1px solid', borderColor: 'divider', height: '100vh', position: 'sticky', top: 0 }}>{sidebarContent}</Grid>}
-        <Grid item xs={12} md={9} lg={9.5}>
+        {!isMobile && <Grid size={{ md: 3, lg: 2.5 }} sx={{ borderRight: '1px solid', borderColor: 'divider', height: '100vh', position: 'sticky', top: 0 }}>{sidebarContent}</Grid>}
+        <Grid size={{ xs: 12, md: 9, lg: 9.5 }}>
           <ContentContainer>
             {activeQuiz ? (
               <ModuleQuiz

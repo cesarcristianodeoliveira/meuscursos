@@ -90,7 +90,7 @@ export default function CreateCourse() {
       </Stack>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} md={7}>
+        <Grid size={{ xs: 12, md: 7 }}>
           <Card variant="outlined" sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
             <CardContent sx={{ p: 4 }}>
               <Box component="form" onSubmit={handleGenerate} noValidate>
@@ -183,7 +183,7 @@ export default function CreateCourse() {
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={5}>
+        <Grid size={{ xs: 12, md: 5 }}>
           <Stack spacing={3}>
             {/* SALDO DE CRÉDITOS */}
             <Card variant="outlined" sx={{ 

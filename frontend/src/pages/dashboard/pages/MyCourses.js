@@ -78,7 +78,7 @@ export default function MyCourses() {
       {isLoading ? (
         <Grid container spacing={3}>
           {[1, 2, 3].map((n) => (
-            <Grid item xs={12} sm={6} md={4} key={n}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={n}>
               <Skeleton variant="rectangular" height={160} sx={{ borderRadius: 3 }} />
               <Box sx={{ pt: 1 }}>
                 <Skeleton width="60%" />
@@ -115,7 +115,7 @@ export default function MyCourses() {
       ) : (
         <Grid container spacing={3}>
           {courses.map((course) => (
-            <Grid item xs={12} sm={6} md={4} key={course._id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={course._id}>
               <Card 
                 sx={{ 
                   height: '100%', 
