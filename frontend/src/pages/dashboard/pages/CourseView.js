@@ -21,6 +21,7 @@ import QuizIcon from '@mui/icons-material/Quiz';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import MenuIcon from '@mui/icons-material/Menu';
+import DownloadIcon from '@mui/icons-material/Download';
 
 // --- ESTILOS ---
 const SidebarWrapper = styled(Box)(({ theme }) => ({
@@ -50,6 +51,72 @@ const StyledCardQuiz = styled(Card)(({ theme, status }) => ({
 }));
 
 const shuffleArray = (array) => [...(array || [])].sort(() => Math.random() - 0.5);
+
+// --- COMPONENTE DE CERTIFICADO (CANVAS) ---
+const CertificateCanvas = ({ userName, courseTitle, date }) => {
+  const canvasRef = React.useRef(null);
+
+  const downloadCertificate = () => {
+    const canvas = canvasRef.current;
+    const link = document.createElement('a');
+    link.download = `Certificado-${courseTitle}.png`;
+    link.href = canvas.toDataURL();
+    link.click();
+  };
+
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    // Fundo
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, 800, 600);
+    
+    // Borda elegante
+    ctx.strokeStyle = '#1a237e';
+    ctx.lineWidth = 20;
+    ctx.strokeRect(20, 20, 760, 560);
+    ctx.strokeStyle = '#c5a059'; // Dourado
+    ctx.lineWidth = 5;
+    ctx.strokeRect(35, 35, 730, 530);
+
+    // Textos
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#1a237e';
+    ctx.font = 'bold 40px serif';
+    ctx.fillText('CERTIFICADO DE CONCLUSÃO', 400, 150);
+
+    ctx.fillStyle = '#333';
+    ctx.font = '20px sans-serif';
+    ctx.fillText('Certificamos que', 400, 220);
+
+    ctx.fillStyle = '#000';
+    ctx.font = 'italic bold 35px serif';
+    ctx.fillText(userName || 'Estudante IAcademy', 400, 280);
+
+    ctx.fillStyle = '#333';
+    ctx.font = '20px sans-serif';
+    ctx.fillText('concluiu com êxito o curso de', 400, 340);
+
+    ctx.fillStyle = '#1a237e';
+    ctx.font = 'bold 30px sans-serif';
+    ctx.fillText(courseTitle, 400, 400);
+
+    ctx.fillStyle = '#666';
+    ctx.font = '16px sans-serif';
+    ctx.fillText(`Emitido em ${new Date(date).toLocaleDateString()}`, 400, 480);
+    ctx.fillText('Autenticidade verificada pela IAcademy AI', 400, 510);
+  }, [userName, courseTitle, date]);
+
+  return (
+    <Stack spacing={2} alignItems="center">
+      <canvas ref={canvasRef} width={800} height={600} style={{ width: '100%', maxWidth: '600px', borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
+      <Button variant="contained" color="secondary" startIcon={<DownloadIcon />} onClick={downloadCertificate}>
+        Baixar Certificado em Alta Definição
+      </Button>
+    </Stack>
+  );
+};
 
 // --- COMPONENTE DE QUIZ ---
 const ModuleQuiz = ({ courseId, quizKey, rawQuestions = [], onComplete, isSaving, title, isGuest }) => {
@@ -167,7 +234,7 @@ export default function CourseView() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
-  const { signed, authLoading } = useAuth();
+  const { signed, user, authLoading } = useAuth();
   const { getCourseProgress, updateLessonProgress, saveQuizResult } = useCourse();
 
   const [course, setCourse] = React.useState(null);
@@ -179,11 +246,16 @@ export default function CourseView() {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
 
+  // 🔄 CORREÇÃO DO SCROLL: Sempre que mudar a aula ou quiz, rola para o topo
+  React.useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeLesson, activeQuiz]);
+
   React.useEffect(() => {
     const fetchCourse = async () => {
       try {
         const query = `*[_type == "course" && slug.current == $slug][0]{
-          _id, title, description, level,
+          _id, title, description, level, _createdAt,
           modules[]{
             _key, title,
             lessons[]{ _key, title, content, duration },
@@ -223,11 +295,10 @@ export default function CourseView() {
       score, totalQuestions: total, isFinalExam: isFinal,
       isPassed: score === total, moduleKey: isFinal ? null : activeQuiz
     });
-    if (res.status === 'concluido') setCourseStatus('concluido');
+    if (res.success && res.status === 'concluido') setCourseStatus('concluido');
     setIsSaving(false);
   };
 
-  // Cálculo para o Exame Final
   const totalLessons = course?.modules?.reduce((acc, m) => acc + (m.lessons?.length || 0), 0) || 0;
   const isCourseComplete = completedLessons.length >= totalLessons;
 
@@ -239,13 +310,7 @@ export default function CourseView() {
     );
   }
 
-  if (!course) {
-    return (
-      <Box sx={{ p: 5, textAlign: 'center' }}>
-        <Typography variant="h6">Curso não encontrado.</Typography>
-      </Box>
-    );
-  }
+  if (!course) return <Box sx={{ p: 5, textAlign: 'center' }}><Typography variant="h6">Curso não encontrado.</Typography></Box>;
 
   const sidebarContent = (
     <SidebarWrapper>
@@ -275,7 +340,7 @@ export default function CourseView() {
                   <ListItemButton
                     key={lesson._key}
                     selected={activeLesson?._key === lesson._key}
-                    onClick={() => { setActiveLesson(lesson); setActiveQuiz(null); setMobileOpen(false); window.scrollTo(0,0); }}
+                    onClick={() => { setActiveLesson(lesson); setActiveQuiz(null); setMobileOpen(false); }}
                   >
                     <ListItemIcon sx={{ minWidth: 35 }}>
                       {completedLessons.includes(lesson._key) ? <CheckCircleIcon color="success" /> : <RadioButtonUncheckedIcon color="disabled" />}
@@ -287,7 +352,7 @@ export default function CourseView() {
                   <ListItemButton
                     disabled={!isModuleDone}
                     selected={activeQuiz === module._key}
-                    onClick={() => { setActiveQuiz(module._key); setActiveLesson(null); setMobileOpen(false); window.scrollTo(0,0); }}
+                    onClick={() => { setActiveQuiz(module._key); setActiveLesson(null); setMobileOpen(false); }}
                     sx={{ m: 1, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.05) }}
                   >
                     <ListItemIcon sx={{ minWidth: 35 }}><QuizIcon color="primary" /></ListItemIcon>
@@ -306,10 +371,10 @@ export default function CourseView() {
           fullWidth variant={activeQuiz === 'final' ? "contained" : "outlined"}
           color="secondary" disabled={!isCourseComplete}
           startIcon={<VerifiedIcon />}
-          onClick={() => { setActiveQuiz('final'); setActiveLesson(null); setMobileOpen(false); window.scrollTo(0,0); }}
+          onClick={() => { setActiveQuiz('final'); setActiveLesson(null); setMobileOpen(false); }}
           sx={{ borderRadius: 3, py: 1.5, fontWeight: 'bold' }}
         >
-          Exame Final
+          {courseStatus === 'concluido' ? "Ver Certificado" : "Exame Final"}
         </Button>
       </Box>
     </SidebarWrapper>
@@ -324,10 +389,16 @@ export default function CourseView() {
       )}
 
       <Grid container>
-        {!isMobile && <Grid size={{ md: 3, lg: 2.5 }} sx={{ borderRight: '1px solid', borderColor: 'divider', height: '100vh', position: 'sticky', top: 0 }}>{sidebarContent}</Grid>}
-        <Grid size={{ xs: 12, md: 9, lg: 9.5 }}>
+        {!isMobile && <Grid item md={3} lg={2.5} sx={{ borderRight: '1px solid', borderColor: 'divider', height: '100vh', position: 'sticky', top: 0 }}>{sidebarContent}</Grid>}
+        <Grid item xs={12} md={9} lg={9.5}>
           <ContentContainer>
-            {activeQuiz ? (
+            {activeQuiz === 'final' && courseStatus === 'concluido' ? (
+              <Stack spacing={4} alignItems="center" sx={{ py: 4 }}>
+                <Typography variant="h3" fontWeight="900" color="success.main" textAlign="center">Parabéns, {user?.name}!</Typography>
+                <Typography variant="h6" textAlign="center">Você concluiu todos os requisitos e agora é certificado neste tema.</Typography>
+                <CertificateCanvas userName={user?.name} courseTitle={course.title} date={new Date().toISOString()} />
+              </Stack>
+            ) : activeQuiz ? (
               <ModuleQuiz
                 courseId={course._id} quizKey={activeQuiz}
                 title={activeQuiz === 'final' ? "Exame de Certificação" : "Quiz de Módulo"}
@@ -357,13 +428,10 @@ export default function CourseView() {
                   </ReactMarkdown>
                 </Box>
               </Stack>
-            ) : (
-                <Typography>Selecione um conteúdo</Typography>
-            )}
+            ) : null}
           </ContentContainer>
         </Grid>
       </Grid>
-
       <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)}>{sidebarContent}</Drawer>
     </Box>
   );

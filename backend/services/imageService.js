@@ -2,98 +2,103 @@ const axios = require('axios');
 const client = require('../config/sanity');
 
 /**
- * SERVIÇO DE IMAGENS (ImageService) v1.2.0
- * Foco: Sincronia com Prompt de IA, Diversidade Visual e Performance.
+ * SERVIÇO DE IMAGENS (ImageService) v1.3.0
+ * Otimizado para prompts artísticos e cascata de busca inteligente.
  */
 
 const fetchAndUploadImage = async (courseData) => {
   try {
     const apiKey = process.env.PIXABAY_API_KEY;
     if (!apiKey) {
-      console.warn("⚠️ PIXABAY_API_KEY não configurada no ambiente.");
+      console.warn("⚠️ PIXABAY_API_KEY não configurada.");
       return null;
     }
 
     const baseUrl = `https://pixabay.com/api/?key=${apiKey}`;
-    const baseParams = `&image_type=photo&orientation=horizontal&safesearch=true&per_page=20&lang=en&editors_choice=false`;
+    const baseParams = `&image_type=photo&orientation=horizontal&safesearch=true&per_page=15&lang=en`;
 
-    // 1. Limpeza de Query Inteligente
-    // Agora mantemos termos de qualidade (food, photography) mas removemos lixo estrutural
+    /**
+     * LIMPEZA DE QUERY PRESERVATIVA
+     * Remove pontuação e lixo, mas mantém adjetivos visuais (cinematic, moody, lighting).
+     */
     const cleanTerm = (text) => {
       if (!text) return "";
       return text
         .toLowerCase()
-        // Remove apenas palavras que REALMENTE estragam a busca no Pixabay
-        .replace(/[:.;?!#]/g, '')
-        .replace(/\b(a|an|the|of|by|for|at|in|on|course|lesson|tutorial|online|class)\b/gi, '')
+        .replace(/[:.;?!#"]/g, '') // Remove pontuação pesada
+        .replace(/\b(course|lesson|tutorial|online|class|ai|generated)\b/gi, '') // Remove termos proibidos
         .trim()
         .split(/\s+/)
-        .filter((word, index, self) => self.indexOf(word) === index)
+        .filter((word, index, self) => self.indexOf(word) === index) // Remove duplicatas
         .join(' ');
     };
 
-    // 2. Hierarquia de Busca (Cascata)
-    // Damos prioridade total ao prompt gerado pela IA (que agora é descritivo)
+    /**
+     * HIERARQUIA DE BUSCA EM CASCATA (Relaxamento de Query)
+     * 1. Prompt Artístico Completo (ex: "Cinematic coffee brewing in sunlight")
+     * 2. Apenas o Título do Curso (ex: "Coffee Brewing Basics")
+     * 3. Apenas a Categoria (ex: "Gastronomia")
+     * 4. Fallback visual abstrato de alta qualidade
+     */
     const queries = [
-      cleanTerm(courseData.imageSearchPrompt), 
-      cleanTerm(`${courseData.title} ${courseData.categoryName || ""}`),
-      "abstract technology background" // Fallback genérico final
+      cleanTerm(courseData.imageSearchPrompt),
+      cleanTerm(courseData.title),
+      cleanTerm(courseData.categoryName),
+      "professional background aesthetic" 
     ].filter(q => q && q.length > 2);
 
     let hits = [];
     let usedQuery = "";
 
-    // 3. Execução em Cascata
     for (const query of queries) {
-      console.log(`📸 Tentando busca Pixabay: "${query}"`);
+      // Pega apenas as primeiras 6 palavras para o Pixabay não se perder em prompts longos demais
+      const shortQuery = query.split(' ').slice(0, 7).join(' ');
+      
+      console.log(`📸 Buscando Pixabay: "${shortQuery}"`);
       try {
-        const response = await axios.get(`${baseUrl}&q=${encodeURIComponent(query)}${baseParams}`, { timeout: 8000 });
+        const response = await axios.get(`${baseUrl}&q=${encodeURIComponent(shortQuery)}${baseParams}`, { timeout: 6000 });
 
         if (response.data.hits && response.data.hits.length > 0) {
           hits = response.data.hits;
-          usedQuery = query;
+          usedQuery = shortQuery;
           break; 
         }
       } catch (err) {
-        console.error(`⚠️ Falha na query "${query}":`, err.message);
+        console.error(`⚠️ Erro na query "${shortQuery}":`, err.message);
         continue;
       }
     }
 
     if (hits.length === 0) return null;
 
-    // 4. Seleção Anti-Repetição
-    // Buscamos uma imagem que ainda não foi usada no banco de dados do Sanity
-    let selectedImage = null;
+    // SELEÇÃO: Prioriza "Editor's Choice" se houver, senão pega a melhor correspondência
+    let selectedImage = hits.find(h => h.editorsChoice) || hits[0];
+
+    // Evita repetição: Se a imagem já foi usada em muitos cursos, tenta a próxima do array
     for (const hit of hits) {
-      const alreadyUsed = await client.fetch(
+      const usageCount = await client.fetch(
         `count(*[_type == "course" && externalImageId == $id])`, 
         { id: String(hit.id) }
       );
-
-      if (alreadyUsed === 0) {
+      if (usageCount === 0) {
         selectedImage = hit;
         break;
       }
     }
 
-    // Se todas as fotos já foram usadas (raro), pegamos uma aleatória das top 5 (mais relevantes)
-    selectedImage = selectedImage || hits[Math.floor(Math.random() * Math.min(5, hits.length))];
+    console.log(`✅ Imagem definida! ID: ${selectedImage.id} via: "${usedQuery}"`);
 
-    console.log(`✅ Imagem selecionada! ID: ${selectedImage.id} via query: "${usedQuery}"`);
-
-    // 5. Download e Upload para o Sanity
+    // DOWNLOAD E UPLOAD
     const imageUrl = selectedImage.largeImageURL || selectedImage.webformatURL;
-    const imageRes = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 15000 });
+    const imageRes = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 12000 });
     const buffer = Buffer.from(imageRes.data);
 
     const asset = await client.assets.upload('image', buffer, {
       filename: `pixabay-${selectedImage.id}.jpg`,
       contentType: 'image/jpeg',
-      label: `Cover: ${courseData.title}`,
+      label: `Capa: ${courseData.title}`,
       title: courseData.title,
-      // Metadados úteis para debug futuro
-      description: `AI Prompt: ${courseData.imageSearchPrompt} | Used Query: ${usedQuery}`
+      description: `Original Prompt: ${courseData.imageSearchPrompt} | Used: ${usedQuery}`
     });
 
     return {
@@ -103,7 +108,7 @@ const fetchAndUploadImage = async (courseData) => {
     };
 
   } catch (error) {
-    console.error("❌ Erro fatal no ImageService:", error.message);
+    console.error("❌ Falha crítica no ImageService:", error.message);
     return null;
   }
 };

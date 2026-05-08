@@ -8,7 +8,7 @@ const CourseContext = createContext();
 export const COURSES_PER_PAGE = 6;
 
 export const CourseProvider = ({ children }) => {
-  const { setUser, signed } = useAuth(); // Usando setUser para atualização atômica
+  const { setUser, signed } = useAuth(); 
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -17,7 +17,7 @@ export const CourseProvider = ({ children }) => {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   /**
-   * 1. BUSCA DADOS GLOBAIS (Stats da Home)
+   * 1. BUSCA DADOS GLOBAIS (Estatísticas e Categorias)
    */
   const fetchGlobalData = useCallback(async (force = false) => {
     if (initialDataLoaded && !force) return;
@@ -56,20 +56,20 @@ export const CourseProvider = ({ children }) => {
 
   /**
    * 2. GERADOR DE CURSOS (IA)
-   * Otimizado para atualizar créditos sem requisições extras.
+   * Agora com feedback visual mais rico e atualização de créditos.
    */
   const generateCourse = useCallback(async (topic, level = 'iniciante') => {
-    if (isGenerating) return { success: false, error: 'Já existe uma geração em curso.' };
+    if (isGenerating) return { success: false, error: 'Uma geração já está em andamento.' };
 
     setIsGenerating(true);
-    setStatusMessage(`O Professor IA está estruturando o conteúdo sobre: ${topic}...`);
+    setStatusMessage(`O Professor IA está analisando o tema: ${topic}...`);
 
     try {
-      // Feedback visual das etapas
       const statusSteps = [
-        "IA gerando conteúdo e lições técnicas...",
-        "Validando estrutura didática...",
-        "Finalizando design e buscando mídias visuais..."
+        "IA estruturando módulos e lições...",
+        "Pesquisando referências técnicas...",
+        "Criando desafios e quizzes...",
+        "Gerando arte de capa personalizada..."
       ];
 
       let step = 0;
@@ -77,36 +77,33 @@ export const CourseProvider = ({ children }) => {
         if (step < statusSteps.length) {
           setStatusMessage(statusSteps[step]);
           step++;
-        } else {
-          clearInterval(interval);
         }
-      }, 3000);
+      }, 3500);
       
       const response = await api.post('/courses/generate', { topic, level });
       clearInterval(interval);
       
       const { slug, updatedCredits, updatedXp } = response.data;
 
-      // 🔄 Sincronização Atômica: Atualiza o usuário globalmente com os novos dados
+      // Sincronização imediata do perfil do usuário
       if (updatedCredits !== undefined) {
         setUser(prev => ({ ...prev, credits: updatedCredits, xp: updatedXp }));
       }
 
-      // Atualiza as estatísticas da home (total de cursos aumentou)
       await fetchGlobalData(true);
-
-      setStatusMessage('Curso criado com sucesso! Redirecionando...');
+      setStatusMessage('Curso pronto! Preparando sua sala de aula...');
+      
       return { success: true, slug: slug };
 
     } catch (error) {
-      const errorMsg = error.response?.data?.error || "Falha na geração do curso.";
+      const errorMsg = error.response?.data?.error || "A IA está ocupada. Tente novamente em instantes.";
       setStatusMessage(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
       setTimeout(() => {
         setIsGenerating(false);
         setStatusMessage('');
-      }, 2500);
+      }, 2000);
     }
   }, [isGenerating, fetchGlobalData, setUser]);
 
@@ -127,8 +124,7 @@ export const CourseProvider = ({ children }) => {
         status: res.data.status || 'em_andamento'
       };
     } catch (err) {
-      console.error("Erro ao obter progresso:", err);
-      return { progress: 0, completedLessons: [], completedQuizzes: [] };
+      return { progress: 0, completedLessons: [], completedQuizzes: [], status: 'erro' };
     }
   }, [signed]);
 
@@ -136,14 +132,13 @@ export const CourseProvider = ({ children }) => {
    * 4. ATUALIZAR PROGRESSO DE LIÇÃO
    */
   const updateLessonProgress = useCallback(async (courseId, lessonData) => {
-    if (!signed) return { success: false, error: 'Faça login para salvar progresso.' };
+    if (!signed) return { success: false, error: 'Login necessário.' };
     
     try {
       const res = await api.post(`/courses/${courseId}/progress`, lessonData);
       return res.data;
     } catch (err) {
-      console.error("Erro ao salvar lição:", err);
-      return { success: false, error: 'Erro ao salvar progresso.' };
+      return { success: false, error: 'Erro de conexão ao salvar progresso.' };
     }
   }, [signed]);
 
@@ -151,26 +146,22 @@ export const CourseProvider = ({ children }) => {
    * 5. SALVAR QUIZ E ATUALIZAR GAMIFICATION
    */
   const saveQuizResult = useCallback(async (courseId, quizData) => {
-    if (!signed) return { success: false, error: 'Login necessário' };
+    if (!signed) return { success: false, error: 'Login necessário.' };
 
     try {
       const res = await api.post(`/courses/${courseId}/quiz-result`, quizData);
       
-      // Se a resposta trouxer dados de XP atualizados, aplicamos ao usuário
+      // Se ganhou XP ao finalizar ou passar no quiz, atualiza o cabeçalho/avatar
       if (res.data.success && res.data.updatedXp) {
         setUser(prev => ({ ...prev, xp: res.data.updatedXp }));
       }
       
       return res.data;
     } catch (err) {
-      console.error("Erro ao salvar resultado do quiz:", err);
-      return { success: false, error: 'Erro ao processar resultado do quiz.' };
+      return { success: false, error: 'Falha ao processar resultado do quiz.' };
     }
   }, [signed, setUser]);
 
-  /**
-   * Valor do contexto memoizado.
-   */
   const contextValue = useMemo(() => ({
     isGenerating, 
     statusMessage, 
@@ -184,16 +175,9 @@ export const CourseProvider = ({ children }) => {
     initialDataLoaded,
     hasPagination: stats.courses > COURSES_PER_PAGE
   }), [
-    isGenerating, 
-    statusMessage, 
-    generateCourse, 
-    getCourseProgress, 
-    updateLessonProgress, 
-    saveQuizResult, 
-    stats, 
-    categories, 
-    fetchGlobalData, 
-    initialDataLoaded
+    isGenerating, statusMessage, generateCourse, getCourseProgress, 
+    updateLessonProgress, saveQuizResult, stats, categories, 
+    fetchGlobalData, initialDataLoaded
   ]);
 
   return (
@@ -205,8 +189,6 @@ export const CourseProvider = ({ children }) => {
 
 export const useCourse = () => {
   const context = useContext(CourseContext);
-  if (!context) {
-    throw new Error('useCourse deve ser usado dentro de um CourseProvider');
-  }
+  if (!context) throw new Error('useCourse deve ser usado dentro de um CourseProvider');
   return context;
 };
