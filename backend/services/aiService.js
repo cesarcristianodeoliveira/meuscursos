@@ -2,114 +2,96 @@ const Groq = require('groq-sdk');
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 /**
- * SERVIÇO DE INTELIGÊNCIA ARTIFICIAL (AI Service) v1.4.0
- * Foco: Engenharia de Prompt para Imagens Artísticas e Precisão de Métricas.
+ * Calcula o tempo estimado de leitura (baseado em ~200 palavras por minuto)
+ * + tempo para processar quizzes (1 min por questão).
  */
+const calculateRealDuration = (courseData) => {
+  let totalWords = 0;
+  let totalQuestions = 0;
 
-const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile', options = {}) => {
+  courseData.modules.forEach(mod => {
+    // Conta palavras das lições
+    mod.lessons.forEach(lesson => {
+      totalWords += lesson.content.split(/\s+/).length;
+    });
+    // Conta questões dos quizzes de módulos
+    totalQuestions += mod.exercises.length;
+  });
+
+  // Conta questões do exame final
+  totalQuestions += courseData.finalExam.length;
+
+  const readingTime = Math.ceil(totalWords / 200); 
+  const quizTime = totalQuestions * 1.5; // 1min 30s por questão
+
+  return Math.ceil(readingTime + quizTime);
+};
+
+const generateCourseContent = async (topic, model, options = {}) => {
   const { level = 'iniciante' } = options;
 
-  const strategy = {
-    iniciante: "Introdução rápida, conceitos base e vitórias rápidas. Linguagem simples e acolhedora.",
-    intermediario: "Foco em ferramentas, métodos e aplicação real. Conteúdo técnico denso e diagramas textuais.",
-    avancado: "Análise crítica, resolução de problemas complexos e otimização profunda."
-  }[level];
-
-  const systemPrompt = `Você é um Designer Instrucional Senior e Diretor de Arte. 
-    Sua missão é gerar um curso em JSON que seja educacionalmente profundo e visualmente inspirador.
+  const systemPrompt = `
+    Você é um Engenheiro de Aprendizagem de última geração e Curador Visual.
+    Sua missão é estruturar um curso de alto valor educacional, denso em conteúdo e visualmente mapeável.
 
     DIRETRIZES DE CONTEÚDO:
-    1. LIÇÕES: Mínimo de 400 palavras por aula. Use Markdown (###, **bold**, listas).
-    2. DIDÁTICA: Aplique a técnica de 'Feynman' para explicar conceitos complexos de forma simples.
+    1. LINGUAGEM: Didática, profissional e envolvente.
+    2. CONTEÚDO: Cada lição deve ser profunda (mínimo de 300 palavras por lição). Use Markdown para formatação (negrito, listas, blocos de código).
+    3. CATEGORIA: Atribua uma categoria lógica (ex: "Desenvolvimento Pessoal", "Data Science", "Culinária").
 
-    DIRETRIZES DE DIRETOR DE ARTE (imageSearchPrompt):
-    Este campo será usado para buscar imagens em bancos profissionais (Unsplash/Pexels). 
-    NÃO use termos genéricos. Siga este template:
-    - [Sujeito Principal] + [Ação/Contexto] + [Estilo Artístico] + [Iluminação]
-    - Exemplo RUIM: "A photo of coffee"
-    - Exemplo BOM: "Close-up of professional barista pouring latte art in a moody cinematic cafe, 8k resolution, macro photography, warm sunlight"
-    - REGRAS: Sempre em INGLÊS. Sem textos na imagem. Sem palavras como 'curso', 'online', 'educação'.
+    DIRETRIZES VISUAIS (PIXABAY OPTIMIZATION):
+    - imageSearchPrompt: Gere apenas de 3 a 5 palavras-chave em INGLÊS separadas por ESPAÇOS. 
+    - Não use vírgulas, pontos ou frases.
+    - Exemplo para Python: "code programming technology screen"
+    - Exemplo para Yoga: "meditation yoga nature zen"
 
-    DIRETRIZES TÉCNICAS:
-    - Retorne apenas o objeto JSON, sem textos explicativos fora do JSON.`;
-
-  const userPrompt = `Crie um curso sobre: "${topic}".
-    Nível: ${level}.
-    Estratégia: ${strategy}
-
-    ESTRUTURA:
-    - 3 a 5 módulos.
-    - Mínimo 2 lições por módulo (cada lição com campo 'duration' em minutos).
-    - 1 Pergunta de múltipla escolha por módulo.
-    - Exame Final com 5 questões.
-
-    SCHEMA JSON:
+    FORMATO JSON OBRIGATÓRIO:
     {
-      "title": "Título",
-      "description": "Descrição",
+      "title": "Título do Curso",
       "categoryName": "Categoria",
-      "tags": ["tag1", "tag2"],
-      "imageSearchPrompt": "Detailed English artistic prompt",
+      "description": "Sinopse foca no 'porquê' aprender isso",
+      "imageSearchPrompt": "keywords spaces english",
+      "xpReward": 0, (Defina entre 500 e 2000 baseado na densidade)
+      "tags": ["Tag1", "Tag2"],
       "modules": [
         {
-          "title": "Módulo",
-          "lessons": [{ "title": "Aula", "content": "Markdown", "duration": 15 }],
-          "exercises": [{ "question": "Q", "options": ["A","B","C","D"], "correctAnswer": "A" }]
+          "title": "Título do Módulo",
+          "lessons": [
+            { "title": "Título da Aula", "content": "Texto longo em Markdown..." }
+          ],
+          "exercises": [
+            { "question": "Pergunta", "options": ["A", "B", "C", "D"], "correctAnswer": 0 }
+          ]
         }
       ],
-      "finalExam": [{ "question": "Q", "options": ["A","B","C","D"], "correctAnswer": "A" }]
-    }`;
+      "finalExam": [
+        { "question": "Pergunta Final", "options": ["A", "B", "C", "D"], "correctAnswer": 0 }
+      ]
+    }
+  `;
 
   try {
     const chatCompletion = await groq.chat.completions.create({
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Gere um curso magistral sobre: ${topic}. Nível: ${level}.` }
       ],
-      model: provider,
-      temperature: 0.6, // Mais baixo para evitar alucinações no formato JSON
+      model: model || "llama-3.3-70b-versatile",
       response_format: { type: "json_object" }
     });
 
-    let rawData = JSON.parse(chatCompletion.choices[0].message.content);
+    const aiData = JSON.parse(chatCompletion.choices[0].message.content);
 
-    // --- PÓS-PROCESSAMENTO DE INTELIGÊNCIA ---
-    let totalMinutes = 0;
-
-    rawData.modules.forEach(mod => {
-      mod.lessons.forEach(lesson => {
-        // Validação de segurança: se a IA mandou pouco texto, forçamos uma duração mínima
-        const wordCount = (lesson.content || "").split(/\s+/).length;
-        const readingTime = Math.ceil(wordCount / 150); // Média de 150-200 palavras por minuto
-        
-        lesson.duration = Math.max(lesson.duration || 5, readingTime);
-        totalMinutes += lesson.duration;
-      });
-    });
-
-    // Tempo de Quiz: 2 min por questão
-    const totalQuestions = rawData.modules.length + (rawData.finalExam?.length || 0);
-    const finalEstimatedTime = totalMinutes + (totalQuestions * 2);
-
-    // Cálculo de XP baseado no esforço (Duração + Nível)
-    const levelBonus = { iniciante: 1, intermediario: 1.5, avancado: 2 };
-    const xpReward = Math.round(finalEstimatedTime * 10 * (levelBonus[level] || 1));
+    // --- LÓGICA DE DURAÇÃO BASEADA EM DADOS REAIS ---
+    aiData.estimatedTime = calculateRealDuration(aiData);
 
     return {
-      course: {
-        ...rawData,
-        estimatedTime: finalEstimatedTime,
-        xpReward: xpReward
-      },
-      usage: {
-        totalTokens: chatCompletion.usage?.total_tokens || 0,
-        model: provider
-      }
+      course: aiData,
+      usage: chatCompletion.usage
     };
-
   } catch (error) {
-    console.error("❌ Erro no aiService:", error);
-    throw new Error("A IA falhou em gerar o conteúdo. Tente um tema mais específico.");
+    console.error("❌ Erro fatal no AI Service:", error);
+    throw new Error("Falha na geração inteligente.");
   }
 };
 

@@ -5,39 +5,40 @@ const authMiddleware = require('../middlewares/authMiddleware');
 
 /**
  * --- ROTAS PÚBLICAS ---
- * Focadas em SEO e Landing Pages de cursos.
+ * Acessíveis por visitantes e indexadores de busca.
  */
 
-// Busca detalhes do curso pelo slug (Acessível sem token)
+// Lista todos os cursos para a vitrine (Home)
+// Adicionada para evitar erros de referência e alimentar a página principal
+router.get('/all', courseController.getAllCourses);
+
+// Busca detalhes do curso pelo slug para a página de vendas/detalhes
 router.get('/public/:slug', courseController.getCourseBySlug);
 
 /**
  * --- ROTAS PRIVADAS (Requerem Autenticação) ---
- * O authMiddleware injeta o 'userId' no objeto 'req' para uso no Controller.
  */
 
 // Geração de novo curso via IA
-// Protegido por cota no Service e Token no Middleware
 router.post('/generate', authMiddleware, courseController.createCourse);
 
-// Lista os cursos do usuário logado (Painel / Dashboard)
+// Lista os cursos que o próprio usuário criou/está vinculado
 router.get('/my-courses', authMiddleware, courseController.getUserCourses);
 
-// Ambiente de estudo (Busca dados completos para o aluno logado)
+// Ambiente de estudo (Busca dados completos do curso para o aluno)
 router.get('/study/:slug', authMiddleware, courseController.getCourseBySlug);
 
 /**
  * --- PROGRESSO E GAMIFICAÇÃO ---
- * Gerenciamento de Matrículas e Conquistas de XP.
  */
 
 // Busca o progresso (Aulas concluídas, notas e status)
 router.get('/:id/progress', authMiddleware, courseController.getProgress);
 
-// Salva progresso de leitura (Marcar/Desmarcar conclusão)
+// Salva progresso de leitura (Marcar/Desmarcar aula como concluída)
 router.post('/:id/progress', authMiddleware, courseController.saveProgress);
 
-// Registra resultado de Quiz e Exame Final (Gatilha ganho de XP)
+// Registra resultado de Quiz e Exame Final (Gatilha ganho de XP e Certificado)
 router.post('/:id/quiz-result', authMiddleware, courseController.saveQuizProgress);
 
 module.exports = router;

@@ -2,31 +2,32 @@ const axios = require('axios');
 const client = require('../config/sanity');
 
 /**
- * SERVIÇO DE IMAGENS (ImageService) v1.3.0
- * Otimizado para prompts artísticos e cascata de busca inteligente.
+ * SERVIÇO DE IMAGENS (ImageService) v1.4.0
+ * Otimizado para buscas precisas no Pixabay e persistência no Sanity.
  */
 
 const fetchAndUploadImage = async (courseData) => {
   try {
     const apiKey = process.env.PIXABAY_API_KEY;
     if (!apiKey) {
-      console.warn("⚠️ PIXABAY_API_KEY não configurada.");
+      console.warn("⚠️ PIXABAY_API_KEY não configurada no ambiente.");
       return null;
     }
 
     const baseUrl = `https://pixabay.com/api/?key=${apiKey}`;
-    const baseParams = `&image_type=photo&orientation=horizontal&safesearch=true&per_page=15&lang=en`;
+    // Configurações focadas em fotos horizontais de alta qualidade
+    const baseParams = `&image_type=photo&orientation=horizontal&safesearch=true&per_page=20&lang=en`;
 
     /**
-     * LIMPEZA DE QUERY PRESERVATIVA
-     * Remove pontuação e lixo, mas mantém adjetivos visuais (cinematic, moody, lighting).
+     * LIMPEZA DE QUERY PARA O PIXABAY
+     * O Pixabay funciona melhor com palavras-chave simples separadas por espaços.
      */
     const cleanTerm = (text) => {
       if (!text) return "";
       return text
         .toLowerCase()
-        .replace(/[:.;?!#"]/g, '') // Remove pontuação pesada
-        .replace(/\b(course|lesson|tutorial|online|class|ai|generated)\b/gi, '') // Remove termos proibidos
+        .replace(/[,.:.;?!#"]/g, ' ') // Remove pontuação e vírgulas (substitui por espaço)
+        .replace(/\b(course|lesson|tutorial|online|class|learning|education)\b/gi, '') // Remove ruído educacional
         .trim()
         .split(/\s+/)
         .filter((word, index, self) => self.indexOf(word) === index) // Remove duplicatas
@@ -34,81 +35,80 @@ const fetchAndUploadImage = async (courseData) => {
     };
 
     /**
-     * HIERARQUIA DE BUSCA EM CASCATA (Relaxamento de Query)
-     * 1. Prompt Artístico Completo (ex: "Cinematic coffee brewing in sunlight")
-     * 2. Apenas o Título do Curso (ex: "Coffee Brewing Basics")
-     * 3. Apenas a Categoria (ex: "Gastronomia")
-     * 4. Fallback visual abstrato de alta qualidade
+     * HIERARQUIA DE BUSCA
+     * 1. O prompt visual gerado pela IA (Ex: "keyboard coding dark")
+     * 2. O título do curso limpo
+     * 3. A categoria
+     * 4. Fallback de alta qualidade
      */
     const queries = [
       cleanTerm(courseData.imageSearchPrompt),
       cleanTerm(courseData.title),
       cleanTerm(courseData.categoryName),
-      "professional background aesthetic" 
+      "abstract professional technology background" 
     ].filter(q => q && q.length > 2);
 
     let hits = [];
     let usedQuery = "";
 
     for (const query of queries) {
-      // Pega apenas as primeiras 6 palavras para o Pixabay não se perder em prompts longos demais
-      const shortQuery = query.split(' ').slice(0, 7).join(' ');
+      // O Pixabay ignora buscas muito longas, limitamos a 5 termos chave
+      const optimizedQuery = query.split(' ').slice(0, 5).join(' ');
       
-      console.log(`📸 Buscando Pixabay: "${shortQuery}"`);
+      console.log(`📸 Tentando Pixabay: [${optimizedQuery}]`);
       try {
-        const response = await axios.get(`${baseUrl}&q=${encodeURIComponent(shortQuery)}${baseParams}`, { timeout: 6000 });
+        const response = await axios.get(`${baseUrl}&q=${encodeURIComponent(optimizedQuery)}${baseParams}`, { timeout: 5000 });
 
         if (response.data.hits && response.data.hits.length > 0) {
           hits = response.data.hits;
-          usedQuery = shortQuery;
+          usedQuery = optimizedQuery;
           break; 
         }
       } catch (err) {
-        console.error(`⚠️ Erro na query "${shortQuery}":`, err.message);
+        console.error(`⚠️ Falha na query "${optimizedQuery}":`, err.message);
         continue;
       }
     }
 
     if (hits.length === 0) return null;
 
-    // SELEÇÃO: Prioriza "Editor's Choice" se houver, senão pega a melhor correspondência
+    // Seleção inteligente: Prioriza fotos com selo de escolha dos editores
     let selectedImage = hits.find(h => h.editorsChoice) || hits[0];
 
-    // Evita repetição: Se a imagem já foi usada em muitos cursos, tenta a próxima do array
+    // Lógica Anti-Repetição: Tenta pegar uma imagem que ainda não foi usada
     for (const hit of hits) {
-      const usageCount = await client.fetch(
+      const isUsed = await client.fetch(
         `count(*[_type == "course" && externalImageId == $id])`, 
         { id: String(hit.id) }
       );
-      if (usageCount === 0) {
+      if (isUsed === 0) {
         selectedImage = hit;
         break;
       }
     }
 
-    console.log(`✅ Imagem definida! ID: ${selectedImage.id} via: "${usedQuery}"`);
+    console.log(`✅ Imagem selecionada: ID ${selectedImage.id} via query "${usedQuery}"`);
 
-    // DOWNLOAD E UPLOAD
+    // Download da imagem (usando a versão largeImageURL para garantir nitidez)
     const imageUrl = selectedImage.largeImageURL || selectedImage.webformatURL;
-    const imageRes = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 12000 });
+    const imageRes = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 10000 });
     const buffer = Buffer.from(imageRes.data);
 
+    // Upload para o Sanity
     const asset = await client.assets.upload('image', buffer, {
       filename: `pixabay-${selectedImage.id}.jpg`,
       contentType: 'image/jpeg',
       label: `Capa: ${courseData.title}`,
-      title: courseData.title,
-      description: `Original Prompt: ${courseData.imageSearchPrompt} | Used: ${usedQuery}`
+      title: courseData.title
     });
 
     return {
-      assetId: asset._id,
-      externalId: String(selectedImage.id),
-      searchPrompt: usedQuery
+      assetId: asset._id, // O que será salvo na referência do curso
+      externalId: String(selectedImage.id)
     };
 
   } catch (error) {
-    console.error("❌ Falha crítica no ImageService:", error.message);
+    console.error("❌ Erro no ImageService:", error.message);
     return null;
   }
 };
