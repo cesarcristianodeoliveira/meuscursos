@@ -1,97 +1,143 @@
 const Groq = require('groq-sdk');
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const { v4: uuidv4 } = require('uuid');
 
 /**
- * Calcula o tempo estimado de leitura (baseado em ~200 palavras por minuto)
- * + tempo para processar quizzes (1 min por questão).
+ * MOTOR DE INTELIGÊNCIA PEDAGÓGICA (AI Service) v2.0.0
+ * Foco: Learning Experience Design (LXD), Polimatia e Automação de Estrutura.
  */
-const calculateRealDuration = (courseData) => {
-  let totalWords = 0;
-  let totalQuestions = 0;
 
-  courseData.modules.forEach(mod => {
-    // Conta palavras das lições
-    mod.lessons.forEach(lesson => {
-      totalWords += lesson.content.split(/\s+/).length;
-    });
-    // Conta questões dos quizzes de módulos
-    totalQuestions += mod.exercises.length;
-  });
-
-  // Conta questões do exame final
-  totalQuestions += courseData.finalExam.length;
-
-  const readingTime = Math.ceil(totalWords / 200); 
-  const quizTime = totalQuestions * 1.5; // 1min 30s por questão
-
-  return Math.ceil(readingTime + quizTime);
-};
-
-const generateCourseContent = async (topic, model, options = {}) => {
+const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile', options = {}) => {
   const { level = 'iniciante' } = options;
 
-  const systemPrompt = `
-    Você é um Engenheiro de Aprendizagem de última geração e Curador Visual.
-    Sua missão é estruturar um curso de alto valor educacional, denso em conteúdo e visualmente mapeável.
+  // Estratégia baseada na Taxonomia de Bloom para progressão de conhecimento
+  const strategy = {
+    iniciante: "Foco em recordar e compreender. Use analogias, conceitos fundamentais e remova barreiras técnicas iniciais.",
+    intermediario: "Foco em aplicar e analisar. Apresente cenários práticos, resolução de problemas e métodos de trabalho.",
+    avancado: "Foco em avaliar e criar. Aborde otimização profunda, arquitetura de soluções e pensamento crítico especializado."
+  }[level];
 
-    DIRETRIZES DE CONTEÚDO:
-    1. LINGUAGEM: Didática, profissional e envolvente.
-    2. CONTEÚDO: Cada lição deve ser profunda (mínimo de 300 palavras por lição). Use Markdown para formatação (negrito, listas, blocos de código).
-    3. CATEGORIA: Atribua uma categoria lógica (ex: "Desenvolvimento Pessoal", "Data Science", "Culinária").
+  const systemPrompt = `Você é um Arquiteto Polimata e Especialista em Learning Experience Design (LXD).
+Sua missão é decodificar qualquer tema solicitado e transformá-lo em uma jornada de conhecimento estruturada, profunda e pedagogicamente fluida.
 
-    DIRETRIZES VISUAIS (PIXABAY OPTIMIZATION):
-    - imageSearchPrompt: Gere apenas de 3 a 5 palavras-chave em INGLÊS separadas por ESPAÇOS. 
-    - Não use vírgulas, pontos ou frases.
-    - Exemplo para Python: "code programming technology screen"
-    - Exemplo para Yoga: "meditation yoga nature zen"
+DIRETRIZES DE OURO:
+1. DESIGN INSTRUCIONAL: Utilize a Técnica de Feynman para simplificar o complexo e garanta que cada aula construa a base para a próxima.
+2. ESTÉTICA VERBAL: Utilize um Português (Brasil) elegante e preciso. Sua autoridade vem da perfeição gramatical e clareza conceitual.
+3. CURADORIA VISUAL: O campo 'imageSearchPrompt' deve ser um comando visual artístico para um fotógrafo, em INGLÊS (ex: "Macro photography of [subject], cinematic lighting, 8k, professional composition").
+4. INTEGRIDADE TÉCNICA: 'correctAnswer' deve ser sempre uma STRING representando o índice da opção (ex: "0", "1").
 
-    FORMATO JSON OBRIGATÓRIO:
+Retorne APENAS o objeto JSON puro.`;
+
+  const userPrompt = `Crie uma experiência de aprendizado profunda sobre: "${topic}".
+Nível Alvo: ${level}.
+Estratégia Pedagógica: ${strategy}
+
+ESTRUTURA JSON EXIGIDA:
+{
+  "title": "Título Impactante",
+  "description": "Descrição que demonstre o valor real do curso",
+  "categoryName": "Categoria Principal",
+  "tags": ["Tag1", "Tag2", "Tag3"],
+  "imageSearchPrompt": "Artistic English prompt for cover image",
+  "modules": [
     {
-      "title": "Título do Curso",
-      "categoryName": "Categoria",
-      "description": "Sinopse foca no 'porquê' aprender isso",
-      "imageSearchPrompt": "keywords spaces english",
-      "xpReward": 0, (Defina entre 500 e 2000 baseado na densidade)
-      "tags": ["Tag1", "Tag2"],
-      "modules": [
-        {
-          "title": "Título do Módulo",
-          "lessons": [
-            { "title": "Título da Aula", "content": "Texto longo em Markdown..." }
-          ],
-          "exercises": [
-            { "question": "Pergunta", "options": ["A", "B", "C", "D"], "correctAnswer": 0 }
-          ]
-        }
-      ],
-      "finalExam": [
-        { "question": "Pergunta Final", "options": ["A", "B", "C", "D"], "correctAnswer": 0 }
-      ]
+      "title": "Nome do Módulo",
+      "lessons": [{ "title": "Título da Aula", "content": "Conteúdo rico em Markdown", "duration": 15 }],
+      "exercises": [{ "question": "Pergunta desafiadora", "options": ["A","B","C","D"], "correctAnswer": "0" }]
     }
-  `;
+  ],
+  "finalExam": [{ "question": "Questão de Certificação", "options": ["A","B","C","D"], "correctAnswer": "0" }]
+}`;
 
   try {
     const chatCompletion = await groq.chat.completions.create({
       messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `Gere um curso magistral sobre: ${topic}. Nível: ${level}.` }
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
       ],
-      model: model || "llama-3.3-70b-versatile",
+      model: provider,
+      temperature: 0.65, // Equilíbrio ideal entre rigor de formato e criatividade pedagógica
       response_format: { type: "json_object" }
     });
 
-    const aiData = JSON.parse(chatCompletion.choices[0].message.content);
+    const rawData = JSON.parse(chatCompletion.choices[0].message.content);
 
-    // --- LÓGICA DE DURAÇÃO BASEADA EM DADOS REAIS ---
-    aiData.estimatedTime = calculateRealDuration(aiData);
+    // --- PÓS-PROCESSAMENTO PARA PADRONIZAÇÃO E SANITY ---
+    let totalMinutes = 0;
+
+    const formattedModules = (rawData.modules || []).map(mod => {
+      const lessons = (mod.lessons || []).map(lesson => {
+        // Cálculo de duração real baseado no volume de conteúdo (150 palavras/min)
+        const wordCount = (lesson.content || "").split(/\s+/).length;
+        const readingTime = Math.ceil(wordCount / 150);
+        const duration = Math.max(lesson.duration || 5, readingTime);
+        totalMinutes += duration;
+
+        return {
+          _key: uuidv4(),
+          _type: 'lesson',
+          title: lesson.title,
+          content: lesson.content,
+          duration: duration
+        };
+      });
+
+      const exercises = (mod.exercises || []).map(ex => ({
+        _key: uuidv4(),
+        _type: 'exercise',
+        question: ex.question,
+        options: ex.options,
+        correctAnswer: String(ex.correctAnswer) // Garante o tipo String exigido pelo Sanity
+      }));
+
+      return {
+        _key: uuidv4(),
+        _type: 'courseModule',
+        title: mod.title,
+        lessons,
+        exercises
+      };
+    });
+
+    const finalExam = (rawData.finalExam || []).map(q => ({
+      _key: uuidv4(),
+      _type: 'examQuestion',
+      question: q.question,
+      options: q.options,
+      correctAnswer: String(q.correctAnswer) // Garante o tipo String exigido pelo Sanity
+    }));
+
+    // Gamificação: 2 min por questão + Duração das aulas
+    const totalQuestions = formattedModules.length + finalExam.length;
+    const finalEstimatedTime = totalMinutes + (totalQuestions * 2);
+    const levelBonus = { iniciante: 1, intermediario: 1.5, avancado: 2 };
 
     return {
-      course: aiData,
-      usage: chatCompletion.usage
+      course: {
+        _type: 'course',
+        title: rawData.title,
+        description: rawData.description,
+        categoryName: rawData.categoryName,
+        tags: rawData.tags || [],
+        imageSearchPrompt: rawData.imageSearchPrompt || topic,
+        level: level,
+        estimatedTime: finalEstimatedTime,
+        xpReward: Math.round(finalEstimatedTime * 10 * (levelBonus[level] || 1)),
+        modules: formattedModules,
+        finalExam: finalExam,
+        isPublished: true,
+        aiMetadata: {
+          _type: 'object',
+          provider: `Groq (${provider})`,
+          totalTokens: chatCompletion.usage?.total_tokens || 0,
+          generatedAt: new Date().toISOString()
+        }
+      }
     };
+
   } catch (error) {
-    console.error("❌ Erro fatal no AI Service:", error);
-    throw new Error("Falha na geração inteligente.");
+    console.error("❌ Erro Crítico no aiService:", error);
+    throw new Error("O motor de IA não conseguiu estruturar este conhecimento no momento.");
   }
 };
 

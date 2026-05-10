@@ -25,7 +25,7 @@ const getAllCourses = async (req, res) => {
 };
 
 /**
- * 2. GERAÇÃO DE CURSO COM IA (Ajustado para Lançamento)
+ * 2. GERAÇÃO DE CURSO COM IA (Motor LXD de Lançamento)
  */
 const createCourse = async (req, res) => {
   const { topic, level } = req.body;
@@ -38,17 +38,17 @@ const createCourse = async (req, res) => {
     const userQuota = await quotaService.checkUserQuota(userId, level);
     if (!userQuota.canGenerate) return res.status(429).json({ error: userQuota.reason });
 
-    // Chamada à IA (Agora com cálculo de tempo real por caracteres/palavras)
+    // Chamada à IA (Retorna aiData já estruturado com keys, tipos e metadados)
     const { course: aiData } = await aiService.generateCourseContent(topic, 'llama-3.3-70b-versatile', { level });
     
-    // Chamada ao ImageService (Otimizado para Pixabay keywords)
+    // Chamada ao ImageService usando o prompt artístico gerado pela IA
     const imageData = await imageService.fetchAndUploadImage({
         imageSearchPrompt: aiData.imageSearchPrompt,
         categoryName: aiData.categoryName,
         title: aiData.title
     });
 
-    // Gestão de Categoria
+    // Gestão de Categoria Orgânica
     const categoryName = aiData.categoryName || 'Geral';
     const categorySlug = formatSlug(categoryName);
     let category = await client.fetch(`*[_type == "category" && slug.current == $slug][0]`, { slug: categorySlug });
@@ -63,44 +63,18 @@ const createCourse = async (req, res) => {
 
     const finalSlug = `${formatSlug(aiData.title)}-${crypto.randomBytes(3).toString('hex')}`;
 
-    // Construção do Documento Sanity
+    // Construção do Documento Sanity (Mesclando IA com referências do Sistema)
     const newCourse = {
-      _type: 'course',
-      title: aiData.title,
+      ...aiData, // Título, Descrição, Módulos (com keys), Exame e Metadados vêm daqui
       slug: { _type: 'slug', current: finalSlug },
-      description: aiData.description,
       author: { _type: 'reference', _ref: userId },
       category: { _type: 'reference', _ref: category._id },
-      level: aiData.level || level || 'iniciante',
-      estimatedTime: aiData.estimatedTime, // Tempo real calculado no aiService
-      xpReward: aiData.xpReward,
-      isPublished: true,
-      // Se a imagem falhar, o campo fica undefined e o frontend usa um fallback
-      thumbnail: imageData?.assetId ? { _type: 'image', asset: { _type: 'reference', _ref: imageData.assetId } } : undefined,
-      externalImageId: imageData?.externalId, // Para evitar duplicidade no futuro
-      modules: aiData.modules.map(m => ({
-        _key: crypto.randomUUID(),
-        title: m.title,
-        lessons: m.lessons.map(l => ({ 
-          _key: crypto.randomUUID(), 
-          title: l.title, 
-          content: l.content,
-          // A duração individual pode ser estimada no aiService ou ser 1/n do total
-          duration: Math.ceil(aiData.estimatedTime / (aiData.modules.length * m.lessons.length))
-        })),
-        exercises: m.exercises.map(e => ({ 
-          _key: crypto.randomUUID(), 
-          question: e.question, 
-          options: e.options, 
-          correctAnswer: e.correctAnswer 
-        }))
-      })),
-      finalExam: aiData.finalExam.map(q => ({ 
-        _key: crypto.randomUUID(), 
-        question: q.question, 
-        options: q.options, 
-        correctAnswer: q.correctAnswer 
-      }))
+      // Thumbnail processada ou fallback
+      thumbnail: imageData?.assetId ? { 
+        _type: 'image', 
+        asset: { _type: 'reference', _ref: imageData.assetId } 
+      } : undefined,
+      externalImageId: imageData?.externalId, 
     };
 
     const result = await client.create(newCourse);
@@ -110,7 +84,6 @@ const createCourse = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Erro na criação do curso:", error);
-    // Tentar reembolsar se houver erro após debitar (opcional)
     return res.status(500).json({ error: "Ocorreu um erro ao gerar seu curso. Tente novamente." });
   }
 };
@@ -176,7 +149,12 @@ const saveProgress = async (req, res) => {
 
     if (completed) {
       if (!lessons.some(l => l.lessonKey === lessonId)) {
-        lessons.push({ _key: crypto.randomUUID(), lessonKey: lessonId, lessonTitle, completedAt: new Date().toISOString() });
+        lessons.push({ 
+          _key: crypto.randomUUID(), 
+          lessonKey: lessonId, 
+          lessonTitle, 
+          completedAt: new Date().toISOString() 
+        });
       }
     } else {
       lessons = lessons.filter(l => l.lessonKey !== lessonId);
@@ -194,7 +172,9 @@ const saveProgress = async (req, res) => {
         status: 'em_andamento'
       });
     } else {
-      await client.patch(enrollment._id).set({ completedLessons: lessons, progress: progressPercent }).commit();
+      await client.patch(enrollment._id)
+        .set({ completedLessons: lessons, progress: progressPercent })
+        .commit();
     }
 
     return res.status(200).json({ success: true, progress: progressPercent });
@@ -204,20 +184,37 @@ const saveProgress = async (req, res) => {
 };
 
 const saveQuizProgress = async (req, res) => {
-    // ... (Mantive a lógica anterior que já estava funcional)
-    // Apenas certifique-se de que ela chama quotaService.addXpReward no finalExam
-    // seguindo o mesmo padrão do saveProgress acima.
-    return res.status(200).json({ success: true }); 
+    const { id: courseId } = req.params;
+    const { score, totalQuestions, isFinalExam } = req.body;
+    const userId = req.userId;
+
+    try {
+        // Se for o exame final e o usuário passou (ex: > 70%), recompensamos com XP
+        if (isFinalExam && (score / totalQuestions) >= 0.7) {
+            const course = await client.fetch(`*[_id == $courseId][0]{xpReward}`, { courseId });
+            await quotaService.addXpReward(userId, course.xpReward || 500);
+        }
+
+        // Registra o histórico da tentativa do Quiz (Opcional: criar um schema para tentativas)
+        return res.status(200).json({ success: true, message: "Resultado do quiz registrado." });
+    } catch (error) {
+        return res.status(500).json({ error: "Erro ao salvar resultado do quiz." });
+    }
 };
 
 const getUserCourses = async (req, res) => {
   try {
     const courses = await client.fetch(
-      `*[_type == "course" && author._ref == $userId] | order(_createdAt desc)`, 
+      `*[_type == "course" && author._ref == $userId] | order(_createdAt desc) {
+        _id, title, "slug": slug.current, level, xpReward, isPublished,
+        "thumbnail": thumbnail.asset->url
+      }`, 
       { userId: req.userId }
     );
     res.json({ success: true, courses });
-  } catch (err) { res.status(500).json({ error: "Erro ao listar seus cursos." }); }
+  } catch (err) { 
+    res.status(500).json({ error: "Erro ao listar seus cursos." }); 
+  }
 };
 
 module.exports = { 
