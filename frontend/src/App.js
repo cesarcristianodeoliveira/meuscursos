@@ -96,7 +96,7 @@ export default function App(props) {
               <Route path="/cadastrar" element={<SignUp />} />
 
               {/* 3. Visualização de Curso (PÚBLICA para SEO) */}
-              <Route path="/curso/:slug" element={<CourseView />} />
+              <Route path="/dashboard/curso/:slug" element={<CourseView />} />
 
               {/* 4. Ecossistema Privado do Aluno */}
               <Route 

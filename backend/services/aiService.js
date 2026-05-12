@@ -3,50 +3,40 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const { v4: uuidv4 } = require('uuid');
 
 /**
- * MOTOR DE INTELIGÊNCIA PEDAGÓGICA (AI Service) v2.0.0
- * Foco: Learning Experience Design (LXD), Polimatia e Automação de Estrutura.
+ * MOTOR DE APRENDIZADO AUTÔNOMO (AI Service) v3.0.0
+ * Foco: Inteligência agnóstica para cursos não regulamentados.
  */
 
 const generateCourseContent = async (topic, provider = 'llama-3.3-70b-versatile', options = {}) => {
   const { level = 'iniciante' } = options;
 
-  // Estratégia baseada na Taxonomia de Bloom para progressão de conhecimento
-  const strategy = {
-    iniciante: "Foco em recordar e compreender. Use analogias, conceitos fundamentais e remova barreiras técnicas iniciais.",
-    intermediario: "Foco em aplicar e analisar. Apresente cenários práticos, resolução de problemas e métodos de trabalho.",
-    avancado: "Foco em avaliar e criar. Aborde otimização profunda, arquitetura de soluções e pensamento crítico especializado."
-  }[level];
+  const systemPrompt = `Você é um Arquiteto de Experiências de Aprendizagem (LXD).
+Sua missão é projetar um curso completo sobre o tema solicitado.
 
-  const systemPrompt = `Você é um Arquiteto Polimata e Especialista em Learning Experience Design (LXD).
-Sua missão é decodificar qualquer tema solicitado e transformá-lo em uma jornada de conhecimento estruturada, profunda e pedagogicamente fluida.
+DIRETRIZES DE INTELIGÊNCIA:
+1. ADAPTABILIDADE: Avalie a complexidade do tema e defina a densidade do conteúdo, o número de módulos e a duração de cada aula de forma orgânica. Não há limite de palavras, busque a maestria sobre o assunto.
+2. REPRESENTAÇÃO VISUAL: No campo 'imageSearchPrompt', crie um termo de busca em inglês que represente a atmosfera e o conceito do curso. Seja específico e artístico para garantir imagens de alta qualidade em bancos de imagem.
+3. DIDÁTICA: Utilize métodos pedagógicos modernos (como Microlearning ou Storytelling) conforme o que melhor se adaptar ao tema.
+4. FORMATO: Retorne estritamente um JSON. 'correctAnswer' deve ser sempre uma string com o índice da opção (ex: "0").`;
 
-DIRETRIZES DE OURO:
-1. DESIGN INSTRUCIONAL: Utilize a Técnica de Feynman para simplificar o complexo e garanta que cada aula construa a base para a próxima.
-2. ESTÉTICA VERBAL: Utilize um Português (Brasil) elegante e preciso. Sua autoridade vem da perfeição gramatical e clareza conceitual.
-3. CURADORIA VISUAL: O campo 'imageSearchPrompt' deve ser um comando visual artístico para um fotógrafo, em INGLÊS (ex: "Macro photography of [subject], cinematic lighting, 8k, professional composition").
-4. INTEGRIDADE TÉCNICA: 'correctAnswer' deve ser sempre uma STRING representando o índice da opção (ex: "0", "1").
+  const userPrompt = `Desenvolva um curso de nível ${level} sobre: "${topic}".
+O curso deve conter uma estrutura completa de módulos, lições profundas, exercícios práticos e um exame final de certificação.
 
-Retorne APENAS o objeto JSON puro.`;
-
-  const userPrompt = `Crie uma experiência de aprendizado profunda sobre: "${topic}".
-Nível Alvo: ${level}.
-Estratégia Pedagógica: ${strategy}
-
-ESTRUTURA JSON EXIGIDA:
+ESTRUTURA JSON:
 {
-  "title": "Título Impactante",
-  "description": "Descrição que demonstre o valor real do curso",
-  "categoryName": "Categoria Principal",
-  "tags": ["Tag1", "Tag2", "Tag3"],
-  "imageSearchPrompt": "Artistic English prompt for cover image",
+  "title": "...",
+  "description": "...",
+  "categoryName": "...",
+  "tags": ["...", "...", "..."],
+  "imageSearchPrompt": "...",
   "modules": [
     {
-      "title": "Nome do Módulo",
-      "lessons": [{ "title": "Título da Aula", "content": "Conteúdo rico em Markdown", "duration": 15 }],
-      "exercises": [{ "question": "Pergunta desafiadora", "options": ["A","B","C","D"], "correctAnswer": "0" }]
+      "title": "...",
+      "lessons": [{ "title": "...", "content": "...", "duration": 0 }],
+      "exercises": [{ "question": "...", "options": ["...", "..."], "correctAnswer": "0" }]
     }
   ],
-  "finalExam": [{ "question": "Questão de Certificação", "options": ["A","B","C","D"], "correctAnswer": "0" }]
+  "finalExam": [{ "question": "...", "options": ["...", "..."], "correctAnswer": "0" }]
 }`;
 
   try {
@@ -56,21 +46,23 @@ ESTRUTURA JSON EXIGIDA:
         { role: 'user', content: userPrompt }
       ],
       model: provider,
-      temperature: 0.65, // Equilíbrio ideal entre rigor de formato e criatividade pedagógica
+      temperature: 0.7, 
       response_format: { type: "json_object" }
     });
 
     const rawData = JSON.parse(chatCompletion.choices[0].message.content);
 
-    // --- PÓS-PROCESSAMENTO PARA PADRONIZAÇÃO E SANITY ---
+    // --- PROCESSAMENTO DINÂMICO (Sem travas de duração ou tamanho) ---
     let totalMinutes = 0;
 
     const formattedModules = (rawData.modules || []).map(mod => {
       const lessons = (mod.lessons || []).map(lesson => {
-        // Cálculo de duração real baseado no volume de conteúdo (150 palavras/min)
+        // A duração é respeitada conforme a IA definiu, 
+        // ou calculada organicamente se ela omitir.
         const wordCount = (lesson.content || "").split(/\s+/).length;
-        const readingTime = Math.ceil(wordCount / 150);
-        const duration = Math.max(lesson.duration || 5, readingTime);
+        const estimatedTime = Math.ceil(wordCount / 180); // Velocidade média de leitura
+        const duration = lesson.duration || estimatedTime || 5;
+        
         totalMinutes += duration;
 
         return {
@@ -82,20 +74,18 @@ ESTRUTURA JSON EXIGIDA:
         };
       });
 
-      const exercises = (mod.exercises || []).map(ex => ({
-        _key: uuidv4(),
-        _type: 'exercise',
-        question: ex.question,
-        options: ex.options,
-        correctAnswer: String(ex.correctAnswer) // Garante o tipo String exigido pelo Sanity
-      }));
-
       return {
         _key: uuidv4(),
         _type: 'courseModule',
         title: mod.title,
         lessons,
-        exercises
+        exercises: (mod.exercises || []).map(ex => ({
+          _key: uuidv4(),
+          _type: 'exercise',
+          question: ex.question,
+          options: ex.options,
+          correctAnswer: String(ex.correctAnswer)
+        }))
       };
     });
 
@@ -104,13 +94,12 @@ ESTRUTURA JSON EXIGIDA:
       _type: 'examQuestion',
       question: q.question,
       options: q.options,
-      correctAnswer: String(q.correctAnswer) // Garante o tipo String exigido pelo Sanity
+      correctAnswer: String(q.correctAnswer)
     }));
 
-    // Gamificação: 2 min por questão + Duração das aulas
-    const totalQuestions = formattedModules.length + finalExam.length;
-    const finalEstimatedTime = totalMinutes + (totalQuestions * 2);
+    // XP baseado no esforço total da jornada gerada
     const levelBonus = { iniciante: 1, intermediario: 1.5, avancado: 2 };
+    const xpReward = Math.round((totalMinutes * 10 + (finalExam.length * 20)) * (levelBonus[level] || 1));
 
     return {
       course: {
@@ -119,10 +108,10 @@ ESTRUTURA JSON EXIGIDA:
         description: rawData.description,
         categoryName: rawData.categoryName,
         tags: rawData.tags || [],
-        imageSearchPrompt: rawData.imageSearchPrompt || topic,
+        imageSearchPrompt: rawData.imageSearchPrompt || (rawData.tags ? rawData.tags.join(' ') : topic),
         level: level,
-        estimatedTime: finalEstimatedTime,
-        xpReward: Math.round(finalEstimatedTime * 10 * (levelBonus[level] || 1)),
+        estimatedTime: totalMinutes + (finalExam.length * 2),
+        xpReward: xpReward,
         modules: formattedModules,
         finalExam: finalExam,
         isPublished: true,
@@ -137,7 +126,7 @@ ESTRUTURA JSON EXIGIDA:
 
   } catch (error) {
     console.error("❌ Erro Crítico no aiService:", error);
-    throw new Error("O motor de IA não conseguiu estruturar este conhecimento no momento.");
+    throw new Error("Falha ao estruturar a experiência de aprendizado.");
   }
 };
 

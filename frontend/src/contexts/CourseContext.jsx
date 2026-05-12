@@ -8,6 +8,7 @@ const CourseContext = createContext();
 export const COURSES_PER_PAGE = 6;
 
 export const CourseProvider = ({ children }) => {
+  // Removido 'refreshUser' daqui para eliminar o warning de variável não utilizada
   const { setUser, signed } = useAuth(); 
   
   const [isGenerating, setIsGenerating] = useState(false);
@@ -17,7 +18,7 @@ export const CourseProvider = ({ children }) => {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   /**
-   * 1. BUSCA DADOS GLOBAIS (Estatísticas e Categorias)
+   * 1. BUSCA DADOS GLOBAIS
    */
   const fetchGlobalData = useCallback(async (force = false) => {
     if (initialDataLoaded && !force) return;
@@ -55,23 +56,21 @@ export const CourseProvider = ({ children }) => {
   }, [fetchGlobalData]);
 
   /**
-   * 2. GERADOR DE CURSOS (IA)
-   * Sincronizado com os novos serviços de Imagem e Duração Real.
+   * 2. GERADOR DE CURSOS (Sincronizado com LXD v3.0)
    */
   const generateCourse = useCallback(async (topic, level = 'iniciante') => {
     if (isGenerating) return { success: false, error: 'Uma geração já está em andamento.' };
 
     setIsGenerating(true);
-    setStatusMessage(`O Professor IA está analisando o tema: ${topic}...`);
+    setStatusMessage(`Analisando o tema: ${topic}...`);
 
     try {
-      // Mensagens que refletem o que realmente está acontecendo no backend corrigido
       const statusSteps = [
         "IA estruturando módulos e lições...",
-        "Redigindo conteúdo técnico detalhado...",
+        "Redigindo conteúdo técnico profundo...",
         "Calculando tempo estimado de leitura...",
         "Gerando questões para os quizzes...",
-        "Buscando arte de capa no Pixabay...",
+        "Buscando arte de capa contextual...",
         "Finalizando sua sala de aula..."
       ];
 
@@ -81,34 +80,38 @@ export const CourseProvider = ({ children }) => {
           setStatusMessage(statusSteps[step]);
           step++;
         }
-      }, 4000); // Aumentado para 4s para dar tempo da IA processar conteúdo denso
+      }, 4000); 
       
       const response = await api.post('/courses/generate', { topic, level });
       clearInterval(interval);
       
       const { slug, updatedCredits, updatedXp } = response.data;
 
-      // Sincronização imediata: Garante que o Header/Perfil reflita o gasto de créditos
+      // ATUALIZAÇÃO OTIMISTA: Atualiza o estado global sem esperar nova chamada de API
       if (updatedCredits !== undefined) {
         setUser(prev => ({ 
           ...prev, 
           credits: updatedCredits, 
-          xp: updatedXp || prev.xp 
+          xp: updatedXp ?? prev.xp,
+          stats: {
+            ...prev.stats,
+            totalXp: updatedXp ?? (prev.stats?.totalXp || 0),
+            coursesCreated: (prev.stats?.coursesCreated || 0) + 1
+          }
         }));
       }
 
       await fetchGlobalData(true);
       setStatusMessage('Curso pronto! Redirecionando...');
       
-      return { success: true, slug: slug };
+      return { success: true, slug };
 
     } catch (error) {
       console.error("❌ Erro na geração:", error);
-      const errorMsg = error.response?.data?.error || "A IA está processando muitos dados. Tente novamente em instantes.";
+      const errorMsg = error.response?.data?.error || "A IA está processando muitos dados. Tente novamente.";
       setStatusMessage(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
-      // Delay suave para o usuário ver a mensagem final de sucesso/erro
       setTimeout(() => {
         setIsGenerating(false);
         setStatusMessage('');
@@ -121,7 +124,6 @@ export const CourseProvider = ({ children }) => {
    */
   const getCourseProgress = useCallback(async (courseId) => {
     if (!courseId || !signed) return { progress: 0 };
-    
     try {
       const res = await api.get(`/courses/${courseId}/progress`);
       return res.data; 
@@ -139,9 +141,15 @@ export const CourseProvider = ({ children }) => {
     try {
       const res = await api.post(`/courses/${courseId}/quiz-result`, quizData);
       
-      // Atualização de XP em tempo real no contexto do usuário
-      if (res.data.success && res.data.updatedXp) {
-        setUser(prev => ({ ...prev, xp: res.data.updatedXp }));
+      if (res.data.success && res.data.updatedXp !== undefined) {
+        setUser(prev => ({ 
+          ...prev, 
+          xp: res.data.updatedXp,
+          stats: {
+            ...prev.stats,
+            totalXp: res.data.updatedXp
+          }
+        }));
       }
       
       return res.data;
@@ -151,7 +159,7 @@ export const CourseProvider = ({ children }) => {
   }, [signed, setUser]);
 
   /**
-   * 5. MEMOIZAÇÃO DOS VALORES
+   * 5. MEMOIZAÇÃO COMPLETA
    */
   const contextValue = useMemo(() => ({
     isGenerating, 

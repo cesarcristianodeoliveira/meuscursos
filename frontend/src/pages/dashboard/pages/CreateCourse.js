@@ -49,11 +49,12 @@ export default function CreateCourse() {
   const [error, setError] = React.useState('');
   const [success, setSuccess] = React.useState(false);
 
-  // Lógica de permissões baseada no Plano
+  // Lógica de permissões baseada na estrutura normalizada do AuthContext
   const isPro = user?.role === 'admin' || user?.plan === 'pro';
   
-  // Verifica se tem créditos ou se é elegível para geração (Admin ou primeira vez)
-  const canGenerate = (user?.credits > 0) || user?.role === 'admin' || !user?.lastGenerationAt;
+  // Melhoria na canGenerate: Verifica créditos ou permissão administrativa
+  const userCredits = user?.credits ?? 0;
+  const canGenerate = (userCredits > 0) || user?.role === 'admin';
 
   const handleGenerate = async (event) => {
     event.preventDefault();
@@ -70,11 +71,14 @@ export default function CreateCourse() {
       return;
     }
 
+    // Garante que usuários Free não tentem enviar níveis Pro via console/manipulação
     const selectedLevel = isPro ? level : 'iniciante';
+    
     const result = await generateCourse(topic, selectedLevel);
 
     if (result.success) {
       setSuccess(true);
+      // O slug agora vem do retorno do generateCourse que chamou a API
       setTimeout(() => {
         navigate(`/dashboard/curso/${result.slug}`);
       }, 2500);
@@ -114,6 +118,7 @@ export default function CreateCourse() {
                       disabled={isGenerating}
                       error={!!error}
                       helperText={error}
+                      autoFocus
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
@@ -159,7 +164,12 @@ export default function CreateCourse() {
                       ))}
                     </TextField>
                     {!isPro && (
-                      <Typography variant="caption" color="primary" sx={{ mt: 1.5, fontWeight: '600', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}>
+                      <Typography 
+                        variant="caption" 
+                        color="primary" 
+                        sx={{ mt: 1.5, fontWeight: '600', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}
+                        onClick={() => navigate('/dashboard/planos')}
+                      >
                         <RocketLaunchIcon sx={{ fontSize: 14 }} /> Liberar níveis avançados com Plano PRO.
                       </Typography>
                     )}
@@ -178,13 +188,16 @@ export default function CreateCourse() {
                         borderRadius: 3,
                         fontSize: '1rem',
                         boxShadow: '0 4px 14px 0 rgba(0,118,255,0.39)',
+                        '&:disabled': {
+                          bgcolor: 'action.disabledBackground'
+                        }
                       }}
                     >
                       {isGenerating 
-                        ? 'PROCESSANDO...' 
+                        ? 'IA ESTÁ PENSANDO...' 
                         : !canGenerate 
-                          ? 'SEM CRÉDITOS' 
-                          : 'CRIAR CURSO AGORA'}
+                          ? 'SEM CRÉDITOS DISPONÍVEIS' 
+                          : 'GERAR CURSO AGORA'}
                     </Button>
                   </Box>
                 </Stack>
@@ -200,21 +213,22 @@ export default function CreateCourse() {
               background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', 
               color: 'white', 
               borderRadius: 4,
+              boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
             }}>
               <CardContent sx={{ p: 3 }}>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
                   <MonetizationOnIcon sx={{ color: '#fbbf24' }} />
                   <Typography variant="subtitle1" fontWeight="700">
-                    Seu Saldo
+                    Seus Créditos de IA
                   </Typography>
                 </Stack>
                 <Typography variant="h3" fontWeight="900" sx={{ mb: 1 }}>
-                  {user?.role === 'admin' ? 'ILIMITADO' : `${user?.credits || 0}`}
+                  {user?.role === 'admin' ? '∞' : userCredits}
                 </Typography>
                 <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                  {user?.credits > 0 
-                    ? "Créditos prontos para uso." 
-                    : "Você usará sua cota gratuita de 1 hora."}
+                  {userCredits > 0 
+                    ? "Cada geração consome 1 crédito." 
+                    : "Você atingiu o limite de gerações."}
                 </Typography>
               </CardContent>
             </Card>
@@ -222,17 +236,17 @@ export default function CreateCourse() {
             <Card variant="outlined" sx={{ borderRadius: 4 }}>
               <CardContent sx={{ p: 3 }}>
                 <Typography variant="subtitle2" fontWeight="800" gutterBottom color="text.primary">
-                  REGRAS DE GERAÇÃO
+                  TECNOLOGIA LXD v3.0
                 </Typography>
                 <Stack spacing={1.5} sx={{ mt: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    • Conteúdo original gerado em tempo real.
+                  <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CheckCircleOutlineIcon sx={{ fontSize: 16, color: 'success.main' }} /> Conteúdo técnico estruturado
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    • Imagens buscadas automaticamente no Pixabay.
+                  <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CheckCircleOutlineIcon sx={{ fontSize: 16, color: 'success.main' }} /> Imagens de alta definição
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    • Quizzes e Exame Final com certificado.
+                  <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CheckCircleOutlineIcon sx={{ fontSize: 16, color: 'success.main' }} /> Quizzes de fixação dinâmicos
                   </Typography>
                 </Stack>
               </CardContent>
@@ -241,38 +255,39 @@ export default function CreateCourse() {
         </Grid>
       </Grid>
 
-      {/* OVERLAY DE CARREGAMENTO */}
+      {/* OVERLAY DE CARREGAMENTO MELHORADO */}
       {(isGenerating || success) && (
         <Box sx={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-          bgcolor: 'rgba(255, 255, 255, 0.95)', display: 'flex', flexDirection: 'column',
-          justifyContent: 'center', alignItems: 'center', zIndex: 9999, backdropFilter: 'blur(10px)'
+          bgcolor: 'rgba(255, 255, 255, 0.96)', display: 'flex', flexDirection: 'column',
+          justifyContent: 'center', alignItems: 'center', zIndex: 9999, backdropFilter: 'blur(8px)'
         }}>
           {success ? (
-             <Stack alignItems="center" spacing={2}>
-                <CheckCircleOutlineIcon sx={{ fontSize: 80, color: 'success.main' }} />
-                <Typography variant="h5" fontWeight="800" color="success.main">CURSO GERADO COM SUCESSO!</Typography>
-                <Typography variant="body1">Redirecionando para sua sala de aula...</Typography>
-             </Stack>
+              <Stack alignItems="center" spacing={2} sx={{ animation: `${pulse} 2s infinite` }}>
+                <CheckCircleOutlineIcon sx={{ fontSize: 100, color: 'success.main' }} />
+                <Typography variant="h4" fontWeight="900" color="success.main">CURSO CONCLUÍDO!</Typography>
+                <Typography variant="h6" color="text.secondary">Sua nova jornada começa agora...</Typography>
+              </Stack>
           ) : (
-            <>
-              <Box sx={{ position: 'relative', display: 'inline-flex', mb: 3 }}>
-                <CircularProgress size={80} thickness={4} sx={{ color: 'primary.main' }} />
+            <Stack alignItems="center" spacing={4} sx={{ maxWidth: '400px', textAlign: 'center', px: 3 }}>
+              <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                <CircularProgress size={100} thickness={3} sx={{ color: 'primary.main' }} />
                 <Box sx={{
                     top: 0, left: 0, bottom: 0, right: 0, position: 'absolute',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    animation: `${pulse} 1.5s infinite ease-in-out`
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }}>
-                  <AutoAwesomeIcon color="primary" />
+                  <AutoAwesomeIcon color="primary" sx={{ fontSize: 40, animation: `${pulse} 1.5s infinite` }} />
                 </Box>
               </Box>
-              <Typography variant="h5" sx={{ fontWeight: '800', color: 'primary.dark', textAlign: 'center', mb: 1 }}>
-                {statusMessage || "O Professor IA está redigindo seu material..."}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ opacity: 0.7 }}>
-                Isso pode levar até 30 segundos devido à complexidade do tema.
-              </Typography>
-            </>
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: '900', color: 'primary.dark', mb: 1 }}>
+                  {statusMessage || "Iniciando Motor de IA..."}
+                </Typography>
+                <Typography variant="body1" color="text.secondary">
+                  Nossos algoritmos LXD estão processando dados complexos para criar o melhor curso para você.
+                </Typography>
+              </Box>
+            </Stack>
           )}
         </Box>
       )}

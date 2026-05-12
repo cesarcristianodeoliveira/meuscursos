@@ -4,19 +4,17 @@ const jwt = require('jsonwebtoken');
 const { formatSlug } = require('../utils/formatter');
 
 /**
- * FUNÇÃO AUXILIAR: Verifica e reseta créditos baseada no tempo.
- * Regra: Se plano 'free' e 0 créditos, recupera 1 crédito após 1 hora.
+ * Verifica e recupera créditos (1 por hora para usuários Free)
  */
 const checkAndResetCredits = async (user) => {
-  if (user.credits > 0 || user.plan === 'pro') return user;
+  if (user.plan === 'pro' || (user.credits || 0) > 0) return user;
 
   const lastGen = new Date(user.stats?.lastGenerationAt || 0);
   const now = new Date();
   const diffInHours = (now - lastGen) / (1000 * 60 * 60);
 
   if (diffInHours >= 1) {
-    console.log(`♻️ Resetando crédito por tempo: ${user.email}`);
-    // Patch atômico para garantir consistência
+    // Atualização atômica direto no banco
     const updatedUser = await client
       .patch(user._id)
       .set({ credits: 1 })
@@ -27,120 +25,73 @@ const checkAndResetCredits = async (user) => {
 };
 
 /**
- * Gera um slug único para o usuário.
- */
-const generateUniqueSlug = async (name) => {
-  const baseSlug = formatSlug(name);
-  let uniqueSlug = baseSlug;
-  let counter = 1;
-  let exists = true;
-
-  while (exists) {
-    const user = await client.fetch(`*[_type == "user" && slug.current == $slug][0]`, { slug: uniqueSlug });
-    if (!user) {
-      exists = false;
-    } else {
-      counter++;
-      uniqueSlug = `${baseSlug}-${counter}`;
-    }
-  }
-  return uniqueSlug;
-};
-
-/**
- * REGISTRO DE USUÁRIO
+ * Registro de Usuário com inicialização de Stats
  */
 const register = async (req, res) => {
   const { name, email, password, newsletter } = req.body;
 
   try {
     if (!name || !email || !password) {
-      return res.status(400).json({ success: false, error: "Preencha todos os campos." });
+      return res.status(400).json({ error: "Preencha todos os campos obrigatórios." });
     }
 
     const userExists = await client.fetch(`*[_type == "user" && email == $email][0]`, { email });
-    if (userExists) {
-      return res.status(400).json({ success: false, error: "E-mail já cadastrado." });
-    }
+    if (userExists) return res.status(400).json({ error: "E-mail já cadastrado." });
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    const finalSlug = await generateUniqueSlug(name);
-
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const baseSlug = formatSlug(name);
+    
     const newUser = {
       _type: 'user',
       name,
       email,
       password: hashedPassword,
-      slug: { _type: 'slug', current: finalSlug },
-      authProvider: 'credentials',
-      role: 'user', 
+      slug: { _type: 'slug', current: `${baseSlug}-${Math.floor(1000 + Math.random() * 9000)}` },
+      role: 'user',
       plan: 'free',
-      credits: 1, 
-      newsletter: !!newsletter, 
+      credits: 1,
+      newsletter: !!newsletter,
       stats: {
-        totalXp: 0, // Nome corrigido para bater com AuthProvider e QuotaService
+        totalXp: 0,
         level: 1,
         coursesCreated: 0,
         coursesCompleted: 0,
         lastLogin: new Date().toISOString(),
-        lastGenerationAt: new Date(Date.now() - 3600000).toISOString() 
+        lastGenerationAt: new Date(Date.now() - 3600000).toISOString()
       }
     };
 
     const userCreated = await client.create(newUser);
 
-    if (newsletter) {
-      client.create({
-        _type: 'newsletter',
-        user: { _type: 'reference', _ref: userCreated._id },
-        email: userCreated.email,
-        subscribedAt: new Date().toISOString()
-      }).catch(err => console.error("Newsletter Error:", err.message));
-    }
-
     const token = jwt.sign(
-      { id: userCreated._id, role: userCreated.role, plan: userCreated.plan },
+      { id: userCreated._id, role: userCreated.role },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
       token,
-      user: {
-        _id: userCreated._id,
-        name: userCreated.name,
-        email: userCreated.email,
-        credits: userCreated.credits,
-        stats: userCreated.stats,
-        slug: userCreated.slug?.current,
-        plan: userCreated.plan
-      }
+      user: { _id: userCreated._id, name, email, credits: 1, stats: newUser.stats }
     });
-
   } catch (error) {
-    console.error("❌ Erro no Registro:", error);
-    return res.status(500).json({ success: false, error: "Erro ao criar conta." });
+    res.status(500).json({ error: "Erro ao criar conta." });
   }
 };
 
 /**
- * LOGIN DE USUÁRIO
+ * Login com renovação automática de sessão
  */
 const login = async (req, res) => {
   const { email, password } = req.body;
   try {
     let user = await client.fetch(`*[_type == "user" && email == $email][0]`, { email });
-    if (!user) return res.status(401).json({ success: false, error: "Credenciais inválidas." });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ error: "Credenciais inválidas." });
+    }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ success: false, error: "Credenciais inválidas." });
-
-    // Atualização de créditos e último login
     user = await checkAndResetCredits(user);
-    
-    // Garantir que stats exista antes de atualizar o lastLogin
+
     await client.patch(user._id)
       .setIfMissing({ stats: { totalXp: 0, level: 1 } })
       .set({ "stats.lastLogin": new Date().toISOString() })
@@ -152,7 +103,7 @@ const login = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    return res.status(200).json({
+    res.json({
       success: true,
       token,
       user: {
@@ -161,40 +112,33 @@ const login = async (req, res) => {
         email: user.email,
         credits: user.credits,
         stats: user.stats,
-        slug: user.slug?.current,
         plan: user.plan
       }
     });
   } catch (error) {
-    console.error("❌ Erro no Login:", error);
-    return res.status(500).json({ success: false, error: "Erro ao processar login." });
+    res.status(500).json({ error: "Erro no login." });
   }
 };
 
-/**
- * GET ME (Validação de Sessão)
- */
 const getMe = async (req, res) => {
   try {
     let user = await client.fetch(`*[_id == $id][0]`, { id: req.userId });
-    if (!user) return res.status(404).json({ success: false, error: "Usuário não encontrado." });
+    if (!user) return res.status(404).json({ error: "Sessão expirada." });
 
     user = await checkAndResetCredits(user);
 
-    return res.status(200).json({
+    res.json({
       success: true,
-      user: { 
+      user: {
         _id: user._id,
         name: user.name,
-        email: user.email,
         credits: user.credits,
-        stats: user.stats || { totalXp: 0, level: 1 }, // Fallback de segurança
-        slug: user.slug?.current,
+        stats: user.stats || { totalXp: 0, level: 1 },
         plan: user.plan
       }
     });
   } catch (error) {
-    return res.status(500).json({ success: false, error: "Erro na sessão." });
+    res.status(500).json({ error: "Erro na sessão." });
   }
 };
 

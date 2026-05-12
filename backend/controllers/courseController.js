@@ -34,21 +34,20 @@ const createCourse = async (req, res) => {
   if (!topic) return res.status(400).json({ error: "O tema é obrigatório." });
 
   try {
-    // Validação de Cotas
+    // 1. Validação de Cotas
     const userQuota = await quotaService.checkUserQuota(userId, level);
     if (!userQuota.canGenerate) return res.status(429).json({ error: userQuota.reason });
 
-    // Chamada à IA (Retorna aiData já estruturado com keys, tipos e metadados)
+    // 2. Geração AI (LXD Nativo)
     const { course: aiData } = await aiService.generateCourseContent(topic, 'llama-3.3-70b-versatile', { level });
     
-    // Chamada ao ImageService usando o prompt artístico gerado pela IA
+    // 3. Imagem Contextual
     const imageData = await imageService.fetchAndUploadImage({
         imageSearchPrompt: aiData.imageSearchPrompt,
-        categoryName: aiData.categoryName,
         title: aiData.title
     });
 
-    // Gestão de Categoria Orgânica
+    // 4. Categoria
     const categoryName = aiData.categoryName || 'Geral';
     const categorySlug = formatSlug(categoryName);
     let category = await client.fetch(`*[_type == "category" && slug.current == $slug][0]`, { slug: categorySlug });
@@ -61,30 +60,25 @@ const createCourse = async (req, res) => {
       });
     }
 
-    const finalSlug = `${formatSlug(aiData.title)}-${crypto.randomBytes(3).toString('hex')}`;
-
-    // Construção do Documento Sanity (Mesclando IA com referências do Sistema)
+    // 5. Persistência (Atomicidade: O crédito só é gasto se o curso for salvo)
     const newCourse = {
-      ...aiData, // Título, Descrição, Módulos (com keys), Exame e Metadados vêm daqui
-      slug: { _type: 'slug', current: finalSlug },
+      ...aiData,
+      slug: { _type: 'slug', current: `${formatSlug(aiData.title)}-${crypto.randomBytes(3).toString('hex')}` },
       author: { _type: 'reference', _ref: userId },
       category: { _type: 'reference', _ref: category._id },
-      // Thumbnail processada ou fallback
-      thumbnail: imageData?.assetId ? { 
-        _type: 'image', 
-        asset: { _type: 'reference', _ref: imageData.assetId } 
-      } : undefined,
-      externalImageId: imageData?.externalId, 
+      thumbnail: imageData?.assetId ? { _type: 'image', asset: { _type: 'reference', _ref: imageData.assetId } } : undefined,
     };
 
     const result = await client.create(newCourse);
+    
+    // SÓ CONSOME O CRÉDITO AGORA
     await quotaService.consumeCredit(userId);
 
     return res.status(201).json({ success: true, slug: result.slug.current });
 
   } catch (error) {
-    console.error("❌ Erro na criação do curso:", error);
-    return res.status(500).json({ error: "Ocorreu um erro ao gerar seu curso. Tente novamente." });
+    console.error("❌ Falha no fluxo de criação:", error);
+    return res.status(500).json({ error: "Não foi possível gerar seu curso agora. Tente em instantes." });
   }
 };
 
@@ -189,16 +183,14 @@ const saveQuizProgress = async (req, res) => {
     const userId = req.userId;
 
     try {
-        // Se for o exame final e o usuário passou (ex: > 70%), recompensamos com XP
         if (isFinalExam && (score / totalQuestions) >= 0.7) {
             const course = await client.fetch(`*[_id == $courseId][0]{xpReward}`, { courseId });
-            await quotaService.addXpReward(userId, course.xpReward || 500);
+            // Passamos o courseId para evitar ganho de XP duplicado
+            await quotaService.addXpReward(userId, courseId, course.xpReward);
         }
-
-        // Registra o histórico da tentativa do Quiz (Opcional: criar um schema para tentativas)
-        return res.status(200).json({ success: true, message: "Resultado do quiz registrado." });
+        return res.status(200).json({ success: true });
     } catch (error) {
-        return res.status(500).json({ error: "Erro ao salvar resultado do quiz." });
+        return res.status(500).json({ error: "Erro ao registrar quiz." });
     }
 };
 

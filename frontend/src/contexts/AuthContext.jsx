@@ -7,23 +7,21 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  /**
-   * Normaliza os dados do usuário vindos do Sanity/Backend.
-   * Mantém a compatibilidade entre 'xp' e 'stats.totalXp'.
-   */
   const handleUserResponse = useCallback((userData) => {
     if (!userData) return null;
     
+    // Normalização para garantir que o Front sempre tenha acesso fácil aos dados
     const normalizedUser = {
       ...userData,
       _id: userData._id || userData.id,
       credits: userData.credits ?? 0,
-      xp: userData.xp ?? userData.stats?.totalXp ?? 0, // Facilita acesso direto
+      xp: userData.stats?.totalXp ?? userData.xp ?? 0,
+      level: userData.stats?.level ?? userData.level ?? 1,
       stats: {
         totalXp: userData.stats?.totalXp ?? userData.xp ?? 0,
         level: userData.stats?.level ?? userData.level ?? 1,
-        coursesCreated: userData.stats?.coursesCreated ?? userData.coursesCreated ?? 0,
-        coursesCompleted: userData.stats?.coursesCompleted ?? userData.coursesCompleted ?? 0,
+        coursesCreated: userData.stats?.coursesCreated ?? 0,
+        coursesCompleted: userData.stats?.coursesCompleted ?? 0,
         lastLogin: userData.stats?.lastLogin || new Date().toISOString(),
       }
     };
@@ -32,9 +30,6 @@ export function AuthProvider({ children }) {
     return normalizedUser;
   }, []);
 
-  /**
-   * Gerencia a persistência do Token e cabeçalhos da API
-   */
   const setSession = useCallback((token) => {
     if (token) {
       localStorage.setItem('@IAcademy:token', token);
@@ -50,9 +45,6 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, [setSession]);
 
-  /**
-   * Busca os dados atualizados (XP, Nível, Créditos)
-   */
   const refreshUser = useCallback(async () => {
     try {
       const response = await api.get('/auth/me');
@@ -61,31 +53,21 @@ export function AuthProvider({ children }) {
       }
       return null;
     } catch (error) {
-      if (error.response?.status === 401) {
-        signOut();
-      }
+      if (error.response?.status === 401) signOut();
       return null;
     }
   }, [handleUserResponse, signOut]);
 
-  /**
-   * Inicialização: Carrega token e dados do usuário ao abrir o app
-   */
   useEffect(() => {
     async function loadStorageData() {
       try {
         const storageToken = localStorage.getItem('@IAcademy:token');
-        
         if (storageToken) {
           setSession(storageToken);
           const currentUser = await refreshUser();
-          
-          if (!currentUser) {
-            signOut();
-          }
+          if (!currentUser) signOut();
         }
       } catch (e) {
-        console.error("Erro ao carregar sessão:", e);
         signOut();
       } finally {
         setLoading(false);
@@ -97,46 +79,35 @@ export function AuthProvider({ children }) {
   const signIn = useCallback(async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
-      
       if (response.data.success) {
-        const { token, user: userData } = response.data;
-        setSession(token);
-        handleUserResponse(userData);
+        setSession(response.data.token);
+        handleUserResponse(response.data.user);
         return { success: true };
       }
-      return { success: false, error: response.data.error || "Credenciais incorretas." };
+      return { success: false, error: response.data.error };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.error || "Falha na conexão com o servidor." 
-      };
+      return { success: false, error: error.response?.data?.error || "Falha na conexão." };
     }
   }, [setSession, handleUserResponse]);
 
-  const signUp = useCallback(async ({ name, email, password, newsletter }) => {
+  const signUp = useCallback(async (data) => {
     try {
-      const response = await api.post('/auth/register', { name, email, password, newsletter });
-      
+      const response = await api.post('/auth/register', data);
       if (response.data.success) {
-        const { token, user: userData } = response.data;
-        setSession(token);
-        handleUserResponse(userData);
+        setSession(response.data.token);
+        handleUserResponse(response.data.user);
         return { success: true };
       }
-      return { success: false, error: response.data.error || "Erro ao criar conta." };
+      return { success: false, error: response.data.error };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.error || "Erro no registro. Tente novamente." 
-      };
+      return { success: false, error: error.response?.data?.error || "Erro no registro." };
     }
   }, [setSession, handleUserResponse]);
 
-  // Adicionado 'setUser' ao value para permitir atualizações manuais de outros contextos
   const authValue = useMemo(() => ({
     signed: !!user,
     user, 
-    setUser, // <--- ADICIONADO AQUI
+    setUser,
     authLoading: loading, 
     signIn, 
     signOut, 
@@ -151,10 +122,4 @@ export function AuthProvider({ children }) {
   );
 }
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);

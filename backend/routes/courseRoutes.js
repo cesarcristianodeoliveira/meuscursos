@@ -5,40 +5,36 @@ const authMiddleware = require('../middlewares/authMiddleware');
 
 /**
  * --- ROTAS PÚBLICAS ---
- * Acessíveis por visitantes e indexadores de busca.
  */
 
-// Lista todos os cursos para a vitrine (Home)
-// Adicionada para evitar erros de referência e alimentar a página principal
+// Vitrine principal (Home)
 router.get('/all', courseController.getAllCourses);
 
-// Busca detalhes do curso pelo slug para a página de vendas/detalhes
+// Página de detalhes (Antes da matrícula/login)
 router.get('/public/:slug', courseController.getCourseBySlug);
 
 /**
- * --- ROTAS PRIVADAS (Requerem Autenticação) ---
+ * --- ROTAS PRIVADAS ---
  */
 
-// Geração de novo curso via IA
+// Geração de curso com o Motor LXD v3.0.0
 router.post('/generate', authMiddleware, courseController.createCourse);
 
-// Lista os cursos que o próprio usuário criou/está vinculado
+// Dashboard do Aluno/Autor
 router.get('/my-courses', authMiddleware, courseController.getUserCourses);
 
-// Ambiente de estudo (Busca dados completos do curso para o aluno)
+// Ambiente de estudo (Conteúdo protegido)
 router.get('/study/:slug', authMiddleware, courseController.getCourseBySlug);
 
 /**
  * --- PROGRESSO E GAMIFICAÇÃO ---
  */
 
-// Busca o progresso (Aulas concluídas, notas e status)
+// Gerenciamento de progresso por ID de documento
 router.get('/:id/progress', authMiddleware, courseController.getProgress);
-
-// Salva progresso de leitura (Marcar/Desmarcar aula como concluída)
 router.post('/:id/progress', authMiddleware, courseController.saveProgress);
 
-// Registra resultado de Quiz e Exame Final (Gatilha ganho de XP e Certificado)
+// Registro de prova final e gatilho de XP
 router.post('/:id/quiz-result', authMiddleware, courseController.saveQuizProgress);
 
 module.exports = router;
